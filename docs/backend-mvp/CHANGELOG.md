@@ -1,5 +1,14 @@
 # BMO Backend MVP Documentation Package — Changelog
 
+## 2026-07-19 — P2 IMPLEMENTED (not VERIFIED)
+
+- Menambahkan FastAPI Audio Service bootstrap untuk `/health` dan `/stt/transcribe`.
+- Menambahkan environment validation, internal service-token authentication, WAV validation, STT response schema, no-speech normalization, dan model cache/bootstrap dry-run.
+- Menambahkan `FasterWhisperTranscriber` adapter untuk faster-whisper `small` multilingual CPU INT8 dengan language auto-detect, VAD, dan beam size 5.
+- Menambahkan P2 unit/integration tests dengan deterministic fake transcriber untuk English, Indonesian, mixed-language, dan no-speech cases.
+- P2 tidak diberi status `VERIFIED` karena real faster-whisper model inference belum dijalankan.
+- Tidak mengerjakan Kokoro, RVC, FFmpeg TTS pipeline, Hermes integration, VPS deployment, firmware/hardware, atau P3–P6.
+
 ## 2026-07-19 — Verification classification split + P2 authorized
 
 - Memisahkan verification menjadi `BACKEND VERIFIED`, `DEPLOYMENT VERIFIED`, dan `HARDWARE INTEGRATION VERIFIED`.

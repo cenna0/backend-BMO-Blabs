@@ -74,7 +74,7 @@ Fresh rerun: 2026-07-19
 ```text
 Command: cd backend && npm run fake-esp32
 Exit code: 0
-Result: requestId=4250dd4f-30de-4484-af22-4548250c8c1d,
+Result: requestId=a52a3493-ca00-4e6d-bfed-06684ebd2abd,
         authenticated=true, uploadStatus=202, thinkingSeen=true,
         audioReadySeen=true, audioContentType=audio/mpeg,
         audioBytes=4077, playbackDoneSent=true
