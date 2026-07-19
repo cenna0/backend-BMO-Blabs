@@ -25,4 +25,19 @@ describe("GET /health", () => {
     });
     expect(JSON.stringify(response.body)).not.toContain("test-device-secret");
   });
+
+  it("reports P4 pipeline dependencies as configured when hardware test mode is disabled", async () => {
+    runtime = await startTestRuntime(false);
+
+    const response = await request(runtime.baseUrl).get("/health").expect(200);
+
+    expect(response.body).toEqual({
+      status: "degraded",
+      backend: "ok",
+      hermes: "configured",
+      audio_service: "configured",
+      rvc: "delegated_to_audio_service",
+    });
+    expect(JSON.stringify(response.body)).not.toContain("test-device-secret");
+  });
 });

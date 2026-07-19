@@ -1,5 +1,7 @@
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import http from "node:http";
+import type { AddressInfo } from "node:net";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 
@@ -18,6 +20,16 @@ const secondRequestId = "6b6a1bc8-55b0-4e88-b62e-289ae089fd54";
 let runtime: TestRuntime;
 let inbox: WsInbox | undefined;
 
+interface PipelineFixtures {
+  audioBaseUrl: string;
+  hermesBaseUrl: string;
+  sttBytes: number[];
+  ttsRequests: unknown[];
+  hermesRequests: unknown[];
+  mp3Length: number;
+  close(): Promise<void>;
+}
+
 function voicePost(id = requestId, wav = makePcmWav()) {
   return request(runtime.baseUrl)
     .post("/api/v1/voice")
@@ -26,6 +38,101 @@ function voicePost(id = requestId, wav = makePcmWav()) {
     .set("X-Request-Id", id)
     .set("Content-Type", "audio/wav")
     .send(wav);
+}
+
+async function startPipelineFixtures(): Promise<PipelineFixtures> {
+  const mp3 = await readFile(fileURLToPath(new URL("./fixtures/test-response.mp3", import.meta.url)));
+  const sttBytes: number[] = [];
+  const ttsRequests: unknown[] = [];
+  const hermesRequests: unknown[] = [];
+
+  const audioServer = http.createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+      if (request.headers["x-internal-service-token"] !== "fixture-internal-token") {
+        response.writeHead(401).end("unauthorized");
+        return;
+      }
+      if (request.method === "POST" && path === "/stt/transcribe") {
+        const body = Buffer.concat(chunks);
+        sttBytes.push(body.length);
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            text: "halo bmo",
+            speech_detected: true,
+            language: "id",
+            language_probability: 0.91,
+            duration_seconds: 1.0,
+          }),
+        );
+        return;
+      }
+      if (request.method === "POST" && path === "/tts/synthesize") {
+        ttsRequests.push(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+        response.writeHead(200, {
+          "content-type": "audio/mpeg",
+          "x-rvc-applied": "false",
+          "x-tts-engine": "kokoro",
+        });
+        response.end(mp3);
+        return;
+      }
+      response.writeHead(404).end("not found");
+    });
+  });
+
+  const hermesServer = http.createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+      if (request.headers.authorization !== "Bearer fixture-hermes-key") {
+        response.writeHead(401).end("unauthorized");
+        return;
+      }
+      if (request.method === "POST" && path === "/v1/responses") {
+        hermesRequests.push(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            status: "completed",
+            output: [
+              { type: "function_call", name: "ignored_tool", arguments: "{}" },
+              {
+                type: "message",
+                content: [{ type: "output_text", text: "Hi! **BMO** is ready to help." }],
+              },
+            ],
+          }),
+        );
+        return;
+      }
+      response.writeHead(404).end("not found");
+    });
+  });
+
+  const [audioAddress, hermesAddress] = await Promise.all([
+    new Promise<AddressInfo>((resolve) => audioServer.listen(0, "127.0.0.1", () => resolve(audioServer.address() as AddressInfo))),
+    new Promise<AddressInfo>((resolve) => hermesServer.listen(0, "127.0.0.1", () => resolve(hermesServer.address() as AddressInfo))),
+  ]);
+
+  return {
+    audioBaseUrl: `http://127.0.0.1:${audioAddress.port}`,
+    hermesBaseUrl: `http://127.0.0.1:${hermesAddress.port}`,
+    sttBytes,
+    ttsRequests,
+    hermesRequests,
+    mp3Length: mp3.length,
+    async close() {
+      await Promise.all([
+        new Promise<void>((resolve, reject) => audioServer.close((error) => (error ? reject(error) : resolve()))),
+        new Promise<void>((resolve, reject) => hermesServer.close((error) => (error ? reject(error) : resolve()))),
+      ]);
+    },
+  };
 }
 
 beforeEach(async () => {
@@ -214,14 +321,56 @@ describe("hardware test mode flow", () => {
   });
 });
 
-describe("hardware test mode safety", () => {
-  it("does not accept voice work when hardware test mode is disabled", async () => {
+describe("full voice pipeline mode", () => {
+  it("runs local STT fixture â†’ Hermes fixture â†’ TTS fixture when hardware test mode is disabled", async () => {
+    const fixtures = await startPipelineFixtures();
     await stopTestRuntime(runtime);
-    runtime = await startTestRuntime(false);
-    inbox = await connectDevice(runtime);
+    runtime = await startTestRuntime(false, {
+      AUDIO_SERVICE_URL: fixtures.audioBaseUrl,
+      HERMES_API_URL: fixtures.hermesBaseUrl,
+      INTERNAL_SERVICE_TOKEN: "fixture-internal-token",
+      HERMES_API_KEY: "fixture-hermes-key",
+    });
 
-    const response = await voicePost().expect(500);
-    expect(response.body).toEqual({ error: "INTERNAL_ERROR" });
-    expect(runtime.backend.requestStore.get(requestId)).toBeUndefined();
+    try {
+      inbox = await connectDevice(runtime);
+      const thinking = inbox.next("display_status");
+      const audioReady = inbox.next("audio_ready");
+
+      const accepted = await voicePost().expect(202);
+      expect(accepted.body).toEqual({ request_id: requestId, status: "processing" });
+      await expect(thinking).resolves.toEqual({
+        event: "display_status",
+        request_id: requestId,
+        status: "thinking",
+      });
+      const event = await audioReady;
+      expect(event).toMatchObject({
+        event: "audio_ready",
+        request_id: requestId,
+        format: "mp3",
+      });
+      const download = await request(String(event.audio_url)).get("").expect(200);
+      expect(download.headers["content-type"]).toMatch(/^audio\/mpeg/);
+      expect(download.body.length).toBe(fixtures.mp3Length);
+
+      expect(fixtures.sttBytes[0]).toBeGreaterThan(44);
+      expect(fixtures.hermesRequests[0]).toMatchObject({
+        model: "hermes-agent",
+        input: "halo bmo",
+        conversation: "bmo-001",
+        store: true,
+        stream: false,
+        truncation: "auto",
+      });
+      expect(fixtures.hermesRequests[0]).toHaveProperty("instructions");
+      expect(fixtures.ttsRequests[0]).toEqual({
+        request_id: requestId,
+        text: "Hi! BMO is ready to help.",
+        use_rvc: true,
+      });
+    } finally {
+      await fixtures.close();
+    }
   });
 });

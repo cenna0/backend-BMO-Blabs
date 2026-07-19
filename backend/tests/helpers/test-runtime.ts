@@ -60,7 +60,10 @@ export interface TestRuntime {
   tempDir: string;
 }
 
-export async function startTestRuntime(hardwareTestMode = true): Promise<TestRuntime> {
+export async function startTestRuntime(
+  hardwareTestMode = true,
+  envOverrides: Record<string, string> = {},
+): Promise<TestRuntime> {
   const tempDir = await mkdtemp(join(tmpdir(), "bmo-p1-"));
   const fixture = fileURLToPath(new URL("../fixtures/test-response.mp3", import.meta.url));
   const config = parseEnv({
@@ -73,8 +76,13 @@ export async function startTestRuntime(hardwareTestMode = true): Promise<TestRun
     TEMP_AUDIO_DIR: tempDir,
     HARDWARE_TEST_MODE: String(hardwareTestMode),
     HARDWARE_TEST_MP3_PATH: fixture,
+    AUDIO_SERVICE_STT_TIMEOUT_MS: "1000",
+    AUDIO_SERVICE_TTS_TIMEOUT_MS: "1000",
+    HERMES_HARD_TIMEOUT_MS: "1000",
+    TOTAL_PIPELINE_TIMEOUT_MS: "3000",
     WS_AUTH_TIMEOUT_MS: "100",
     WS_HEARTBEAT_INTERVAL_MS: "1000",
+    ...envOverrides,
   });
   const backend = createBackendRuntime(config);
   const address = await backend.start(0);

@@ -46,6 +46,21 @@ export class TempAudioService {
     return record;
   }
 
+  async createFromBytes(bytes: Buffer): Promise<TempAudioRecord> {
+    const audioId = randomUUID();
+    const path = join(this.root, `${audioId}.mp3`);
+    await writeFile(path, bytes, { flag: "wx" });
+    const info = await stat(path);
+    const record = {
+      audioId,
+      path,
+      size: info.size,
+      expiresAt: Date.now() + this.ttlSeconds * 1_000,
+    };
+    this.#audio.set(audioId, record);
+    return record;
+  }
+
   get(audioId: string): TempAudioRecord | undefined {
     return this.#audio.get(audioId);
   }

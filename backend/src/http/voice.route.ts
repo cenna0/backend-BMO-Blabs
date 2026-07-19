@@ -7,6 +7,7 @@ import type { BackendConfig } from "../config/env.js";
 import { RequestStoreError, type RequestStore } from "../domain/request-store.js";
 import type { HardwareTestService } from "../services/hardware-test.service.js";
 import type { TempAudioService } from "../services/temp-audio.service.js";
+import type { VoicePipelineService } from "../services/voice-pipeline.service.js";
 import { deviceTokenMatches } from "../utils/device-auth.js";
 import { isUuidV4 } from "../utils/uuid.js";
 import { validateCanonicalWav } from "../utils/wav-validator.js";
@@ -24,6 +25,7 @@ export interface VoiceRouteDependencies {
   sockets: DeviceWebSocketServer;
   tempAudio: TempAudioService;
   hardwareTest: HardwareTestService;
+  pipeline?: VoicePipelineService;
   logger: Logger;
 }
 
@@ -35,7 +37,7 @@ function websocketRequired(response: Parameters<RequestHandler>[1]): void {
 }
 
 export function createVoiceRouter(dependencies: VoiceRouteDependencies): Router {
-  const { config, requestStore, sockets, tempAudio, hardwareTest, logger } = dependencies;
+  const { config, requestStore, sockets, tempAudio, hardwareTest, pipeline, logger } = dependencies;
   const router = Router();
 
   const preflight: RequestHandler = (request, response, next) => {
@@ -71,10 +73,6 @@ export function createVoiceRouter(dependencies: VoiceRouteDependencies): Router 
         response.status(413).json({ error: "AUDIO_TOO_LARGE", max_bytes: config.MAX_AUDIO_BYTES });
       });
       request.resume();
-      return;
-    }
-    if (!config.HARDWARE_TEST_MODE) {
-      response.status(500).json({ error: "INTERNAL_ERROR" });
       return;
     }
     if (!sockets.isAuthenticated(deviceId)) {
@@ -135,7 +133,17 @@ export function createVoiceRouter(dependencies: VoiceRouteDependencies): Router 
       });
       response.status(202).json({ request_id: context.requestId, status: "processing" });
       setImmediate(() => {
-        void hardwareTest.process(record);
+        if (config.HARDWARE_TEST_MODE) {
+          void hardwareTest.process(record);
+          return;
+        }
+        if (pipeline) {
+          void pipeline.process(record);
+          return;
+        }
+        logger.error({ request_id: record.requestId }, "voice pipeline unavailable");
+        requestStore.fail(record.requestId, "INTERNAL_ERROR");
+        sockets.sendRequestFailed(record.deviceId, record.requestId, "INTERNAL_ERROR");
       });
     } catch (error) {
       if (inputPath) await tempAudio.deleteInput(inputPath);

@@ -16,9 +16,9 @@ export function createHealthRouter(hardwareTestMode: boolean): Router {
     response.json({
       status: "degraded",
       backend: "ok",
-      hermes: "not_integrated",
-      audio_service: "not_integrated",
-      rvc: "not_integrated",
+      hermes: "configured",
+      audio_service: "configured",
+      rvc: "delegated_to_audio_service",
     });
   });
   return router;

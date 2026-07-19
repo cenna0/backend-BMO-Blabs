@@ -7,8 +7,8 @@
 
 ```text
 Documentation package: VERIFIED
-Active implementation phase: P3
-Implementation authorization: P3 ONLY
+Active implementation phase: P4
+Implementation authorization: P4 ONLY
 ```
 
 Coding agent tidak boleh mulai mengubah source code sampai user mengotorisasi satu phase secara eksplisit.
@@ -35,7 +35,7 @@ Coding agent tidak boleh mulai mengubah source code sampai user mengotorisasi sa
 | P1 | Core backend transport + hardware test mode: health, WS auth/state, raw WAV upload, dummy MP3, fake ESP32 basic | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P1-TEST-EVIDENCE.md`](P1-TEST-EVIDENCE.md); external hardware validation deferred |
 | P2 | Audio Service bootstrap + faster-whisper STT | 01, 03, 04, 05, 06 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P2-TEST-EVIDENCE.md`](P2-TEST-EVIDENCE.md); real faster-whisper inference passed locally; VPS benchmark remains P6 |
 | P3 | Kokoro + FFmpeg + RVC fallback | 01, 03, 04, 05, 06 | IMPLEMENTED — not VERIFIED | AUTHORIZED BY USER | [`P3-TEST-EVIDENCE.md`](P3-TEST-EVIDENCE.md); real RVC inference runtime unavailable |
-| P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | NOT_STARTED | NOT AUTHORIZED | — |
+| P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P4-TEST-EVIDENCE.md`](P4-TEST-EVIDENCE.md); real local Hermes pipeline passed; real Hermes VPS integration remains P6 |
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | NOT_STARTED | NOT AUTHORIZED | — |
 | P6 | VPS integration, benchmark, staging, final report | 01–06 | NOT_STARTED | NOT AUTHORIZED | — |
 
@@ -95,6 +95,20 @@ Scope:
 - decoder dan speaker playback;
 - playback_done/playback_failed;
 - reconnect dan duplicate-event handling.
+
+### P3-RVC-VERIFICATION
+
+Status: DEFERRED
+Dependency: compatible RVC runtime available in isolated Docker/VPS environment
+Scope:
+
+- install/pin compatible RVC inference runtime;
+- real Kokoro → RVC → FFmpeg inference;
+- validate BMO `.pth` dan `.index`;
+- record latency, output metadata, and listening samples;
+- rerun P3 regressions.
+
+P3 yang belum verified penuh tidak memblokir P4 karena Kokoro-only fallback sudah terbukti dan RVC bukan single point of failure.
 
 ## 7. Status transition checklist
 
@@ -189,3 +203,19 @@ Contract consistency: internal Audio Service `/tts/synthesize` only; public back
 PRD consistency: P3 TTS/RVC subset matches PRD voice pipeline requirement; Hermes/full orchestration remains deferred to P4
 Known limitations: VPS benchmark and physical ESP32 remain out of P3
 Blockers: real RVC inference runtime/CLI unavailable locally; P3 cannot become `VERIFIED — LOCAL FUNCTIONAL` until Kokoro + real RVC + FFmpeg succeeds end-to-end
+
+### P4 — Hermes adapter + full voice pipeline orchestration
+
+Status: VERIFIED — LOCAL FUNCTIONAL
+Authorized by: explicit user instruction in chat
+Started at: 2026-07-19
+Verified at: 2026-07-19
+Commit: `feat: implement P4 Hermes adapter and voice pipeline orchestration`
+Files changed: recorded in `P4-TEST-EVIDENCE.md`
+Requirements implemented: backend Audio Service client, Hermes `/v1/responses` runtime adapter, documented chat-completions fallback adapter, safe output parser, BMO runtime instructions, output sanitizer, provider-error detection, async STT→Hermes→TTS orchestration, MP3 temp storage, `audio_ready`, input WAV cleanup, canonical error mapping, per-conversation serialization, and full local fake-device verification
+Commands run: `npm test`, `npm run typecheck`, `npm run build`, `npm audit`, `npm run fake-esp32`, `npm run verify-p4-full-pipeline`, real local Hermes full-pipeline verification, `ffprobe`, audio-service `pytest`, `compileall`, `pip check`, and `python scripts/verify-backend-mvp-docs.py`
+Test result: latest 2026-07-19 rerun: backend 14 files / 70 tests passed; audio-service 47 tests passed; full local pipeline passed with Hermes fixture and real local Hermes; typecheck/build/audit/docs verifier/fake ESP32/ffprobe/compileall/pip check passed
+Contract consistency: public backend interface, WebSocket event set, hardware contract, PRD locked decisions unchanged
+PRD consistency: P4 local orchestration matches PRD voice pipeline using real local STT, real local Hermes, real Kokoro/FFmpeg fallback TTS, and fake ESP32 transport
+Known limitations: real RVC inference remains deferred to `P3-RVC-VERIFICATION`; real Hermes VPS integration and latency remain P6
+Blockers: none for LOCAL FUNCTIONAL verification

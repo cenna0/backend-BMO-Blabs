@@ -1,5 +1,17 @@
 # BMO Backend MVP Documentation Package — Changelog
 
+## 2026-07-19 — P4 VERIFIED — LOCAL FUNCTIONAL
+
+- Mengotorisasi hanya P4 dan menjaga P5–P6 tetap `NOT AUTHORIZED`.
+- Mempertahankan P3 sebagai `IMPLEMENTED — not VERIFIED` dan menambahkan milestone `P3-RVC-VERIFICATION` untuk real RVC inference terpisah.
+- Menambahkan backend Audio Service client, Hermes `/v1/responses` adapter, parser aman Responses-style, sanitizer output, provider-error detection, chat-completions fallback adapter terdokumentasi, dan serialization per conversation.
+- Mengaktifkan orchestration lokal setelah HTTP 202: raw WAV → STT → Hermes → TTS → temp MP3 → `audio_ready` → playback completion.
+- Membuktikan full pipeline lokal dengan Hermes-compatible fixture, real faster-whisper, real Kokoro, real FFmpeg, fake ESP32, dan MP3 ffprobe.
+- Membuktikan full pipeline lokal tambahan memakai Hermes Agent lokal v0.16.0 (`hermes-agent` via `/v1/responses`), tanpa mengubah global Hermes config atau `SOUL.md`.
+- P4 dinaikkan menjadi `VERIFIED — LOCAL FUNCTIONAL`; real Hermes VPS integration dan benchmark tetap scope P6.
+- Real RVC inference tetap deferred ke `P3-RVC-VERIFICATION`; Kokoro-only fallback tetap digunakan saat RVC runtime unavailable.
+- Tidak mengubah PRD, hardware contract, public endpoint, WebSocket event set, firmware, deployment, Spotify, WhatsApp, database, mobile app, atau P5–P6.
+
 ## 2026-07-19 — P3 IMPLEMENTED (not VERIFIED)
 
 - Mengotorisasi hanya P3 dan mengubah active phase menjadi `P3`; P4–P6 tetap `NOT AUTHORIZED`.

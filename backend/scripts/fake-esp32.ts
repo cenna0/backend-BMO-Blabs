@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 
@@ -14,6 +14,7 @@ export interface FakeEsp32Options {
   requestId: string;
   wav: Buffer;
   timeoutMs?: number;
+  outputMp3Path?: string;
 }
 
 export interface FakeEsp32Result {
@@ -24,6 +25,7 @@ export interface FakeEsp32Result {
   audioReadySeen: boolean;
   audioContentType: string;
   audioBytes: number;
+  audioPath: string | null;
   playbackDoneSent: boolean;
 }
 
@@ -164,6 +166,9 @@ export async function runFakeEsp32(options: FakeEsp32Options): Promise<FakeEsp32
     if (bytes.length === 0 || declaredLength !== bytes.length) {
       throw new Error("audio content length mismatch");
     }
+    if (options.outputMp3Path) {
+      await writeFile(options.outputMp3Path, bytes, { flag: "w" });
+    }
 
     await sendJson(socket, { event: "audio_playback_done", request_id: options.requestId });
     return {
@@ -174,6 +179,7 @@ export async function runFakeEsp32(options: FakeEsp32Options): Promise<FakeEsp32
       audioReadySeen: coordinator.audioReadySeen,
       audioContentType,
       audioBytes: bytes.length,
+      audioPath: options.outputMp3Path ?? null,
       playbackDoneSent: true,
     };
   } finally {
@@ -209,13 +215,20 @@ async function runCli(): Promise<void> {
   const wav = process.env.FAKE_ESP32_WAV_PATH
     ? await readFile(process.env.FAKE_ESP32_WAV_PATH)
     : makeSilenceWav();
-  const result = await runFakeEsp32({
+  const options: FakeEsp32Options = {
     baseUrl: process.env.BMO_BASE_URL ?? "http://127.0.0.1:3000",
     deviceId: process.env.DEVICE_ID ?? "bmo-001",
     deviceToken: process.env.DEVICE_TOKEN ?? "",
     requestId: process.env.FAKE_ESP32_REQUEST_ID ?? randomUUID(),
     wav,
-  });
+  };
+  if (process.env.FAKE_ESP32_TIMEOUT_MS) {
+    options.timeoutMs = Number(process.env.FAKE_ESP32_TIMEOUT_MS);
+  }
+  if (process.env.FAKE_ESP32_OUTPUT_MP3_PATH) {
+    options.outputMp3Path = process.env.FAKE_ESP32_OUTPUT_MP3_PATH;
+  }
+  const result = await runFakeEsp32(options);
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 

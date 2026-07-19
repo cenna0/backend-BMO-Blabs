@@ -22,6 +22,20 @@ describe("parseEnv", () => {
     expect(config.WS_MAX_MISSED_PONGS).toBe(2);
   });
 
+  it("uses canonical P4 local orchestration defaults", () => {
+    const config = parseEnv(minimal);
+
+    expect(config.AUDIO_SERVICE_URL).toBe("http://127.0.0.1:8001");
+    expect(config.HERMES_API_URL).toBe("http://127.0.0.1:8642");
+    expect(config.HERMES_MODEL).toBe("hermes-agent");
+    expect(config.HERMES_CONVERSATION).toBe("bmo-001");
+    expect(config.HERMES_SOFT_TIMEOUT_MS).toBe(30_000);
+    expect(config.HERMES_HARD_TIMEOUT_MS).toBe(180_000);
+    expect(config.TOTAL_PIPELINE_TIMEOUT_MS).toBe(300_000);
+    expect(config.AUDIO_SERVICE_STT_TIMEOUT_MS).toBe(90_000);
+    expect(config.AUDIO_SERVICE_TTS_TIMEOUT_MS).toBe(180_000);
+  });
+
   it("parses an explicit hardware test mode flag", () => {
     expect(parseEnv({ ...minimal, HARDWARE_TEST_MODE: "true" }).HARDWARE_TEST_MODE).toBe(true);
     expect(parseEnv({ ...minimal, HARDWARE_TEST_MODE: "false" }).HARDWARE_TEST_MODE).toBe(false);

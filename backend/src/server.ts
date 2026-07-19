@@ -9,8 +9,12 @@ import { RequestStore } from "./domain/request-store.js";
 import { createAudioRouter } from "./http/audio.route.js";
 import { createHealthRouter } from "./http/health.route.js";
 import { createVoiceErrorHandler, createVoiceRouter } from "./http/voice.route.js";
+import { AudioServiceClient } from "./services/audio-service.client.js";
+import { ConversationQueue } from "./services/conversation-queue.js";
+import { HermesResponsesClient } from "./services/hermes.client.js";
 import { HardwareTestService } from "./services/hardware-test.service.js";
 import { TempAudioService } from "./services/temp-audio.service.js";
+import { VoicePipelineService } from "./services/voice-pipeline.service.js";
 import { DeviceRegistry } from "./websocket/device-registry.js";
 import { DeviceWebSocketServer } from "./websocket/websocket.server.js";
 
@@ -65,9 +69,37 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     sockets,
     logger,
   );
+  const audioService = new AudioServiceClient({
+    baseUrl: config.AUDIO_SERVICE_URL,
+    internalToken: config.INTERNAL_SERVICE_TOKEN,
+    sttTimeoutMs: config.AUDIO_SERVICE_STT_TIMEOUT_MS,
+    ttsTimeoutMs: config.AUDIO_SERVICE_TTS_TIMEOUT_MS,
+  });
+  const hermes = new HermesResponsesClient({
+    baseUrl: config.HERMES_API_URL,
+    apiKey: config.HERMES_API_KEY,
+    model: config.HERMES_MODEL,
+    conversation: config.HERMES_CONVERSATION,
+    softTimeoutMs: config.HERMES_SOFT_TIMEOUT_MS,
+    hardTimeoutMs: config.HERMES_HARD_TIMEOUT_MS,
+    logger,
+  });
+  const conversationQueue = new ConversationQueue();
+  const pipeline = new VoicePipelineService({
+    publicBaseUrl: () => publicBaseUrl,
+    tempAudio,
+    requestStore,
+    sockets,
+    logger,
+    audioService,
+    hermes,
+    conversationQueue,
+    conversationKey: config.HERMES_CONVERSATION,
+    totalTimeoutMs: config.TOTAL_PIPELINE_TIMEOUT_MS,
+  });
 
   app.use(createHealthRouter(config.HARDWARE_TEST_MODE));
-  app.use(createVoiceRouter({ config, requestStore, sockets, tempAudio, hardwareTest, logger }));
+  app.use(createVoiceRouter({ config, requestStore, sockets, tempAudio, hardwareTest, pipeline, logger }));
   app.use(createAudioRouter(tempAudio));
   app.use(createVoiceErrorHandler(config.MAX_AUDIO_BYTES));
   app.use((_error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {

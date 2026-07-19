@@ -1,4 +1,11 @@
-export type RequestStatus = "accepted" | "audio_ready" | "completed" | "failed";
+export type RequestStatus =
+  | "accepted"
+  | "transcribing"
+  | "thinking"
+  | "generating_voice"
+  | "audio_ready"
+  | "completed"
+  | "failed";
 
 export interface NewRequest {
   requestId: string;
@@ -72,9 +79,23 @@ export class RequestStore {
     return requestId ? this.#requests.get(requestId) : undefined;
   }
 
+  setStatus(requestId: string, status: Exclude<RequestStatus, "completed" | "failed">): VoiceRequestRecord {
+    const record = this.#require(requestId);
+    if (record.status === "completed" || record.status === "failed") {
+      throw new RequestStoreError("INVALID_REQUEST_STATE");
+    }
+    record.status = status;
+    return record;
+  }
+
   markAudioReady(requestId: string, output: AudioOutput): VoiceRequestRecord {
     const record = this.#require(requestId);
-    if (record.status !== "accepted") {
+    if (
+      record.status !== "accepted" &&
+      record.status !== "transcribing" &&
+      record.status !== "thinking" &&
+      record.status !== "generating_voice"
+    ) {
       throw new RequestStoreError("INVALID_REQUEST_STATE");
     }
 
