@@ -94,7 +94,7 @@ describe("Hermes clients", () => {
     expect(fetcher).toHaveBeenCalledOnce();
   });
 
-  it("maps non-2xx, invalid JSON, provider error output, and timeout to HERMES_FAILED/PIPELINE_TIMEOUT", async () => {
+  it("maps non-2xx, invalid JSON, provider error output, and timeout to HERMES_FAILED", async () => {
     const non2xx = new HermesResponsesClient({
       baseUrl: "http://local",
       apiKey: "key",
@@ -145,7 +145,7 @@ describe("Hermes clients", () => {
           );
         }),
     });
-    await expect(timeout.generate("hi")).rejects.toMatchObject({ code: "PIPELINE_TIMEOUT" });
+    await expect(timeout.generate("hi")).rejects.toMatchObject({ code: "HERMES_FAILED" });
   });
 
   it("keeps chat-completions adapter documented but separate", async () => {

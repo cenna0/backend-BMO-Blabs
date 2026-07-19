@@ -101,6 +101,6 @@ describe("AudioServiceClient", () => {
           );
         }),
     });
-    await expect(timeout.transcribe(Buffer.from("wav"))).rejects.toMatchObject({ code: "PIPELINE_TIMEOUT" });
+    await expect(timeout.transcribe(Buffer.from("wav"))).rejects.toMatchObject({ code: "STT_FAILED" });
   });
 });

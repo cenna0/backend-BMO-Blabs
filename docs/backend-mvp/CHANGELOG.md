@@ -1,5 +1,15 @@
 # BMO Backend MVP Documentation Package — Changelog
 
+## 2026-07-19 — P5 VERIFIED — BACKEND
+
+- Mengotorisasi hanya P5, mengubah active phase menjadi `P5`, dan menjaga P6 tetap `NOT AUTHORIZED`.
+- Mempertahankan P1 sebagai `VERIFIED — BACKEND`, P2 sebagai `VERIFIED — LOCAL FUNCTIONAL`, P3 sebagai `IMPLEMENTED — not VERIFIED`, `P3-RVC-VERIFICATION` sebagai `DEFERRED`, dan P4 sebagai `VERIFIED — LOCAL FUNCTIONAL`.
+- Menambahkan idempotency berbasis request ID/body SHA-256, duplicate conflict handling, public duplicate status mapping, tombstone retention, bounded request GC, MP3 TTL expiry, `410 AUDIO_EXPIRED`, startup cleanup, playback done/failed idempotency, stage-specific timeout mapping, total-timeout cancellation, production secret guard, heartbeat instrumentation, fake ESP32 self-host mode, dan one-hour idle WebSocket soak script.
+- Menambahkan P5 targeted tests untuk idempotency, request store GC, TTL/temp cleanup, playback lifecycle, timeout/failure matrix, dan security; backend full suite kini 21 files / 99 tests passed, P5 targeted 7 files / 29 tests passed, audio-service 48 tests passed.
+- Menjalankan one-hour idle WebSocket soak 3,600,004 ms dengan ping/pong 59/59, memory RSS 89,092,096 → 56,586,240 bytes, tanpa disconnect/reconnect/crash/unhandled rejection.
+- Membuktikan post-soak full local pipeline dengan real faster-whisper, Hermes-compatible fixture, real Kokoro/FFmpeg, fake ESP32, dan MP3 ffprobe.
+- Tidak mengubah PRD, hardware contract, public endpoint, WebSocket event set, firmware, deployment VPS, Spotify, WhatsApp, database, mobile app, atau P6.
+
 ## 2026-07-19 — P4 VERIFIED — LOCAL FUNCTIONAL
 
 - Mengotorisasi hanya P4 dan menjaga P5–P6 tetap `NOT AUTHORIZED`.

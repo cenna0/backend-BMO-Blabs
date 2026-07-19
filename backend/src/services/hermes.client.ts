@@ -21,7 +21,7 @@ export class HermesClientError extends Error {
 }
 
 export interface HermesGenerateClient {
-  generate(input: string): Promise<string>;
+  generate(input: string, signal?: AbortSignal): Promise<string>;
 }
 
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
@@ -155,10 +155,10 @@ async function jsonOrThrow(response: Response): Promise<unknown> {
 function normalizeHermesError(error: unknown): HermesClientError {
   if (error instanceof HermesClientError) return error;
   if (error instanceof DOMException && error.name === "AbortError") {
-    return new HermesClientError("PIPELINE_TIMEOUT", "Hermes timed out");
+    return new HermesClientError("HERMES_FAILED", "Hermes timed out");
   }
   if (isObject(error) && error.name === "AbortError") {
-    return new HermesClientError("PIPELINE_TIMEOUT", "Hermes timed out");
+    return new HermesClientError("HERMES_FAILED", "Hermes timed out");
   }
   return new HermesClientError("HERMES_FAILED", "Hermes request failed");
 }
@@ -170,9 +170,11 @@ abstract class BaseHermesClient {
     this.fetcher = options.fetcher;
   }
 
-  protected async postJson(url: string, body: unknown): Promise<unknown> {
+  protected async postJson(url: string, body: unknown, parentSignal?: AbortSignal): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.options.hardTimeoutMs);
+    const abortFromParent = () => controller.abort();
+    parentSignal?.addEventListener("abort", abortFromParent, { once: true });
     const softTimer =
       this.options.softTimeoutMs && this.options.softTimeoutMs < this.options.hardTimeoutMs
         ? setTimeout(() => {
@@ -202,6 +204,7 @@ abstract class BaseHermesClient {
     } finally {
       clearTimeout(timer);
       if (softTimer) clearTimeout(softTimer);
+      parentSignal?.removeEventListener("abort", abortFromParent);
     }
   }
 
@@ -219,7 +222,7 @@ export class HermesResponsesClient extends BaseHermesClient implements HermesGen
     super({ ...options, fetcher: options.fetcher ?? fetch });
   }
 
-  async generate(input: string): Promise<string> {
+  async generate(input: string, signal?: AbortSignal): Promise<string> {
     const payload = await this.postJson(endpoint(this.options.baseUrl, "/v1/responses"), {
       model: this.options.model,
       instructions: BMO_RUNTIME_INSTRUCTIONS,
@@ -228,7 +231,7 @@ export class HermesResponsesClient extends BaseHermesClient implements HermesGen
       store: true,
       stream: false,
       truncation: "auto",
-    });
+    }, signal);
     return this.finalize(parseResponsesText(payload));
   }
 }
@@ -238,7 +241,7 @@ export class HermesChatCompletionsClient extends BaseHermesClient implements Her
     super({ ...options, fetcher: options.fetcher ?? fetch });
   }
 
-  async generate(input: string): Promise<string> {
+  async generate(input: string, signal?: AbortSignal): Promise<string> {
     const payload = await this.postJson(endpoint(this.options.baseUrl, "/v1/chat/completions"), {
       model: this.options.model,
       messages: [
@@ -247,7 +250,7 @@ export class HermesChatCompletionsClient extends BaseHermesClient implements Her
       ],
       conversation: this.options.conversation,
       stream: false,
-    });
+    }, signal);
     return this.finalize(parseChatCompletionsText(payload));
   }
 }

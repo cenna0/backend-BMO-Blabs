@@ -41,6 +41,11 @@ export class DeviceWebSocketServer {
   readonly #server: WebSocketServer;
   readonly #states = new WeakMap<WebSocket, SocketState>();
   readonly #heartbeat: NodeJS.Timeout;
+  readonly #heartbeatStats = {
+    pingCount: 0,
+    pongCount: 0,
+    terminatedCount: 0,
+  };
 
   constructor(private readonly options: DeviceWebSocketServerOptions) {
     this.#server = new WebSocketServer({
@@ -83,6 +88,10 @@ export class DeviceWebSocketServer {
     });
   }
 
+  getHeartbeatStats(): { pingCount: number; pongCount: number; terminatedCount: number } {
+    return { ...this.#heartbeatStats };
+  }
+
   async close(): Promise<void> {
     clearInterval(this.#heartbeat);
     for (const client of this.#server.clients) {
@@ -114,6 +123,7 @@ export class DeviceWebSocketServer {
     authTimer.unref();
 
     socket.on("pong", () => {
+      this.#heartbeatStats.pongCount += 1;
       state.awaitingPong = false;
       state.missedPongs = 0;
       if (state.deviceId) this.options.registry.touchPong(state.deviceId, socket);
@@ -256,11 +266,13 @@ export class DeviceWebSocketServer {
       if (state.awaitingPong) {
         state.missedPongs += 1;
         if (state.missedPongs >= this.options.maxMissedPongs) {
+          this.#heartbeatStats.terminatedCount += 1;
           socket.terminate();
           continue;
         }
       }
       state.awaitingPong = true;
+      this.#heartbeatStats.pingCount += 1;
       socket.ping();
     }
   }

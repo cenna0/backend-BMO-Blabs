@@ -18,6 +18,9 @@ const envSchema = z
     DEVICE_TOKEN: z.string().min(16),
     TEMP_AUDIO_DIR: z.string().min(1),
     TEMP_AUDIO_TTL_SECONDS: positiveInt(300),
+    TEMP_AUDIO_CLEANUP_INTERVAL_SECONDS: positiveInt(30),
+    REQUEST_TOMBSTONE_TTL_SECONDS: positiveInt(600),
+    MAX_REQUEST_STORE_ENTRIES: positiveInt(1_000),
     MAX_AUDIO_BYTES: positiveInt(3_145_728),
     MAX_AUDIO_DURATION_SECONDS: positiveInt(60),
     HARDWARE_TEST_MODE: booleanString,
@@ -45,6 +48,31 @@ const envSchema = z
         message: "HARDWARE_TEST_MODE cannot be enabled when NODE_ENV=production",
         path: ["HARDWARE_TEST_MODE"],
       });
+    }
+    if (value.NODE_ENV === "production") {
+      const unsafeSecrets: Array<[keyof typeof value, string]> = [
+        ["DEVICE_TOKEN", value.DEVICE_TOKEN],
+        ["INTERNAL_SERVICE_TOKEN", value.INTERNAL_SERVICE_TOKEN],
+        ["HERMES_API_KEY", value.HERMES_API_KEY],
+      ];
+      for (const [key, secret] of unsafeSecrets) {
+        if (
+          secret.length < 24 ||
+          secret.toLowerCase().includes("test") ||
+          secret.toLowerCase().includes("local") ||
+          secret === "local-internal-token" ||
+          secret === "local-hermes-key" ||
+          secret === "test-device-secret" ||
+          secret === "replace-me" ||
+          secret.startsWith("replace-with-")
+        ) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "unsafe production secret placeholder is not allowed",
+            path: [key],
+          });
+        }
+      }
     }
   });
 

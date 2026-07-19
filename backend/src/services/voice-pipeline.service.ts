@@ -70,15 +70,17 @@ export class VoicePipelineService {
   async process(record: VoiceRequestRecord): Promise<VoicePipelineResult> {
     let timer: NodeJS.Timeout | undefined;
     let timedOut = false;
+    const controller = new AbortController();
     const timeout = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
         timedOut = true;
+        controller.abort();
         reject(Object.assign(new Error("pipeline timeout"), { code: "PIPELINE_TIMEOUT" }));
       }, this.options.totalTimeoutMs);
     });
 
     try {
-      return await Promise.race([this.#run(record, () => timedOut), timeout]);
+      return await Promise.race([this.#run(record, () => timedOut, controller.signal), timeout]);
     } catch (error) {
       const code = mapPipelineError(error);
       return this.#fail(record, code, error);
@@ -88,13 +90,17 @@ export class VoicePipelineService {
     }
   }
 
-  async #run(record: VoiceRequestRecord, isTimedOut: () => boolean): Promise<VoicePipelineResult> {
+  async #run(
+    record: VoiceRequestRecord,
+    isTimedOut: () => boolean,
+    signal: AbortSignal,
+  ): Promise<VoicePipelineResult> {
     const totalStarted = performance.now();
     this.options.requestStore.setStatus(record.requestId, "transcribing");
     const wav = await readFile(record.inputPath);
     this.#throwIfTimedOut(isTimedOut);
     const sttStarted = performance.now();
-    const stt = await this.options.audioService.transcribe(wav);
+    const stt = await this.options.audioService.transcribe(wav, signal);
     const sttMs = Math.round(performance.now() - sttStarted);
     this.#throwIfTimedOut(isTimedOut);
     if (!this.#hasSpeech(stt)) {
@@ -105,14 +111,14 @@ export class VoicePipelineService {
     this.options.sockets.sendThinking(record.deviceId, record.requestId);
     const hermesStarted = performance.now();
     const responseText = await this.options.conversationQueue.run(this.options.conversationKey, () =>
-      this.options.hermes.generate(stt.text),
+      this.options.hermes.generate(stt.text, signal),
     );
     const hermesMs = Math.round(performance.now() - hermesStarted);
     this.#throwIfTimedOut(isTimedOut);
 
     this.options.requestStore.setStatus(record.requestId, "generating_voice");
     const ttsStarted = performance.now();
-    const tts = await this.options.audioService.synthesize(record.requestId, responseText, true);
+    const tts = await this.options.audioService.synthesize(record.requestId, responseText, true, signal);
     const ttsMs = Math.round(performance.now() - ttsStarted);
     this.#throwIfTimedOut(isTimedOut);
     const storeStarted = performance.now();

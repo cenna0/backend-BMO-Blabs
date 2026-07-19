@@ -7,8 +7,8 @@
 
 ```text
 Documentation package: VERIFIED
-Active implementation phase: P4
-Implementation authorization: P4 ONLY
+Active implementation phase: P5
+Implementation authorization: P5 ONLY
 ```
 
 Coding agent tidak boleh mulai mengubah source code sampai user mengotorisasi satu phase secara eksplisit.
@@ -36,7 +36,7 @@ Coding agent tidak boleh mulai mengubah source code sampai user mengotorisasi sa
 | P2 | Audio Service bootstrap + faster-whisper STT | 01, 03, 04, 05, 06 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P2-TEST-EVIDENCE.md`](P2-TEST-EVIDENCE.md); real faster-whisper inference passed locally; VPS benchmark remains P6 |
 | P3 | Kokoro + FFmpeg + RVC fallback | 01, 03, 04, 05, 06 | IMPLEMENTED — not VERIFIED | AUTHORIZED BY USER | [`P3-TEST-EVIDENCE.md`](P3-TEST-EVIDENCE.md); real RVC inference runtime unavailable |
 | P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P4-TEST-EVIDENCE.md`](P4-TEST-EVIDENCE.md); real local Hermes pipeline passed; real Hermes VPS integration remains P6 |
-| P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | NOT_STARTED | NOT AUTHORIZED | — |
+| P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P5-TEST-EVIDENCE.md`](P5-TEST-EVIDENCE.md) |
 | P6 | VPS integration, benchmark, staging, final report | 01–06 | NOT_STARTED | NOT AUTHORIZED | — |
 
 ## 4. Verification types
@@ -219,3 +219,19 @@ Contract consistency: public backend interface, WebSocket event set, hardware co
 PRD consistency: P4 local orchestration matches PRD voice pipeline using real local STT, real local Hermes, real Kokoro/FFmpeg fallback TTS, and fake ESP32 transport
 Known limitations: real RVC inference remains deferred to `P3-RVC-VERIFICATION`; real Hermes VPS integration and latency remain P6
 Blockers: none for LOCAL FUNCTIONAL verification
+
+### P5 — Reliability, security, lifecycle, reconnect/idempotency/TTL
+
+Status: VERIFIED — BACKEND
+Authorized by: explicit user instruction in chat
+Started at: 2026-07-19
+Verified at: 2026-07-19
+Commit: `feat: implement P5 reliability security and lifecycle`
+Files changed: recorded in `P5-TEST-EVIDENCE.md`
+Requirements implemented: request idempotency, duplicate conflict handling, public status mapping, tombstone retention and GC, WebSocket heartbeat/reconnect verification, playback done/failed idempotency, temp WAV/MP3 lifecycle, MP3 TTL expiry and `410 AUDIO_EXPIRED`, startup cleanup, total-timeout cancellation, timeout/failure mapping, security hardening, fake ESP32 soak instrumentation, and full regression evidence
+Commands run: `python scripts/verify-backend-mvp-docs.py`, backend `npm test`, `npm test -- p5`, `npm run typecheck`, `npm run build`, `npm audit`, `npm run fake-esp32`, `npm run soak-p5-idle-ws`, `npm run verify-p4-full-pipeline`, audio-service `.venv\Scripts\python.exe -m pytest`, `compileall`, `pip check`, and standalone `ffprobe`
+Test result: latest 2026-07-19 rerun: backend 21 files / 99 tests passed; backend P5 targeted 7 files / 29 tests passed; audio-service 48 tests passed; one-hour idle soak passed; post-soak full local pipeline passed; typecheck/build/audit/docs verifier/fake ESP32/compileall/pip check/ffprobe passed
+Contract consistency: public backend interface, WebSocket event set, hardware contract, and PRD locked decisions must remain unchanged
+PRD consistency: P5 reliability/security/lifecycle behavior matches PRD/backend MVP voice pipeline guardrails; P6 deployment/benchmark remains out of scope
+Known limitations: real RVC inference remains deferred to `P3-RVC-VERIFICATION`; real VPS deployment/resource benchmark remains P6; physical ESP32 remains `HW-INTEGRATION-01`
+Blockers: none for BACKEND verification

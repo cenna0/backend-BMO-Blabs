@@ -22,6 +22,14 @@ class FakeKokoro:
         return 0.11
 
 
+class FakeKokoroFailure:
+    ready = True
+
+    def synthesize_to_wav(self, text: str, output_path: Path) -> float:
+        output_path.write_bytes(b"partial wav")
+        raise RuntimeError("kokoro failed")
+
+
 class FakeRvcFailure:
     available = True
     error = "forced failure"
@@ -117,6 +125,23 @@ def test_synthesize_uses_rvc_when_available_and_cleans_temp_files(tmp_path):
 
 def test_synthesize_returns_tts_failed_when_ffmpeg_fails_and_cleans_temp_files(tmp_path):
     orchestrator = make_orchestrator(tmp_path, FakeRvcFailure(), FakeFfmpeg(fail=True))
+
+    with pytest.raises(TtsSynthesisError):
+        orchestrator.synthesize("Hi! BMO is ready to help.", use_rvc=True)
+
+    assert not list(tmp_path.glob("*"))
+
+
+def test_synthesize_returns_tts_failed_when_kokoro_fails_and_cleans_temp_files(tmp_path):
+    orchestrator = TtsOrchestrator(
+        settings=Settings(
+            internal_service_token="test-internal-token",
+            tts_temp_dir=tmp_path,
+        ),
+        kokoro=FakeKokoroFailure(),
+        ffmpeg=FakeFfmpeg(),
+        rvc=FakeRvcSuccess(),
+    )
 
     with pytest.raises(TtsSynthesisError):
         orchestrator.synthesize("Hi! BMO is ready to help.", use_rvc=True)
