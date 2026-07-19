@@ -7,8 +7,8 @@
 
 ```text
 Documentation package: VERIFIED
-Active implementation phase: P2
-Implementation authorization: P2 ONLY
+Active implementation phase: P3
+Implementation authorization: P3 ONLY
 ```
 
 Coding agent tidak boleh mulai mengubah source code sampai user mengotorisasi satu phase secara eksplisit.
@@ -34,7 +34,7 @@ Coding agent tidak boleh mulai mengubah source code sampai user mengotorisasi sa
 |---|---|---|---|---|---|
 | P1 | Core backend transport + hardware test mode: health, WS auth/state, raw WAV upload, dummy MP3, fake ESP32 basic | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P1-TEST-EVIDENCE.md`](P1-TEST-EVIDENCE.md); external hardware validation deferred |
 | P2 | Audio Service bootstrap + faster-whisper STT | 01, 03, 04, 05, 06 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P2-TEST-EVIDENCE.md`](P2-TEST-EVIDENCE.md); real faster-whisper inference passed locally; VPS benchmark remains P6 |
-| P3 | Kokoro + FFmpeg + RVC fallback | 01, 03, 04, 05, 06 | NOT_STARTED | NOT AUTHORIZED | — |
+| P3 | Kokoro + FFmpeg + RVC fallback | 01, 03, 04, 05, 06 | IMPLEMENTED — not VERIFIED | AUTHORIZED BY USER | [`P3-TEST-EVIDENCE.md`](P3-TEST-EVIDENCE.md); real RVC inference runtime unavailable |
 | P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | NOT_STARTED | NOT AUTHORIZED | — |
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | NOT_STARTED | NOT AUTHORIZED | — |
 | P6 | VPS integration, benchmark, staging, final report | 01–06 | NOT_STARTED | NOT AUTHORIZED | — |
@@ -173,3 +173,19 @@ Contract consistency: internal Audio Service API matches P2 subset of `04-AUDIO-
 PRD consistency: P2 STT subset matches PRD voice pipeline requirement for Audio Service/faster-whisper; later Hermes/TTS/RVC steps remain deferred  
 Known limitations: benchmark latency/resource pada VPS belum dilakukan dan tetap scope P6; P3–P6 remain not authorized
 Blockers: none for LOCAL FUNCTIONAL verification
+
+### P3 — Kokoro + FFmpeg + RVC fallback
+
+Status: IMPLEMENTED — not VERIFIED
+Authorized by: explicit user instruction in chat
+Started at: 2026-07-19
+Verified at: —
+Commit: `feat: implement P3 Kokoro FFmpeg and RVC fallback`
+Files changed: recorded in `P3-TEST-EVIDENCE.md`
+Requirements implemented: Kokoro English TTS adapter, text validation, full waveform merge to one WAV, FFmpeg MP3 conversion, MP3 output configuration, safe RVC model bootstrap/inspection/extraction, configurable RVC CLI adapter, Kokoro-only fallback when RVC unavailable/fails, internal `/tts/synthesize`, result headers, P3 health state, cleanup via `finally`, unit/integration tests
+Commands run: `bootstrap_rvc.py --allow-download`, `verify_voice_pipeline.py`, offline cache rerun with `HF_HUB_OFFLINE=1`, `ffprobe`, `pytest`, `compileall`, `pip check`, `python scripts/verify-backend-mvp-docs.py`, plus P1 regression `npm test`, `npm run typecheck`, `npm run build`, `npm audit`, and `npm run fake-esp32`
+Test result: latest 2026-07-19 final rerun: backend 10 files / 50 tests passed; audio-service 47 tests passed; Kokoro-only real MP3 and forced RVC fallback passed; RVC archive size/hash verified; real RVC inference not run because RVC inference command/runtime unavailable
+Contract consistency: internal Audio Service `/tts/synthesize` only; public backend interface must remain unchanged
+PRD consistency: P3 TTS/RVC subset matches PRD voice pipeline requirement; Hermes/full orchestration remains deferred to P4
+Known limitations: VPS benchmark and physical ESP32 remain out of P3
+Blockers: real RVC inference runtime/CLI unavailable locally; P3 cannot become `VERIFIED — LOCAL FUNCTIONAL` until Kokoro + real RVC + FFmpeg succeeds end-to-end

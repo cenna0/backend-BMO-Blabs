@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.main import create_app
 from app.stt import TranscriptionResult
+from app.tts import TtsEngineState
 
 
 class ReadyTranscriber:
@@ -33,24 +34,35 @@ class LoadingTranscriber:
         raise RuntimeError("model loading")
 
 
-def make_client(transcriber):
+class ReadySynthesizer:
+    def health_state(self):
+        return TtsEngineState(
+            kokoro_loaded=True,
+            ffmpeg_available=True,
+            rvc_available=True,
+            rvc_error=None,
+        )
+
+
+def make_client(transcriber, synthesizer=None):
     app = create_app(
         settings=Settings(internal_service_token="test-internal-token"),
         transcriber=transcriber,
+        synthesizer=synthesizer or ReadySynthesizer(),
     )
     return TestClient(app)
 
 
-def test_health_reports_stt_ready_without_claiming_p3_components():
+def test_health_reports_ready_p2_and_p3_components():
     response = make_client(ReadyTranscriber()).get("/health")
 
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
         "stt_loaded": True,
-        "kokoro_loaded": False,
-        "rvc_available": False,
-        "ffmpeg_available": False,
+        "kokoro_loaded": True,
+        "rvc_available": True,
+        "ffmpeg_available": True,
     }
 
 

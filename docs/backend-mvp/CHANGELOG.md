@@ -1,5 +1,15 @@
 # BMO Backend MVP Documentation Package — Changelog
 
+## 2026-07-19 — P3 IMPLEMENTED (not VERIFIED)
+
+- Mengotorisasi hanya P3 dan mengubah active phase menjadi `P3`; P4–P6 tetap `NOT AUTHORIZED`.
+- Menambahkan Kokoro English TTS `af_heart`, validasi teks, merge seluruh waveform segment ke satu WAV, FFmpeg MP3 mono 24 kHz 96 kbps, dan internal `POST /tts/synthesize`.
+- Menambahkan header hasil `Content-Type: audio/mpeg`, `X-RVC-Applied`, dan `X-TTS-Engine`.
+- Menambahkan safe RVC bootstrap untuk model `Freaky98/CGO-adventure-time-BMO-rvc-v2-420e` revision `82a8bc529bd41b930589188ead30f073d4f99fc0`, termasuk verifikasi size/SHA-256 sebelum extract dan extract hanya `.pth`/`.index`.
+- Menambahkan fallback Kokoro-only ketika RVC unavailable/gagal, plus cleanup intermediate files melalui `finally`.
+- Real Kokoro + real FFmpeg + forced RVC fallback terbukti lokal; real RVC inference belum terbukti karena runtime/CLI `rvc infer` belum tersedia.
+- P3 tetap `IMPLEMENTED — not VERIFIED`; tidak mengerjakan Express backend integration, Hermes integration, deployment VPS, firmware/hardware, public backend interface change, atau P4–P6.
+
 ## 2026-07-19 — P2 VERIFIED — LOCAL FUNCTIONAL
 
 - Membuktikan real faster-whisper inference memakai `small` multilingual, CPU, `int8`, language auto-detect, task `transcribe`, VAD enabled, dan beam size 5.

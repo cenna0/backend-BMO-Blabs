@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from uuid import UUID
 
 
 class HealthResponse(BaseModel):
@@ -15,3 +16,9 @@ class TranscribeResponse(BaseModel):
     language: str | None
     language_probability: float
     duration_seconds: float
+
+
+class TtsRequest(BaseModel):
+    request_id: UUID
+    text: str
+    use_rvc: bool = True
