@@ -33,7 +33,7 @@ Coding agent tidak boleh mulai mengubah source code sampai user mengotorisasi sa
 | Phase | Scope | Required docs | Status | Authorization | Evidence |
 |---|---|---|---|---|---|
 | P1 | Core backend transport + hardware test mode: health, WS auth/state, raw WAV upload, dummy MP3, fake ESP32 basic | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P1-TEST-EVIDENCE.md`](P1-TEST-EVIDENCE.md); external hardware validation deferred |
-| P2 | Audio Service bootstrap + faster-whisper STT | 01, 03, 04, 05, 06 | IMPLEMENTED | AUTHORIZED BY USER | [`P2-TEST-EVIDENCE.md`](P2-TEST-EVIDENCE.md); real faster-whisper inference still open |
+| P2 | Audio Service bootstrap + faster-whisper STT | 01, 03, 04, 05, 06 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P2-TEST-EVIDENCE.md`](P2-TEST-EVIDENCE.md); real faster-whisper inference passed locally; VPS benchmark remains P6 |
 | P3 | Kokoro + FFmpeg + RVC fallback | 01, 03, 04, 05, 06 | NOT_STARTED | NOT AUTHORIZED | — |
 | P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | NOT_STARTED | NOT AUTHORIZED | — |
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | NOT_STARTED | NOT AUTHORIZED | — |
@@ -60,6 +60,12 @@ HARDWARE INTEGRATION VERIFIED
 Integrasi hardware terbukti bersama tim hardware memakai physical ESP32 setelah endpoint staging tersedia.
 
 Physical ESP32 test dan progressive hardware playback tetap requirement final, tetapi bukan blocker untuk melanjutkan development backend P2–P6. Perubahan ini hanya memperbaiki klasifikasi verification; tidak mengurangi requirement hardware final.
+
+```text
+VERIFIED — LOCAL FUNCTIONAL
+```
+
+Phase audio/backend terbukti secara lokal dengan dependency nyata, unit/integration test, typecheck/compile, build, dependency check, documentation verifier, contract consistency, dan scope audit. Benchmark latency/resource pada VPS tetap scope P6, bukan blocker untuk local functional verification.
 
 ## 5. Phase ownership and dependency
 
@@ -154,16 +160,16 @@ Blockers: none for BACKEND verification
 
 ### P2 — Audio Service bootstrap + faster-whisper STT
 
-Status: IMPLEMENTED — not VERIFIED  
+Status: VERIFIED — LOCAL FUNCTIONAL
 Authorized by: explicit user instruction in chat  
 Started at: 2026-07-19  
-Verified at: —  
+Verified at: 2026-07-19
 Commit: `feat: implement P2 audio service and faster-whisper STT`  
 Files changed: recorded in `P2-TEST-EVIDENCE.md`  
-Requirements implemented: FastAPI bootstrap, env validation, internal token auth, health state, raw WAV STT endpoint, WAV validation, faster-whisper adapter boundary, language/no-speech normalization, model cache/bootstrap dry-run, unit/integration tests  
-Commands run: `pytest`, `compileall`, `pip check`, `bootstrap_whisper.py --dry-run`, `python scripts/verify-backend-mvp-docs.py`, plus P1 regression `npm test`, `npm run typecheck`, `npm run build`, `npm audit`, `npm run fake-esp32`, and `ffprobe`  
-Test result: latest 2026-07-19 final rerun: P1 10 files / 50 tests passed; P2 22 tests passed; typecheck/build/audit/docs verifier/fake ESP32/ffprobe/compileall/pip check/bootstrap dry-run passed  
+Requirements implemented: FastAPI bootstrap, env validation, internal token auth, health state, raw WAV STT endpoint, WAV validation, faster-whisper adapter boundary, real faster-whisper `small` multilingual CPU INT8 inference, auto language detection, language/no-speech normalization, model cache/bootstrap, unit/integration tests
+Commands run: `verify_real_inference.py`, `bootstrap_whisper.py --allow-download`, offline cache rerun with `HF_HUB_OFFLINE=1`, `pytest`, `compileall`, `pip check`, `python scripts/verify-backend-mvp-docs.py`, plus P1 regression `npm test`, `npm run typecheck`, `npm run build`, `npm audit`, and `npm run fake-esp32`
+Test result: latest 2026-07-19 final rerun: real faster-whisper inference passed English, Indonesian, mixed Indonesian-English, silence, and noise fixtures; P1 10 files / 50 tests passed; P2 22 tests passed; typecheck/build/audit/docs verifier/fake ESP32/compileall/pip check passed
 Contract consistency: internal Audio Service API matches P2 subset of `04-AUDIO-SERVICE.md` §14.1–§14.2; public hardware contract unchanged  
 PRD consistency: P2 STT subset matches PRD voice pipeline requirement for Audio Service/faster-whisper; later Hermes/TTS/RVC steps remain deferred  
-Known limitations: P3–P6 remain not authorized  
-Blockers: real faster-whisper inference evidence required before P2 can be marked VERIFIED
+Known limitations: benchmark latency/resource pada VPS belum dilakukan dan tetap scope P6; P3–P6 remain not authorized
+Blockers: none for LOCAL FUNCTIONAL verification

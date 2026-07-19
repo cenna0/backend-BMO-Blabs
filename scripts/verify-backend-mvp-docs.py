@@ -155,6 +155,7 @@ valid_statuses = {
     "IMPLEMENTED",
     "VERIFIED",
     "VERIFIED — BACKEND",
+    "VERIFIED — LOCAL FUNCTIONAL",
     "VERIFIED — DEPLOYMENT",
     "HARDWARE INTEGRATION VERIFIED",
 }
@@ -183,12 +184,12 @@ if active_match and authorization_match and len(phase_rows) == 6:
             if phase_number < authorized_number:
                 if authorization != "AUTHORIZED BY USER":
                     errors.append(f"completed prior phase {phase} must retain authorization evidence")
-                if phase_status not in {"IMPLEMENTED", "VERIFIED", "VERIFIED — BACKEND", "VERIFIED — DEPLOYMENT", "HARDWARE INTEGRATION VERIFIED"}:
+                if phase_status not in {"IMPLEMENTED", "VERIFIED", "VERIFIED — BACKEND", "VERIFIED — LOCAL FUNCTIONAL", "VERIFIED — DEPLOYMENT", "HARDWARE INTEGRATION VERIFIED"}:
                     errors.append(f"completed prior phase {phase} status {phase_status} is invalid")
             elif phase == authorized_phase:
                 if authorization != "AUTHORIZED BY USER":
                     errors.append(f"{phase} lacks explicit user authorization evidence")
-                if phase_status not in {"AUTHORIZED", "IN_PROGRESS", "BLOCKED", "IMPLEMENTED", "VERIFIED", "VERIFIED — BACKEND"}:
+                if phase_status not in {"AUTHORIZED", "IN_PROGRESS", "BLOCKED", "IMPLEMENTED", "VERIFIED", "VERIFIED — BACKEND", "VERIFIED — LOCAL FUNCTIONAL"}:
                     errors.append(f"{phase} status {phase_status} is invalid after authorization")
             else:
                 if phase_status != "NOT_STARTED":

@@ -1,5 +1,15 @@
 # BMO Backend MVP Documentation Package — Changelog
 
+## 2026-07-19 — P2 VERIFIED — LOCAL FUNCTIONAL
+
+- Membuktikan real faster-whisper inference memakai `small` multilingual, CPU, `int8`, language auto-detect, task `transcribe`, VAD enabled, dan beam size 5.
+- Menggunakan model `Systran/faster-whisper-small` revision `536b0662742c02347bc0e980a01041f333bce120`; `small.en` tidak digunakan.
+- Menambahkan evidence fixtures English, Indonesian, mixed Indonesian-English, silence, dan noise melalui endpoint `/stt/transcribe` dengan real `FasterWhisperTranscriber`.
+- Membuktikan run kedua memakai cache lokal `audio-service/models/` tanpa download ulang; model/cache/audio/result artifacts tetap ignored dan tidak masuk Git.
+- Menambahkan verification-only real inference runner dan model manifest metadata.
+- P2 dinaikkan menjadi `VERIFIED — LOCAL FUNCTIONAL`; benchmark latency/resource pada VPS belum dilakukan dan tetap scope P6.
+- Tidak mengotorisasi atau mengerjakan Kokoro, RVC, Hermes integration, deployment VPS, firmware/hardware, public backend interface change, atau P3–P6.
+
 ## 2026-07-19 — P2 IMPLEMENTED (not VERIFIED)
 
 - Menambahkan FastAPI Audio Service bootstrap untuk `/health` dan `/stt/transcribe`.
