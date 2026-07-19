@@ -1,5 +1,14 @@
 # BMO Backend MVP Documentation Package — Changelog
 
+## 2026-07-19 — Verification classification split + P2 authorized
+
+- Memisahkan verification menjadi `BACKEND VERIFIED`, `DEPLOYMENT VERIFIED`, dan `HARDWARE INTEGRATION VERIFIED`.
+- Mengubah P1 menjadi `VERIFIED — BACKEND` berdasarkan bukti lokal: 50/50 tests, fake ESP32, typecheck, build, dependency audit, documentation verifier, contract consistency, PRD consistency, dan scope audit.
+- Memindahkan physical ESP32/progressive playback ke milestone external `HW-INTEGRATION-01` dengan dependency P6 staging endpoint tersedia.
+- Memindahkan idle WebSocket soak satu jam ke P5 reliability verification.
+- Mengotorisasi hanya P2: Audio Service bootstrap + faster-whisper STT.
+- Tidak mengubah public endpoint, WebSocket event, hardware contract, PRD locked decisions, atau scope P3–P6.
+
 ## 2026-07-19 — P1 IMPLEMENTED (not VERIFIED)
 
 - Menambahkan Express.js + TypeScript core backend untuk health, WebSocket auth/state/heartbeat, raw WAV upload validation, in-memory request state, dan dummy MP3 hardware test mode.

@@ -147,7 +147,16 @@ for line in status.splitlines():
     phase_rows[phase] = (phase_status, authorization)
 
 valid_statuses = {
-    "NOT_STARTED", "READY", "AUTHORIZED", "IN_PROGRESS", "BLOCKED", "IMPLEMENTED", "VERIFIED"
+    "NOT_STARTED",
+    "READY",
+    "AUTHORIZED",
+    "IN_PROGRESS",
+    "BLOCKED",
+    "IMPLEMENTED",
+    "VERIFIED",
+    "VERIFIED — BACKEND",
+    "VERIFIED — DEPLOYMENT",
+    "HARDWARE INTEGRATION VERIFIED",
 }
 if set(phase_rows) != {f"P{number}" for number in range(1, 7)}:
     errors.append("implementation phase table must contain P1-P6 exactly once")
@@ -166,16 +175,26 @@ if active_match and authorization_match and len(phase_rows) == 6:
                 errors.append(f"{phase} authorization must be NOT AUTHORIZED")
     else:
         authorized_phase = authorization_state.split()[0]
-        if active_phase not in {"NONE", authorized_phase}:
+        authorized_number = int(authorized_phase[1])
+        if active_phase != authorized_phase:
             errors.append(f"active phase {active_phase} differs from authorized phase {authorized_phase}")
         for phase, (phase_status, authorization) in phase_rows.items():
-            if phase == authorized_phase:
+            phase_number = int(phase[1])
+            if phase_number < authorized_number:
+                if authorization != "AUTHORIZED BY USER":
+                    errors.append(f"completed prior phase {phase} must retain authorization evidence")
+                if phase_status not in {"IMPLEMENTED", "VERIFIED", "VERIFIED — BACKEND", "VERIFIED — DEPLOYMENT", "HARDWARE INTEGRATION VERIFIED"}:
+                    errors.append(f"completed prior phase {phase} status {phase_status} is invalid")
+            elif phase == authorized_phase:
                 if authorization != "AUTHORIZED BY USER":
                     errors.append(f"{phase} lacks explicit user authorization evidence")
-                if phase_status not in {"AUTHORIZED", "IN_PROGRESS", "BLOCKED", "IMPLEMENTED", "VERIFIED"}:
+                if phase_status not in {"AUTHORIZED", "IN_PROGRESS", "BLOCKED", "IMPLEMENTED", "VERIFIED", "VERIFIED — BACKEND"}:
                     errors.append(f"{phase} status {phase_status} is invalid after authorization")
-            elif authorization != "NOT AUTHORIZED":
-                errors.append(f"unauthorized phase {phase} has authorization {authorization}")
+            else:
+                if phase_status != "NOT_STARTED":
+                    errors.append(f"future phase {phase} must remain NOT_STARTED")
+                if authorization != "NOT AUTHORIZED":
+                    errors.append(f"future phase {phase} must remain NOT AUTHORIZED")
 
 # Stable filenames: status belongs in tracker, not filename suffixes.
 for path in bm.glob("*.md"):
@@ -197,4 +216,4 @@ if errors:
     sys.exit(1)
 
 print("PASS")
-print("Verified 11 package files, exact source hashes, semantic migration §1–§33, canonical decisions, internal path, and authorization gate.")
+print("Verified 11 package files, exact source hashes, semantic migration §1–§33, canonical decisions, internal path, verification taxonomy, and authorization gate.")

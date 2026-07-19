@@ -14,6 +14,16 @@ File ini menentukan minimum automated test, fake ESP32 behavior, fixtures, accep
 
 Acceptance criteria yang belum relevan untuk phase aktif tetap dipertahankan tetapi baru wajib diselesaikan pada phase pemiliknya. Test yang relevan dengan phase aktif tidak boleh ditunda ke phase lain tanpa alasan tertulis.
 
+## Jenis verifikasi
+
+`BACKEND VERIFIED` berarti phase backend terbukti melalui unit test, integration test, fake ESP32, typecheck, build, dependency audit, documentation verifier, contract consistency, PRD consistency, dan scope audit lokal.
+
+`DEPLOYMENT VERIFIED` berarti service sudah berjalan di VPS dan endpoint staging tersedia.
+
+`HARDWARE INTEGRATION VERIFIED` berarti tim backend dan tim hardware sudah membuktikan flow memakai physical ESP32 setelah endpoint staging tersedia.
+
+Physical ESP32 test dan progressive hardware playback tetap requirement final, tetapi bukan blocker untuk melanjutkan development backend P2–P6. Perubahan ini hanya memperbaiki klasifikasi verification, bukan mengurangi requirement hardware final.
+
 ## Ownership verifikasi per implementation phase
 
 | Phase | Fokus test yang dimiliki | Tidak boleh dikerjakan lebih awal |
@@ -26,6 +36,8 @@ Acceptance criteria yang belum relevan untuk phase aktif tetap dipertahankan tet
 | P6 | VPS integration, resource benchmark, staging smoke/E2E, rollback, final evidence report | Fitur phase 2 produk |
 
 Test lintas phase boleh dibuat sebagai fixture atau test skeleton, tetapi tidak boleh memaksa implementasi phase yang belum diotorisasi.
+
+External hardware validation P1 dipindahkan ke milestone `HW-INTEGRATION-01`. Idle WebSocket soak satu jam menjadi bagian P5 reliability verification.
 
 ## 27. Testing Wajib
 
