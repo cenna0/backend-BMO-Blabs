@@ -105,6 +105,7 @@ class FasterWhisperTranscriber:
             task="transcribe",
             beam_size=self._settings.whisper_beam_size,
             vad_filter=self._settings.whisper_vad,
+            hotwords=self._settings.whisper_hotwords,
         )
         segments = [
             SegmentTranscript(

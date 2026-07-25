@@ -1,44 +1,39 @@
 # Audio Service model manifest
 
-**Last verified:** 2026-07-19
-**Phase:** P2 — Audio Service bootstrap + faster-whisper STT
-**Status:** local real-inference evidence recorded; model files not committed
+**Last verified:** 2026-07-25
+**Phase:** P5 manual STT accuracy validation
+**Status:** local real-inference and multilingual regression evidence recorded; model files not committed
 
 ## faster-whisper STT
 
 | Field | Value |
 |---|---|
-| Model | `small` multilingual |
-| Repository | `Systran/faster-whisper-small` |
-| Revision | `536b0662742c02347bc0e980a01041f333bce120` |
+| Model | `medium` multilingual |
+| Repository | `Systran/faster-whisper-medium` |
+| Revision | `08e178d48790749d25932bbc082711ddcfdfbc4f` |
 | Device | `cpu` |
 | Compute type | `int8` |
 | Language | auto-detect |
 | Task | `transcribe` |
 | VAD | enabled |
 | Beam size | `5` |
-| Cache path | `audio-service/models/hf-cache/hub/models--Systran--faster-whisper-small` |
-| Snapshot path | `audio-service/models/hf-cache/hub/models--Systran--faster-whisper-small/snapshots/536b0662742c02347bc0e980a01041f333bce120` |
+| Hotwords | `BMO` |
+| Condition on previous text | library default, `true` |
+| Cache path | `audio-service/models/hf-cache/hub/models--Systran--faster-whisper-medium` |
+| Snapshot path | `audio-service/models/hf-cache/hub/models--Systran--faster-whisper-medium/snapshots/08e178d48790749d25932bbc082711ddcfdfbc4f` |
 | Cached files | `10` |
-| Cached bytes | `486213279` |
+| Cached bytes | `1530572644` |
 
 The cache directory is ignored by `audio-service/.gitignore` through `models/`.
 
 ## Bootstrap evidence
 
 ```text
-Command: scripts/bootstrap_whisper.py --allow-download --models-dir .\models --manifest .\temp\MODEL_MANIFEST.bootstrap-first.json
+Command: $env:WHISPER_MODEL='medium'; .\.venv\Scripts\python.exe scripts\bootstrap_whisper.py --allow-download --models-dir .\models --manifest .\temp\MODEL_MANIFEST.medium-investigation.json
 Exit code: 0
 ```
 
-```text
-Command: HF_HUB_OFFLINE=1 scripts/bootstrap_whisper.py --allow-download --models-dir .\models --manifest .\temp\MODEL_MANIFEST.bootstrap-second-offline.json
-Exit code: 0
-Before: 10 files / 486213279 bytes.
-After: 10 files / 486213279 bytes.
-```
-
-`small.en` was not used.
+`medium.en` was not used. The selected model remains multilingual and leaves `language=None` for automatic English, Indonesian, and mixed-language detection.
 
 ## Kokoro TTS
 
