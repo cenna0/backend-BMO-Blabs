@@ -1,7 +1,7 @@
 # BMO MVP Hardware Handoff Pack — Design
 
 **Tanggal:** 2026-07-26  
-**Status:** Approved for implementation planning  
+**Status:** Awaiting written-spec review  
 **Audience:** Tim hardware/firmware ESP32-S3 dan tim backend BMO
 
 ## 1. Tujuan
@@ -141,7 +141,7 @@ Minimum skenario:
 22. hard recording stop 60 detik;
 23. display `idle → thinking → speaking → idle`;
 24. display/audio error lokal;
-25. minimum 30 interaksi berurutan tanpa state macet.
+25. setelah setiap terminal path, state kembali siap dan request berikutnya diterima.
 
 Evidence minimum:
 
@@ -308,4 +308,3 @@ Implementation plan dianggap selesai jika:
 7. link lokal valid;
 8. verifier dokumentasi dan backend regression tetap lulus;
 9. tim hardware memiliki checklist yang dapat dicentang dan test case yang dapat diisi tanpa menafsirkan backend internal.
-
