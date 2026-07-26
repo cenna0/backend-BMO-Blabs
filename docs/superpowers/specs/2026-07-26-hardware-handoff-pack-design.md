@@ -1,7 +1,7 @@
 # BMO MVP Hardware Handoff Pack — Design
 
-**Tanggal:** 2026-07-26  
-**Status:** Awaiting written-spec review  
+**Tanggal:** 2026-07-26
+**Status:** Awaiting written-spec review
 **Audience:** Tim hardware/firmware ESP32-S3 dan tim backend BMO
 
 ## 1. Tujuan
