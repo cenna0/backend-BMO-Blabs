@@ -9,4 +9,5 @@ backend/dist/
 backend/temp-audio/
 audio-service/models/
 audio-service/temp/
+manual-validation/
 .worktrees/

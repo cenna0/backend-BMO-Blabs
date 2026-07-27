@@ -1,0 +1,76 @@
+{
+  "result": "PASS",
+  "checks": [
+    {
+      "name": "broken_links",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "medium",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "name": "hotwords",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "name": "kokoro_speed",
+      "pass": true,
+      "detail": 10
+    },
+    {
+      "name": "kokoro_voice",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "name": "stale_small_env",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "stale_kokoro_1_env",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "hardware_contract_unchanged",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "archive_prd_unchanged",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "archive_backend_unchanged",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "P2-TEST-EVIDENCE.md_superseded_note",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "P2-IMPLEMENTATION-PLAN.md_superseded_note",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "hw_no_whisper_model",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "hw_no_kokoro_speed",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "broken_links": []
+}

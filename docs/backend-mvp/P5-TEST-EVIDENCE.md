@@ -1,5 +1,7 @@
 # P5 Reliability, Security, Lifecycle Test Evidence
 
+> **HISTORICAL PHASE RECORD — NOT A CURRENT EXECUTION INSTRUCTION.** This file records the P1–P5 state/ownership at the time it was written. References to “P6” or old runtime defaults inside this record are historical. For current execution order and ownership, use `../NEXT-ACTION.md`, `IMPLEMENTATION-STATUS.md`, and `../roadmap/P6-P10-ROADMAP.md`.
+
 **Status:** VERIFIED — BACKEND
 **Verification date:** 2026-07-19
 **Authorized by:** explicit user instruction in chat

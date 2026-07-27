@@ -4,7 +4,7 @@
 **Status:** CANONICAL VERIFICATION REFERENCE
 
 > **Status:** Canonical backend MVP documentation package  
-> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.0  
+> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
 > **Scope:** Backend voice MVP only. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
 
 
@@ -18,11 +18,11 @@ Acceptance criteria yang belum relevan untuk phase aktif tetap dipertahankan tet
 
 `BACKEND VERIFIED` berarti phase backend terbukti melalui unit test, integration test, fake ESP32, typecheck, build, dependency audit, documentation verifier, contract consistency, PRD consistency, dan scope audit lokal.
 
-`DEPLOYMENT VERIFIED` berarti service sudah berjalan di VPS dan endpoint staging tersedia.
+`DEPLOYMENT VERIFIED` berarti service sudah berjalan di VPS dan public HTTPS/WSS endpoint telah lulus smoke/E2E verification.
 
-`HARDWARE INTEGRATION VERIFIED` berarti tim backend dan tim hardware sudah membuktikan flow memakai physical ESP32 setelah endpoint staging tersedia.
+`HARDWARE INTEGRATION VERIFIED` berarti tim backend dan tim hardware sudah membuktikan flow memakai physical ESP32 terhadap endpoint deployment yang telah diverifikasi.
 
-Physical ESP32 test dan progressive hardware playback tetap requirement final, tetapi bukan blocker untuk melanjutkan development backend P2–P6. Perubahan ini hanya memperbaiki klasifikasi verification, bukan mengurangi requirement hardware final.
+Physical ESP32 test dan progressive hardware playback tetap requirement final dan sekarang dimiliki P10; hal itu bukan blocker untuk P6–P9 selama public contract tidak berubah. Perubahan ini hanya memperbaiki klasifikasi verification, bukan mengurangi requirement hardware final.
 
 ## Ownership verifikasi per implementation phase
 
@@ -33,7 +33,11 @@ Physical ESP32 test dan progressive hardware playback tetap requirement final, t
 | P3 | Kokoro, waveform merge, FFmpeg, RVC + fallback, audio metadata | Hermes/full orchestration |
 | P4 | Hermes adapter, output parsing/filtering, full STT→Hermes→TTS orchestration | Deployment publik dan final benchmark |
 | P5 | Reconnect, duplicate/idempotency, lifecycle, TTL, cleanup, security, failure matrix, full regression | Domain/TLS tanpa approval |
-| P6 | VPS integration, resource benchmark, staging smoke/E2E, rollback, final evidence report | Fitur phase 2 produk |
+| P6 | VPS foundation, secure operations, monitoring/alerts, backup baseline | Public BMO API claim before foundation verification |
+| P7 | VPS backend/audio deployment, Hermes integration, public HTTPS/WSS fake-device E2E | Physical ESP32 sign-off |
+| P8 | Real RVC inference, fallback regression, CPU/RAM/latency benchmark | Hardware protocol change |
+| P9 | PostgreSQL/Prisma readiness, migration, backup/restore | Moving voice request state into DB |
+| P10 | Hardware handoff activation + physical ESP32 acceptance matrix | New protocol invention/workaround |
 
 Test lintas phase boleh dibuat sebagai fixture atau test skeleton, tetapi tidak boleh memaksa implementasi phase yang belum diotorisasi.
 
@@ -161,9 +165,9 @@ Implementasi dianggap selesai jika:
 
 ---
 
-## 31. Laporan Akhir Wajib dari Hermes
+## 31. Laporan Akhir Wajib dari Deployment Executor
 
-Setelah implementasi, buat laporan yang berisi:
+Setelah phase deployment yang relevan, executor (Codex untuk rencana VPS saat ini) membuat laporan yang berisi:
 
 1. Ringkasan arsitektur final.
 2. Daftar file yang dibuat/diubah.

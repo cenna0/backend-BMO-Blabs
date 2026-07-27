@@ -1,0 +1,224 @@
+# BMO — P6–P10 Infrastructure and Hardware Readiness Roadmap
+
+**Status:** LOCKED ROADMAP / PHASE-BY-PHASE EXECUTION  
+**Current next phase:** P6 — `READY`  
+**Reason for split:** the original P6 scope became too broad after adding full VPS foundation, public TLS, monitoring, real RVC, database readiness, backup/recovery, and hardware handoff.
+
+The split below follows dependencies, not equal workload. The current coding agent must use [`../NEXT-ACTION.md`](../NEXT-ACTION.md) and [`P6-EXECUTION-SPEC.md`](P6-EXECUTION-SPEC.md) for the next action.
+
+**Execution rule:** locked order is **P6 → P7 → P8 → P9 → P10**. Verify one phase, record evidence, stop, then load the next phase in a fresh execution turn. Technical dependencies listed below explain architecture; they do not authorize skipping the execution order.
+
+## P6 — VPS Foundation and Operations Baseline
+
+### Goal
+Prepare a safe, repeatable VPS foundation without yet claiming the BMO voice stack is publicly ready.
+
+### Inputs
+- existing VPS;
+- existing Hermes/Codex installations;
+- `personalbmo.web.id` DNS ownership;
+- production source branch `main`.
+
+### Scope
+- preflight audit;
+- preserve/audit Hermes existing service;
+- create/confirm `bmo-admin` operating model and Codex access from that account;
+- install/configure Docker Engine + Compose if absent;
+- create `/opt/bmo` layout/ownership including persistent `MODEL_MANIFEST.md`;
+- config/secret separation;
+- Caddy baseline;
+- DNS/TLS preparation;
+- Tailscale admin access setup and SSH migration verification;
+- firewall baseline;
+- Beszel + public authenticated `monitor.personalbmo.web.id`;
+- Telegram alert integration using VPS-held secret;
+- Docker log rotation/resource observability;
+- backup directories/schedules and restore procedure draft;
+- maintenance/update/recovery runbook + verified version inventory.
+
+### Output
+- stable VPS foundation;
+- documented service inventory;
+- working private admin access before public SSH restriction;
+- Caddy/Beszel foundation;
+- deployment/rollback scripts or documented commands.
+
+### Acceptance criteria
+- Hermes remains healthy and loopback-only;
+- Docker/Compose works;
+- `/opt/bmo` ownership/permissions verified;
+- secrets are outside Git and mode-restricted;
+- public exposure is limited to approved reverse-proxy ports;
+- Tailscale SSH path is tested before public SSH is restricted;
+- Beszel is reachable through HTTPS/login and can alert Telegram;
+- backup mechanism can create a test artifact;
+- no BMO API availability claim yet unless P7 also passes.
+
+### Dependency
+None beyond safe access to the existing VPS and explicit authorization for risky network changes.
+
+---
+
+## P7 — Deploy Backend + Audio Service + Hermes Integration
+
+### Goal
+Run the existing backend/audio implementation on the real VPS and expose it safely through the production API hostname.
+
+### Inputs
+- P6 verified foundation;
+- Git repository reachable;
+- `main` deployment source;
+- runtime secrets supplied out-of-band;
+- existing Hermes API healthy on host.
+
+### Scope
+- verify/fetch the P6-established `/opt/bmo/app` Git checkout and select the exact `main` commit to deploy;
+- fresh source-vs-doc contract audit before deployment: routes/events/env behavior must match the canonical HW contract and current runtime docs; block/document any conflict before changing public behavior;
+- build immutable backend/audio images with restart/health readiness policy;
+- preserve/test the target topology: backend host networking + loopback `:3000`, Audio Service loopback publish `:8001`, Hermes host loopback `:8642`;
+- configure `backend.env` and `audio.env`;
+- persistent model caches;
+- run backend/audio containers as non-root where possible;
+- connect backend → Hermes host service;
+- Caddy route `api.personalbmo.web.id`;
+- HTTPS/WSS public smoke tests;
+- fake ESP32 E2E over public domain;
+- measure baseline CPU/RAM/disk/latency;
+- update hardware deployment config only if verified.
+
+### Output
+- deployed backend/audio stack;
+- public WSS/HTTPS endpoints;
+- deployment commit SHA;
+- health and E2E evidence;
+- rollback evidence/commands;
+- `hardware-handoff/DEPLOYMENT-CONFIG.md` updated to `VERIFIED` only if the public fake-ESP32 gate passes, which allows the HW team to begin live endpoint integration before final P10 physical acceptance.
+
+### Acceptance criteria
+- `https://api.personalbmo.web.id/health` works through Caddy;
+- WSS auth works through public hostname;
+- valid WAV upload returns canonical response;
+- `thinking` and `audio_ready` work through WSS;
+- MP3 download works through HTTPS;
+- fake ESP32 sends completion successfully;
+- internal ports are not publicly reachable;
+- Hermes remains healthy;
+- regression tests pass in the deployment environment.
+
+### Dependency
+P6.
+
+---
+
+## P8 — Real RVC Verification and Voice Resource Benchmark
+
+### Goal
+Turn RVC from implemented fallback-capable integration into a real verified BMO voice conversion path on the VPS.
+
+### Inputs
+- P7 deployed Audio Service;
+- verified RVC asset revision/hash;
+- `/opt/bmo/models/rvc/bmo/` model location.
+
+### Scope
+- install/pin compatible RVC inference runtime;
+- verify `.pth` and optional `.index` paths;
+- verify required HuBERT/RMVPE assets when needed;
+- run real Kokoro → RVC → FFmpeg;
+- compare Kokoro-only and RVC output;
+- use `KOKORO_VOICE=af_heart` and `KOKORO_SPEED=0.80` as the current pre-RVC target, then revalidate perceived tempo after RVC;
+- forced RVC failure fallback test;
+- benchmark peak CPU/RAM, RVC latency, total pipeline;
+- assess 4-core/8-GB VPS headroom using Beszel evidence.
+
+### Output
+- RVC verified or documented blocker;
+- model manifest/path/config;
+- audio samples/metadata and benchmark report;
+- resource recommendation.
+
+### Acceptance criteria
+- real RVC inference succeeds, **or** phase is honestly `BLOCKED/PARTIALLY VERIFIED` with fallback still proven;
+- fallback Kokoro-only remains functional;
+- no secret is exposed to the RVC runtime unnecessarily;
+- model files are not re-downloaded on routine restart;
+- output remains compatible with the hardware MP3 contract.
+
+### Dependency
+P7.
+
+---
+
+## P9 — PostgreSQL + Prisma Ready-to-Use Data Layer
+
+### Goal
+Prepare the application database for mobile/user/device/integration work without moving MVP voice request state into PostgreSQL.
+
+### Inputs
+- P6 foundation;
+- application schema baseline from this PRD;
+- the latest approved mobile-app/auth/device-pairing requirements available at P9 execution time;
+- backup storage policy.
+
+### Scope
+- re-audit the PRD schema baseline against the latest approved mobile/auth/device-pairing specification before creating migrations; do not freeze an outdated schema merely because it appears in an older product snapshot;
+- PostgreSQL container/private storage;
+- `postgres.env` secret generation;
+- Prisma configuration/migration baseline;
+- healthcheck;
+- persistent volume ownership;
+- daily/weekly backup;
+- restore test;
+- private-only DB network exposure.
+
+### Output
+- ready database service;
+- migration workflow;
+- backup/restore evidence.
+
+### Acceptance criteria
+- DB survives container restart/recreate;
+- migration procedure is reproducible;
+- backup and restore test pass;
+- port 5432 is not public;
+- voice request store remains in-memory.
+
+### Dependency
+Technical dependency: P6. **Execution order:** run P9 after P8 unless the user explicitly changes the roadmap; do not jump from P6 directly to P9 just because the DB is technically independent.
+
+---
+
+## P10 — Hardware Handoff Activation and Physical Integration
+
+### Goal
+Convert the documentation pack from protocol-ready to live-endpoint-ready and prove the physical ESP32 against the deployed backend.
+
+### Inputs
+- P7 public endpoint verified;
+- P8 result recorded (RVC success is not required for protocol because Kokoro fallback is valid);
+- P9 database-readiness phase verified per the locked execution sequence;
+- firmware team receives device token securely;
+- `docs/hardware-handoff/` finalized.
+
+### Scope
+- confirm the P7-verified `DEPLOYMENT-CONFIG.md` still matches the live deployment, then update its physical-ESP32 status/evidence;
+- re-run fake ESP32 through the exact public domain;
+- hand off concise docs to hardware team;
+- execute physical acceptance matrix;
+- capture firmware build ID/request IDs;
+- resolve any true backend/firmware mismatch through canonical contract authority.
+
+### Output
+- final hardware handoff pack;
+- physical integration evidence;
+- endpoint sheet usable by humans and coding agents.
+
+### Acceptance criteria
+- all public routes/events/payloads match canonical contract;
+- physical ESP32 authenticates, uploads WAV, receives state/result, downloads/plays MP3, reports completion;
+- reconnect/idempotency/error cases pass;
+- hardware does not depend on internal backend service endpoints;
+- `HARDWARE INTEGRATION VERIFIED` is only declared with physical evidence.
+
+### Dependency
+Technical dependency: P7 + documented P8 status. P9 is **not** a hardware voice-protocol dependency. The currently selected project execution order places P9 before final P10, but P7 verification already unlocks the live endpoint for the HW team; P10 is the final physical acceptance gate.

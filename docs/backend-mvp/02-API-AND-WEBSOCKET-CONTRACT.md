@@ -5,7 +5,7 @@
 **Authority eksternal:** Hardware Contract v1.0.5
 
 > **Status:** Canonical backend MVP documentation package  
-> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.0  
+> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
 > **Scope:** Backend voice MVP only. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
 
 
@@ -158,7 +158,7 @@ Backend → ESP32, audio siap:
 {
   "event": "audio_ready",
   "request_id": "<uuid-v4>",
-  "audio_url": "http://<host>:3000/audio/<audio-uuid>.mp3",
+  "audio_url": "https://api.personalbmo.web.id/audio/<audio-uuid>.mp3",
   "format": "mp3",
   "expires_in_seconds": 300
 }

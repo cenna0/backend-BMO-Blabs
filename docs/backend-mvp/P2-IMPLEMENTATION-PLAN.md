@@ -1,5 +1,7 @@
 # P2 — Audio Service bootstrap + faster-whisper STT Implementation Plan
 
+> **HISTORICAL PHASE RECORD — NOT A CURRENT EXECUTION INSTRUCTION.** This file records the P1–P5 state/ownership at the time it was written. References to “P6” or old runtime defaults inside this record are historical. For current execution order and ownership, use `../NEXT-ACTION.md`, `IMPLEMENTATION-STATUS.md`, and `../roadmap/P6-P10-ROADMAP.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build only P2: a localhost FastAPI Audio Service with authenticated internal STT, faster-whisper integration boundary, model bootstrap/cache support, WAV handling, no-speech handling, and P2 tests.

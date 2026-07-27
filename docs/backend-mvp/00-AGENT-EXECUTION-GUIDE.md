@@ -1,14 +1,25 @@
 # BMO Backend MVP — Agent Execution Guide
 
-**Versi package:** 1.0.1  
-**Tanggal:** 2026-07-18  
-**Status dokumentasi:** VERIFIED  
-**Active implementation phase:** NONE — belum ada phase coding yang diotorisasi
+**Backend reference lineage:** 1.0.1 (historical split-package lineage)  
+**Current docs audit:** 2026-07-26  
+**Status dokumentasi:** CURRENT / AUDITED  
+**Active implementation phase:** lihat `IMPLEMENTATION-STATUS.md` — jangan gunakan status statis dari snapshot package lama
 
 > **Status:** Canonical backend MVP documentation package  
-> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.0  
-> **Scope:** Backend voice MVP only. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
+> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
+> **Scope:** Active backend references in this folder primarily define the voice MVP. Firmware, mobile app, Spotify, WhatsApp, and the future application database are not silently pulled into a voice phase. P9 may implement PostgreSQL/Prisma only under its own authorized execution spec, while voice request state remains in-memory.
 
+
+## 0. Current next action
+
+For the current project state, the next implementation phase is **P6 — VPS Foundation and Operations Baseline**. Before using the general workflow in this file, read:
+
+1. `../NEXT-ACTION.md`
+2. `../roadmap/P6-EXECUTION-SPEC.md`
+3. `IMPLEMENTATION-STATUS.md`
+4. `../operations/MAINTENANCE-AND-RECOVERY.md` for P6+ host operation/recovery rules
+
+P6 is `READY`, not automatically running. An explicit user instruction to execute/continue the next phase authorizes P6 according to that execution spec. After P6 is verified, stop; do not automatically continue into P7.
 
 ## 1. Tujuan file ini
 
@@ -30,11 +41,12 @@ Agent wajib membaca dalam urutan berikut:
 1. `00-AGENT-EXECUTION-GUIDE.md`.
 2. `IMPLEMENTATION-STATUS.md`.
 3. `01-SCOPE-AND-DECISIONS.md`.
-4. `../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` hanya untuk kewajiban public interface backend.
-5. Dokumen implementation package yang diwajibkan oleh phase aktif.
-6. `05-TESTING-AND-ACCEPTANCE.md` untuk test dan definition of done phase aktif.
-7. `REQUIREMENT-TRACEABILITY.md` saat verifikasi akhir.
-8. Bagian PRD relevan di `../product/BMO-BY-BLABS-PRD-v1.2.0.md` hanya untuk consistency check; PRD bukan instruksi untuk mengimplementasikan fitur phase lain.
+4. `../operations/MAINTENANCE-AND-RECOVERY.md` untuk phase P6+ yang menyentuh VPS/operations.
+5. `../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` hanya untuk kewajiban public interface backend.
+6. Dokumen implementation package yang diwajibkan oleh phase aktif.
+7. `05-TESTING-AND-ACCEPTANCE.md` untuk test dan definition of done phase aktif.
+8. `REQUIREMENT-TRACEABILITY.md` saat verifikasi akhir.
+9. Bagian PRD relevan di `../product/BMO-BY-BLABS-PRD-v1.2.4.md` hanya untuk consistency check; PRD bukan instruksi untuk mengimplementasikan fitur phase lain.
 
 Agent boleh membaca dokumen lain untuk memahami dependency dan interface, tetapi **tidak boleh mengimplementasikan scope dokumen lain** kecuali status phase-nya `AUTHORIZED` atau `IN_PROGRESS`.
 
@@ -43,9 +55,12 @@ Agent boleh membaca dokumen lain untuk memahami dependency dan interface, tetapi
 Jika ditemukan perbedaan, gunakan urutan authority berikut:
 
 1. **Public firmware ↔ backend interface:** `../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`.
-2. **Detail implementasi backend/audio service:** file canonical di folder `backend-mvp/` ini.
-3. **Konteks produk, arsitektur besar, dan roadmap:** PRD v1.2.0.
-4. **Dokumen backend lama:** hanya arsip migrasi di `../archive/`; bukan source of truth aktif.
+2. **Current STT/TTS runtime values:** `CURRENT-RUNTIME-CONFIG.md`.
+3. **Actual implementation status/evidence:** `IMPLEMENTATION-STATUS.md` + latest phase/manual evidence.
+4. **Detail implementasi backend/audio service:** active canonical references di folder `backend-mvp/` ini.
+5. **Deployment-specific public values:** `../hardware-handoff/DEPLOYMENT-CONFIG.md` hanya setelah statusnya `VERIFIED`.
+6. **Konteks produk/arsitektur:** PRD v1.2.4.
+7. **Dokumen backend lama/audit intermediate:** `../archive/`; historical only.
 
 Agent dilarang menyelesaikan konflik dengan mengubah kontrak sendiri. Konflik harus dicatat sebagai `BLOCKED` dan dilaporkan kepada user.
 
@@ -70,12 +85,12 @@ Agent dilarang:
 - mengubah hardware wiring, wake word implementation, display implementation, atau decoder firmware;
 - membangun mobile app;
 - mengimplementasikan Spotify atau WhatsApp;
-- mengimplementasikan PostgreSQL atau Prisma untuk voice MVP;
+- mengimplementasikan PostgreSQL/Prisma before P9 authorization or moving voice-request state into PostgreSQL; P9 is a separate application-data phase governed by the roadmap/latest approved data requirements;
 - mengubah PRD, hardware contract, keputusan locked, endpoint, event, field JSON, close code, atau error code tanpa approval user;
 - mengubah global Hermes config atau `SOUL.md`;
 - memindahkan, menghentikan, mengganti, atau mengekspos service Hermes existing;
-- membuka firewall/port publik, menghapus data/container/image/volume, memasang package ke host, deploy domain/TLS, atau merotasi secret tanpa approval;
-- mengerjakan phase `NOT_STARTED`, `READY`, atau `BLOCKED`;
+- melakukan tindakan infrastructure berisiko di luar scope phase yang sudah diotorisasi. Untuk **P6**, satu instruksi eksplisit user untuk `execute P6`/`continue next phase` sudah mengotorisasi instalasi/config non-destruktif yang memang tercantum di `../roadmap/P6-EXECUTION-SPEC.md` (Docker/Compose, Caddy, Tailscale, Beszel, TLS, dan transisi firewall yang aman). Approval tambahan tetap wajib untuk penghapusan data/container/image/volume, migrasi Hermes, menutup satu-satunya SSH path sebelum alternatif terbukti, rotasi credential existing, atau perubahan destruktif/tidak terduga;
+- mengerjakan phase `NOT_STARTED` atau `BLOCKED`; phase `READY` hanya boleh dimulai setelah explicit user execution command mengubahnya menjadi `AUTHORIZED/IN_PROGRESS`;
 - melakukan refactor spekulatif atau membuat fitur future hanya karena terlihat mudah.
 
 ## 6. Aturan phase dan status
@@ -160,7 +175,7 @@ implementasi lokal
 → redeploy
 ```
 
-VPS bukan source code utama. Perubahan darurat di VPS wajib dibawa kembali ke Git agar tidak terjadi drift.
+Git `main` is the production source of truth. `/opt/bmo/app` is a clean production/deployment checkout, not a scratch development directory. If Codex must change application code, use a normal Git branch/worktree or separate development checkout, run the required tests, merge/land the approved change into `main`, then update `/opt/bmo/app` to the selected commit and rebuild immutable images. An emergency host edit is not a valid production release until it is captured in Git and redeployed, otherwise drift exists.
 
 Secret asli, model weights, cache model, dan generated audio tidak boleh disimpan di Git.
 
@@ -236,15 +251,13 @@ Setiap klaim keberhasilan harus memiliki bukti seperti:
 
 Jangan mencatat secret, raw authorization header, device token, Hermes key, atau transcript/audio sensitif.
 
-## 14. Active state saat package dibuat
+## 14. Historical package bootstrap state
 
 Documentation package telah diverifikasi. Tidak ada phase coding yang otomatis aktif.
 
 ```text
-Documentation package: VERIFIED
-Active implementation phase: NONE
-Next candidate phase: P1 — Core Backend Transport & Hardware Test Mode
-P1 status: READY, NOT AUTHORIZED
+Documentation package bootstrap (2026-07-18): VERIFIED
+Initial next phase at that time: P1
 ```
 
-Coding agent harus berhenti setelah membaca package sampai user mengubah P1 menjadi `AUTHORIZED` melalui instruksi eksplisit.
+This block is historical. P1–P5 have since progressed. **Current phase/status authority is `IMPLEMENTATION-STATUS.md` and the P6–P10 roadmap.** Agent authorization rules above remain active: a future phase still requires explicit user authorization before execution.

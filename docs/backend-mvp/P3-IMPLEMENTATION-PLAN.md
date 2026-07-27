@@ -1,5 +1,7 @@
 # P3 — Kokoro + FFmpeg + RVC fallback Implementation Plan
 
+> **HISTORICAL PHASE RECORD — NOT A CURRENT EXECUTION INSTRUCTION.** This file records the P1–P5 state/ownership at the time it was written. References to “P6” or old runtime defaults inside this record are historical. For current execution order and ownership, use `../NEXT-ACTION.md`, `IMPLEMENTATION-STATUS.md`, and `../roadmap/P6-P10-ROADMAP.md`.
+
 > **For agentic workers:** Execute inline in this session. No subagent delegation unless the user explicitly asks for it.
 
 **Goal:** Implement only P3 Audio Service voice synthesis: Kokoro English TTS, optional RVC BMO conversion, FFmpeg MP3 output, authenticated internal `/tts/synthesize`, model/cache safety, cleanup, tests, and local evidence.

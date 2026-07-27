@@ -1,11 +1,13 @@
-# BMO Backend MVP — Requirement Traceability
+# BMO Backend MVP — Requirement Traceability (Historical Migration Baseline)
 
 **Versi:** 1.0.1  
-**Status:** VERIFIED
+**Status:** HISTORICAL VERIFIED BASELINE
 
 ## 1. Tujuan
 
 Matrix ini membuktikan bahwa seluruh top-level requirement Backend Implementation v1.0.5 §1–§33 memiliki target primary dalam package baru. Dokumen sumber disimpan sebagai arsip read-only di `../archive/BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md`.
+
+> **2026-07-26 note:** this matrix proves the original v1.0.5 documentation migration. Active deployment details in `06-DEPLOYMENT-AND-OPERATIONS.md` have since been intentionally updated for the current `/opt/bmo`, Caddy, domain, monitoring, backup, and P6–P10 plan. Public hardware protocol authority remains unchanged.
 
 ## 2. Backend source migration matrix
 
@@ -45,7 +47,7 @@ Matrix ini membuktikan bahwa seluruh top-level requirement Backend Implementatio
 | §32 | Urutan Eksekusi | `06-DEPLOYMENT-AND-OPERATIONS.md` | MIGRATED |
 | §33 | Hal yang Harus Ditanyakan Sebelum Tindakan Berisiko | `06-DEPLOYMENT-AND-OPERATIONS.md` | MIGRATED |
 
-## 3. Cross-reference PRD v1.2.0
+## 3. Cross-reference PRD v1.2.4
 
 | PRD section | Requirement yang diverifikasi | Target package | Hasil |
 |---|---|---|---|
