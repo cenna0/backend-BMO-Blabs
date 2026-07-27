@@ -27,10 +27,15 @@ expected = [
 ]
 
 source_hashes = {
-    prd: "fa76871f90918805e057b4f5e4841c4fbf42c0eca79e59c8c2b35c5edad191a3",
+    prd: "85022140f9825cb9256b7b29ce49b8407cc854108dbf720b4377581304b7e53f",
     archive: "d1554d8d2cdbd6e32cf7acca75ce17031adcc47463b8577f64cdc288fa076853",
     hw_copy: "633e398a7fa39a3ebc469af7f9ca46fd04890339bb132ec7de2c2286207c6a44",
 }
+
+def canonical_text_bytes(path: Path) -> bytes:
+    """Return the LF form stored by Git for locked text documents."""
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
 
 section_targets = {
     1: "01-SCOPE-AND-DECISIONS.md", 2: "01-SCOPE-AND-DECISIONS.md", 3: "01-SCOPE-AND-DECISIONS.md",
@@ -57,7 +62,7 @@ for path, expected_hash in source_hashes.items():
     if not path.is_file():
         errors.append(f"missing canonical reference {path}")
         continue
-    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    actual = hashlib.sha256(canonical_text_bytes(path)).hexdigest()
     if actual != expected_hash:
         errors.append(f"hash mismatch {path.name}: {actual}")
 
