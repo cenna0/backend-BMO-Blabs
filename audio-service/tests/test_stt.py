@@ -46,7 +46,7 @@ def test_normalize_transcription_marks_empty_segments_as_no_speech():
     assert result.language_probability == 0.0
 
 
-def test_faster_whisper_adapter_uses_canonical_p2_model_config():
+def test_faster_whisper_adapter_uses_accuracy_model_config_and_hotwords():
     captured = {}
 
     class StubSegment:
@@ -77,7 +77,7 @@ def test_faster_whisper_adapter_uses_canonical_p2_model_config():
 
     result = transcriber.transcribe(Path("sample.wav"))
 
-    assert captured["model_args"] == ("small",)
+    assert captured["model_args"] == ("medium",)
     assert captured["model_kwargs"] == {
         "device": "cpu",
         "compute_type": "int8",
@@ -89,6 +89,7 @@ def test_faster_whisper_adapter_uses_canonical_p2_model_config():
         "task": "transcribe",
         "beam_size": 5,
         "vad_filter": True,
+        "hotwords": "BMO",
     }
     assert result.text == "Hello BMO"
     assert result.speech_detected is True

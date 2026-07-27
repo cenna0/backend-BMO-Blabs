@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+
+import { parseEnv } from "../src/config/env.js";
+import { createBackendRuntime } from "../src/server.js";
 
 interface JsonObject {
   [key: string]: unknown;
@@ -212,13 +217,41 @@ function makeSilenceWav(durationSeconds = 0.2): Buffer {
 }
 
 async function runCli(): Promise<void> {
+  const selfHost = process.env.FAKE_ESP32_SELF_HOST === "true" || (!process.env.BMO_BASE_URL && !process.env.DEVICE_TOKEN);
+  let cleanup: (() => Promise<void>) | undefined;
+  let baseUrl = process.env.BMO_BASE_URL ?? "http://127.0.0.1:3000";
+  let deviceToken = process.env.DEVICE_TOKEN ?? "";
+  if (selfHost) {
+    const tempDir = await mkdtemp(join(tmpdir(), "bmo-fake-esp32-"));
+    const fixture = fileURLToPath(new URL("../tests/fixtures/test-response.mp3", import.meta.url));
+    const runtime = createBackendRuntime(
+      parseEnv({
+        NODE_ENV: "test",
+        BACKEND_HOST: "127.0.0.1",
+        BACKEND_PORT: "3000",
+        PUBLIC_BASE_URL: "http://127.0.0.1:0",
+        DEVICE_ID: "bmo-001",
+        DEVICE_TOKEN: "test-device-secret",
+        TEMP_AUDIO_DIR: tempDir,
+        HARDWARE_TEST_MODE: "true",
+        HARDWARE_TEST_MP3_PATH: fixture,
+      }),
+    );
+    const address = await runtime.start(0);
+    baseUrl = `http://127.0.0.1:${address.port}`;
+    deviceToken = "test-device-secret";
+    cleanup = async () => {
+      await runtime.stop();
+      await rm(tempDir, { recursive: true, force: true });
+    };
+  }
   const wav = process.env.FAKE_ESP32_WAV_PATH
     ? await readFile(process.env.FAKE_ESP32_WAV_PATH)
     : makeSilenceWav();
   const options: FakeEsp32Options = {
-    baseUrl: process.env.BMO_BASE_URL ?? "http://127.0.0.1:3000",
+    baseUrl,
     deviceId: process.env.DEVICE_ID ?? "bmo-001",
-    deviceToken: process.env.DEVICE_TOKEN ?? "",
+    deviceToken,
     requestId: process.env.FAKE_ESP32_REQUEST_ID ?? randomUUID(),
     wav,
   };
@@ -228,8 +261,12 @@ async function runCli(): Promise<void> {
   if (process.env.FAKE_ESP32_OUTPUT_MP3_PATH) {
     options.outputMp3Path = process.env.FAKE_ESP32_OUTPUT_MP3_PATH;
   }
-  const result = await runFakeEsp32(options);
-  process.stdout.write(`${JSON.stringify(result)}\n`);
+  try {
+    const result = await runFakeEsp32(options);
+    process.stdout.write(`${JSON.stringify(result)}\n`);
+  } finally {
+    await cleanup?.();
+  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

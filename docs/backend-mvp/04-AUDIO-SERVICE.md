@@ -3,8 +3,10 @@
 **Versi:** 1.0.1  
 **Status:** CANONICAL AUDIO IMPLEMENTATION REFERENCE
 
+> **2026-07-26 audit note:** konfigurasi STT aktif di bawah telah diselaraskan dengan investigasi P5 (`medium` + hotword `BMO`). Real RVC inference masih belum verified; fallback Kokoro-only tetap valid. Path production target memakai `/opt/bmo/models`; historical deployment paths are archive/evidence only.
+
 > **Status:** Canonical backend MVP documentation package  
-> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.0  
+> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
 > **Scope:** Backend voice MVP only. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
 
 
@@ -69,8 +71,8 @@ faster-whisper dan Kokoro dapat mengunduh model/voice saat pertama kali dipakai.
 
 Gunakan prosedur berikut:
 
-1. Buat script/container bootstrap satu kali yang memiliki akses tulis ke `/opt/bmo-mvp/models`.
-2. Download model Whisper `small`, weight/voice Kokoro, dependency RVC, dan model BMO ke cache persisten.
+1. Buat script/container bootstrap satu kali yang memiliki akses tulis ke `/opt/bmo/models`.
+2. Download model Whisper yang dikonfigurasi (`medium` pada baseline implementasi saat ini), weight/voice Kokoro, dependency RVC, dan model BMO ke cache persisten.
 3. Catat source, revision, ukuran, dan SHA256 di `MODEL_MANIFEST.md`.
 4. Jalankan smoke inference saat cache masih writable.
 5. Setelah lengkap, runtime `bmo-audio-service` mount directory model sebagai read-only.
@@ -79,8 +81,8 @@ Gunakan prosedur berikut:
 Gunakan cache persisten:
 
 ```text
-HF_HOME=/opt/bmo-mvp/models/hf-cache
-TORCH_HOME=/opt/bmo-mvp/models/torch-cache
+HF_HOME=/opt/bmo/models/hf-cache
+TORCH_HOME=/opt/bmo/models/torch-cache
 ```
 
 Cache sementara library lain dapat diarahkan ke `/tmp/cache`.
@@ -95,19 +97,22 @@ Catatan kompatibilitas RVC:
 
 ## 10. Konfigurasi faster-whisper
 
-Konfigurasi awal:
+Baseline implementasi aktif setelah investigasi akurasi P5:
 
 ```text
-Model         : small multilingual, bukan small.en
+Model         : medium multilingual
 Device        : cpu
 Compute type  : int8
 CPU threads   : 4
 Workers       : 1
-Language      : auto detect
+Language      : auto detect (`None`)
 Task          : transcribe
 VAD           : aktif
 Beam size     : 5
+Hotwords      : BMO
 ```
+
+`small` adalah baseline historis awal. Investigasi real pada 2026-07-25 memilih `medium` + hotword `BMO` karena lebih akurat pada utterance pendek/aksen yang diuji. Perubahan ini tidak mengubah kontrak hardware. Benchmark latency/resource pada VPS tetap wajib sebelum deployment dianggap verified.
 
 Target implementasi:
 
@@ -115,7 +120,7 @@ Target implementasi:
 from faster_whisper import WhisperModel
 
 model = WhisperModel(
-    "small",
+    "medium",
     device="cpu",
     compute_type="int8",
     cpu_threads=4,
@@ -128,8 +133,11 @@ segments, info = model.transcribe(
     task="transcribe",
     beam_size=5,
     vad_filter=True,
+    hotwords="BMO",
 )
 ```
+
+Source evidence: [`P5-STT-ACCURACY-INVESTIGATION.md`](P5-STT-ACCURACY-INVESTIGATION.md).
 
 Input user dapat berupa:
 
@@ -185,6 +193,7 @@ Konfigurasi awal:
 ```text
 Language code : a (American English)
 Voice         : af_heart
+Speed         : 0.80
 Output        : WAV 24 kHz
 ```
 
@@ -193,7 +202,10 @@ Environment variable:
 ```env
 KOKORO_LANG_CODE=a
 KOKORO_VOICE=af_heart
+KOKORO_SPEED=0.80
 ```
+
+`KOKORO_SPEED=0.80` dipilih pada manual listening UAT dari kandidat `0.90`, `0.85`, `0.80`, dan `0.75`, lalu dipromosikan menjadi current deployment target. Revalidasi setelah real RVC tetap wajib.
 
 Aturan:
 
@@ -224,7 +236,7 @@ License   : openrail (model card sangat minim; perlakukan sebagai aset eksperime
 
 Prosedur:
 
-1. Download revision exact ke `/opt/bmo-mvp/models/rvc-bmo/`.
+1. Download revision exact ke `/opt/bmo/models/rvc/bmo/`.
 2. Verifikasi byte size dan SHA256 sebelum extract.
 3. Inspeksi isi archive sebelum extract.
 4. Jangan menjalankan script dari archive model.

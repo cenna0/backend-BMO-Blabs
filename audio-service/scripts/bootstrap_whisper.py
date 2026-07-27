@@ -26,6 +26,7 @@ def build_manifest(settings: Settings, status: str) -> dict[str, object]:
         "whisper_workers": settings.whisper_workers,
         "whisper_beam_size": settings.whisper_beam_size,
         "whisper_vad": settings.whisper_vad,
+        "whisper_hotwords": settings.whisper_hotwords,
         "hf_home": str(settings.hf_home),
         "torch_home": str(settings.torch_home),
     }

@@ -1,8 +1,10 @@
-# BMO Backend MVP — Verification Report
+# BMO Backend MVP — Verification Report (Historical Package Baseline)
 
 **Tanggal verifikasi:** 2026-07-18  
 **Package version:** 1.0.1  
-**Result:** PASS
+**Result:** PASS for the 2026-07-18 documentation package baseline
+
+> **2026-07-26 audit note:** this report proves the original documentation migration/package, not current implementation status. Since this report was written, P1–P5 implementation evidence was added, STT tuning selected `medium` + `BMO` hotword, and future deployment scope was split into P6–P10. Use `IMPLEMENTATION-STATUS.md`, `P5-*` evidence, `../hardware-handoff/`, and `../roadmap/P6-P10-ROADMAP.md` for current status.
 
 ## 1. Source documents
 

@@ -25,8 +25,8 @@ export interface TtsResult {
 }
 
 export interface AudioServicePort {
-  transcribe(wav: Buffer): Promise<SttResult>;
-  synthesize(requestId: string, text: string, useRvc: boolean): Promise<TtsResult>;
+  transcribe(wav: Buffer, signal?: AbortSignal): Promise<SttResult>;
+  synthesize(requestId: string, text: string, useRvc: boolean, signal?: AbortSignal): Promise<TtsResult>;
 }
 
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
@@ -50,10 +50,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 function normalizeError(error: unknown, fallback: AudioServiceClientErrorCode): AudioServiceClientError {
   if (error instanceof AudioServiceClientError) return error;
   if (error instanceof DOMException && error.name === "AbortError") {
-    return new AudioServiceClientError("PIPELINE_TIMEOUT", "Audio Service request timed out");
+    return new AudioServiceClientError(fallback, "Audio Service request timed out");
   }
   if (isObject(error) && error.name === "AbortError") {
-    return new AudioServiceClientError("PIPELINE_TIMEOUT", "Audio Service request timed out");
+    return new AudioServiceClientError(fallback, "Audio Service request timed out");
   }
   return new AudioServiceClientError(fallback, "Audio Service request failed");
 }
@@ -62,15 +62,19 @@ async function withTimeout<T>(
   timeoutMs: number,
   work: (signal: AbortSignal) => Promise<T>,
   fallback: AudioServiceClientErrorCode,
+  parentSignal?: AbortSignal,
 ): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const abortFromParent = () => controller.abort();
+  parentSignal?.addEventListener("abort", abortFromParent, { once: true });
   try {
     return await work(controller.signal);
   } catch (error) {
     throw normalizeError(error, fallback);
   } finally {
     clearTimeout(timer);
+    parentSignal?.removeEventListener("abort", abortFromParent);
   }
 }
 
@@ -108,7 +112,7 @@ export class AudioServiceClient implements AudioServicePort {
     this.#fetcher = options.fetcher ?? fetch;
   }
 
-  async transcribe(wav: Buffer): Promise<SttResult> {
+  async transcribe(wav: Buffer, signal?: AbortSignal): Promise<SttResult> {
     return withTimeout(
       this.options.sttTimeoutMs,
       async (signal) => {
@@ -132,10 +136,11 @@ export class AudioServiceClient implements AudioServicePort {
         }
       },
       "STT_FAILED",
+      signal,
     );
   }
 
-  async synthesize(requestId: string, text: string, useRvc: boolean): Promise<TtsResult> {
+  async synthesize(requestId: string, text: string, useRvc: boolean, signal?: AbortSignal): Promise<TtsResult> {
     return withTimeout(
       this.options.ttsTimeoutMs,
       async (signal) => {
@@ -167,6 +172,7 @@ export class AudioServiceClient implements AudioServicePort {
         };
       },
       "TTS_FAILED",
+      signal,
     );
   }
 }

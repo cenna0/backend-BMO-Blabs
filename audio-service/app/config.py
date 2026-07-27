@@ -15,13 +15,14 @@ class Settings(BaseSettings):
     model_download_allowed: bool = False
     model_manifest_path: Path = Path("/opt/bmo-mvp/MODEL_MANIFEST.md")
 
-    whisper_model: str = "small"
+    whisper_model: str = "medium"
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
     whisper_cpu_threads: int = Field(default=4, gt=0)
     whisper_workers: int = Field(default=1, gt=0)
     whisper_beam_size: int = Field(default=5, gt=0)
     whisper_vad: bool = True
+    whisper_hotwords: str | None = "BMO"
 
     kokoro_lang_code: str = "a"
     kokoro_voice: str = "af_heart"

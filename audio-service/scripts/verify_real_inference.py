@@ -129,13 +129,14 @@ def prepare_fixtures(fixtures_dir: Path, skip_generate: bool) -> dict[str, Path]
     return paths
 
 
-def model_cache_metadata(models_dir: Path) -> dict[str, object]:
-    repo_dir = models_dir / "hf-cache" / "hub" / "models--Systran--faster-whisper-small"
+def model_cache_metadata(models_dir: Path, model_name: str) -> dict[str, object]:
+    source = f"Systran/faster-whisper-{model_name}"
+    repo_dir = models_dir / "hf-cache" / "hub" / f"models--Systran--faster-whisper-{model_name}"
     revision_path = repo_dir / "refs" / "main"
     revision = revision_path.read_text(encoding="utf-8").strip() if revision_path.is_file() else None
     files = [path for path in repo_dir.rglob("*") if path.is_file()]
     return {
-        "source": "Systran/faster-whisper-small",
+        "source": source,
         "revision": revision,
         "cache_dir": str(repo_dir),
         "file_count": len(files),
@@ -242,7 +243,7 @@ def main() -> int:
             "beam_size": settings.whisper_beam_size,
             "transcriber_class": type(transcriber).__name__,
             "load_seconds": model_load_seconds,
-            **model_cache_metadata(args.models_dir),
+            **model_cache_metadata(args.models_dir, settings.whisper_model),
         },
         "health_after_load": health,
         "fixtures": results,

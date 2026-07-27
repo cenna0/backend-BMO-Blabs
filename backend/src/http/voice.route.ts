@@ -4,7 +4,7 @@ import express, { Router, type ErrorRequestHandler, type RequestHandler } from "
 import type { Logger } from "pino";
 
 import type { BackendConfig } from "../config/env.js";
-import { RequestStoreError, type RequestStore } from "../domain/request-store.js";
+import { RequestStoreError, toPublicRequestStatus, type RequestStore } from "../domain/request-store.js";
 import type { HardwareTestService } from "../services/hardware-test.service.js";
 import type { TempAudioService } from "../services/temp-audio.service.js";
 import type { VoicePipelineService } from "../services/voice-pipeline.service.js";
@@ -79,14 +79,6 @@ export function createVoiceRouter(dependencies: VoiceRouteDependencies): Router 
       websocketRequired(response);
       return;
     }
-    if (requestStore.getActiveForDevice(deviceId)) {
-      response.status(409).json({
-        error: "DEVICE_BUSY",
-        message: "Previous voice request is still processing.",
-      });
-      return;
-    }
-
     response.locals.voice = { deviceId, requestId, contentLength } satisfies VoiceContext;
     next();
   };
@@ -116,6 +108,39 @@ export function createVoiceRouter(dependencies: VoiceRouteDependencies): Router 
     }
 
     const inputSha256 = createHash("sha256").update(body).digest("hex");
+    const existing = requestStore.get(context.requestId);
+    if (existing) {
+      if (existing.deviceId !== context.deviceId) {
+        response.status(409).json({ error: "REQUEST_ID_CONFLICT" });
+        return;
+      }
+      if (existing.inputSha256 !== inputSha256 || existing.inputContentLength !== body.length) {
+        response.status(409).json({ error: "REQUEST_ID_CONFLICT" });
+        return;
+      }
+      if (existing.status === "audio_ready" && existing.expiresAt !== null && existing.expiresAt <= Date.now()) {
+        if (existing.audioId) await tempAudio.expireAudio(existing.audioId);
+        requestStore.expire(existing.requestId);
+      }
+      response.status(200).json({
+        request_id: context.requestId,
+        status: toPublicRequestStatus(existing),
+        duplicate: true,
+        error_code: existing.errorCode,
+      });
+      if (existing.status === "audio_ready") {
+        sockets.sendAudioReady(existing);
+      }
+      return;
+    }
+    if (requestStore.getActiveForDevice(context.deviceId)) {
+      response.status(409).json({
+        error: "DEVICE_BUSY",
+        message: "Previous voice request is still processing.",
+      });
+      return;
+    }
+
     let inputPath: string | undefined;
     try {
       inputPath = await tempAudio.writeInput(context.requestId, body);

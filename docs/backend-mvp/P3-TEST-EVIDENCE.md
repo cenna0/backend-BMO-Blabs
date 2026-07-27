@@ -1,5 +1,7 @@
 # P3 — Kokoro + FFmpeg + RVC fallback Evidence
 
+> **HISTORICAL PHASE RECORD — NOT A CURRENT EXECUTION INSTRUCTION.** This file records the P1–P5 state/ownership at the time it was written. References to “P6” or old runtime defaults inside this record are historical. For current execution order and ownership, use `../NEXT-ACTION.md`, `IMPLEMENTATION-STATUS.md`, and `../roadmap/P6-P10-ROADMAP.md`.
+
 **Date:** 2026-07-19
 **Status:** IMPLEMENTED — not VERIFIED
 **Authorization:** P3 only, explicit user instruction

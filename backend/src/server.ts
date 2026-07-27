@@ -24,6 +24,7 @@ export interface BackendRuntime {
   requestStore: RequestStore;
   sockets: DeviceWebSocketServer;
   tempAudio: TempAudioService;
+  runMaintenance(): Promise<void>;
   start(port?: number): Promise<AddressInfo>;
   stop(): Promise<void>;
 }
@@ -33,14 +34,25 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   const app = express();
   app.disable("x-powered-by");
   const httpServer = createServer(app);
-  const requestStore = new RequestStore();
+  const requestStore = new RequestStore({
+    tombstoneTtlMs: config.REQUEST_TOMBSTONE_TTL_SECONDS * 1_000,
+    maxEntries: config.MAX_REQUEST_STORE_ENTRIES,
+  });
   const registry = new DeviceRegistry(requestStore);
   const tempAudio = new TempAudioService(config.TEMP_AUDIO_DIR, config.TEMP_AUDIO_TTL_SECONDS);
   let publicBaseUrl = config.PUBLIC_BASE_URL.replace(/\/$/, "");
+  let cleanupInterval: NodeJS.Timeout | undefined;
 
   const removeOutput = async (deviceId: string, requestId: string, failed: boolean) => {
     const record = requestStore.get(requestId);
-    if (!record || record.deviceId !== deviceId || record.status !== "audio_ready") {
+    if (!record || record.deviceId !== deviceId) {
+      logger.warn({ device_id: deviceId, request_id: requestId }, "ignored playback event");
+      return;
+    }
+    if (record.status === "completed" || record.status === "failed" || record.status === "expired") {
+      return;
+    }
+    if (record.status !== "audio_ready") {
       logger.warn({ device_id: deviceId, request_id: requestId }, "ignored playback event");
       return;
     }
@@ -98,9 +110,22 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     totalTimeoutMs: config.TOTAL_PIPELINE_TIMEOUT_MS,
   });
 
+  const runMaintenance = async () => {
+    const expired = requestStore.expireReadyBefore(Date.now());
+    for (const record of expired) {
+      if (record.audioId) await tempAudio.expireAudio(record.audioId);
+      sockets.sendRequestFailed(record.deviceId, record.requestId, "AUDIO_EXPIRED");
+    }
+    requestStore.collectGarbage();
+    tempAudio.collectExpiredAudioTombstones(
+      config.REQUEST_TOMBSTONE_TTL_SECONDS * 1_000,
+      config.MAX_REQUEST_STORE_ENTRIES,
+    );
+  };
+
   app.use(createHealthRouter(config.HARDWARE_TEST_MODE));
   app.use(createVoiceRouter({ config, requestStore, sockets, tempAudio, hardwareTest, pipeline, logger }));
-  app.use(createAudioRouter(tempAudio));
+  app.use(createAudioRouter(tempAudio, { requestStore, sockets }));
   app.use(createVoiceErrorHandler(config.MAX_AUDIO_BYTES));
   app.use((_error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
     response.status(500).json({ error: "INTERNAL_ERROR" });
@@ -112,8 +137,10 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     requestStore,
     sockets,
     tempAudio,
+    runMaintenance,
     async start(port = config.BACKEND_PORT) {
       await tempAudio.initialize();
+      await tempAudio.startupCleanup();
       await new Promise<void>((resolve, reject) => {
         const onError = (error: Error) => reject(error);
         httpServer.once("error", onError);
@@ -129,10 +156,19 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
         configured.port = String(address.port);
         publicBaseUrl = configured.toString().replace(/\/$/, "");
       }
+      cleanupInterval = setInterval(
+        () => void runMaintenance(),
+        config.TEMP_AUDIO_CLEANUP_INTERVAL_SECONDS * 1_000,
+      );
+      cleanupInterval.unref();
       logger.info({ host: config.BACKEND_HOST, port: address.port }, "backend started");
       return address;
     },
     async stop() {
+      if (cleanupInterval) {
+        clearInterval(cleanupInterval);
+        cleanupInterval = undefined;
+      }
       await sockets.close();
       if (httpServer.listening) {
         await new Promise<void>((resolve, reject) => {

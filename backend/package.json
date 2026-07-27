@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "fake-esp32": "tsx scripts/fake-esp32.ts",
     "hermes-fixture": "tsx scripts/hermes-fixture.ts",
+    "soak-p5-idle-ws": "tsx scripts/soak-p5-idle-ws.ts",
     "verify-p4-full-pipeline": "tsx scripts/verify-p4-full-pipeline.ts",
     "start": "node dist/src/server.js",
     "test": "vitest run",

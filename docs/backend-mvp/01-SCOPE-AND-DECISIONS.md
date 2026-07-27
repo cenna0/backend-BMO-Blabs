@@ -5,7 +5,7 @@
 **Implementasi:** Belum otomatis diotorisasi
 
 > **Status:** Canonical backend MVP documentation package  
-> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.0  
+> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
 > **Scope:** Backend voice MVP only. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
 
 
@@ -13,23 +13,36 @@
 
 File ini menentukan batas backend MVP, keputusan yang tidak boleh diubah, baseline yang wajib dibenchmark, dan guardrail terhadap service Hermes existing. Coding agent wajib membaca file ini pada setiap phase.
 
-Dokumen di bawah mempertahankan seluruh requirement dari Backend Implementation v1.0.5 §1–§3. Istilah “Hermes” pada bagian peran berarti agent/orchestrator yang menjalankan pekerjaan di environment VPS; source code tetap dikelola local-first sesuai execution guide.
+Dokumen awal v1.0.5 menggunakan istilah Hermes sebagai agent/orchestrator implementasi. **Model operasional project saat ini telah diklarifikasi:** Codex adalah coding/infrastructure executor untuk P6 dan phase implementasi berikutnya, sedangkan Hermes adalah runtime service/dependency BMO yang harus dipertahankan. Referensi historical P1–P5 yang menyebut Hermes sebagai executor tidak mengubah ownership saat ini.
 
-## 1. Peran Hermes
+## 1. Peran Codex dan Hermes
 
-Hermes bertindak sebagai orkestrator implementasi. Hermes wajib:
+### Codex — implementation/infrastructure executor
 
-1. Melakukan audit VPS tanpa merusak instalasi Hermes yang sudah berjalan.
-2. Membangun backend Express.js + TypeScript.
-3. Membangun Local Audio Service menggunakan Python + FastAPI.
-4. Memasang dan mengonfigurasi faster-whisper, Kokoro, RVC, dan FFmpeg.
-5. Mengintegrasikan backend dengan Hermes API yang sudah aktif.
-6. Men-deploy backend dan audio service melalui Docker Compose.
-7. Membuat automated tests dan fake ESP32 client.
-8. Menjalankan smoke test dan end-to-end test.
-9. Membuat laporan akhir dengan bukti hasil verifikasi.
+Saat phase telah diotorisasi, Codex bertugas:
 
-Jangan hanya membuat scaffold. Hasil akhir harus benar-benar berjalan.
+1. Melakukan audit environment tanpa merusak service existing.
+2. Membuat/mengubah backend, Audio Service, test, deployment, dan dokumentasi sesuai scope phase aktif.
+3. Menjalankan test, smoke test, benchmark, deployment, dan verification loop yang diwajibkan phase.
+4. Menjaga Git sebagai source of truth dan mencegah drift VPS.
+5. Menghasilkan evidence sebelum menyatakan phase selesai.
+6. Berhenti pada boundary phase dan tidak mengerjakan phase berikutnya tanpa authorization.
+
+Codex adalah tooling/operator. BMO tidak boleh bergantung pada Codex untuk runtime normal.
+
+### Hermes — runtime service BMO
+
+Hermes:
+
+- berjalan existing pada host VPS;
+- menerima transcript dari backend melalui API lokal;
+- menghasilkan jawaban BMO;
+- menjaga personality/context/memory/capability runtime;
+- merupakan dependency yang harus tetap sehat selama perubahan infrastructure/backend.
+
+Hermes **bukan executor P6**, tidak dipindahkan ke Docker, dan tidak dimigrasikan ke user/path baru hanya untuk merapikan arsitektur.
+
+Jangan hanya membuat scaffold. Hasil implementasi phase yang diotorisasi harus benar-benar berjalan dan memiliki evidence.
 
 ---
 
@@ -82,10 +95,13 @@ State request pipeline suara MVP disimpan in-memory. Hilangnya request aktif saa
 - WAV dihapus setelah output MP3 selesai; MP3 dihapus setelah playback selesai/gagal atau TTL;
 - error diekspresikan oleh hardware dengan audio error lokal.
 
-**Baseline teknis yang harus dibenchmark, bukan dianggap keputusan permanen user:**
+**Current selected runtime yang wajib dipakai sebagai deployment target dan tetap dibenchmark di VPS:**
 
-- faster-whisper `small`, CPU INT8, 4 thread, beam size 5;
-- Kokoro voice `af_heart`;
+- faster-whisper `medium` multilingual, CPU INT8, 4 threads, 1 worker, beam size 5, VAD aktif, language auto-detect, hotword `BMO`;
+- Kokoro `af_heart` dengan `KOKORO_SPEED=0.80`.
+
+**Baseline teknis lain yang masih boleh disesuaikan setelah benchmark:**
+
 - MP3 mono 24 kHz/96 kbps;
 - timeout per tahap;
 - retry upload maksimal dua kali setelah percobaan awal;
@@ -94,7 +110,7 @@ State request pipeline suara MVP disimpan in-memory. Hilangnya request aktif saa
 - parameter RVC `f0_up_key=0` dan `rmvpe`;
 - Node.js 22, Python 3.10, Zod/Pino/Vitest sebagai pilihan implementasi awal.
 
-Hermes boleh mengubah baseline hanya setelah test/benchmark dan wajib mencatat alasan serta dampaknya. Hermes tidak boleh mengubah keputusan locked atau kontrak event/endpoint tanpa approval user.
+Implementation executor boleh menyesuaikan baseline teknis hanya setelah test/benchmark dan wajib mencatat alasan serta dampaknya. Keputusan locked atau kontrak event/endpoint tidak boleh diubah tanpa approval user.
 
 Guardrail seperti `backend_state`, body SHA-256, tombstone request, public status mapping, dan HTTP `410 AUDIO_EXPIRED` ditambahkan untuk menutup edge case implementasi. Guardrail ini bukan perubahan produk dan tetap wajib diimplementasikan selama tidak terbukti bermasalah pada test hardware.
 

@@ -1,4 +1,46 @@
-# BMO Backend MVP Documentation Package — Changelog
+# BMO Backend MVP — Changelog
+
+> Entries under **Historical package changelog** preserve the phase ownership/runtime facts as they were recorded at that time. They are evidence, not current next-step authority. Use `../NEXT-ACTION.md` and `IMPLEMENTATION-STATUS.md` for current ownership.
+
+## 2026-07-26 — Final execution-readiness audit
+
+- Reconciled P6 authorization semantics so one explicit `execute P6` instruction covers the planned non-destructive P6 installs/configuration while destructive/unexpected actions still require separate approval.
+- Locked Caddy as a host system service and Beszel infrastructure Compose path as `/opt/bmo/deploy/infra-compose.yml`.
+- Clarified secret env ownership/readability for `bmo-admin`, postponed `DATABASE_URL`/real `postgres.env` activation to P9, and required commit-SHA image tags for deterministic rollback.
+- Added ESP32 production TLS prerequisite: trusted device time plus certificate-chain validation.
+
+## 2026-07-26 — Next-action/P6 execution handoff
+
+- Added root `NEXT-ACTION.md` as the operational entry point for Codex.
+- Added `roadmap/P6-EXECUTION-SPEC.md` with exact P6 tasks, acceptance criteria, authorization boundary, evidence, and stop condition.
+- Marked P6 as `READY` and the explicit current next phase; P7–P10 remain dependency-gated.
+- Locked phase-by-phase execution so the agent stops after each verified phase instead of collapsing P6–P10 into one context.
+- Clarified that P6 authorization covers the already-selected non-destructive infrastructure setup but never authorizes destructive changes or Hermes migration.
+
+## 2026-07-26 — Documentation audit + hardware handoff pack
+
+- Added `docs/README.md` as the documentation entry point and authority map.
+- Added complete `docs/hardware-handoff/` pack for humans and firmware coding agents.
+- Added explicit `DEPLOYMENT_STATUS: NOT_VERIFIED` gate so the agreed production domain is not misrepresented as already live.
+- Added current backend capability/status matrix and 34 physical ESP32 acceptance tests.
+- Updated active STT implementation reference from historical `small` baseline to selected `medium` + hotword `BMO` based on P5 accuracy evidence.
+- Reworked deployment target around `/opt/bmo`, Git `main` production source, Docker image runtime, external config/secrets, Caddy, Tailscale admin access, Beszel + Telegram alerts, backup/restore, rollback, RVC ownership, PostgreSQL readiness, and hardware handoff gate.
+- Split future deployment work into dependency-based P6–P10 roadmap.
+- Marked old static P1/P5 phase markers and the 2026-07-18 verification report as historical where appropriate.
+- Removed non-authoritative `docs/superpowers/` planning material from final handoff package because it referenced uncreated handoff files/scripts and was not intended as protocol authority.
+- Canonical Hardware Contract v1.0.5, PRD v1.2.0, and archived Backend Implementation v1.0.5 were preserved byte-for-byte.
+
+## Historical package changelog
+
+## 2026-07-19 — P5 VERIFIED — BACKEND
+
+- Mengotorisasi hanya P5, mengubah active phase menjadi `P5`, dan menjaga P6 tetap `NOT AUTHORIZED`.
+- Mempertahankan P1 sebagai `VERIFIED — BACKEND`, P2 sebagai `VERIFIED — LOCAL FUNCTIONAL`, P3 sebagai `IMPLEMENTED — not VERIFIED`, `P3-RVC-VERIFICATION` sebagai `DEFERRED`, dan P4 sebagai `VERIFIED — LOCAL FUNCTIONAL`.
+- Menambahkan idempotency berbasis request ID/body SHA-256, duplicate conflict handling, public duplicate status mapping, tombstone retention, bounded request GC, MP3 TTL expiry, `410 AUDIO_EXPIRED`, startup cleanup, playback done/failed idempotency, stage-specific timeout mapping, total-timeout cancellation, production secret guard, heartbeat instrumentation, fake ESP32 self-host mode, dan one-hour idle WebSocket soak script.
+- Menambahkan P5 targeted tests untuk idempotency, request store GC, TTL/temp cleanup, playback lifecycle, timeout/failure matrix, dan security; backend full suite kini 21 files / 99 tests passed, P5 targeted 7 files / 29 tests passed, audio-service 48 tests passed.
+- Menjalankan one-hour idle WebSocket soak 3,600,004 ms dengan ping/pong 59/59, memory RSS 89,092,096 → 56,586,240 bytes, tanpa disconnect/reconnect/crash/unhandled rejection.
+- Membuktikan post-soak full local pipeline dengan real faster-whisper, Hermes-compatible fixture, real Kokoro/FFmpeg, fake ESP32, dan MP3 ffprobe.
+- Tidak mengubah PRD, hardware contract, public endpoint, WebSocket event set, firmware, deployment VPS, Spotify, WhatsApp, database, mobile app, atau P6.
 
 ## 2026-07-19 — P4 VERIFIED — LOCAL FUNCTIONAL
 

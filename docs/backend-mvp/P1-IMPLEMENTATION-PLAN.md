@@ -1,5 +1,7 @@
 # P1 — Core Backend Transport & Hardware Test Mode Implementation Plan
 
+> **HISTORICAL PHASE RECORD — NOT A CURRENT EXECUTION INSTRUCTION.** This file records the P1–P5 state/ownership at the time it was written. References to “P6” or old runtime defaults inside this record are historical. For current execution order and ownership, use `../NEXT-ACTION.md`, `IMPLEMENTATION-STATUS.md`, and `../roadmap/P6-P10-ROADMAP.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` inline. Steps use checkbox (`- [ ]`) syntax for tracking. No subagent/delegation is authorized.
 
 **Goal:** Build only P1: Express.js + TypeScript transport, authenticated WebSocket state, raw WAV validation/upload, hardware-test dummy MP3 delivery, and basic fake ESP32 verification.
