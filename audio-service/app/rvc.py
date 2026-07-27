@@ -14,6 +14,7 @@ RVC_MODEL_REVISION = "82a8bc529bd41b930589188ead30f073d4f99fc0"
 RVC_MODEL_ARCHIVE = "CGO-adventure-time-BMO-rvc-v2-420e.zip"
 RVC_MODEL_EXPECTED_SIZE = 63_780_149
 RVC_MODEL_EXPECTED_SHA256 = "dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0"
+RVC_RELATIVE_DIR = Path("rvc/bmo")
 
 
 class RvcCommandConverter:
@@ -26,7 +27,7 @@ class RvcCommandConverter:
         if not self._settings.rvc_enabled:
             self.error = "RVC disabled"
             return False
-        if not self._settings.rvc_model_path.is_file():
+        if self._settings.rvc_model_path is None or not self._settings.rvc_model_path.is_file():
             self.error = "RVC model file unavailable"
             return False
         if not self._settings.rvc_infer_command:

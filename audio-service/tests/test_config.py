@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -18,6 +20,9 @@ def test_settings_use_p2_whisper_defaults():
     assert settings.whisper_vad is True
     assert settings.whisper_hotwords == "BMO"
     assert settings.model_download_allowed is False
+    assert settings.hf_home == Path("/opt/bmo/models/hf-cache")
+    assert settings.torch_home == Path("/opt/bmo/models/torch-cache")
+    assert settings.model_manifest_path == Path("/opt/bmo/models/MODEL_MANIFEST.md")
 
 
 def test_settings_use_p3_tts_defaults():
@@ -25,6 +30,7 @@ def test_settings_use_p3_tts_defaults():
 
     assert settings.kokoro_lang_code == "a"
     assert settings.kokoro_voice == "af_heart"
+    assert settings.kokoro_speed == 0.80
     assert settings.kokoro_sample_rate == 24_000
     assert settings.output_mp3_sample_rate == 24_000
     assert settings.output_mp3_bitrate == "96k"
@@ -38,6 +44,7 @@ def test_settings_use_p3_tts_defaults():
     assert settings.rvc_model_archive == "CGO-adventure-time-BMO-rvc-v2-420e.zip"
     assert settings.rvc_model_expected_size == 63_780_149
     assert settings.rvc_model_expected_sha256 == "dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0"
+    assert settings.rvc_model_path is None
 
 
 def test_settings_reject_short_internal_service_token():

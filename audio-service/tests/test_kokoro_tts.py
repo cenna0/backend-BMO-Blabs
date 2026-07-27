@@ -37,7 +37,7 @@ def test_kokoro_synthesizer_merges_all_segments_into_one_24khz_wav(tmp_path):
 
     assert seconds >= 0
     assert captured["pipeline"].lang_code == "a"
-    assert captured["pipeline"].calls == [("Hi! BMO is ready to help.", "af_heart", 1.0)]
+    assert captured["pipeline"].calls == [("Hi! BMO is ready to help.", "af_heart", 0.80)]
     with wave.open(str(output), "rb") as wav:
         assert wav.getframerate() == 24_000
         assert wav.getnchannels() == 1

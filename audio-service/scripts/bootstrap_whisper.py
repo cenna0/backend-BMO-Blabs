@@ -14,6 +14,8 @@ if str(ROOT) not in sys.path:
 
 from app.config import Settings
 
+DEFAULT_MODELS_DIR = Path("/opt/bmo/models")
+
 
 def build_manifest(settings: Settings, status: str) -> dict[str, object]:
     return {
@@ -36,7 +38,7 @@ def main() -> int:
     parser = ArgumentParser(description="Bootstrap/cache faster-whisper model for BMO P2.")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--allow-download", action="store_true")
-    parser.add_argument("--models-dir", type=Path, default=Path("/opt/bmo-mvp/models"))
+    parser.add_argument("--models-dir", type=Path, default=DEFAULT_MODELS_DIR)
     parser.add_argument("--manifest", type=Path, default=Path("MODEL_MANIFEST.json"))
     args = parser.parse_args()
 

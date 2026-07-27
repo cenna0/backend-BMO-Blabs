@@ -21,7 +21,10 @@ from app.rvc import (
     RVC_MODEL_EXPECTED_SIZE,
     RVC_MODEL_REPO,
     RVC_MODEL_REVISION,
+    RVC_RELATIVE_DIR,
 )
+
+DEFAULT_MODELS_DIR = Path("/opt/bmo/models")
 
 
 @dataclass(frozen=True)
@@ -130,12 +133,12 @@ def write_manifest(
 def main() -> int:
     parser = ArgumentParser(description="Safely bootstrap the canonical BMO RVC model.")
     parser.add_argument("--allow-download", action="store_true")
-    parser.add_argument("--models-dir", type=Path, default=Path("/opt/bmo-mvp/models"))
+    parser.add_argument("--models-dir", type=Path, default=DEFAULT_MODELS_DIR)
     parser.add_argument("--manifest", type=Path, default=Path("MODEL_MANIFEST.rvc.json"))
     args = parser.parse_args()
 
     settings = Settings(internal_service_token="bootstrap-token-000")
-    rvc_dir = args.models_dir / "rvc-bmo"
+    rvc_dir = args.models_dir / RVC_RELATIVE_DIR
     archive_dir = rvc_dir / "archive"
     extract_dir = rvc_dir / "assets"
     archive_path = archive_dir / settings.rvc_model_archive

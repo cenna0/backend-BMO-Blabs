@@ -1,4 +1,5 @@
 import hashlib
+from pathlib import Path
 import zipfile
 
 import pytest
@@ -10,6 +11,7 @@ from app.rvc import (
     RVC_MODEL_REPO,
     RVC_MODEL_REVISION,
 )
+from scripts import bootstrap_rvc
 from scripts.bootstrap_rvc import inspect_rvc_archive, safe_extract_rvc_assets, verify_archive
 
 
@@ -25,6 +27,11 @@ def test_rvc_constants_match_canonical_model():
     assert RVC_MODEL_ARCHIVE == "CGO-adventure-time-BMO-rvc-v2-420e.zip"
     assert RVC_MODEL_EXPECTED_SIZE == 63_780_149
     assert RVC_MODEL_EXPECTED_SHA256 == "dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0"
+
+
+def test_rvc_bootstrap_defaults_to_current_models_layout():
+    assert bootstrap_rvc.DEFAULT_MODELS_DIR == Path("/opt/bmo/models")
+    assert bootstrap_rvc.RVC_RELATIVE_DIR == Path("rvc/bmo")
 
 
 def test_rvc_archive_inspection_accepts_only_model_assets(tmp_path):

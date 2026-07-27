@@ -1,13 +1,56 @@
+# Secrets and local environment
 .env
 .env.*
 !.env.example
 !*.env.example
+!*.example
+
+# Dependencies and language caches
 node_modules/
-dist/
 backend/node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build and test output
+dist/
 backend/dist/
+build/
+coverage/
+
+# Runtime data, model assets, and framework caches
 backend/temp-audio/
+temp-audio/
 audio-service/models/
 audio-service/temp/
+**/hf-cache/
+**/torch-cache/
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.bin
+*.safetensors
+*.index
+*.mp3
+*.wav
+!backend/tests/fixtures/*.mp3
+!backend/tests/fixtures/*.wav
+
+# Logs and local backups
+*.log
+*.bak
+*.backup
+*.old
+*.orig
+*~
+
+# Local validation and agent/worktree artifacts
 manual-validation/
 .worktrees/
+worktrees/
+.codex/
+GPT_PUSH_REVIEW_CONTEXT.md

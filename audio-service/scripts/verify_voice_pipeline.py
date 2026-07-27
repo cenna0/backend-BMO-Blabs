@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
 from app.config import Settings
 from app.ffmpeg import FfmpegConverter, probe_audio
 from app.kokoro_tts import KokoroSynthesizer
-from app.rvc import RvcCommandConverter
+from app.rvc import RVC_RELATIVE_DIR, RvcCommandConverter
 from app.tts import TtsEngineState, TtsOrchestrator
 
 
@@ -111,7 +111,7 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    rvc_assets_dir = args.models_dir / "rvc-bmo" / "assets"
+    rvc_assets_dir = args.models_dir / RVC_RELATIVE_DIR / "assets"
     discovered_model = discover_single_asset(rvc_assets_dir, ".pth")
     discovered_index = discover_single_asset(rvc_assets_dir, ".index")
 
@@ -120,12 +120,12 @@ def main() -> int:
         hf_home=args.models_dir / "hf-cache",
         torch_home=args.models_dir / "torch-cache",
         tts_temp_dir=work_dir,
-        rvc_model_path=discovered_model or args.models_dir / "rvc-bmo" / "assets" / "__missing__.pth",
+        rvc_model_path=discovered_model,
         rvc_index_path=discovered_index,
     )
     before_cache = {
         "kokoro": cache_stats(args.models_dir / "hf-cache"),
-        "rvc": cache_stats(args.models_dir / "rvc-bmo"),
+        "rvc": cache_stats(args.models_dir / RVC_RELATIVE_DIR),
     }
 
     kokoro = KokoroSynthesizer(settings)
@@ -183,7 +183,7 @@ def main() -> int:
     }
     after_cache = {
         "kokoro": cache_stats(args.models_dir / "hf-cache"),
-        "rvc": cache_stats(args.models_dir / "rvc-bmo"),
+        "rvc": cache_stats(args.models_dir / RVC_RELATIVE_DIR),
     }
     temp_remaining = [str(path) for path in work_dir.rglob("*") if path.is_file()]
 
@@ -198,7 +198,7 @@ def main() -> int:
             "output_mp3_bitrate": settings.output_mp3_bitrate,
             "rvc_available": real_rvc_available,
             "rvc_error": rvc.error,
-            "rvc_model_path": str(settings.rvc_model_path),
+            "rvc_model_path": str(settings.rvc_model_path) if settings.rvc_model_path else None,
             "rvc_index_path": str(settings.rvc_index_path) if settings.rvc_index_path else None,
             "rvc_f0_up_key": settings.rvc_f0_up_key,
             "rvc_f0_method": settings.rvc_f0_method,

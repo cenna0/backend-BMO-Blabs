@@ -3,6 +3,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scripts import bootstrap_whisper
+
+
+def test_bootstrap_whisper_defaults_to_current_models_root():
+    assert bootstrap_whisper.DEFAULT_MODELS_DIR == Path("/opt/bmo/models")
+
 
 def test_bootstrap_whisper_dry_run_writes_manifest_without_model_files(tmp_path):
     manifest = tmp_path / "MODEL_MANIFEST.json"
