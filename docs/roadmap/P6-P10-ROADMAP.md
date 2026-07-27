@@ -15,13 +15,15 @@ Prepare a safe, repeatable VPS foundation without yet claiming the BMO voice sta
 
 ### Inputs
 - existing VPS;
-- existing Hermes/Codex installations;
+- Hermes preflight state may be present or absent;
+- existing Codex installation when available;
 - `personalbmo.web.id` DNS ownership;
 - production source branch `main`.
 
 ### Scope
 - preflight audit;
-- preserve/audit Hermes existing service;
+- classify Hermes from recorded evidence; preserve it when present; bootstrap it when absent;
+- keep Hermes as a host runtime, bind only to `127.0.0.1:8642`, and record actual user/paths/startup/recovery evidence;
 - create/confirm `bmo-admin` operating model and Codex access from that account;
 - install/configure Docker Engine + Compose if absent;
 - create `/opt/bmo` layout/ownership including persistent `MODEL_MANIFEST.md`;
@@ -38,13 +40,16 @@ Prepare a safe, repeatable VPS foundation without yet claiming the BMO voice sta
 
 ### Output
 - stable VPS foundation;
-- documented service inventory;
+- documented service inventory including the actual Hermes runtime user, install/config/data paths, startup/service mechanism, and recovery/start procedure;
 - working private admin access before public SSH restriction;
 - Caddy/Beszel foundation;
 - deployment/rollback scripts or documented commands.
 
 ### Acceptance criteria
-- Hermes remains healthy and loopback-only;
+- a present Hermes installation remains healthy without cosmetic reinstall/migration;
+- an absent Hermes installation is bootstrapped/configured as a maintainable host runtime;
+- Hermes health passes, listener is only `127.0.0.1:8642`, and no public `:8642` exposure exists;
+- Hermes restart behavior is verified and reboot/autostart behavior is checked where safely possible;
 - Docker/Compose works;
 - `/opt/bmo` ownership/permissions verified;
 - secrets are outside Git and mode-restricted;
@@ -69,7 +74,7 @@ Run the existing backend/audio implementation on the real VPS and expose it safe
 - Git repository reachable;
 - `main` deployment source;
 - runtime secrets supplied out-of-band;
-- existing Hermes API healthy on host.
+- P6-verified Hermes host API healthy on `127.0.0.1:8642`.
 
 ### Scope
 - verify/fetch the P6-established `/opt/bmo/app` Git checkout and select the exact `main` commit to deploy;
@@ -80,6 +85,7 @@ Run the existing backend/audio implementation on the real VPS and expose it safe
 - persistent model caches;
 - run backend/audio containers as non-root where possible;
 - connect backend → Hermes host service;
+- P7 integrates backend/audio with Hermes; it does not perform initial Hermes installation.
 - Caddy route `api.personalbmo.web.id`;
 - HTTPS/WSS public smoke tests;
 - fake ESP32 E2E over public domain;

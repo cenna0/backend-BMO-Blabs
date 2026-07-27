@@ -13,7 +13,8 @@
 - Source is cloned/pulled on the VPS, but runtime code runs from built Docker images.
 - Editing source on the VPS does not change the running production container until build/deploy occurs.
 - Persistent data, models, secrets, and backups live outside the Git checkout.
-- Hermes remains a host service and must not be moved into Docker merely for cleanup.
+- Hermes remains a host runtime and is never Dockerized.
+- If Hermes is present, preserve its proven ownership/path/config/runtime. If Hermes is absent, P6 owns initial host bootstrap.
 - Codex is an admin/development tool, not a BMO runtime dependency.
 - Production public traffic uses domain + HTTPS/WSS through Caddy.
 - Internal service ports are not exposed to the public internet.
@@ -51,13 +52,18 @@ bmo-admin
 ├── Docker Compose operations
 └── sudo when required
 
-Hermes runtime user
-└── preserve existing Hermes ownership/user unless migration is proven necessary and approved
+Hermes runtime ownership
+└── preserve proven ownership if present; select from actual install/runtime requirements if absent
 ```
 
 Do **not** create a Linux host user named `docker` just to run containers. Docker is a daemon/service; each container runs under its own appropriate non-root runtime user where supported.
 
-Before changing Hermes ownership/path, audit the actual existing Hermes user, service definition, config path, and data path. A stable existing installation wins over cosmetic restructuring.
+Before changing Hermes state, classify it from process, service/supervisor, listener, installation/runtime, and path evidence:
+
+- **If Hermes is present**, audit the actual user, service definition, install/config/data paths, listener, and health; a stable installation wins over cosmetic restructuring.
+- **If Hermes is absent**, P6 may install/configure the host runtime, bind it only to `127.0.0.1:8642`, choose ownership appropriate to the actual installation model, and create a maintainable startup/service mechanism.
+
+Do not create a dedicated Hermes Linux user unless the installation/runtime model or a proven security/operational need requires one. Record the actual decision and evidence.
 
 ## 4. Target filesystem
 
@@ -252,7 +258,9 @@ BMO backend
 
 ### 7.1 P7 application container networking
 
-P7 target networking keeps the original proven host-access model: `bmo-backend` uses Linux `network_mode: host`, binds the production origin to `127.0.0.1:3000`, and therefore can call the existing host-loopback Hermes at `127.0.0.1:8642`. `bmo-audio-service` stays on normal container networking and publishes only `127.0.0.1:8001:8001`; P9 PostgreSQL, when activated, is private and may expose `127.0.0.1:5432` only for the host-network backend if required by the final Compose topology. Caddy is the only public path. If the P7 source audit proves a different host-access mechanism is already implemented and safer, document/test it before changing this target; never expose Hermes or change the public hardware contract merely to solve container networking.
+P7 target networking keeps the original proven host-access model: `bmo-backend` uses Linux `network_mode: host`, binds the production origin to `127.0.0.1:3000`, and therefore can call the P6-verified host-loopback Hermes at `127.0.0.1:8642`. `bmo-audio-service` stays on normal container networking and publishes only `127.0.0.1:8001:8001`; P9 PostgreSQL, when activated, is private and may expose `127.0.0.1:5432` only for the host-network backend if required by the final Compose topology. Caddy is the only public path. If the P7 source audit proves a different host-access mechanism is already implemented and safer, document/test it before changing this target; never expose Hermes or change the public hardware contract merely to solve container networking.
+
+P7 performs backend/audio → Hermes integration only. Initial Hermes installation belongs to P6 when preflight proves it absent.
 
 Audio Service does not receive `HERMES_API_KEY` or device token.
 
@@ -541,7 +549,7 @@ If Docker is not installed, record that fact; do not assume the historical docum
 Inspect:
 
 - current users and sudo access;
-- existing Hermes user/service/path;
+- Hermes process/service/supervisor/listener/install/runtime/path evidence, then classify `PRESENT` or `ABSENT`;
 - Codex installation/location;
 - current ports/listeners;
 - DNS resolution;
@@ -553,12 +561,12 @@ If free disk is below 20 GB, stop large model/runtime downloads and report a blo
 
 ## 19. Approval boundary during P6
 
-The architecture choices in this file are already selected. When the user explicitly authorizes **P6**, that authorization includes the non-destructive P6 setup described in `../roadmap/P6-EXECUTION-SPEC.md` (for example creating the approved filesystem/operator account, installing/configuring Docker/Compose, Caddy, Tailscale, Beszel, monitoring, and applying the safe firewall transition after alternate SSH is proven).
+The architecture choices in this file are already selected. When the user explicitly authorizes **P6**, that authorization includes the non-destructive P6 setup described in `../roadmap/P6-EXECUTION-SPEC.md` (for example creating the approved filesystem/operator account, installing/configuring Docker/Compose, Caddy, Tailscale, Beszel, monitoring, and applying the safe firewall transition after alternate SSH is proven). When preflight proves Hermes absent, initial Hermes host bootstrap is authorized within P6.
 
 Even with P6 authorized, stop and obtain approval before destructive/high-risk changes such as:
 
 - deleting existing data/container/image/volume;
-- changing or migrating Hermes runtime/config/ownership;
+- changing, reinstalling, or migrating a Hermes runtime/config/ownership that preflight found present;
 - closing/replacing the only SSH access path;
 - opening public service ports beyond the approved design;
 - rotating production secrets;

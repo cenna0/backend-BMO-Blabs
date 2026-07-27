@@ -1,6 +1,6 @@
 # BMO Backend MVP — Implementation Status
 
-**Last updated:** 2026-07-26  
+**Last updated:** 2026-07-27
 **Backend reference lineage:** 1.0.1; current active documentation is date-audited and governed by this status file
 
 ## 1. Control state
@@ -42,14 +42,16 @@ The previous active P5 marker was stale after P5 verification/manual follow-up. 
 | P3 | Kokoro + FFmpeg + RVC fallback | 01, 03, 04, 05, 06 | IMPLEMENTED — not VERIFIED | AUTHORIZED BY USER | [`P3-TEST-EVIDENCE.md`](P3-TEST-EVIDENCE.md); real RVC inference runtime unavailable |
 | P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P4-TEST-EVIDENCE.md`](P4-TEST-EVIDENCE.md); real local Hermes pipeline passed; real Hermes host/VPS integration belongs to P7 |
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P5-TEST-EVIDENCE.md`](P5-TEST-EVIDENCE.md) |
-| P6 | VPS foundation: users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale admin path, firewall, Beszel/Telegram, backup baseline | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | READY | AWAITING EXPLICIT EXECUTION COMMAND | — |
-| P7 | Deploy backend/audio on VPS, Hermes host integration, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | NOT_STARTED | DEPENDS ON P6 VERIFIED | — |
+| P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | READY | AWAITING EXPLICIT EXECUTION COMMAND | — |
+| P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | NOT_STARTED | DEPENDS ON P6 VERIFIED | — |
 | P8 | Real RVC inference + fallback verification + VPS resource benchmark | 04–06 + roadmap | NOT_STARTED | DEPENDS ON P7 VERIFIED | — |
 | P9 | PostgreSQL + Prisma ready-to-use application data layer + backup/restore | PRD + 06 + roadmap | NOT_STARTED | DEPENDS ON P8 COMPLETED/VERIFIED STATUS; EXECUTE AFTER P8 | — |
 | P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
 
 ## 3.1 Post-P5 implementation updates captured by this audit
 
+- P6 now owns conditional Hermes host bootstrap: preserve/audit a proven installation when present; install/configure a maintainable loopback-only host runtime when preflight proves it absent. P7 remains integration-only and does not own initial Hermes installation.
+- The 2026-07-27 production VPS preflight reported Hermes `ABSENT`; this documentation update records the execution path but did not install Hermes or start P6 host changes. The P6 executor must re-confirm absence from host evidence before bootstrap.
 - STT accuracy investigation on 2026-07-25 selected `WHISPER_MODEL=medium` with `WHISPER_HOTWORDS=BMO`, while keeping CPU INT8, 4 threads, 1 worker, beam 5, VAD, and language auto-detect. The earlier `small` references in P2 evidence remain historical evidence of P2 at that time, not the current tuning target.
 - Kokoro manual listening selected `KOKORO_VOICE=af_heart` with `KOKORO_SPEED=0.80` as the current deployment target; earlier evidence that production remained at `1.0` is historical and superseded by this later project decision. Revalidate perceived tempo after real RVC integration.
 - Hermes real local `/v1/responses` integration is recorded in the P5 manual evidence addendum. This is not equivalent to VPS/public deployment verification.
@@ -94,7 +96,7 @@ P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10
 - P2/P3 dapat memakai internal test harness, tetapi tidak boleh mengubah public interface.
 - P4 menyatukan seluruh pipeline setelah komponen individual terbukti.
 - P5 menutup edge case dan membuktikan acceptance criteria lengkap.
-- P6 menyiapkan fondasi VPS; P7 menjalankan deployment/public integration; P8 membuktikan RVC dan resource benchmark; P9 menyiapkan database; P10 melakukan hardware handoff/physical verification.
+- P6 menyiapkan fondasi VPS termasuk Hermes host runtime kondisional; P7 menjalankan deployment/public integration terhadap Hermes yang sudah diverifikasi P6; P8 membuktikan RVC dan resource benchmark; P9 menyiapkan database; P10 melakukan hardware handoff/physical verification.
 - Idle WebSocket soak satu jam menjadi bagian P5 reliability verification, bukan blocker untuk memulai P2.
 
 ## 6. External integration milestones

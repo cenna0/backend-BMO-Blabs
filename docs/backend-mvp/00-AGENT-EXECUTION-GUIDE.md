@@ -72,7 +72,7 @@ Hanya bila phase terkait telah diotorisasi, agent boleh:
 - membuat WebSocket server, REST routes, state store, dan voice pipeline orchestration;
 - membuat Local Audio Service dengan Python + FastAPI;
 - mengintegrasikan faster-whisper, Kokoro, RVC, dan FFmpeg;
-- membuat adapter ke Hermes API existing;
+- membuat adapter ke P6-verified Hermes host API;
 - membuat fake ESP32, test fixtures, automated tests, dan benchmark;
 - membuat Dockerfile, Docker Compose, health check, cleanup, dan staging backend;
 - membuat mock, stub, interface, atau feature flag minimal untuk dependency phase berikutnya.
@@ -88,8 +88,8 @@ Agent dilarang:
 - mengimplementasikan PostgreSQL/Prisma before P9 authorization or moving voice-request state into PostgreSQL; P9 is a separate application-data phase governed by the roadmap/latest approved data requirements;
 - mengubah PRD, hardware contract, keputusan locked, endpoint, event, field JSON, close code, atau error code tanpa approval user;
 - mengubah global Hermes config atau `SOUL.md`;
-- memindahkan, menghentikan, mengganti, atau mengekspos service Hermes existing;
-- melakukan tindakan infrastructure berisiko di luar scope phase yang sudah diotorisasi. Untuk **P6**, satu instruksi eksplisit user untuk `execute P6`/`continue next phase` sudah mengotorisasi instalasi/config non-destruktif yang memang tercantum di `../roadmap/P6-EXECUTION-SPEC.md` (Docker/Compose, Caddy, Tailscale, Beszel, TLS, dan transisi firewall yang aman). Approval tambahan tetap wajib untuk penghapusan data/container/image/volume, migrasi Hermes, menutup satu-satunya SSH path sebelum alternatif terbukti, rotasi credential existing, atau perubahan destruktif/tidak terduga;
+- memindahkan, mengganti, atau mengekspos instalasi Hermes yang terbukti ada; recover melalui mechanism existing dan jangan reinstall/migrate untuk cosmetics;
+- melakukan tindakan infrastructure berisiko di luar scope phase yang sudah diotorisasi. Untuk **P6**, satu instruksi eksplisit user untuk `execute P6`/`continue next phase` sudah mengotorisasi instalasi/config non-destruktif yang memang tercantum di `../roadmap/P6-EXECUTION-SPEC.md` (Docker/Compose, Caddy, Tailscale, Beszel, TLS, transisi firewall yang aman, dan conditional Hermes path). If Hermes is absent berdasarkan preflight evidence, P6 mengotorisasi initial host-runtime bootstrap. Approval tambahan tetap wajib untuk penghapusan data/container/image/volume, migrasi instalasi Hermes yang terbukti ada, menutup satu-satunya SSH path sebelum alternatif terbukti, rotasi credential existing, atau perubahan destruktif/tidak terduga;
 - mengerjakan phase `NOT_STARTED` atau `BLOCKED`; phase `READY` hanya boleh dimulai setelah explicit user execution command mengubahnya menjadi `AUTHORIZED/IN_PROGRESS`;
 - melakukan refactor spekulatif atau membuat fitur future hanya karena terlihat mudah.
 

@@ -128,7 +128,8 @@ Sediakan:
 
 Implementasi dianggap selesai jika:
 
-- [ ] Hermes existing tetap sehat.
+- [ ] Hermes host runtime sehat dan loopback-only.
+- [ ] P6 branch `PRESENT` mempertahankan instalasi yang terbukti; branch `ABSENT` menyelesaikan bootstrap/install, ownership/path/service evidence, restart, dan recovery procedure sebelum P7.
 - [ ] Docker Compose berhasil build dan start.
 - [ ] Backend health `ok` atau `degraded` hanya karena RVC.
 - [ ] Audio service health valid setelah model load dan model tidak di-download ulang setiap restart.

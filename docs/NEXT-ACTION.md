@@ -61,7 +61,7 @@ Public ports                    : 80/443 only for application/monitoring traffic
 Public SSH                      : may be restricted only AFTER Tailscale SSH path is proven
 Daily operator                  : bmo-admin
 Root                            : emergency/system admin only
-Hermes                          : preserve existing host runtime/user/path; do not migrate for cosmetics
+Hermes                          : host runtime; preserve if present, bootstrap in P6 if absent; never Dockerize
 Docker host user                : do NOT create a dedicated Linux user named docker
 Runtime code                    : immutable Docker images built from Git source
 Live source bind mount          : do NOT use for production backend/audio-service
@@ -77,7 +77,10 @@ Database activation              : PostgreSQL/DATABASE_URL are P9; P7 voice depl
 
 P6 **does**:
 
-- audit and protect existing VPS/Hermes/Codex;
+- audit existing VPS/Hermes/Codex state;
+- follow a deterministic Hermes branch:
+  - **Hermes present:** audit and preserve the proven user/path/config/data/runtime; do not reinstall or migrate for cosmetics;
+  - **Hermes absent:** bootstrap/install Hermes host runtime, select ownership from the actual installation model, configure maintainable startup, bind only to `127.0.0.1:8642`, health-check, and record recovery/restart evidence;
 - establish admin access/user/permissions;
 - Docker + Compose foundation;
 - `/opt/bmo` filesystem and config separation;
@@ -97,7 +100,9 @@ P6 **does not**:
 - deploy PostgreSQL/Prisma application layer — P9;
 - hand a live endpoint/token to physical hardware or claim HW integration — P10;
 - modify the firmware contract;
-- migrate Hermes to Docker or another Linux user merely for cleanliness.
+- migrate a working Hermes installation to Docker, another Linux user, or another path merely for cleanliness;
+- create an unnecessary dedicated Hermes Linux user;
+- defer initial Hermes installation to P7. P7 performs backend/audio → Hermes integration, not initial Hermes installation.
 
 ## 5. Authorization semantics
 
@@ -116,6 +121,8 @@ Even after P6 authorization, stop for approval before:
 - replacing unrelated existing host services;
 - proceeding around an unverified model/license/security blocker.
 
+If read-only preflight proves Hermes is absent, initial host-runtime bootstrap under the P6 execution spec is already within P6 scope. This does not authorize replacing or cosmetically restructuring a Hermes installation that is present.
+
 ## 6. First action after P6 authorization
 
 Do **not** install first. Start with a read-only preflight and capture evidence:
@@ -125,7 +132,8 @@ OS/kernel
 CPU/RAM/disk
 current users/sudo
 current SSH path
-Hermes user/process/service/config/data/listener
+Hermes installation evidence + PRESENT/ABSENT classification
+Hermes user/process/service/config/data/listener when present
 Codex location
 Docker/Compose presence
 current containers/images/volumes
@@ -138,6 +146,8 @@ Git remote/current repo state
 
 If a real VPS fact conflicts with these docs, document the conflict before modifying the host.
 
+For Hermes, distinguish `ABSENT` from merely stopped/unhealthy by checking process, service/supervisor, known installation/config/data paths, runtime/package evidence, and listener. Record sanitized evidence before selecting the branch.
+
 ## 7. P6 finish line
 
 P6 may become `VERIFIED` only when all acceptance criteria in `roadmap/P6-EXECUTION-SPEC.md` pass and evidence is recorded.
@@ -145,7 +155,11 @@ P6 may become `VERIFIED` only when all acceptance criteria in `roadmap/P6-EXECUT
 At minimum:
 
 ```text
-Hermes still healthy + loopback-only
+Hermes PRESENT/ABSENT branch evidence recorded
+Hermes healthy + listener only at 127.0.0.1:8642
+Hermes actual runtime user, install/config/data paths, and startup/service mechanism recorded
+Hermes restart verified; reboot/autostart verified where safely possible
+Hermes recovery/start procedure documented; no public :8642 exposure
 bmo-admin operational
 Docker + Compose healthy
 /opt/bmo structure + permissions verified

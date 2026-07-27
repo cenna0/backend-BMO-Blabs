@@ -249,6 +249,11 @@ p6_spec = active_doc_text[docs / "roadmap" / "P6-EXECUTION-SPEC.md"]
 roadmap = active_doc_text[docs / "roadmap" / "P6-P10-ROADMAP.md"]
 runtime_config = active_doc_text[bm / "CURRENT-RUNTIME-CONFIG.md"]
 deployment_doc = active_doc_text[bm / "06-DEPLOYMENT-AND-OPERATIONS.md"]
+scope_doc = active_doc_text[bm / "01-SCOPE-AND-DECISIONS.md"]
+implementation_status = active_doc_text[bm / "IMPLEMENTATION-STATUS.md"]
+recovery_doc = active_doc_text[docs / "operations" / "MAINTENANCE-AND-RECOVERY.md"]
+execution_guide = active_doc_text[bm / "00-AGENT-EXECUTION-GUIDE.md"]
+testing_doc = active_doc_text[bm / "05-TESTING-AND-ACCEPTANCE.md"]
 
 current_doc_requirements = {
     "docs/README.md": (
@@ -317,6 +322,126 @@ for label, (text, required_values) in current_doc_requirements.items():
     for value in required_values:
         if value not in text:
             errors.append(f"{label} missing current-state assertion: {value}")
+
+hermes_phase_requirements = {
+    "docs/backend-mvp/00-AGENT-EXECUTION-GUIDE.md": (
+        execution_guide,
+        [
+            "P6-verified Hermes host API",
+            "If Hermes is absent",
+            "initial host-runtime bootstrap",
+        ],
+    ),
+    "docs/NEXT-ACTION.md": (
+        next_action,
+        [
+            "Hermes present:",
+            "Hermes absent:",
+            "bootstrap/install Hermes host runtime",
+            "127.0.0.1:8642",
+            "P7 performs backend/audio → Hermes integration, not initial Hermes installation.",
+        ],
+    ),
+    "docs/roadmap/P6-EXECUTION-SPEC.md": (
+        p6_spec,
+        [
+            "PRESENT",
+            "ABSENT",
+            "Task 1A — Conditional Hermes host runtime",
+            "Hermes remains a host runtime and is never Dockerized.",
+            "Do not create a dedicated Linux user solely for Hermes",
+            "actual runtime user",
+            "actual install, config, and data paths",
+            "startup/service mechanism",
+            "127.0.0.1:8642",
+            "no public `:8642` exposure",
+            "restart behavior is verified",
+            "recovery/start procedure is documented",
+        ],
+    ),
+    "docs/roadmap/P6-P10-ROADMAP.md": (
+        roadmap,
+        [
+            "preserve it when present; bootstrap it when absent",
+            "P6-verified Hermes host API healthy",
+            "P7 integrates backend/audio with Hermes; it does not perform initial Hermes installation.",
+        ],
+    ),
+    "docs/backend-mvp/01-SCOPE-AND-DECISIONS.md": (
+        scope_doc,
+        [
+            "Preserve If Present, Bootstrap If Absent",
+            "Hermes present",
+            "Hermes absent",
+            "127.0.0.1:8642",
+        ],
+    ),
+    "docs/backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md": (
+        deployment_doc,
+        [
+            "If Hermes is present",
+            "If Hermes is absent",
+            "Hermes remains a host runtime and is never Dockerized.",
+            "initial Hermes host bootstrap is authorized within P6",
+        ],
+    ),
+    "docs/backend-mvp/IMPLEMENTATION-STATUS.md": (
+        implementation_status,
+        [
+            "P6 now owns conditional Hermes host bootstrap",
+            "P7 remains integration-only and does not own initial Hermes installation.",
+            "production VPS preflight reported Hermes `ABSENT`",
+        ],
+    ),
+    "docs/backend-mvp/05-TESTING-AND-ACCEPTANCE.md": (
+        testing_doc,
+        [
+            "Hermes host runtime sehat dan loopback-only.",
+            "PRESENT",
+            "ABSENT",
+        ],
+    ),
+    "docs/operations/MAINTENANCE-AND-RECOVERY.md": (
+        recovery_doc,
+        [
+            "Hermes present",
+            "Hermes absent",
+            "actual Hermes startup/service mechanism",
+            "127.0.0.1:8642",
+        ],
+    ),
+}
+for label, (text, required_values) in hermes_phase_requirements.items():
+    for value in required_values:
+        if value not in text:
+            errors.append(f"{label} missing conditional Hermes assertion: {value}")
+
+obsolete_hermes_assumptions = {
+    "docs/roadmap/P6-EXECUTION-SPEC.md": (
+        p6_spec,
+        "Runtime dependency to preserve:** existing Hermes host service",
+    ),
+    "docs/roadmap/P6-P10-ROADMAP.md": (
+        roadmap,
+        "existing Hermes API healthy on host",
+    ),
+    "docs/backend-mvp/01-SCOPE-AND-DECISIONS.md": (
+        scope_doc,
+        "Hermes sudah berjalan langsung di host VPS",
+    ),
+}
+for label, (text, obsolete_value) in obsolete_hermes_assumptions.items():
+    if obsolete_value in text:
+        errors.append(f"{label} still assumes Hermes already exists: {obsolete_value}")
+
+for value in [
+    "Hermes host bootstrap clarification",
+    "production VPS preflight reported Hermes absent",
+    "re-confirm `PRESENT` or `ABSENT`",
+    "does not modify the locked PRD snapshot or hardware contract",
+]:
+    if value not in docs_readme:
+        errors.append(f"docs/README.md missing Hermes operational clarification: {value}")
 
 active_source_paths = [
     *sorted((root / "backend" / "src").rglob("*.ts")),

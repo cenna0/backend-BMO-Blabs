@@ -4,7 +4,7 @@
 **Owner:** `bmo-admin` / Codex when explicitly authorized  
 **Applies from:** P6 foundation onward; service-specific steps activate when the related phase is deployed.
 
-> Purpose: make routine maintenance and recovery deterministic. Do not improvise destructive fixes on the VPS. Record the state before changing it, preserve Hermes, and use the latest verified deployment record as the rollback anchor.
+> Purpose: make routine maintenance and recovery deterministic. Do not improvise destructive fixes on the VPS. Record the state before changing it, preserve a proven Hermes installation, bootstrap it only when evidence shows it is absent, and use the latest verified deployment record as the rollback anchor.
 
 ## 1. Authority and safety
 
@@ -12,7 +12,9 @@
 - `docs/backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` defines the deployment target.
 - Public firmware/backend behavior remains governed by the canonical hardware contract.
 - Never delete data, volumes, users, or unrelated services just to make a health check green.
-- Never change/migrate Hermes ownership, config, data, or listener without explicit approval.
+- **Hermes present:** never reinstall/change/migrate its proven ownership, config, data, path, or listener merely for cleanliness.
+- **Hermes absent:** P6 may bootstrap the host runtime under the conditional path in `P6-EXECUTION-SPEC.md`; do not defer that bootstrap to P7.
+- Hermes must remain a host runtime bound only to `127.0.0.1:8642`.
 - Never close the only known-good SSH path.
 - Before a risky maintenance action, capture current versions, service state, disk/RAM, current deployed commit/image, and a relevant backup when applicable.
 
@@ -74,7 +76,7 @@ Default scheduler: use `systemd` timers when no existing healthy project schedul
 
 Backup material containing `.env`, Beszel data, notification credentials, database dumps, or other secrets must be access-restricted and encrypted/protected for off-server storage.
 
-Beszel data should be included in the weekly recovery set if practical because it may contain monitoring configuration/history. Treat it as sensitive. P6 must also inventory Hermes config/data paths and document what is backup-worthy/portable; if copied, protect it as sensitive and do not alter the working Hermes installation.
+Beszel data should be included in the weekly recovery set if practical because it may contain monitoring configuration/history. Treat it as sensitive. P6 must also inventory the actual Hermes runtime user, install/config/data paths, and startup/service mechanism, then document what is backup-worthy/portable. If copied, protect it as sensitive and do not alter a working Hermes installation.
 
 A backup is not considered verified until a restore procedure has been exercised against a safe test location/service. Git/deploy SSH credentials, Tailscale machine credentials, and other host identity secrets should normally be re-provisioned out-of-band during recovery rather than copied into a general backup bundle unless an explicitly encrypted credential-backup process is approved.
 
@@ -85,7 +87,7 @@ After an intentional or unexpected VPS reboot, verify in order:
 ```text
 1. SSH/Tailscale admin access
 2. disk/RAM/swap + filesystem health
-3. Hermes process/service + 127.0.0.1:8642 only
+3. Hermes health + actual startup/service mechanism + 127.0.0.1:8642 only
 4. Docker daemon + Compose-managed infra
 5. Caddy + HTTPS certificates/routes
 6. Beszel Hub + Agent + host/container visibility
@@ -109,6 +111,7 @@ Do not mark recovery complete because processes merely exist; check the service 
 | Disk <20 GB free | stop large model/image downloads and investigate | clean only known disposable cache/log/temp artifacts; never mass-prune blindly |
 | Disk full | stop writes causing damage where safe, identify largest known paths | recover space from documented disposable files/log rotation; verify DB/filesystem before normal operation |
 | Hermes down | inspect its existing service/user/logs | recover existing Hermes runtime; do not migrate/reinstall as a first response |
+| Hermes absent on fresh/replacement VPS | confirm absence from process/service/path/runtime/listener evidence | perform the P6 host-runtime bootstrap, restore approved portable config/data if available, bind only to `127.0.0.1:8642`, then verify health/restart/recovery evidence |
 | Backend container crash (P7+) | inspect health/log/correlation IDs | restart known image; rollback to previous SHA-tagged image if release-related |
 | Audio Service crash/OOM (P7+) | inspect model load/RAM/swap/logs | restart; preserve model cache; use Kokoro fallback only according to existing backend behavior |
 | Model/cache corruption (P7/P8+) | compare manifest/hash | re-download exact pinned revision; do not substitute a random newer model |
@@ -128,7 +131,11 @@ new VPS
 → restore Caddy/Tailscale/Docker foundation
 → restore /opt/bmo configuration + deployment metadata
 → restore Beszel configuration/data as needed
-→ recover existing Hermes data/config from its approved backup path (if backed up/portable)
+→ classify Hermes as PRESENT or ABSENT from evidence
+→ PRESENT: recover it through its recorded user/path/startup mechanism without cosmetic migration
+→ ABSENT: install the Hermes host runtime using the recorded P6 bootstrap procedure
+→ restore approved portable Hermes config/data when available
+→ verify Hermes health, restart/autostart, and listener 127.0.0.1:8642 only
 → P7: clone main + deploy known-good SHA-tagged release
 → P8: restore/re-fetch models by manifest/hash
 → P9: restore PostgreSQL dump/data
@@ -161,3 +168,5 @@ known residual risk
 ```
 
 Never include live tokens/passwords/authorization headers in the evidence.
+
+The P6 evidence/runbook must record the actual Hermes startup/service mechanism plus its exact start, stop, restart, status, health-check, and recovery commands. Generic guessed commands are not a recovery procedure.

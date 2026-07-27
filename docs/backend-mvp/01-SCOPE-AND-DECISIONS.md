@@ -11,9 +11,9 @@
 
 ## Cara menggunakan file ini
 
-File ini menentukan batas backend MVP, keputusan yang tidak boleh diubah, baseline yang wajib dibenchmark, dan guardrail terhadap service Hermes existing. Coding agent wajib membaca file ini pada setiap phase.
+File ini menentukan batas backend MVP, keputusan yang tidak boleh diubah, baseline yang wajib dibenchmark, dan guardrail terhadap Hermes host runtime. Coding agent wajib membaca file ini pada setiap phase.
 
-Dokumen awal v1.0.5 menggunakan istilah Hermes sebagai agent/orchestrator implementasi. **Model operasional project saat ini telah diklarifikasi:** Codex adalah coding/infrastructure executor untuk P6 dan phase implementasi berikutnya, sedangkan Hermes adalah runtime service/dependency BMO yang harus dipertahankan. Referensi historical P1–P5 yang menyebut Hermes sebagai executor tidak mengubah ownership saat ini.
+Dokumen awal v1.0.5 menggunakan istilah Hermes sebagai agent/orchestrator implementasi. **Model operasional project saat ini telah diklarifikasi:** Codex adalah coding/infrastructure executor untuk P6 dan phase implementasi berikutnya, sedangkan Hermes adalah host runtime service/dependency BMO. P6 mempertahankan instalasi yang ada atau melakukan initial bootstrap jika preflight membuktikan Hermes tidak ada. Referensi historical P1–P5 yang menyebut Hermes sebagai executor tidak mengubah ownership saat ini.
 
 ## 1. Peran Codex dan Hermes
 
@@ -34,13 +34,15 @@ Codex adalah tooling/operator. BMO tidak boleh bergantung pada Codex untuk runti
 
 Hermes:
 
-- berjalan existing pada host VPS;
+- tetap berjalan langsung sebagai host runtime, bukan container;
+- diaudit dan dipertahankan jika ditemukan pada preflight P6;
+- di-bootstrap oleh P6 jika preflight membuktikan belum terpasang;
 - menerima transcript dari backend melalui API lokal;
 - menghasilkan jawaban BMO;
 - menjaga personality/context/memory/capability runtime;
 - merupakan dependency yang harus tetap sehat selama perubahan infrastructure/backend.
 
-Hermes **bukan executor P6**, tidak dipindahkan ke Docker, dan tidak dimigrasikan ke user/path baru hanya untuk merapikan arsitektur.
+Hermes **bukan executor P6**, tidak dipindahkan ke Docker, dan instalasi yang sudah bekerja tidak dimigrasikan ke user/path baru hanya untuk merapikan arsitektur.
 
 Jangan hanya membuat scaffold. Hasil implementasi phase yang diotorisasi harus benar-benar berjalan dan memiliki evidence.
 
@@ -116,9 +118,9 @@ Guardrail seperti `backend_state`, body SHA-256, tombstone request, public statu
 
 ---
 
-## 3. Hermes Existing Service — Jangan Dirusak
+## 3. Hermes Host Service — Preserve If Present, Bootstrap If Absent
 
-Hermes sudah berjalan langsung di host VPS:
+Target host API Hermes:
 
 ```text
 Base URL : http://127.0.0.1:8642
@@ -130,14 +132,16 @@ Auth     : Bearer API key
 Aturan wajib:
 
 - Jangan memindahkan Hermes ke Docker.
-- Jangan menghentikan atau mengganti service Hermes existing.
+- **Hermes present:** audit dan pertahankan actual user, install/config/data path, startup/service mechanism, serta runtime yang sudah terbukti; jangan reinstall/migrate untuk kebersihan.
+- **Hermes absent:** P6 melakukan initial host-runtime bootstrap, menentukan ownership sesuai installation/runtime model aktual, dan mencatat path/startup/recovery evidence.
+- Jangan membuat dedicated Linux user Hermes hanya karena nama service; buat hanya jika model instalasi atau kebutuhan security/operational yang terbukti memang memerlukannya.
 - Jangan expose port `8642` ke internet.
 - Jangan mencetak API key aktif ke log atau laporan.
 - Jangan mengubah global `SOUL.md` tanpa persetujuan user.
 - Backend wajib mengirim personality/instructions BMO pada setiap request.
 
-Audit Hermes yang diberikan user sudah memverifikasi `/v1/responses`, `/v1/chat/completions`, dan `/v1/models`. Namun model pada body saat ini hanya label/cosmetic; model LLM aktual tetap ditentukan konfigurasi Hermes. Karena itu `/v1/models` boleh dipakai untuk diagnosis, tetapi jangan dijadikan dependency runtime backend.
+Evidence local historical yang diberikan user sudah memverifikasi `/v1/responses`, `/v1/chat/completions`, dan `/v1/models`. Evidence tersebut tidak membuktikan instalasi production VPS. Model pada body saat ini hanya label/cosmetic; model LLM aktual tetap ditentukan konfigurasi Hermes. Karena itu `/v1/models` boleh dipakai untuk diagnosis, tetapi jangan dijadikan dependency runtime backend.
 
-Jalankan smoke test ulang ke `/v1/responses` dengan `stream:false` untuk memastikan service belum berubah, simpan contoh struktur respons yang sudah disanitasi, lalu gunakan adapter Responses-style yang telah terbukti. `/v1/chat/completions` hanya menjadi fallback jika `/v1/responses` benar-benar gagal atau berubah tidak kompatibel.
+P6 wajib membuktikan health, listener `127.0.0.1:8642`, startup/restart, dan recovery procedure untuk branch present maupun absent. P7 kemudian menjalankan smoke/integration test backend ke `/v1/responses` dengan `stream:false`, menyimpan contoh struktur respons yang sudah disanitasi, lalu menggunakan adapter Responses-style yang telah terbukti. `/v1/chat/completions` hanya menjadi fallback jika `/v1/responses` benar-benar gagal atau berubah tidak kompatibel.
 
 ---

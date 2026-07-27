@@ -4,13 +4,13 @@
 **Executor:** Codex acting as infrastructure/backend operator  
 **Dependency:** safe access to the existing VPS  
 **Next phase after verification:** P7  
-**Runtime dependency to preserve:** existing Hermes host service
+**Hermes host policy:** preserve the proven installation when present; bootstrap a maintainable host runtime when absent
 
 ## 1. Goal
 
 Create a safe, maintainable and repeatable VPS foundation for BMO without yet deploying or claiming the public BMO voice API as ready.
 
-P6 is successful when later phases can deploy application services into a known filesystem/network/security/monitoring/backup baseline without guessing host state.
+P6 is successful when later phases can deploy application services into a known filesystem/network/security/monitoring/backup baseline without guessing host state. This includes a healthy loopback-only Hermes host API whether preflight found an existing installation or no Hermes installation at all.
 
 ## 2. Inputs
 
@@ -44,7 +44,8 @@ Do not during P6:
 - perform real RVC integration;
 - modify firmware or public HW/backend contract;
 - migrate Hermes into Docker;
-- create a cosmetic new Hermes user and move a working install;
+- reinstall, relocate, or change the owner of a working Hermes installation for cosmetic consistency;
+- defer initial Hermes installation to P7 when P6 preflight proves Hermes is absent;
 - create a host Linux user named `docker`;
 - enable/install Portainer; Portainer remains intentionally skipped.
 
@@ -70,7 +71,7 @@ Inspect without modifying:
 
 - current SSH login user/path;
 - sudo configuration relevant to the operator;
-- Hermes process, owning user, service unit/process supervisor, config/data paths, listener;
+- Hermes installation evidence, process, owning user, service unit/process supervisor, config/data paths, and listener;
 - Codex install/workspace;
 - Docker/Compose presence/version/state;
 - existing containers/images/volumes/networks if Docker exists;
@@ -88,6 +89,15 @@ free disk < 20 GB → BLOCK large image/model/runtime downloads and report
 
 Output: sanitized preflight evidence and a conflict list (if any). If the repository is private and no working non-interactive Git credential/deploy key exists for `bmo-admin`, stop and request that credential rather than inventing or embedding a personal token.
 
+Classify Hermes deterministically before any installation:
+
+```text
+PRESENT → installation/runtime evidence exists; audit and preserve it
+ABSENT  → no installation/runtime evidence after process, service, path, package/runtime, and listener checks
+```
+
+A stopped or unhealthy service is not automatically `ABSENT`. Diagnose and recover a proven installation before considering bootstrap. Record the commands and sanitized evidence supporting the classification.
+
 ## 5. Task 1 — Operator/user model
 
 Target:
@@ -95,7 +105,7 @@ Target:
 ```text
 root      → emergency/system administration
 bmo-admin → daily SSH, Codex, Git/deploy, Docker operations, sudo when needed
-Hermes    → keep current proven runtime ownership/user/path
+Hermes    → keep proven ownership when present; select ownership from the actual install/runtime model when absent
 ```
 
 Requirements:
@@ -105,14 +115,50 @@ Requirements:
 - least privilege where practical;
 - if `bmo-admin` joins the Docker group, document that Docker-group access is effectively root-equivalent;
 - do not delete the existing working admin account during P6;
-- do not migrate Hermes user/path.
+- do not migrate a present Hermes user/path for cleanliness;
+- do not invent a dedicated Hermes Linux user when the selected installation/runtime model does not require one.
 
 Acceptance:
 
 - a fresh `bmo-admin` session can log in and perform authorized admin/deploy tasks;
 - Codex is usable from the `bmo-admin` account through a supported authentication/config path; do not copy another user's credentials blindly;
 - root login is not required for normal operation;
-- existing Hermes still runs under its preflight-proven ownership.
+- a present Hermes installation still runs under its preflight-proven ownership;
+- an absent-then-bootstrapped Hermes installation runs under the ownership selected from its actual installation/runtime requirements, with that decision recorded.
+
+## 5.1 Task 1A — Conditional Hermes host runtime
+
+Hermes remains a host runtime and is never Dockerized.
+
+### `PRESENT` branch
+
+- audit the actual runtime user, install path, config path, data path, startup/service mechanism, listener, and health behavior;
+- preserve the working user/path/config/data/runtime;
+- recover an unhealthy proven installation through its existing mechanism;
+- do not reinstall, migrate, or restructure it merely for cleanliness.
+
+### `ABSENT` branch
+
+- bootstrap/install Hermes host runtime during P6 from a documented, maintainable source and record the selected version/revision where the installation model exposes one;
+- configure a maintainable startup/service mechanism appropriate to the actual Hermes runtime;
+- bind the API only to `127.0.0.1:8642`;
+- configure and run the applicable health check;
+- determine ownership from the installation/runtime model and least-privilege needs. Do not create a dedicated Linux user solely for Hermes unless that model or a proven security/operational requirement needs one;
+- record the actual runtime user, actual install, config, and data paths, and startup/service mechanism;
+- verify service restart and automatic startup behavior. Perform a full VPS reboot test where safely possible; otherwise verify enablement plus a service restart and record why a full reboot was deferred;
+- write the exact recovery/start procedure using the mechanism actually installed.
+
+Both branches require:
+
+```text
+health check = PASS
+listener = 127.0.0.1:8642 only
+no public :8642 exposure
+restart behavior is verified
+recovery/start procedure is documented
+```
+
+Do not put active Hermes credentials in Git, docs, logs, command transcripts, or evidence. P7 performs backend/audio → Hermes integration; it does not perform initial Hermes installation.
 
 ## 6. Task 2 — `/opt/bmo` filesystem and permission baseline
 
@@ -271,6 +317,8 @@ SSH:
 
 Never alter firewall rules blindly. Record before/after state.
 
+Explicitly verify that no public `:8642` exposure exists after the firewall transition. A loopback listener is required even when firewall rules would otherwise block the port.
+
 ## 11. Task 7 — Beszel monitoring + Telegram alerting
 
 Deploy/configure Beszel **Hub + local Agent** using the pinned/tested release selected during P6. Keep persistent Hub/Agent data under `/opt/bmo/data/beszel` (or documented subpaths) and use `/opt/bmo/deploy/infra-compose.yml` as the long-term source of truth. Prefer the supported local Unix-socket Hub↔Agent pattern when compatible with the selected release; otherwise use an explicitly private/local Agent listener. The Agent may read `/var/run/docker.sock` read-only for container telemetry. Never expose the Agent listener or Docker socket publicly.
@@ -304,6 +352,7 @@ free disk < 20 GB     → warning / block large model download
 sustained high swap   → warning
 backend down          → critical once backend exists (P7)
 audio-service down    → critical once audio service exists (P7)
+Hermes down           → critical once the P6 health-check mechanism is available
 postgres down         → critical once PostgreSQL exists (P9)
 ```
 
@@ -365,6 +414,7 @@ P6 must at least:
 - document update sequencing and rollback;
 - document post-reboot verification;
 - document recovery for Caddy/Tailscale/Docker/Beszel/Hermes, low/full disk, config corruption, and whole-VPS replacement;
+- reconcile Hermes recovery/start steps with the actual runtime user, paths, and startup/service mechanism recorded by Task 1A;
 - confirm that application dependency/model updates are Git/release-managed, not ad-hoc host mutation;
 - record the limitation that same-VPS Beszel is not an independent whole-host uptime monitor.
 
@@ -377,8 +427,12 @@ Run an audit → fix → verify → re-audit loop.
 Verify at minimum:
 
 ```text
-Hermes health unchanged
-Hermes listener still loopback-only
+Hermes preflight classification and branch evidence recorded
+Hermes health PASS
+Hermes listener is 127.0.0.1:8642 only; no public :8642 exposure
+Hermes actual runtime user, install/config/data paths, and startup/service mechanism recorded
+Hermes restart behavior verified; reboot behavior verified where safely possible or the deferral recorded
+Hermes recovery/start procedure documented
 bmo-admin login/admin path works
 Tailscale admin SSH works
 Docker/Compose works
@@ -406,6 +460,8 @@ Create a P6 evidence report containing:
 preflight summary
 before/after service inventory
 users/ownership changes
+Hermes PRESENT/ABSENT classification + selected branch
+Hermes runtime user, install/config/data paths, startup/service mechanism, listener, health, restart/reboot, and recovery evidence
 filesystem tree + permissions
 installed/verified versions + pinned infra image tags/digests
 Codex-under-bmo-admin verification
@@ -430,7 +486,14 @@ Never include active passwords, keys, bot tokens, device tokens, or authorizatio
 P6 is `VERIFIED` only if:
 
 - [ ] preflight evidence exists;
-- [ ] existing Hermes remains healthy and loopback-only;
+- [ ] Hermes is classified `PRESENT` or `ABSENT` from recorded evidence;
+- [ ] if Hermes was present, its proven user/path/config/data/runtime were preserved and it was not reinstalled or migrated for cleanliness;
+- [ ] if Hermes was absent, Hermes was installed/configured as a host runtime during P6;
+- [ ] actual Hermes runtime user, install/config/data paths, and startup/service mechanism are recorded;
+- [ ] Hermes health check passes and its only listener is `127.0.0.1:8642`;
+- [ ] firewall/listener evidence proves no public `:8642` exposure;
+- [ ] Hermes restart behavior is verified, automatic startup is configured, and safe reboot evidence or an explicit reboot deferral is recorded;
+- [ ] the actual Hermes recovery/start procedure is documented;
 - [ ] `bmo-admin` is operational and Codex can run there without copying/exposing another account's secret config;
 - [ ] Docker Engine + Compose are healthy;
 - [ ] `/opt/bmo` layout and permissions are verified;
