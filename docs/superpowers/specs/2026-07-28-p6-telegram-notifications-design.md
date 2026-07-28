@@ -41,6 +41,13 @@ Telegram HTTPS API in-process, so the token never becomes a child-process
 argument. Beszel necessarily stores its Shoutrrr URL in protected Hub data;
 that data and its backups are treated as credential-bearing recovery material.
 
+A Telegram API operation succeeds only when the HTTPS request completes with a
+successful HTTP status and the decoded Telegram response contains boolean
+`ok=true`. A client error, non-success HTTP status, invalid JSON, non-boolean
+`ok`, or `ok=false` is a failure. Error output contains only a bounded error
+category and, where available, the numeric HTTP status; it never contains the
+request URL, response body, token, or chat identifier.
+
 ## Notification paths
 
 ### Beszel
@@ -114,14 +121,14 @@ Before activation:
 - test token-file absence and malformed state handling without a real token;
 - test the state machine for healthy, failures one through three, repeated
   failure, recovery, and notification-send failure;
-- validate both unit files and confirm their credential paths;
+- validate all three unit files and confirm their credential paths;
 - confirm no token-shaped value appears in tracked or modified files.
 
 After the operator installs the token:
 
 1. verify directory/file owner and modes without printing contents;
 2. validate the bot identity and target delivery without logging the URL or
-   response body;
+   response body, requiring both HTTP success and Telegram `ok=true`;
 3. configure Beszel and confirm one Telegram webhook exists using a boolean or
    count only;
 4. send a labeled Beszel test;
