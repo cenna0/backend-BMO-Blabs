@@ -1,0 +1,63 @@
+#!/bin/sh
+set -eu
+
+umask 077
+
+backup_root=/opt/bmo/backups
+timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+artifact_dir="${backup_root}/config/${timestamp}"
+manifest_dir="${backup_root}/manifests/${timestamp}"
+
+install -d -m 0700 "${artifact_dir}" "${manifest_dir}"
+
+tar -C / -czf "${artifact_dir}/runtime-config.tar.gz" \
+  opt/bmo/config \
+  opt/bmo/deploy \
+  opt/bmo/models/MODEL_MANIFEST.md \
+  usr/local/sbin/bmo-backup \
+  usr/local/libexec/bmo-hermes-health-notify \
+  usr/local/libexec/bmo-configure-beszel-telegram \
+  usr/local/libexec/bmo-beszel-telegram-relay \
+  etc/caddy/Caddyfile \
+  etc/docker/daemon.json \
+  etc/systemd/system/hermes-gateway.service \
+  etc/systemd/system/bmo-backup.service \
+  etc/systemd/system/bmo-backup.timer \
+  etc/systemd/system/bmo-hermes-health-notify.service \
+  etc/systemd/system/bmo-hermes-health-notify.timer \
+  etc/systemd/system/bmo-telegram-test.service
+
+tar -C / -czf "${artifact_dir}/beszel-recovery.tar.gz" \
+  --exclude='opt/bmo/data/beszel/socket' \
+  opt/bmo/data/beszel/hub \
+  opt/bmo/data/beszel/agent
+
+{
+  printf 'created_utc=%s\n' "${timestamp}"
+  printf 'hostname=%s\n' "$(hostname)"
+  printf 'repository_branch=%s\n' \
+    "$(git -c safe.directory=/opt/bmo/app -C /opt/bmo/app branch --show-current)"
+  printf 'repository_commit=%s\n' \
+    "$(git -c safe.directory=/opt/bmo/app -C /opt/bmo/app rev-parse HEAD)"
+  printf 'repository_clean='
+  if test -z "$(git -c safe.directory=/opt/bmo/app -C /opt/bmo/app status --porcelain)"; then
+    printf 'yes\n'
+  else
+    printf 'no\n'
+  fi
+} > "${manifest_dir}/deployment.txt"
+
+sha256sum "${artifact_dir}/runtime-config.tar.gz" \
+  "${artifact_dir}/beszel-recovery.tar.gz" \
+  > "${manifest_dir}/SHA256SUMS"
+
+chmod 0600 "${artifact_dir}"/*.tar.gz "${manifest_dir}"/*
+
+# Four-week pruning is intentionally disabled until the operator gives the
+# separate destructive-data approval required by the P6 execution boundary.
+if test "${BMO_BACKUP_PRUNE_ENABLED:-0}" = "1"; then
+  find "${backup_root}/config" "${backup_root}/manifests" \
+    -mindepth 1 -maxdepth 1 -type d -mtime +28 -exec rm -rf -- {} +
+fi
+
+printf 'BMO backup completed: %s\n' "${timestamp}"
