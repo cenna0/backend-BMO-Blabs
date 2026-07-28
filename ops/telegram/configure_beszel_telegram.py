@@ -5,8 +5,6 @@ import base64
 import hashlib
 import hmac
 import json
-from pathlib import Path
-import re
 import sqlite3
 import sys
 import time
@@ -17,12 +15,11 @@ import urllib.request
 
 BESZEL_ORIGIN = "http://127.0.0.1:8090"
 BESZEL_DATABASE = "/opt/bmo/data/beszel/hub/data.db"
-TOKEN_FILE = Path("/opt/bmo/config/telegram/bot-token")
-CHAT_FILE = Path("/opt/bmo/config/telegram/chat-id")
+RELAY_WEBHOOK = (
+    "generic://telegram-relay:8787/notify?disabletls=yes"
+)
 API_TIMEOUT_SECONDS = 10
 MAX_RESPONSE_BYTES = 65_536
-TOKEN_PATTERN = re.compile(r"^[0-9]+:[A-Za-z0-9_-]+$")
-CHAT_PATTERN = re.compile(r"^-?[0-9]+$")
 
 
 class BeszelConfigError(RuntimeError):
@@ -112,8 +109,6 @@ def mint_static_user_token(
 
 def merge_webhook(
     settings: dict,
-    token: str,
-    chat_id: str,
 ) -> tuple[dict, str]:
     if not isinstance(settings, dict):
         raise BeszelConfigError("invalid_user_settings")
@@ -122,15 +117,17 @@ def merge_webhook(
         isinstance(item, str) for item in existing
     ):
         raise BeszelConfigError("invalid_user_settings")
-    webhook = f"telegram://{token}@telegram?chats={chat_id}"
     preserved = [
         item
         for item in existing
-        if urllib.parse.urlsplit(item).scheme.lower() != "telegram"
+        if (
+            urllib.parse.urlsplit(item).scheme.lower() != "telegram"
+            and item != RELAY_WEBHOOK
+        )
     ]
     merged = dict(settings)
-    merged["webhooks"] = [*preserved, webhook]
-    return merged, webhook
+    merged["webhooks"] = [*preserved, RELAY_WEBHOOK]
+    return merged, RELAY_WEBHOOK
 
 
 def api_json(
@@ -185,24 +182,7 @@ def validate_test_response(payload: dict) -> None:
         raise BeszelConfigError("beszel_test_rejected")
 
 
-def read_secret(path: Path, label: str) -> str:
-    try:
-        value = path.read_text(encoding="utf-8").strip()
-    except OSError:
-        raise BeszelConfigError(f"credential_unreadable={label}") from None
-    if not value or "\n" in value or "\r" in value:
-        raise BeszelConfigError(f"credential_invalid={label}")
-    return value
-
-
 def configure_and_test() -> None:
-    token = read_secret(TOKEN_FILE, "telegram-bot-token")
-    chat_id = read_secret(CHAT_FILE, "telegram-chat-id")
-    if not TOKEN_PATTERN.fullmatch(token):
-        raise BeszelConfigError("credential_invalid=telegram-bot-token")
-    if not CHAT_PATTERN.fullmatch(chat_id):
-        raise BeszelConfigError("credential_invalid=telegram-chat-id")
-
     database_uri = f"file:{BESZEL_DATABASE}?mode=ro"
     try:
         with sqlite3.connect(database_uri, uri=True) as database:
@@ -215,7 +195,7 @@ def configure_and_test() -> None:
     except sqlite3.Error:
         raise BeszelConfigError("database_error") from None
 
-    merged_settings, webhook = merge_webhook(settings, token, chat_id)
+    merged_settings, webhook = merge_webhook(settings)
     encoded_settings_id = urllib.parse.quote(settings_id, safe="")
     updated = api_json(
         "PATCH",

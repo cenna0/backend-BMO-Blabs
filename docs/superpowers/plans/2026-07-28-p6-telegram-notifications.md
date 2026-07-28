@@ -4,7 +4,7 @@
 
 **Goal:** Configure Beszel Telegram delivery and a hardened three-failure Hermes health notifier, prove both paths with labeled receipt tests, and close P6 without starting P7.
 
-**Architecture:** Runtime token and chat files remain root-only outside Git. A standard-library Python notifier receives them through systemd credentials, performs Telegram HTTPS calls in-process, and accepts delivery only for HTTP 2xx plus JSON boolean `ok=true`. A separate root-only activation helper mints a short-lived PocketBase user token from local Beszel data, preserves existing settings, configures the Telegram Shoutrrr URL through the loopback API, and invokes Beszel's built-in test.
+**Architecture:** Runtime token and chat files remain root-only outside Git. A standard-library Python notifier receives them through systemd credentials, performs Telegram HTTPS calls in-process, and accepts delivery only for HTTP 2xx plus JSON boolean `ok=true`. Beszel calls a token-free generic webhook on a private Compose relay that reuses the strict client and returns success only after the same Telegram validation. A root-only activation helper mints a short-lived PocketBase user token from local Beszel data, preserves existing settings, configures the relay webhook through the loopback API, and invokes Beszel's built-in test.
 
 **Tech Stack:** Python 3.12 standard library, `unittest`, systemd 255 credentials/sandboxing, PocketBase REST API, Beszel 0.18.7, Telegram Bot API.
 
@@ -13,11 +13,13 @@
 ## File structure
 
 - `ops/telegram/bmo_telegram_notify.py`: strict Telegram client, Hermes health validation, persistent three-failure/recovery state machine, and fixed labeled direct-path test.
+- `ops/telegram/beszel_telegram_relay.py`: private HTTP relay that maps strict Telegram delivery to fixed HTTP success/failure for Beszel.
 - `ops/telegram/configure_beszel_telegram.py`: short-lived local PocketBase auth token, settings-preserving Beszel webhook configuration, and sanitized Beszel test invocation.
 - `ops/telegram/systemd/bmo-hermes-health-notify.service`: sandboxed one-shot health check with systemd credentials and persistent state directory.
 - `ops/telegram/systemd/bmo-hermes-health-notify.timer`: one-minute scheduler.
 - `ops/telegram/systemd/bmo-telegram-test.service`: static sandboxed direct-path receipt test.
 - `tests/operations/test_bmo_telegram_notify.py`: strict HTTP/API validation and health state-machine tests.
+- `tests/operations/test_beszel_telegram_relay.py`: relay success/failure and log-sanitization tests.
 - `tests/operations/test_configure_beszel_telegram.py`: JWT construction, settings merge, and sanitized API failure tests.
 - `docs/backend-mvp/P6-TEST-EVIDENCE.md`: sanitized final P6 evidence.
 - `docs/operations/MAINTENANCE-AND-RECOVERY.md`: credential rotation, test, and recovery commands.
@@ -188,9 +190,7 @@ class BeszelConfigurationTests(unittest.TestCase):
 
     def test_merge_preserves_emails_and_nontelegram_webhooks(self):
         merged, webhook = merge_webhook(
-            {"emails": ["operator@example.invalid"], "webhooks": ["generic://example.invalid"]},
-            "1:fake-token",
-            "123",
+            {"emails": ["operator@example.invalid"], "webhooks": ["generic://example.invalid"]}
         )
         self.assertEqual(merged["emails"], ["operator@example.invalid"])
         self.assertIn("generic://example.invalid", merged["webhooks"])
@@ -198,9 +198,7 @@ class BeszelConfigurationTests(unittest.TestCase):
 
     def test_merge_replaces_existing_telegram_webhook_once(self):
         merged, webhook = merge_webhook(
-            {"webhooks": ["telegram://old@telegram?chats=456"]},
-            "1:fake-token",
-            "123",
+            {"webhooks": ["telegram://old@telegram?chats=456"]}
         )
         self.assertEqual(merged["webhooks"], [webhook])
 
@@ -237,8 +235,8 @@ Implement:
 def mint_static_user_token(db: sqlite3.Connection, now: int) -> tuple[str, str, dict]:
     """Read one verified user, its collection auth secret, and settings; sign HS256 for 300 seconds."""
 
-def merge_webhook(settings: dict, token: str, chat_id: str) -> tuple[dict, str]:
-    """Preserve settings, replace Telegram entries, return updated settings and in-memory URL."""
+def merge_webhook(settings: dict) -> tuple[dict, str]:
+    """Preserve settings and replace managed entries with the token-free relay URL."""
 
 def api_json(method: str, path: str, body: dict, auth_token: str) -> dict:
     """Call only the fixed loopback Beszel origin with sanitized failures."""
@@ -260,14 +258,14 @@ JWT claims must use values read from the live local records and have this shape:
 ```
 
 Sign HS256 with `user.tokenKey + users.options.authToken.secret`. Keep the JWT,
-signing material, Shoutrrr URL, API bodies, and API response bodies in memory
-only and never print them.
+signing material, API bodies, and API response bodies in memory only and never
+print them.
 
 The Beszel test is accepted only when HTTP succeeds and its decoded response is
 exactly compatible with `{"err": false}`. Final delivery remains pending until
 the operator confirms the labeled Beszel test arrived. The pinned Shoutrrr
-Telegram implementation also decodes Telegram's response and requires
-`ok=true`; record that source audit without recording its request URL.
+0.14.1 Telegram client is explicitly excluded because it can discard a
+transport/API error and falsely return success.
 
 - [ ] **Step 4: Run helper tests and compile check**
 
@@ -279,6 +277,36 @@ python3 -m py_compile ops/telegram/configure_beszel_telegram.py
 ```
 
 Expected: all tests pass and compilation exits zero.
+
+### Task 2A: Strict private Beszel relay
+
+**Files:**
+- Create: `tests/operations/test_beszel_telegram_relay.py`
+- Create: `ops/telegram/beszel_telegram_relay.py`
+- Modify: `/opt/bmo/deploy/infra-compose.yml`
+
+- [ ] **Step 1: Test relay success and sanitized failure**
+
+Use an ephemeral local HTTP server and an injected sender. Require HTTP `204`
+only after the sender returns successfully. Require a fixed HTTP `502` and a
+sanitized log category for `DeliveryError` or an unexpected exception. Verify
+that health and unknown paths never send and that the request path is not
+logged.
+
+- [ ] **Step 2: Implement the relay**
+
+Accept only `POST /notify` and `GET /health`, bound to the container network.
+Read a bounded UTF-8 message, prefix it with `[BMO BESZEL]`, and call the strict
+Telegram client in-process. Never log the message, request path, token, chat
+identifier, exception message, or Telegram response body.
+
+- [ ] **Step 3: Add the private Compose service**
+
+Use a digest-pinned Python image, no published port, read-only filesystem, all
+capabilities dropped, `no-new-privileges`, core limit zero, bounded logging,
+and read-only mounts for the two root-owned credential files and both scripts.
+The Beszel Hub depends on relay health. Validate with `docker compose config`
+but do not start the relay before the token file exists.
 
 ### Task 3: Hardened systemd units
 
@@ -317,6 +345,7 @@ ProtectSystem=strict
 RestrictAddressFamilies=AF_INET AF_INET6
 RestrictSUIDSGID=yes
 LockPersonality=yes
+LimitCORE=0
 MemoryDenyWriteExecute=yes
 ```
 
@@ -362,6 +391,7 @@ Expected: no syntax or dependency errors.
 **Files:**
 - Install: `/usr/local/libexec/bmo-hermes-health-notify` (`root:root`, `0755`)
 - Install: `/usr/local/libexec/bmo-configure-beszel-telegram` (`root:root`, `0750`)
+- Install: `/usr/local/libexec/bmo-beszel-telegram-relay` (`root:root`, `0755`)
 - Install: the three source units under `/etc/systemd/system/` (`root:root`, `0644`)
 - Create: `/opt/bmo/config/telegram/chat-id` (`root:root`, `0600`)
 - User creates: `/opt/bmo/config/telegram/bot-token` (`root:root`, `0600`)
@@ -432,7 +462,8 @@ journal contains only telegram_delivery=success label=direct_test
 
 - [ ] **Step 2: Configure Beszel and run its test**
 
-Run `/usr/local/libexec/bmo-configure-beszel-telegram` as host root. Verify only:
+Start the private relay, verify it is healthy with no published host port, then
+run `/usr/local/libexec/bmo-configure-beszel-telegram` as host root. Verify only:
 
 ```text
 beszel_webhook_count=1
@@ -440,14 +471,16 @@ beszel_test_accepted=true
 ```
 
 Query the Hub database afterward and output only the webhook count and a boolean
-that the single entry uses the Telegram scheme. Never output the value.
+that the single managed entry targets the internal relay. Never output the
+value.
 
 - [ ] **Step 3: Ask for two-message receipt confirmation**
 
 Require confirmation of:
 
 1. `[P6 HERMES PATH TEST]` from the strict host notifier;
-2. Beszel's built-in `Test Alert` / “notification from Beszel” message.
+2. `[BMO BESZEL]` plus Beszel's built-in `Test Alert` / “notification from
+   Beszel” message.
 
 Do not mark either delivered or P6 verified before the operator confirms both.
 
@@ -491,6 +524,7 @@ Record:
 ```text
 Telegram credential metadata PASS (never value)
 strict host test HTTP success + ok=true PASS
+Beszel relay HTTP success after Telegram HTTP success + ok=true PASS
 Beszel test accepted PASS
 both labeled receipts confirmed PASS
 Hermes timer enabled/active; threshold=3; one recovery behavior test PASS
@@ -506,9 +540,11 @@ Run:
 
 ```bash
 python3 -m unittest -v \
+  tests.operations.test_beszel_telegram_relay \
   tests.operations.test_bmo_telegram_notify \
   tests.operations.test_configure_beszel_telegram
 python3 -m py_compile \
+  ops/telegram/beszel_telegram_relay.py \
   ops/telegram/bmo_telegram_notify.py \
   ops/telegram/configure_beszel_telegram.py \
   scripts/verify-backend-mvp-docs.py

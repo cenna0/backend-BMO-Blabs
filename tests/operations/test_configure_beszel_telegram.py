@@ -7,6 +7,7 @@ import unittest
 
 from ops.telegram.configure_beszel_telegram import (
     BeszelConfigError,
+    RELAY_WEBHOOK,
     api_json,
     merge_webhook,
     mint_static_user_token,
@@ -149,8 +150,6 @@ class WebhookMergeTests(unittest.TestCase):
                 "emails": ["operator@example.invalid"],
                 "webhooks": ["generic://example.invalid"],
             },
-            "1:fake-token",
-            "123",
         )
 
         self.assertEqual(
@@ -161,22 +160,19 @@ class WebhookMergeTests(unittest.TestCase):
             merged["webhooks"],
             ["generic://example.invalid", webhook],
         )
-        self.assertEqual(
-            webhook,
-            "telegram://1:fake-token@telegram?chats=123",
-        )
+        self.assertEqual(webhook, RELAY_WEBHOOK)
+        self.assertNotIn("fake-token", webhook)
 
-    def test_replaces_existing_telegram_webhook_once(self) -> None:
+    def test_replaces_existing_managed_webhooks_once(self) -> None:
         merged, webhook = merge_webhook(
             {
                 "webhooks": [
                     "telegram://1:old@telegram?chats=456",
                     "generic://example.invalid",
                     "telegram://2:old@telegram?chats=789",
+                    RELAY_WEBHOOK,
                 ],
             },
-            "1:fake-token",
-            "123",
         )
 
         self.assertEqual(
@@ -191,8 +187,6 @@ class WebhookMergeTests(unittest.TestCase):
         ):
             merge_webhook(
                 {"webhooks": "not-a-list"},
-                "1:fake-token",
-                "123",
             )
 
 

@@ -14,6 +14,7 @@ StateDirectoryMode=0700
 UMask=0077
 CapabilityBoundingSet=
 LockPersonality=yes
+LimitCORE=0
 MemoryDenyWriteExecute=yes
 NoNewPrivileges=yes
 PrivateDevices=yes

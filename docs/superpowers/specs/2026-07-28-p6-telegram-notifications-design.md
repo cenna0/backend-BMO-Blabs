@@ -38,8 +38,10 @@ The token must not appear in:
 The host notifier receives both files through systemd `LoadCredential`. Its
 Python process reads them from the service credential directory and calls the
 Telegram HTTPS API in-process, so the token never becomes a child-process
-argument. Beszel necessarily stores its Shoutrrr URL in protected Hub data;
-that data and its backups are treated as credential-bearing recovery material.
+argument. The Beszel Hub stores only a token-free generic webhook for an
+internal relay. The relay receives the same root-owned credential files as
+read-only container mounts, so neither the Telegram token nor a token-bearing
+Shoutrrr URL is stored in the Hub database.
 
 A Telegram API operation succeeds only when the HTTPS request completes with a
 successful HTTP status and the decoded Telegram response contains boolean
@@ -54,10 +56,16 @@ request URL, response body, token, or chat identifier.
 
 Configure the existing authenticated user settings through Beszel's loopback
 API, not by editing the live SQLite database. Preserve existing settings and
-add one Telegram Shoutrrr URL targeting the configured private chat. Assemble
-the documented Telegram scheme only in process memory. Beszel stores the
-resulting URL in its Hub database; this design does not assume that field is
-encrypted, so Hub data and backups remain credential-bearing material.
+add one token-free generic webhook targeting an internal
+`telegram-relay` Compose service.
+
+The pinned Shoutrrr 0.14.1 Telegram client cannot be used for this boundary: it
+can discard a transport/API error and return success. The relay instead reuses
+the strict in-process Telegram client described above. It returns HTTP success
+to Beszel only after Telegram itself returned HTTP 2xx and boolean `ok=true`;
+all other outcomes return a fixed error status and sanitized body. The relay
+has no published host port, runs read-only with all capabilities dropped and
+core dumps disabled, and logs only a bounded result category.
 
 Use Beszel's notification-test action for a labeled P6 Beszel test. Never print
 the request body, stored URL, response body, or authorization material.
@@ -68,6 +76,7 @@ Install a small host notifier, a timer/service pair, and a static test service:
 
 ```text
 /usr/local/libexec/bmo-hermes-health-notify
+/usr/local/libexec/bmo-beszel-telegram-relay
 /etc/systemd/system/bmo-hermes-health-notify.service
 /etc/systemd/system/bmo-hermes-health-notify.timer
 /etc/systemd/system/bmo-telegram-test.service
@@ -112,7 +121,8 @@ The health and test services use `DynamicUser`, systemd credentials, systemd
 sandboxing, no new privileges, a private temporary directory, a service-owned
 state directory, restricted filesystem access, and only the address families
 required for loopback health and Telegram HTTPS. The test service is static and
-cannot be enabled as a recurring service.
+cannot be enabled as a recurring service. Both credential-consuming systemd
+services set `LimitCORE=0`.
 
 ## Testing
 
@@ -121,6 +131,9 @@ Before activation:
 - test token-file absence and malformed state handling without a real token;
 - test the state machine for healthy, failures one through three, repeated
   failure, recovery, and notification-send failure;
+- test that the Beszel relay returns success only after the strict sender
+  succeeds, maps delivery failure to a fixed error, and never logs request
+  paths or exception messages;
 - validate all three unit files and confirm their credential paths;
 - confirm no token-shaped value appears in tracked or modified files.
 
@@ -129,24 +142,25 @@ After the operator installs the token:
 1. verify directory/file owner and modes without printing contents;
 2. validate the bot identity and target delivery without logging the URL or
    response body, requiring both HTTP success and Telegram `ok=true`;
-3. configure Beszel and confirm one Telegram webhook exists using a boolean or
-   count only;
-4. send a labeled Beszel test;
-5. send a labeled Hermes-notifier test without changing Hermes health;
-6. ask the operator to confirm both messages arrived;
-7. enable the timer, run a normal healthy check, and verify sanitized service
+3. start the private relay and confirm it has no published host port;
+4. configure Beszel and confirm one managed relay webhook exists using a
+   boolean or count only;
+5. send a labeled Beszel test through the relay;
+6. send a labeled Hermes-notifier test without changing Hermes health;
+7. ask the operator to confirm both messages arrived;
+8. enable the timer, run a normal healthy check, and verify sanitized service
    state and logs;
-8. rerun the P6 audit and update sanitized evidence.
+9. rerun the P6 audit and update sanitized evidence.
 
 P6 remains in progress until both labeled test messages are confirmed received.
 
 ## Recovery and rotation
 
 Token rotation replaces only the root-owned token file using the same hidden
-interactive procedure, updates the Beszel Shoutrrr URL through its authenticated
-API, sends both tests again, and then revokes the previous token.
+interactive procedure, restarts the private relay so it reloads the
+credential, sends both tests again, and then revokes the previous token.
 
 If notification delivery fails, verify file metadata, bot reachability, the
 configured target, Beszel webhook presence, timer state, and sanitized journal
-errors. Never print the token or the complete Telegram/Shoutrrr URL during
+and relay errors. Never print the token or a Telegram request URL during
 diagnosis.
