@@ -1,6 +1,6 @@
 # BMO Documentation — Start Here
 
-**Last audited:** 2026-07-27
+**Last audited:** 2026-07-28
 **Purpose:** Single documentation entry point for BMO voice MVP, especially hardware ↔ backend integration.
 
 ## 1. What to read
@@ -56,11 +56,18 @@ Never resolve a conflict by silently changing firmware behavior or adding a new 
 
 ## 2.1 Operational next-step authority
 
-`NEXT-ACTION.md` determines **what the coding agent should execute next**. It does not override the protocol/runtime source-of-truth hierarchy above. At this revision, the next phase is **P6**, and later phases must not be collapsed into the same execution turn.
+`NEXT-ACTION.md` determines **what the coding agent should execute next**. It
+does not override the protocol/runtime source-of-truth hierarchy above. At this
+revision, **P6 is verified and P7 is next but not started or authorized**.
+Later phases must not be collapsed into the same execution turn.
 
 ## 2.2 Hermes host bootstrap clarification
 
-The 2026-07-27 production VPS preflight reported Hermes absent. The P6 executor must still re-confirm `PRESENT` or `ABSENT` from process/service/path/runtime/listener evidence before changing the host:
+The 2026-07-27 production VPS preflight reported Hermes absent. P6 re-confirmed
+the `ABSENT` branch and bootstrapped Hermes 0.19.0 as a loopback-only host
+runtime. Current evidence is in
+[`backend-mvp/P6-TEST-EVIDENCE.md`](backend-mvp/P6-TEST-EVIDENCE.md). The branch
+rules remain:
 
 - `PRESENT` → audit and preserve the proven installation; never reinstall/migrate for cleanliness.
 - `ABSENT` → P6 bootstraps a maintainable host runtime bound only to `127.0.0.1:8642`, then records health, ownership, paths, startup/restart, and recovery evidence.

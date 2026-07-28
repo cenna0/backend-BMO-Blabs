@@ -1,6 +1,6 @@
 # P6 — VPS Foundation and Operations Baseline — Execution Spec
 
-**Status:** `READY`  
+**Status:** `VERIFIED`
 **Executor:** Codex acting as infrastructure/backend operator  
 **Dependency:** safe access to the existing VPS  
 **Next phase after verification:** P7  
@@ -485,31 +485,31 @@ Never include active passwords, keys, bot tokens, device tokens, or authorizatio
 
 P6 is `VERIFIED` only if:
 
-- [ ] preflight evidence exists;
-- [ ] Hermes is classified `PRESENT` or `ABSENT` from recorded evidence;
-- [ ] if Hermes was present, its proven user/path/config/data/runtime were preserved and it was not reinstalled or migrated for cleanliness;
-- [ ] if Hermes was absent, Hermes was installed/configured as a host runtime during P6;
-- [ ] actual Hermes runtime user, install/config/data paths, and startup/service mechanism are recorded;
-- [ ] Hermes health check passes and its only listener is `127.0.0.1:8642`;
-- [ ] firewall/listener evidence proves no public `:8642` exposure;
-- [ ] Hermes restart behavior is verified, automatic startup is configured, and safe reboot evidence or an explicit reboot deferral is recorded;
-- [ ] the actual Hermes recovery/start procedure is documented;
-- [ ] `bmo-admin` is operational and Codex can run there without copying/exposing another account's secret config;
-- [ ] Docker Engine + Compose are healthy;
-- [ ] `/opt/bmo` layout and permissions are verified;
-- [ ] `/opt/bmo/app` is the approved clean `main` Git checkout, with `origin` and fetch access verified under `bmo-admin` and no credential embedded in the remote/evidence;
-- [ ] runtime secrets are outside Git with restricted permissions;
-- [ ] Tailscale admin SSH is proven before any public SSH restriction;
-- [ ] Caddy/TLS foundation works;
-- [ ] public application exposure is limited to approved reverse-proxy surface;
-- [ ] Beszel is reachable at its HTTPS hostname with auth;
-- [ ] Telegram test alert is received;
-- [ ] logging/monitoring baseline is active;
-- [ ] weekly config/manifest backup schedule is active, a test artifact is created, restore steps are documented, and monthly off-server flow is documented;
-- [ ] maintenance/update/recovery runbook is reconciled with actual VPS state and version inventory;
-- [ ] no destructive/unapproved existing-service change occurred;
-- [ ] P7 scope was not silently implemented;
-- [ ] evidence and `IMPLEMENTATION-STATUS.md` are updated.
+- [x] preflight evidence exists;
+- [x] Hermes is classified `PRESENT` or `ABSENT` from recorded evidence;
+- [x] if Hermes was present, its proven user/path/config/data/runtime were preserved and it was not reinstalled or migrated for cleanliness;
+- [x] if Hermes was absent, Hermes was installed/configured as a host runtime during P6;
+- [x] actual Hermes runtime user, install/config/data paths, and startup/service mechanism are recorded;
+- [x] Hermes health check passes and its only listener is `127.0.0.1:8642`;
+- [x] firewall/listener evidence proves no public `:8642` exposure;
+- [x] Hermes restart behavior is verified, automatic startup is configured, and safe reboot evidence or an explicit reboot deferral is recorded;
+- [x] the actual Hermes recovery/start procedure is documented;
+- [x] `bmo-admin` is operational and Codex can run there without copying/exposing another account's secret config;
+- [x] Docker Engine + Compose are healthy;
+- [x] `/opt/bmo` layout and permissions are verified;
+- [x] `/opt/bmo/app` is the approved clean `main` Git checkout, with `origin` and fetch access verified under `bmo-admin` and no credential embedded in the remote/evidence;
+- [x] runtime secrets are outside Git with restricted permissions;
+- [x] Tailscale admin SSH is proven before any public SSH restriction;
+- [x] Caddy/TLS foundation works;
+- [x] public application exposure is limited to approved reverse-proxy surface;
+- [x] Beszel is reachable at its HTTPS hostname with auth;
+- [x] Telegram test alert is received;
+- [x] logging/monitoring baseline is active;
+- [x] weekly config/manifest backup schedule is active, a test artifact is created, restore steps are documented, and monthly off-server flow is documented;
+- [x] maintenance/update/recovery runbook is reconciled with actual VPS state and version inventory;
+- [x] no destructive/unapproved existing-service change occurred;
+- [x] P7 scope was not silently implemented;
+- [x] evidence and `IMPLEMENTATION-STATUS.md` are updated.
 
 ## 18. Stop condition
 

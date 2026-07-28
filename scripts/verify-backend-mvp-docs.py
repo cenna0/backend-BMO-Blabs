@@ -21,6 +21,7 @@ expected = [
     "06-DEPLOYMENT-AND-OPERATIONS.md",
     "CURRENT-RUNTIME-CONFIG.md",
     "IMPLEMENTATION-STATUS.md",
+    "P6-TEST-EVIDENCE.md",
     "REQUIREMENT-TRACEABILITY.md",
     "VERIFICATION-REPORT.md",
     "CHANGELOG.md",
@@ -125,12 +126,13 @@ if archive.is_file():
 status = (bm / "IMPLEMENTATION-STATUS.md").read_text(encoding="utf-8")
 control_state = [
     "Documentation package: AUDITED / HARDWARE HANDOFF ADDED",
-    "Current next implementation phase: P6 — VPS Foundation and Operations Baseline",
-    "P6 state: READY",
     (
-        "P6 execution authorization: requires an explicit user command to execute/continue "
-        "the next phase; documentation alone does not start host changes"
+        "Current next implementation phase: P7 — Deploy Backend + Audio "
+        "Service + Hermes Integration"
     ),
+    "P6 state: VERIFIED",
+    "P6 execution authorization: COMPLETED",
+    "P7 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
     "P7–P10: PLANNED / dependency-gated",
 ]
 for value in control_state:
@@ -156,8 +158,8 @@ expected_phase_rows = {
     "P3": ("IMPLEMENTED — not VERIFIED", "AUTHORIZED BY USER"),
     "P4": ("VERIFIED — LOCAL FUNCTIONAL", "AUTHORIZED BY USER"),
     "P5": ("VERIFIED — BACKEND", "AUTHORIZED BY USER"),
-    "P6": ("READY", "AWAITING EXPLICIT EXECUTION COMMAND"),
-    "P7": ("NOT_STARTED", "DEPENDS ON P6 VERIFIED"),
+    "P6": ("VERIFIED", "COMPLETED"),
+    "P7": ("NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"),
     "P8": ("NOT_STARTED", "DEPENDS ON P7 VERIFIED"),
     "P9": (
         "NOT_STARTED",
@@ -251,6 +253,7 @@ runtime_config = active_doc_text[bm / "CURRENT-RUNTIME-CONFIG.md"]
 deployment_doc = active_doc_text[bm / "06-DEPLOYMENT-AND-OPERATIONS.md"]
 scope_doc = active_doc_text[bm / "01-SCOPE-AND-DECISIONS.md"]
 implementation_status = active_doc_text[bm / "IMPLEMENTATION-STATUS.md"]
+p6_evidence = active_doc_text[bm / "P6-TEST-EVIDENCE.md"]
 recovery_doc = active_doc_text[docs / "operations" / "MAINTENANCE-AND-RECOVERY.md"]
 execution_guide = active_doc_text[bm / "00-AGENT-EXECUTION-GUIDE.md"]
 testing_doc = active_doc_text[bm / "05-TESTING-AND-ACCEPTANCE.md"]
@@ -268,16 +271,16 @@ current_doc_requirements = {
         next_action,
         [
             "Current next phase:",
-            "P6 — VPS Foundation and Operations Baseline",
-            "Phase state:** `READY`",
-            "The next implementation task is **P6 only**.",
-            "Do not auto-run P7",
+            "P7 — Deploy Backend + Audio Service + Hermes Integration",
+            "Phase state:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
+            "P6 is `VERIFIED`",
+            "Do not start P7",
         ],
     ),
     "docs/roadmap/P6-EXECUTION-SPEC.md": (
         p6_spec,
         [
-            "Status:** `READY`",
+            "Status:** `VERIFIED`",
             "Next phase after verification:** P7",
             "P6 does **not** build/start the BMO backend/audio application",
         ],
@@ -317,6 +320,16 @@ current_doc_requirements = {
             "Voice MVP P7 must run without PostgreSQL.",
         ],
     ),
+    "docs/backend-mvp/P6-TEST-EVIDENCE.md": (
+        p6_evidence,
+        [
+            "Status:** `VERIFIED`",
+            "Direct strict test",
+            "Beszel relay test",
+            "Operator confirmed both receipts",
+            "P7 status:** `NOT_STARTED`",
+        ],
+    ),
 }
 for label, (text, required_values) in current_doc_requirements.items():
     for value in required_values:
@@ -335,11 +348,10 @@ hermes_phase_requirements = {
     "docs/NEXT-ACTION.md": (
         next_action,
         [
-            "Hermes present:",
-            "Hermes absent:",
-            "bootstrap/install Hermes host runtime",
+            "P6-verified Hermes host API",
+            "reinstall, relocate, Dockerize",
             "127.0.0.1:8642",
-            "P7 performs backend/audio → Hermes integration, not initial Hermes installation.",
+            "integrate backend with the P6-verified Hermes host API",
         ],
     ),
     "docs/roadmap/P6-EXECUTION-SPEC.md": (
@@ -437,7 +449,8 @@ for label, (text, obsolete_value) in obsolete_hermes_assumptions.items():
 for value in [
     "Hermes host bootstrap clarification",
     "production VPS preflight reported Hermes absent",
-    "re-confirm `PRESENT` or `ABSENT`",
+    "P6 re-confirmed",
+    "the `ABSENT` branch",
     "does not modify the locked PRD snapshot or hardware contract",
 ]:
     if value not in docs_readme:
@@ -627,7 +640,7 @@ if errors:
 
 print("PASS")
 print(
-    "Verified 12 backend package files, immutable reference hashes, traceability §1–§33, "
+    "Verified 13 backend package files, immutable reference hashes, traceability §1–§33, "
     "P1–P10 phase/dependency model, bootstrap chain, runtime defaults, env templates, "
-    "active UTF-8/path hygiene, locked hardware contract, and P6 authorization gate."
+    "active UTF-8/path hygiene, locked hardware contract, and the P6-to-P7 phase gate."
 )

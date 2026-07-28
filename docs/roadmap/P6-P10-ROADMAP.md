@@ -1,7 +1,7 @@
 # BMO — P6–P10 Infrastructure and Hardware Readiness Roadmap
 
 **Status:** LOCKED ROADMAP / PHASE-BY-PHASE EXECUTION  
-**Current next phase:** P6 — `READY`  
+**Current next phase:** P7 — `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 **Reason for split:** the original P6 scope became too broad after adding full VPS foundation, public TLS, monitoring, real RVC, database readiness, backup/recovery, and hardware handoff.
 
 The split below follows dependencies, not equal workload. The current coding agent must use [`../NEXT-ACTION.md`](../NEXT-ACTION.md) and [`P6-EXECUTION-SPEC.md`](P6-EXECUTION-SPEC.md) for the next action.
@@ -9,6 +9,9 @@ The split below follows dependencies, not equal workload. The current coding age
 **Execution rule:** locked order is **P6 → P7 → P8 → P9 → P10**. Verify one phase, record evidence, stop, then load the next phase in a fresh execution turn. Technical dependencies listed below explain architecture; they do not authorize skipping the execution order.
 
 ## P6 — VPS Foundation and Operations Baseline
+
+**Phase status:** `VERIFIED` — see
+[`../backend-mvp/P6-TEST-EVIDENCE.md`](../backend-mvp/P6-TEST-EVIDENCE.md).
 
 ### Goal
 Prepare a safe, repeatable VPS foundation without yet claiming the BMO voice stack is publicly ready.
@@ -65,6 +68,8 @@ None beyond safe access to the existing VPS and explicit authorization for risky
 ---
 
 ## P7 — Deploy Backend + Audio Service + Hermes Integration
+
+**Phase status:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 
 ### Goal
 Run the existing backend/audio implementation on the real VPS and expose it safely through the production API hostname.

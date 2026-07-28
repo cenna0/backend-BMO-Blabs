@@ -170,3 +170,163 @@ known residual risk
 Never include live tokens/passwords/authorization headers in the evidence.
 
 The P6 evidence/runbook must record the actual Hermes startup/service mechanism plus its exact start, stop, restart, status, health-check, and recovery commands. Generic guessed commands are not a recovery procedure.
+
+## 10. Actual P6 VPS reconciliation — 2026-07-28
+
+Current status: `VERIFIED`. See
+[`../backend-mvp/P6-TEST-EVIDENCE.md`](../backend-mvp/P6-TEST-EVIDENCE.md).
+
+Verified version inventory:
+
+```text
+Ubuntu               24.04.4 LTS
+Kernel               6.8.0-124-generic
+systemd              255
+Docker Engine        29.6.2
+Docker Compose       5.3.1
+Caddy                2.11.4
+Tailscale            1.98.9
+Beszel Hub/Agent     0.18.7, pinned by digest in infra-compose.yml
+Hermes               0.19.0
+Codex CLI            0.145.0
+```
+
+Actual service recovery commands:
+
+```bash
+# Hermes: host runtime owned by hermes:hermes
+sudo systemctl status hermes-gateway --no-pager
+sudo systemctl restart hermes-gateway
+curl --fail --silent --show-error http://127.0.0.1:8642/health
+ss -lntp | grep ':8642'
+
+# Caddy: validate persistent config before restart
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl restart caddy
+curl --fail --silent --show-error https://monitor.personalbmo.web.id/api/health
+
+# Docker and Beszel
+sudo systemctl status docker --no-pager
+docker compose -f /opt/bmo/deploy/infra-compose.yml config -q
+docker compose -f /opt/bmo/deploy/infra-compose.yml up -d
+docker compose -f /opt/bmo/deploy/infra-compose.yml ps
+
+# Tailscale: do not restart from the only working private SSH session
+tailscale status
+sudo systemctl status tailscaled --no-pager
+
+# Backup
+sudo systemctl start bmo-backup.service
+systemctl status bmo-backup.service bmo-backup.timer --no-pager
+
+# Hermes health notifications
+sudo systemctl start bmo-hermes-health-notify.service
+systemctl status bmo-hermes-health-notify.service \
+  bmo-hermes-health-notify.timer --no-pager
+```
+
+Telegram credential installation/rotation uses hidden input on the operator's
+Tailscale SSH terminal. The command text, process arguments, and environment do
+not contain the token:
+
+```bash
+sudo install -d -o root -g root -m 0700 /opt/bmo/config/telegram
+sudo bash -c '
+set -eu
+umask 077
+token=
+trap '\''unset token'\'' EXIT
+printf "Telegram bot token: " >/dev/tty
+IFS= read -r -s token </dev/tty
+printf "\n" >/dev/tty
+if ! [[ "$token" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]]; then
+  printf "Invalid Telegram token format\n" >/dev/tty
+  exit 1
+fi
+runtime_token_file="$(mktemp /opt/bmo/config/telegram/.bot-token.XXXXXX)"
+trap '\''rm -f -- "$runtime_token_file"; unset token'\'' EXIT
+printf "%s\n" "$token" >"$runtime_token_file"
+chown root:root "$runtime_token_file"
+chmod 0600 "$runtime_token_file"
+mv -f -- "$runtime_token_file" /opt/bmo/config/telegram/bot-token
+trap - EXIT
+unset token
+'
+sudo stat -c '%A %U:%G %n' \
+  /opt/bmo/config/telegram \
+  /opt/bmo/config/telegram/bot-token
+```
+
+Required metadata is directory `root:root` mode `0700` and bot-token file
+`root:root` mode `0600`. Never print or inspect the value in a command
+transcript.
+
+Beszel uses a token-free generic webhook to the private
+`bmo-telegram-relay` container. Do not switch it to the pinned Shoutrrr
+Telegram client: that client can falsely report success for a failed Telegram
+request. The relay has no published host port and accepts delivery only after
+Telegram returns HTTP 2xx and boolean `ok=true`.
+
+After initial installation or token replacement:
+
+```bash
+docker compose -f /opt/bmo/deploy/infra-compose.yml \
+  up -d --force-recreate telegram-relay
+docker compose -f /opt/bmo/deploy/infra-compose.yml \
+  ps telegram-relay
+sudo systemctl start bmo-telegram-test.service
+sudo /usr/local/libexec/bmo-configure-beszel-telegram
+systemctl status \
+  bmo-hermes-health-notify.timer \
+  bmo-telegram-test.service \
+  --no-pager
+```
+
+Confirm both the `[P6 HERMES PATH TEST]` and `[BMO BESZEL]` test messages
+before revoking an old token. Runtime logs and evidence may contain only
+sanitized status categories; never record the token, chat identifier, Telegram
+request URL, PocketBase authorization token, request/response bodies, or
+notification message contents.
+
+Actual Hermes locations:
+
+```text
+install       /home/hermes/.hermes/hermes-agent
+config root   /home/hermes/.hermes
+config        /home/hermes/.hermes/config.yaml
+sensitive env /home/hermes/.hermes/.env
+state/data    /home/hermes/.hermes/state,
+              /home/hermes/.hermes/state.db,
+              /home/hermes/.hermes/response_store.db,
+              /home/hermes/.hermes/sessions,
+              /home/hermes/.hermes/memories
+service       /etc/systemd/system/hermes-gateway.service
+```
+
+Monthly off-server workflow:
+
+1. Run `bmo-backup.service` and verify the newest
+   `manifests/<timestamp>/SHA256SUMS`.
+2. On the VPS, create a single mode-`600` staging archive under
+   `/home/bmo-admin/` containing only the matching protected
+   `config/<timestamp>` and `manifests/<timestamp>` directories.
+3. Copy it from the admin workstation over Tailscale SSH to an encrypted,
+   access-controlled off-server destination.
+4. Verify a separately copied SHA-256 on the destination.
+5. Perform a safe test listing/extraction without overwriting live paths.
+6. After the destination copy and checksum are confirmed, remove the temporary
+   VPS staging archive in a separate deliberate cleanup action.
+
+The bundle contains live config and Beszel recovery data and must be treated as
+sensitive. Tailscale machine identity, Git credentials, and other host identity
+credentials should be re-provisioned rather than added to this general bundle.
+
+Current reboot caveat:
+
+- full reboot proof is deferred because the P6 verification runs inside the
+  active Codex/Tailscale session;
+- Hermes, Caddy, and Beszel controlled restarts passed;
+- startup enablement is verified;
+- `cloud-init.service` and `systemd-networkd-wait-online.service` retain old
+  failed states from the current boot and must be reviewed before a planned
+  reboot rather than silently cleared.

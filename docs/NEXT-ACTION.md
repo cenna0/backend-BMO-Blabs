@@ -1,190 +1,123 @@
 # BMO — Next Execution Action
 
-**Last updated:** 2026-07-26  
-**Audience:** Codex / infrastructure-backend coding agent  
-**Current next phase:** **P6 — VPS Foundation and Operations Baseline**  
-**Phase state:** `READY` — execute only after the user explicitly asks to execute/continue the next phase.
+**Last updated:** 2026-07-28
+**Audience:** Codex / infrastructure-backend coding agent
+**Current next phase:** **P7 — Deploy Backend + Audio Service + Hermes Integration**
+**Phase state:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 
-> This is the operational entry point for the next implementation turn. Do not infer the next task from historical P1–P5 evidence. Do not start P7 in the same execution turn unless the user explicitly authorizes it after P6 verification.
+> P6 is `VERIFIED`. This file identifies the next phase but does not authorize
+> it. Do not start P7 merely because its dependency is satisfied.
 
-## 1. What must happen next
+## 1. Current checkpoint
 
-The next implementation task is **P6 only**.
+P6 VPS Foundation and Operations Baseline is complete. Sanitized proof is in
+[`backend-mvp/P6-TEST-EVIDENCE.md`](backend-mvp/P6-TEST-EVIDENCE.md).
 
-P6 prepares the VPS foundation required by every later phase:
+Verified P6 outcomes include:
+
+- Hermes 0.19.0 healthy on loopback `127.0.0.1:8642`, enabled under systemd,
+  with restart/recovery evidence;
+- Docker/Compose, `/opt/bmo`, Caddy TLS, Tailscale-only SSH firewall access,
+  and protected backup/restore foundations;
+- Beszel host/container/six-unit systemd telemetry and supported host alerts;
+- a private strict Beszel-to-Telegram relay plus an independent Hermes health
+  notifier with three-failure threshold and single recovery notification;
+- both labeled Telegram receipt tests confirmed by the operator;
+- no P7 backend/audio containers, public API readiness claim, or P7 listeners.
+
+The current turn must stop after recording P6. P7 requires a new explicit user
+command such as **“execute P7”** or **“continue with P7.”**
+
+## 2. Locked execution order
 
 ```text
-P6 VPS foundation
-  ↓ VERIFIED + explicit next-phase authorization
-P7 backend/audio deployment + public API
-  ↓ VERIFIED + explicit next-phase authorization
-P8 real RVC verification + resource benchmark
-  ↓ completed/verified status + explicit next-phase authorization
+P6 VPS foundation                         VERIFIED
+  ↓ explicit next-phase authorization
+P7 backend/audio deployment + public API NOT_STARTED
+  ↓ VERIFIED + explicit authorization
+P8 real RVC verification + benchmark
+  ↓ completed/verified + explicit authorization
 P9 PostgreSQL + Prisma readiness
-  ↓ VERIFIED + explicit next-phase authorization
-P10 hardware handoff activation + physical ESP32 verification
+  ↓ VERIFIED + explicit authorization
+P10 physical hardware acceptance
 ```
 
-Do not collapse P6–P10 back into one large task and do not skip the locked execution order **P6 → P7 → P8 → P9 → P10** unless the user explicitly changes the roadmap. Technical dependency alone is not execution authorization.
+Do not collapse phases or infer execution authority from technical readiness.
 
-## 2. Read these before touching the VPS
+## 3. Read before a future P7 execution
 
 Read in this order:
 
 1. `NEXT-ACTION.md` — this file.
-2. `roadmap/P6-EXECUTION-SPEC.md` — exact P6 execution contract.
-3. `backend-mvp/IMPLEMENTATION-STATUS.md` — current phase/status authority.
-4. `backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` — locked deployment/operations target.
-5. `backend-mvp/00-AGENT-EXECUTION-GUIDE.md` — general agent safety and verification rules.
-6. `backend-mvp/CURRENT-RUNTIME-CONFIG.md` — runtime values that later deployment must preserve.
-7. `hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — read-only public HW/backend contract.
-8. `operations/MAINTENANCE-AND-RECOVERY.md` — maintenance/update/recovery baseline that P6 must establish.
-9. `roadmap/P6-P10-ROADMAP.md` — downstream dependency plan; do not execute later phases yet.
+2. `roadmap/P6-P10-ROADMAP.md` — P7 goal, scope, outputs, and acceptance.
+3. `backend-mvp/IMPLEMENTATION-STATUS.md` — current status authority.
+4. `backend-mvp/P6-TEST-EVIDENCE.md` — foundation and residual risks P7 must
+   preserve.
+5. `backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` — deployment target.
+6. `backend-mvp/00-AGENT-EXECUTION-GUIDE.md` — general execution rules.
+7. `backend-mvp/CURRENT-RUNTIME-CONFIG.md` — runtime values to preserve.
+8. `hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — read-only
+   public protocol contract.
+9. `operations/MAINTENANCE-AND-RECOVERY.md` — live recovery procedures.
 
-Historical P1–P5 plans/evidence are evidence, not next-step instructions.
+Historical P1–P5 plans and evidence remain evidence, not next-step authority.
 
-## 3. Locked decisions for P6
+## 4. P7 boundary
 
-Treat these as already decided unless the real VPS audit proves a technical blocker:
+P7 may:
 
-```text
-Production source branch        : main
-Production source location      : /opt/bmo/app
-Persistent root                 : /opt/bmo
-Reverse proxy                   : Caddy (host system service; config managed/recoverable under /opt/bmo/config/caddy)
-BMO production hostname         : api.personalbmo.web.id
-Monitoring hostname             : monitor.personalbmo.web.id
-Monitoring                      : Beszel
-Portainer                       : NOT USED for now
-Admin private network           : Tailscale
-Public ports                    : 80/443 only for application/monitoring traffic
-Public SSH                      : may be restricted only AFTER Tailscale SSH path is proven
-Daily operator                  : bmo-admin
-Root                            : emergency/system admin only
-Hermes                          : host runtime; preserve if present, bootstrap in P6 if absent; never Dockerize
-Docker host user                : do NOT create a dedicated Linux user named docker
-Runtime code                    : immutable Docker images built from Git source
-Live source bind mount          : do NOT use for production backend/audio-service
-Real secrets                    : /opt/bmo/config, outside Git; bmo-admin-readable only as required for deploy; never world-readable
-RVC ownership                   : Audio Service; target assets under /opt/bmo/models/rvc/bmo
-Telegram                        : Beszel alert destination; use a fresh active bot token + target chat ID supplied out-of-band, never Git/docs
-Deployment downtime             : short recreate interruption ~10–30 s acceptable for current MVP
-Image release identity           : application images must be tied to deployed Git commit SHA for deterministic rollback
-Database activation              : PostgreSQL/DATABASE_URL are P9; P7 voice deployment must not require the DB
-```
+- audit source behavior against current docs and the hardware contract;
+- select the exact `main` commit to deploy;
+- build immutable backend/audio images tied to that commit;
+- configure runtime secrets outside Git;
+- deploy backend/audio with health, restart, and rollback controls;
+- integrate backend with the P6-verified Hermes host API;
+- activate the Caddy API route;
+- run public HTTPS/WSS and fake-ESP32 end-to-end tests;
+- record baseline resource/latency and deployment evidence.
 
-## 4. P6 is infrastructure only
+P7 must not:
 
-P6 **does**:
+- reinstall, relocate, Dockerize, or cosmetically restructure Hermes;
+- expose Hermes, Beszel, Audio Service, or backend origin ports publicly;
+- require PostgreSQL or activate `DATABASE_URL`; that is P9;
+- claim real RVC verification; that is P8;
+- hand off a live credential to physical hardware or claim final physical
+  integration; that is P10;
+- change the locked hardware/backend contract without explicit authorization.
 
-- audit existing VPS/Hermes/Codex state;
-- follow a deterministic Hermes branch:
-  - **Hermes present:** audit and preserve the proven user/path/config/data/runtime; do not reinstall or migrate for cosmetics;
-  - **Hermes absent:** bootstrap/install Hermes host runtime, select ownership from the actual installation model, configure maintainable startup, bind only to `127.0.0.1:8642`, health-check, and record recovery/restart evidence;
-- establish admin access/user/permissions;
-- Docker + Compose foundation;
-- `/opt/bmo` filesystem and config separation;
-- Caddy/DNS/TLS foundation;
-- Tailscale administration path;
-- firewall transition using safe ordering;
-- Beszel + authenticated monitoring + Telegram test alert;
-- bounded logging/resource observability;
-- backup framework and test artifact;
-- maintenance/update/recovery runbook + pinned-version inventory;
-- evidence, rollback notes, and documentation update.
+## 5. Authorization and first action
 
-P6 **does not**:
-
-- deploy/claim the BMO public voice API as ready — P7;
-- integrate/verify real RVC inference — P8;
-- deploy PostgreSQL/Prisma application layer — P9;
-- hand a live endpoint/token to physical hardware or claim HW integration — P10;
-- modify the firmware contract;
-- migrate a working Hermes installation to Docker, another Linux user, or another path merely for cleanliness;
-- create an unnecessary dedicated Hermes Linux user;
-- defer initial Hermes installation to P7. P7 performs backend/audio → Hermes integration, not initial Hermes installation.
-
-## 5. Authorization semantics
-
-This documentation does not authorize actions by itself.
-
-When the user explicitly says **“execute P6”**, **“continue the next phase”**, or equivalent while pointing the agent to this documentation, that authorizes the non-destructive P6 actions defined in `roadmap/P6-EXECUTION-SPEC.md`, including installation/configuration of the selected P6 tooling.
-
-Even after P6 authorization, stop for approval before:
-
-- deleting existing data, containers, images, volumes, users, or unrelated config;
-- migrating/changing the existing Hermes runtime user, path, config, service, or data;
-- closing the only working SSH path before a second tested admin path exists;
-- destructive firewall recovery actions not covered by the safe P6 transition;
-- rotating existing production credentials;
-- destructive database operations;
-- replacing unrelated existing host services;
-- proceeding around an unverified model/license/security blocker.
-
-If read-only preflight proves Hermes is absent, initial host-runtime bootstrap under the P6 execution spec is already within P6 scope. This does not authorize replacing or cosmetically restructuring a Hermes installation that is present.
-
-## 6. First action after P6 authorization
-
-Do **not** install first. Start with a read-only preflight and capture evidence:
+Documentation does not authorize P7. After an explicit user command, start with
+a read-only source/runtime reconciliation:
 
 ```text
-OS/kernel
-CPU/RAM/disk
-current users/sudo
-current SSH path
-Hermes installation evidence + PRESENT/ABSENT classification
-Hermes user/process/service/config/data/listener when present
-Codex location
-Docker/Compose presence
-current containers/images/volumes
-listeners/ports
-firewall
-DNS for api + monitor hostnames
-existing Caddy/Tailscale/Beszel state
-Git remote/current repo state
+local main commit and fetch state
+source routes/events/env behavior vs canonical docs
+P6 service/listener/firewall baseline
+Hermes health and loopback listener
+available build tooling and pinned base images
+runtime secret-file presence/metadata without values
+rollback anchors and current backup state
 ```
 
-If a real VPS fact conflicts with these docs, document the conflict before modifying the host.
+Document any conflict before changing public behavior or the live stack.
 
-For Hermes, distinguish `ABSENT` from merely stopped/unhealthy by checking process, service/supervisor, known installation/config/data paths, runtime/package evidence, and listener. Record sanitized evidence before selecting the branch.
+## 6. P7 finish line
 
-## 7. P6 finish line
-
-P6 may become `VERIFIED` only when all acceptance criteria in `roadmap/P6-EXECUTION-SPEC.md` pass and evidence is recorded.
-
-At minimum:
+P7 is verified only when:
 
 ```text
-Hermes PRESENT/ABSENT branch evidence recorded
-Hermes healthy + listener only at 127.0.0.1:8642
-Hermes actual runtime user, install/config/data paths, and startup/service mechanism recorded
-Hermes restart verified; reboot/autostart verified where safely possible
-Hermes recovery/start procedure documented; no public :8642 exposure
-bmo-admin operational
-Docker + Compose healthy
-/opt/bmo structure + permissions verified
-/opt/bmo/app is an approved clean `main` Git checkout usable by bmo-admin
-secrets outside Git
-Caddy/TLS foundation valid
-Tailscale admin SSH verified before public SSH restriction
-firewall exposes only approved surfaces
-Beszel HTTPS/login works
-Telegram test alert received
-logging/resource guardrails active
-backup test artifact + restore procedure documented
-maintenance/update/recovery runbook verified
-reboot/restart behavior checked where relevant
-P7 has NOT been silently started
+immutable backend/audio images are tied to a recorded commit
+backend and Audio Service are healthy with private origins
+backend integrates with the existing Hermes host runtime
+https://api.personalbmo.web.id/health succeeds through Caddy
+public WSS authentication and canonical events pass
+valid WAV upload, MP3 retrieval, and completion flow pass
+fake ESP32 public-domain E2E passes
+internal ports remain non-public
+rollback and resource evidence are recorded
+Hermes and all P6 controls remain healthy
 ```
 
-## 8. What to do after P6
-
-After P6 is verified:
-
-1. update `backend-mvp/IMPLEMENTATION-STATUS.md` with evidence/commit/state;
-2. create/update P6 evidence under `backend-mvp/` or `audit/`;
-3. summarize changed host state, commands, risks, and rollback;
-4. stop;
-5. report that **P7 is now the next phase**.
-
-Do not auto-run P7 merely because P6 passed.
+After P7 evidence is recorded, stop again. Do not auto-run P8.

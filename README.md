@@ -18,7 +18,9 @@ Current canonical references:
 Rules:
 
 - Active docs override historical/archive evidence.
-- P6 is next and `READY`; documentation alone does not authorize execution.
+- P6 is `VERIFIED`; P7 is next but remains `NOT_STARTED` until separately
+  authorized. See
+  [`docs/backend-mvp/P6-TEST-EVIDENCE.md`](docs/backend-mvp/P6-TEST-EVIDENCE.md).
 - Do not start P7–P10, deploy, or change locked hardware/backend contracts without explicit phase authorization.
 - Never commit real secrets. Copy the root `.env.*.example` templates to runtime config outside Git.
 

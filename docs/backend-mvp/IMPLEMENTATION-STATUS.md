@@ -1,6 +1,6 @@
 # BMO Backend MVP — Implementation Status
 
-**Last updated:** 2026-07-27
+**Last updated:** 2026-07-28
 **Backend reference lineage:** 1.0.1; current active documentation is date-audited and governed by this status file
 
 ## 1. Control state
@@ -8,20 +8,24 @@
 ```text
 Documentation package: AUDITED / HARDWARE HANDOFF ADDED
 P1–P5 backend history: implemented/verified according to phase evidence below
-Current next implementation phase: P6 — VPS Foundation and Operations Baseline
-P6 state: READY
-P6 execution authorization: requires an explicit user command to execute/continue the next phase; documentation alone does not start host changes
+Current next implementation phase: P7 — Deploy Backend + Audio Service + Hermes Integration
+P6 state: VERIFIED
+P6 execution authorization: COMPLETED
+P7 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
 P7–P10: PLANNED / dependency-gated
 ```
 
-The previous active P5 marker was stale after P5 verification/manual follow-up. The next phase is now explicitly **P6**. Read `../NEXT-ACTION.md` and `../roadmap/P6-EXECUTION-SPEC.md` before execution. A coding agent still needs an explicit user execution command before changing the VPS, and must stop after P6 verification rather than auto-start P7.
+P6 is verified. P7 is the next dependency phase but is not started or
+authorized. Read `../NEXT-ACTION.md`, the P7 section of
+`../roadmap/P6-P10-ROADMAP.md`, and `P6-TEST-EVIDENCE.md` before a future P7
+execution. Do not infer P7 authorization from P6 completion.
 
 ## 2. Documentation status
 
 | Document | Status | Verification |
 |---|---|---|
 | `../NEXT-ACTION.md` | CURRENT OPERATIONAL ENTRY | Explicitly selects P6 and prevents accidental P7+ execution |
-| `../roadmap/P6-EXECUTION-SPEC.md` | READY / LOCKED P6 SPEC | Exact P6 scope, authorization boundary, tasks, acceptance, evidence, stop condition |
+| `../roadmap/P6-EXECUTION-SPEC.md` | VERIFIED / LOCKED P6 RECORD | Exact P6 scope, authorization boundary, completed acceptance checklist, evidence, and stop condition |
 | `00-AGENT-EXECUTION-GUIDE.md` | VERIFIED | Workflow, boundary, phase control, stop condition tersedia |
 | `01-SCOPE-AND-DECISIONS.md` | VERIFIED / LOCKED | Backend source §1–§3 termigrasi |
 | `02-API-AND-WEBSOCKET-CONTRACT.md` | VERIFIED / LOCKED | Backend source §15–§17, §22 dan hardware contract dicocokkan |
@@ -32,6 +36,7 @@ The previous active P5 marker was stale after P5 verification/manual follow-up. 
 | `REQUIREMENT-TRACEABILITY.md` | VERIFIED | Seluruh source §1–§33 memiliki target primary |
 | `VERIFICATION-REPORT.md` | HISTORICAL PASS | Original 2026-07-18 package verification; not current implementation status |
 | `CHANGELOG.md` | VERIFIED | Baseline package tercatat |
+| `P6-TEST-EVIDENCE.md` | VERIFIED | Sanitized VPS evidence, strict dual Telegram receipt proof, recovery commands, residual risks, and no-P7 proof |
 
 ## 3. Implementation phases
 
@@ -42,16 +47,27 @@ The previous active P5 marker was stale after P5 verification/manual follow-up. 
 | P3 | Kokoro + FFmpeg + RVC fallback | 01, 03, 04, 05, 06 | IMPLEMENTED — not VERIFIED | AUTHORIZED BY USER | [`P3-TEST-EVIDENCE.md`](P3-TEST-EVIDENCE.md); real RVC inference runtime unavailable |
 | P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P4-TEST-EVIDENCE.md`](P4-TEST-EVIDENCE.md); real local Hermes pipeline passed; real Hermes host/VPS integration belongs to P7 |
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P5-TEST-EVIDENCE.md`](P5-TEST-EVIDENCE.md) |
-| P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | READY | AWAITING EXPLICIT EXECUTION COMMAND | — |
-| P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | NOT_STARTED | DEPENDS ON P6 VERIFIED | — |
+| P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
+| P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | NOT_STARTED | AWAITING EXPLICIT USER AUTHORIZATION | — |
 | P8 | Real RVC inference + fallback verification + VPS resource benchmark | 04–06 + roadmap | NOT_STARTED | DEPENDS ON P7 VERIFIED | — |
 | P9 | PostgreSQL + Prisma ready-to-use application data layer + backup/restore | PRD + 06 + roadmap | NOT_STARTED | DEPENDS ON P8 COMPLETED/VERIFIED STATUS; EXECUTE AFTER P8 | — |
 | P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
 
-## 3.1 Post-P5 implementation updates captured by this audit
+## 3.1 Post-P5/P6 implementation updates captured by this audit
 
 - P6 now owns conditional Hermes host bootstrap: preserve/audit a proven installation when present; install/configure a maintainable loopback-only host runtime when preflight proves it absent. P7 remains integration-only and does not own initial Hermes installation.
-- The 2026-07-27 production VPS preflight reported Hermes `ABSENT`; this documentation update records the execution path but did not install Hermes or start P6 host changes. The P6 executor must re-confirm absence from host evidence before bootstrap.
+- The 2026-07-27 production VPS preflight reported Hermes `ABSENT`; P6
+  re-confirmed that branch and bootstrapped Hermes 0.19.0 as the `hermes`
+  host user with a systemd service, loopback-only listener, health check, and
+  controlled restart evidence.
+- Caddy HTTPS, Tailscale-only SSH firewall access, Beszel host/container/systemd
+  metrics, supported host alerts, bounded logging, and protected
+  backup/checksum/restore evidence pass.
+- Telegram uses a fresh root-only credential, a token-free private Beszel
+  relay that requires HTTP success plus Telegram boolean `ok=true`, and an
+  independent Hermes timer with a three-failure threshold and single recovery
+  notification. Both labeled receipts were confirmed and sanitized secret
+  scans passed.
 - STT accuracy investigation on 2026-07-25 selected `WHISPER_MODEL=medium` with `WHISPER_HOTWORDS=BMO`, while keeping CPU INT8, 4 threads, 1 worker, beam 5, VAD, and language auto-detect. The earlier `small` references in P2 evidence remain historical evidence of P2 at that time, not the current tuning target.
 - Kokoro manual listening selected `KOKORO_VOICE=af_heart` with `KOKORO_SPEED=0.80` as the current deployment target; earlier evidence that production remained at `1.0` is historical and superseded by this later project decision. Revalidate perceived tempo after real RVC integration.
 - Hermes real local `/v1/responses` integration is recorded in the P5 manual evidence addendum. This is not equivalent to VPS/public deployment verification.
