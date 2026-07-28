@@ -4,6 +4,8 @@
 **Continued/verified:** 2026-07-28
 **Authorized by:** explicit user instruction to continue P6 only from the current VPS state
 **P6 notification implementation commit:** `d3103da`
+**P6 evidence/status commit:** `d0ae312`
+**P6 backup recovery commit:** `1be444f`
 **P7 status:** `NOT_STARTED`
 
 This report is sanitized. It does not contain active passwords, API keys, bot
@@ -37,9 +39,9 @@ Hermes branch         ABSENT -> bootstrapped host runtime
 
 Before this evidence file was written, `git fetch origin main` passed,
 `HEAD == origin/main`, and the working tree was clean. The remote URL contains
-no embedded credential. P6 was then implemented in local commits
-`afa57bf`, `47b4d7d`, `e99e408`, and `d3103da`; no remote push was performed.
-The final evidence commit restores a clean local working tree.
+no embedded credential. P6 was then implemented and recorded in local commits
+through `1be444f`; no remote push was performed. The final evidence update
+restores a clean local working tree.
 
 ## 3. Hermes host runtime
 
@@ -290,15 +292,19 @@ Schedule             Sunday 03:15 + randomized delay, persistent
 Retention deletion   disabled pending separate destructive approval
 ```
 
-Latest protected artifact:
+Final verified protected artifact:
 
 ```text
-Timestamp                 20260728T074119Z
+Timestamp                 20260728T100838Z
 runtime-config checksum   PASS
 Beszel recovery checksum  PASS
-Git branch/clean marker   main / clean
+Git branch/clean marker   main / clean at 1be444f
 Release pointer dirs      included
 Beszel data.db            included
+Telegram credential files included with protected archive metadata
+Notification executables  included
+Notification units        included
+Backup script             included
 ```
 
 An isolated restore of `etc/caddy/Caddyfile` from artifact
