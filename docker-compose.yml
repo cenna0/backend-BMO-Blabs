@@ -1,0 +1,90 @@
+name: bmo-production
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to an immutable name@sha256 digest}
+    network_mode: host
+    env_file:
+      - path: ${BACKEND_ENV_FILE:-/opt/bmo/config/backend.env}
+        required: true
+    environment:
+      NODE_ENV: production
+      BACKEND_HOST: 127.0.0.1
+      BACKEND_PORT: "3000"
+      HERMES_API_URL: http://127.0.0.1:8642
+      AUDIO_SERVICE_URL: http://127.0.0.1:8001
+      HARDWARE_TEST_MODE: "false"
+    volumes:
+      - type: bind
+        source: /opt/bmo/temp/audio
+        target: /opt/bmo/temp/audio
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  audio:
+    image: ${AUDIO_IMAGE:?Set AUDIO_IMAGE to an immutable name@sha256 digest}
+    env_file:
+      - path: ${AUDIO_ENV_FILE:-/opt/bmo/config/audio.env}
+        required: true
+    environment:
+      AUDIO_SERVICE_HOST: 0.0.0.0
+      AUDIO_SERVICE_PORT: "8001"
+      MODEL_DOWNLOAD_ALLOWED: "false"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      RVC_ENABLED: "false"
+      RUNTIME_MODELS_ROOT: /opt/bmo/models/runtime
+      MODEL_MANIFEST_PATH: /opt/bmo/models/runtime/MODEL_MANIFEST.json
+      HF_HOME: /opt/bmo/cache/audio/huggingface
+      TORCH_HOME: /opt/bmo/cache/audio/torch
+      XDG_CACHE_HOME: /opt/bmo/cache/audio/xdg
+      TTS_TEMP_DIR: /opt/bmo/temp/tts
+    ports:
+      - target: 8001
+        published: "8001"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: /opt/bmo/models/runtime
+        target: /opt/bmo/models/runtime
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /opt/bmo/cache/audio
+        target: /opt/bmo/cache/audio
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /opt/bmo/temp/tts
+        target: /opt/bmo/temp/tts
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
