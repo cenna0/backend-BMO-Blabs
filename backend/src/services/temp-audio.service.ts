@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { copyFile, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { copyFile, lstat, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 
 import { isUuidV4 } from "../utils/uuid.js";
 
@@ -19,6 +19,12 @@ export type AudioDownloadLookup =
 export interface TempAudioServiceOptions {
   now?: () => number;
   inputWavMaxAgeMs?: number;
+  cleanupBatchLimit?: number;
+}
+
+export interface TempAudioCleanupResult {
+  deleted: number;
+  failed: number;
 }
 
 export class TempAudioService {
@@ -26,6 +32,7 @@ export class TempAudioService {
   readonly #expiredAudio = new Map<string, number>();
   readonly #now: () => number;
   readonly #inputWavMaxAgeMs: number;
+  readonly #cleanupBatchLimit: number;
 
   constructor(
     private readonly root: string,
@@ -34,6 +41,10 @@ export class TempAudioService {
   ) {
     this.#now = options.now ?? Date.now;
     this.#inputWavMaxAgeMs = options.inputWavMaxAgeMs ?? 600_000;
+    this.#cleanupBatchLimit = options.cleanupBatchLimit ?? 256;
+    if (!Number.isInteger(this.#cleanupBatchLimit) || this.#cleanupBatchLimit <= 0) {
+      throw new RangeError("cleanupBatchLimit must be a positive integer");
+    }
   }
 
   async initialize(): Promise<void> {
@@ -41,27 +52,45 @@ export class TempAudioService {
   }
 
   async startupCleanup(): Promise<void> {
+    await this.cleanupExpiredOrphans();
+  }
+
+  async cleanupExpiredOrphans(): Promise<TempAudioCleanupResult> {
     await this.initialize();
     const root = resolve(this.root);
     const files = await readdir(root, { withFileTypes: true });
     const now = this.#now();
+    let deleted = 0;
+    let failed = 0;
     for (const file of files) {
       if (!file.isFile()) continue;
       const path = resolve(root, file.name);
-      if (!path.startsWith(root)) continue;
-      const info = await stat(path);
-      const ageMs = now - info.mtimeMs;
+      if (dirname(path) !== root) continue;
+      let maxAgeMs: number | undefined;
       if (file.name.endsWith(".mp3")) {
         const audioId = file.name.slice(0, -4);
-        if (isUuidV4(audioId) && ageMs >= this.ttlSeconds * 1_000) {
-          await rm(path, { force: true });
+        if (isUuidV4(audioId) && !this.#audio.has(audioId)) {
+          maxAgeMs = this.ttlSeconds * 1_000;
         }
-        continue;
+      } else if (file.name.startsWith("input-") && file.name.endsWith(".wav")) {
+        const requestId = file.name.slice(6, -4);
+        if (isUuidV4(requestId)) {
+          maxAgeMs = this.#inputWavMaxAgeMs;
+        }
       }
-      if (file.name.startsWith("input-") && file.name.endsWith(".wav") && ageMs >= this.#inputWavMaxAgeMs) {
+      if (maxAgeMs === undefined) continue;
+      try {
+        const info = await lstat(path);
+        if (!info.isFile() || now - info.mtimeMs < maxAgeMs) continue;
+        if (deleted + failed >= this.#cleanupBatchLimit) break;
         await rm(path, { force: true });
+        deleted += 1;
+      } catch {
+        failed += 1;
+        if (deleted + failed >= this.#cleanupBatchLimit) break;
       }
     }
+    return { deleted, failed };
   }
 
   async writeInput(requestId: string, bytes: Buffer): Promise<string> {

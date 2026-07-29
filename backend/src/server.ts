@@ -124,7 +124,14 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   const runMaintenance = async () => {
     const expired = requestStore.expireReadyBefore(Date.now());
     for (const record of expired) {
-      if (record.audioId) await tempAudio.expireAudio(record.audioId);
+      try {
+        if (record.audioId) await tempAudio.expireAudio(record.audioId);
+      } catch (error) {
+        logger.warn(
+          { request_id: record.requestId, err: error },
+          "failed to delete tracked expired audio",
+        );
+      }
       sockets.sendRequestFailed(record.deviceId, record.requestId, "AUDIO_EXPIRED");
     }
     requestStore.collectGarbage();
@@ -132,6 +139,17 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
       config.REQUEST_TOMBSTONE_TTL_SECONDS * 1_000,
       config.MAX_REQUEST_STORE_ENTRIES,
     );
+    try {
+      const cleanup = await tempAudio.cleanupExpiredOrphans();
+      if (cleanup.failed > 0) {
+        logger.warn(
+          { failed_files: cleanup.failed },
+          "one or more orphan temp-audio files could not be cleaned",
+        );
+      }
+    } catch (error) {
+      logger.warn({ err: error }, "periodic orphan temp-audio cleanup failed");
+    }
   };
 
   app.use(createHealthRouter({ hardwareTestMode: config.HARDWARE_TEST_MODE, readiness }));
@@ -151,7 +169,11 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     runMaintenance,
     async start(port = config.BACKEND_PORT) {
       await tempAudio.initialize();
-      await tempAudio.startupCleanup();
+      try {
+        await tempAudio.startupCleanup();
+      } catch (error) {
+        logger.warn({ err: error }, "startup orphan temp-audio cleanup failed");
+      }
       await new Promise<void>((resolve, reject) => {
         const onError = (error: Error) => reject(error);
         httpServer.once("error", onError);
@@ -168,7 +190,11 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
         publicBaseUrl = configured.toString().replace(/\/$/, "");
       }
       cleanupInterval = setInterval(
-        () => void runMaintenance(),
+        () => {
+          void runMaintenance().catch((error) => {
+            logger.error({ err: error }, "unexpected backend maintenance failure");
+          });
+        },
         config.TEMP_AUDIO_CLEANUP_INTERVAL_SECONDS * 1_000,
       );
       cleanupInterval.unref();
