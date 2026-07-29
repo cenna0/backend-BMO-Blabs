@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from app.model_assets import WHISPER_SPEC, runtime_snapshot_path
 from app.stt import FasterWhisperTranscriber
 from app.wav import inspect_wav
 
@@ -130,18 +131,17 @@ def prepare_fixtures(fixtures_dir: Path, skip_generate: bool) -> dict[str, Path]
 
 
 def model_cache_metadata(models_dir: Path, model_name: str) -> dict[str, object]:
-    source = f"Systran/faster-whisper-{model_name}"
-    repo_dir = models_dir / "hf-cache" / "hub" / f"models--Systran--faster-whisper-{model_name}"
-    revision_path = repo_dir / "refs" / "main"
-    revision = revision_path.read_text(encoding="utf-8").strip() if revision_path.is_file() else None
-    files = [path for path in repo_dir.rglob("*") if path.is_file()]
+    del model_name
+    snapshot = runtime_snapshot_path(models_dir / "runtime", WHISPER_SPEC)
+    runtime_root = models_dir / "runtime"
+    files = [path for path in snapshot.rglob("*") if path.is_file()]
     return {
-        "source": source,
-        "revision": revision,
-        "cache_dir": str(repo_dir),
+        "source": WHISPER_SPEC.repository,
+        "revision": WHISPER_SPEC.revision,
+        "cache_dir": str(runtime_root),
         "file_count": len(files),
-        "total_bytes": sum(path.lstat().st_size for path in files),
-        "snapshot_dir": str(repo_dir / "snapshots" / revision) if revision else None,
+        "total_bytes": sum(path.stat().st_size for path in files),
+        "snapshot_dir": str(snapshot),
     }
 
 

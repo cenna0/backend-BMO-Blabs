@@ -4,6 +4,12 @@ from threading import Lock
 from typing import Callable, Iterable, Protocol
 
 from app.config import Settings
+from app.model_assets import (
+    WHISPER_SPEC,
+    configure_model_environment,
+    runtime_snapshot_path,
+    validate_model_snapshot,
+)
 
 
 @dataclass(frozen=True)
@@ -91,19 +97,40 @@ class FasterWhisperTranscriber:
                 return self._model
             factory = self._model_factory
             if factory is None:
+                configure_model_environment(
+                    hf_home=self._settings.hf_home,
+                    torch_home=self._settings.torch_home,
+                    xdg_cache_home=self._settings.xdg_cache_home,
+                    downloads_allowed=self._settings.model_download_allowed,
+                )
+                snapshot = runtime_snapshot_path(
+                    self._settings.runtime_models_root,
+                    WHISPER_SPEC,
+                )
+                try:
+                    validate_model_snapshot(snapshot, WHISPER_SPEC)
+                except Exception:
+                    self._load_failed = True
+                    raise
                 try:
                     from faster_whisper import WhisperModel
                 except ImportError as error:
                     self._load_failed = True
                     raise RuntimeError("faster-whisper dependency is not installed") from error
                 factory = WhisperModel
+                model_reference = str(snapshot)
+                local_only_options = {"local_files_only": True}
+            else:
+                model_reference = self._settings.whisper_model
+                local_only_options = {}
             try:
                 self._model = factory(
-                    self._settings.whisper_model,
+                    model_reference,
                     device=self._settings.whisper_device,
                     compute_type=self._settings.whisper_compute_type,
                     cpu_threads=self._settings.whisper_cpu_threads,
                     num_workers=self._settings.whisper_workers,
+                    **local_only_options,
                 )
                 self._load_failed = False
                 return self._model

@@ -4,11 +4,16 @@ from array import array
 from pathlib import Path
 from threading import Lock
 from typing import Callable
-import os
 import time
 import wave
 
 from app.config import Settings
+from app.model_assets import (
+    KOKORO_SPEC,
+    configure_model_environment,
+    runtime_snapshot_path,
+    validate_model_snapshot,
+)
 
 
 def _extract_audio(result: object) -> object:
@@ -51,6 +56,7 @@ class KokoroSynthesizer:
         self._settings = settings
         self._pipeline_factory = pipeline_factory
         self._pipeline: object | None = None
+        self._voice_reference = settings.kokoro_voice
         self._load_failed = False
         self._load_lock = Lock()
 
@@ -72,15 +78,45 @@ class KokoroSynthesizer:
                 return self._pipeline
             factory = self._pipeline_factory
             if factory is None:
-                os.environ.setdefault("HF_HOME", str(self._settings.hf_home))
-                os.environ.setdefault("TORCH_HOME", str(self._settings.torch_home))
-                os.environ.setdefault("XDG_CACHE_HOME", str(self._settings.xdg_cache_home))
+                configure_model_environment(
+                    hf_home=self._settings.hf_home,
+                    torch_home=self._settings.torch_home,
+                    xdg_cache_home=self._settings.xdg_cache_home,
+                    downloads_allowed=self._settings.model_download_allowed,
+                )
+                snapshot = runtime_snapshot_path(
+                    self._settings.runtime_models_root,
+                    KOKORO_SPEC,
+                )
                 try:
-                    from kokoro import KPipeline
+                    validate_model_snapshot(snapshot, KOKORO_SPEC)
+                except Exception:
+                    self._load_failed = True
+                    raise
+                try:
+                    from kokoro import KModel, KPipeline
                 except ImportError as error:
                     self._load_failed = True
                     raise RuntimeError("kokoro dependency is not installed") from error
-                factory = KPipeline
+                try:
+                    model = KModel(
+                        repo_id=KOKORO_SPEC.repository,
+                        config=str(snapshot / "config.json"),
+                        model=str(snapshot / "kokoro-v1_0.pth"),
+                    ).to("cpu").eval()
+                    self._pipeline = KPipeline(
+                        lang_code=self._settings.kokoro_lang_code,
+                        repo_id=KOKORO_SPEC.repository,
+                        model=model,
+                    )
+                    self._voice_reference = str(
+                        snapshot / "voices" / f"{self._settings.kokoro_voice}.pt",
+                    )
+                    self._load_failed = False
+                    return self._pipeline
+                except Exception:
+                    self._load_failed = True
+                    raise
             try:
                 self._pipeline = factory(self._settings.kokoro_lang_code)
                 self._load_failed = False
@@ -97,7 +133,7 @@ class KokoroSynthesizer:
         pipeline = self._load_pipeline()
         generator = pipeline(
             text,
-            voice=self._settings.kokoro_voice,
+            voice=self._voice_reference,
             speed=self._settings.kokoro_speed,
         )
         samples: list[float] = []

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,11 +12,18 @@ class Settings(BaseSettings):
 
     hf_home: Path = Path("/opt/bmo/models/hf-cache")
     torch_home: Path = Path("/opt/bmo/models/torch-cache")
+    runtime_models_root: Path = Path("/opt/bmo/models/runtime")
     xdg_cache_home: Path = Path("/tmp/cache")
     model_download_allowed: bool = False
     model_manifest_path: Path = Path("/opt/bmo/models/MODEL_MANIFEST.md")
 
     whisper_model: str = "medium"
+    whisper_model_repo: Literal["Systran/faster-whisper-medium"] = (
+        "Systran/faster-whisper-medium"
+    )
+    whisper_model_revision: Literal["08e178d48790749d25932bbc082711ddcfdfbc4f"] = (
+        "08e178d48790749d25932bbc082711ddcfdfbc4f"
+    )
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
     whisper_cpu_threads: int = Field(default=4, gt=0)
@@ -25,7 +33,11 @@ class Settings(BaseSettings):
     whisper_hotwords: str | None = "BMO"
 
     kokoro_lang_code: str = "a"
-    kokoro_voice: str = "af_heart"
+    kokoro_voice: Literal["af_heart"] = "af_heart"
+    kokoro_model_repo: Literal["hexgrad/Kokoro-82M"] = "hexgrad/Kokoro-82M"
+    kokoro_model_revision: Literal["f3ff3571791e39611d31c381e3a41a3af07b4987"] = (
+        "f3ff3571791e39611d31c381e3a41a3af07b4987"
+    )
     kokoro_sample_rate: int = Field(default=24_000, gt=0)
     kokoro_speed: float = Field(default=0.80, gt=0)
 
