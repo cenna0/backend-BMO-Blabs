@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+from io import StringIO
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from ops.telegram.bmo_telegram_notify import (
     DeliveryError,
     HealthState,
     StateError,
     load_state,
+    main,
     run_health_check,
     save_state,
     send_telegram,
@@ -345,6 +350,43 @@ class StateMachineTests(unittest.TestCase):
         save_state(self.state_path, HealthState(failures=1))
 
         self.assertEqual(self.state_path.stat().st_mode & 0o777, 0o600)
+
+
+class CommandTests(unittest.TestCase):
+    def test_static_test_uses_exact_group_test_label(self) -> None:
+        with tempfile.TemporaryDirectory() as credentials_directory:
+            credentials = Path(credentials_directory)
+            (credentials / "telegram-bot-token").write_text(
+                "1:fake-token\n",
+                encoding="utf-8",
+            )
+            (credentials / "telegram-chat-id").write_text(
+                "-123\n",
+                encoding="utf-8",
+            )
+            output = StringIO()
+            with (
+                patch.dict(
+                    os.environ,
+                    {"CREDENTIALS_DIRECTORY": credentials_directory},
+                ),
+                patch(
+                    "ops.telegram.bmo_telegram_notify.send_telegram",
+                ) as sender,
+                redirect_stdout(output),
+            ):
+                result = main(["test"])
+
+        self.assertEqual(result, 0)
+        sender.assert_called_once()
+        self.assertEqual(
+            sender.call_args.args[2].splitlines()[0],
+            "[P6 HERMES GROUP TEST]",
+        )
+        self.assertIn(
+            "telegram_delivery=success label=direct_test",
+            output.getvalue(),
+        )
 
 
 if __name__ == "__main__":

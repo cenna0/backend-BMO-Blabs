@@ -26,6 +26,9 @@ BIND_PORT = 8787
 TOKEN_FILE = Path("/run/secrets/telegram-bot-token")
 CHAT_FILE = Path("/run/secrets/telegram-chat-id")
 MAX_MESSAGE_BYTES = 65_536
+BESZEL_BUILT_IN_TEST_PAYLOAD = "This is a notification from Beszel."
+BESZEL_ALERT_LABEL = "[BMO BESZEL]"
+BESZEL_GROUP_TEST_LABEL = "[BMO BESZEL GROUP TEST]"
 SAFE_DELIVERY_ERROR = re.compile(
     r"^(?:"
     r"http_status=[0-9]{3}|"
@@ -56,6 +59,15 @@ def safe_delivery_reason(error: DeliveryError) -> str:
     if SAFE_DELIVERY_ERROR.fullmatch(reason):
         return reason
     return "delivery_error"
+
+
+def format_telegram_message(message: str) -> str:
+    label = (
+        BESZEL_GROUP_TEST_LABEL
+        if message == BESZEL_BUILT_IN_TEST_PAYLOAD
+        else BESZEL_ALERT_LABEL
+    )
+    return f"{label}\n{message}"
 
 
 def make_handler(
@@ -116,7 +128,7 @@ def make_handler(
                 telegram_sender(
                     token,
                     chat_id,
-                    f"[BMO BESZEL]\n{message}",
+                    format_telegram_message(message),
                 )
             except DeliveryError as error:
                 print(

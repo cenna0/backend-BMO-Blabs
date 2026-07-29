@@ -79,6 +79,68 @@ class RelayHttpTests(unittest.TestCase):
             ],
         )
 
+    def test_exact_beszel_builtin_test_payload_uses_group_test_label(
+        self,
+    ) -> None:
+        messages: list[str] = []
+
+        def sender(token: str, chat_id: str, message: str) -> None:
+            messages.append(message)
+
+        server = self.start_server(sender)
+        status, body = self.request(
+            server,
+            "POST",
+            "/notify",
+            b"This is a notification from Beszel.",
+        )
+
+        self.assertEqual((status, body), (204, b""))
+        self.assertEqual(
+            messages,
+            [
+                "[BMO BESZEL GROUP TEST]\n"
+                "This is a notification from Beszel.",
+            ],
+        )
+
+    def test_non_test_payloads_are_never_relabelled(self) -> None:
+        messages: list[str] = []
+
+        def sender(token: str, chat_id: str, message: str) -> None:
+            messages.append(message)
+
+        server = self.start_server(sender)
+        near_matches = (
+            "This is a notification from Beszel",
+            "This is a notification from Beszel. ",
+            " This is a notification from Beszel.",
+            "This is a notification from Beszel.\n",
+            "this is a notification from Beszel.",
+            "This is a notification from Beszel. extra",
+            "CPU averaged 91% for the previous 10 minutes.",
+        )
+
+        for payload in near_matches:
+            with self.subTest(payload=payload):
+                messages.clear()
+                status, body = self.request(
+                    server,
+                    "POST",
+                    "/notify",
+                    payload.encode("utf-8"),
+                )
+
+                self.assertEqual((status, body), (204, b""))
+                self.assertEqual(
+                    messages,
+                    [f"[BMO BESZEL]\n{payload}"],
+                )
+                self.assertNotIn(
+                    "[BMO BESZEL GROUP TEST]",
+                    messages[0],
+                )
+
     def test_delivery_error_returns_sanitized_502(self) -> None:
         def sender(token: str, chat_id: str, message: str) -> None:
             raise DeliveryError("telegram_api_ok_false")

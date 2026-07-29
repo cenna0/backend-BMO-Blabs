@@ -259,7 +259,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         if arguments.action == "test":
             notify(
-                "[P6 HERMES PATH TEST]\n"
+                "[P6 HERMES GROUP TEST]\n"
                 f"Host: {socket.gethostname()}\n"
                 "Strict delivery validation requires HTTP success and ok=true.",
             )
