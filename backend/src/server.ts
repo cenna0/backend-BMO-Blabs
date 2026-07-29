@@ -13,6 +13,7 @@ import { AudioServiceClient } from "./services/audio-service.client.js";
 import { ConversationQueue } from "./services/conversation-queue.js";
 import { HermesResponsesClient } from "./services/hermes.client.js";
 import { HardwareTestService } from "./services/hardware-test.service.js";
+import { BackendReadinessService } from "./services/readiness.service.js";
 import { TempAudioService } from "./services/temp-audio.service.js";
 import { VoicePipelineService } from "./services/voice-pipeline.service.js";
 import { DeviceRegistry } from "./websocket/device-registry.js";
@@ -73,14 +74,19 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     onPlaybackDone: (deviceId, requestId) => removeOutput(deviceId, requestId, false),
     onPlaybackFailed: (deviceId, requestId) => removeOutput(deviceId, requestId, true),
   });
-  const hardwareTest = new HardwareTestService(
-    config.HARDWARE_TEST_MP3_PATH,
-    () => publicBaseUrl,
-    tempAudio,
-    requestStore,
-    sockets,
-    logger,
-  );
+  let hardwareTest: HardwareTestService | undefined;
+  if (config.HARDWARE_TEST_MODE) {
+    const fixturePath = config.HARDWARE_TEST_MP3_PATH;
+    if (!fixturePath) throw new Error("hardware test fixture is required");
+    hardwareTest = new HardwareTestService(
+      fixturePath,
+      () => publicBaseUrl,
+      tempAudio,
+      requestStore,
+      sockets,
+      logger,
+    );
+  }
   const audioService = new AudioServiceClient({
     baseUrl: config.AUDIO_SERVICE_URL,
     internalToken: config.INTERNAL_SERVICE_TOKEN,
@@ -95,6 +101,11 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     softTimeoutMs: config.HERMES_SOFT_TIMEOUT_MS,
     hardTimeoutMs: config.HERMES_HARD_TIMEOUT_MS,
     logger,
+  });
+  const readiness = new BackendReadinessService({
+    hermesBaseUrl: config.HERMES_API_URL,
+    audioServiceBaseUrl: config.AUDIO_SERVICE_URL,
+    timeoutMs: config.READINESS_PROBE_TIMEOUT_MS,
   });
   const conversationQueue = new ConversationQueue();
   const pipeline = new VoicePipelineService({
@@ -123,7 +134,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     );
   };
 
-  app.use(createHealthRouter(config.HARDWARE_TEST_MODE));
+  app.use(createHealthRouter({ hardwareTestMode: config.HARDWARE_TEST_MODE, readiness }));
   app.use(createVoiceRouter({ config, requestStore, sockets, tempAudio, hardwareTest, pipeline, logger }));
   app.use(createAudioRouter(tempAudio, { requestStore, sockets }));
   app.use(createVoiceErrorHandler(config.MAX_AUDIO_BYTES));

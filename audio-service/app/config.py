@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     output_mp3_sample_rate: int = Field(default=24_000, gt=0)
     output_mp3_bitrate: str = "96k"
 
-    rvc_enabled: bool = True
+    rvc_enabled: bool = False
     rvc_model_repo: str = "Freaky98/CGO-adventure-time-BMO-rvc-v2-420e"
     rvc_model_revision: str = "82a8bc529bd41b930589188ead30f073d4f99fc0"
     rvc_model_archive: str = "CGO-adventure-time-BMO-rvc-v2-420e.zip"

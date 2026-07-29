@@ -24,6 +24,7 @@ def test_rvc_command_converter_uses_rvc_infer_cli_shape(tmp_path, monkeypatch):
     converter = RvcCommandConverter(
         Settings(
             internal_service_token="test-internal-token",
+            rvc_enabled=True,
             rvc_model_path=model,
             rvc_index_path=index,
             rvc_infer_command="rvc infer",

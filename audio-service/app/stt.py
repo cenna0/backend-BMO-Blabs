@@ -1,5 +1,6 @@
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Callable, Iterable, Protocol
 
 from app.config import Settings
@@ -69,6 +70,8 @@ class FasterWhisperTranscriber:
         self._settings = settings
         self._model_factory = model_factory
         self._model: object | None = None
+        self._load_failed = False
+        self._load_lock = Lock()
 
     @property
     def ready(self) -> bool:
@@ -76,26 +79,40 @@ class FasterWhisperTranscriber:
 
     @property
     def health_status(self) -> str:
-        return "ok" if self.ready else "loading"
+        if self.ready:
+            return "ok"
+        return "error" if self._load_failed else "loading"
 
     def _load_model(self) -> object:
         if self._model is not None:
             return self._model
-        factory = self._model_factory
-        if factory is None:
+        with self._load_lock:
+            if self._model is not None:
+                return self._model
+            factory = self._model_factory
+            if factory is None:
+                try:
+                    from faster_whisper import WhisperModel
+                except ImportError as error:
+                    self._load_failed = True
+                    raise RuntimeError("faster-whisper dependency is not installed") from error
+                factory = WhisperModel
             try:
-                from faster_whisper import WhisperModel
-            except ImportError as error:
-                raise RuntimeError("faster-whisper dependency is not installed") from error
-            factory = WhisperModel
-        self._model = factory(
-            self._settings.whisper_model,
-            device=self._settings.whisper_device,
-            compute_type=self._settings.whisper_compute_type,
-            cpu_threads=self._settings.whisper_cpu_threads,
-            num_workers=self._settings.whisper_workers,
-        )
-        return self._model
+                self._model = factory(
+                    self._settings.whisper_model,
+                    device=self._settings.whisper_device,
+                    compute_type=self._settings.whisper_compute_type,
+                    cpu_threads=self._settings.whisper_cpu_threads,
+                    num_workers=self._settings.whisper_workers,
+                )
+                self._load_failed = False
+                return self._model
+            except Exception:
+                self._load_failed = True
+                raise
+
+    def warm_up(self) -> None:
+        self._load_model()
 
     def transcribe(self, audio_path: Path) -> TranscriptionResult:
         model = self._load_model()

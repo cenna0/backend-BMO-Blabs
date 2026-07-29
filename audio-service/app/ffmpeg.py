@@ -33,6 +33,14 @@ class FfmpegConverter:
                 self._available = False
         return self._available
 
+    @property
+    def ready(self) -> bool:
+        return self._available is True
+
+    def warm_up(self) -> None:
+        if not self.available:
+            raise RuntimeError("ffmpeg is unavailable")
+
     def convert_wav_to_mp3(self, input_wav: Path, output_mp3: Path) -> float:
         command = [
             self._settings.ffmpeg_binary,

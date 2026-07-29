@@ -106,6 +106,19 @@ class TtsOrchestrator:
         self._kokoro = kokoro
         self._ffmpeg = ffmpeg
         self._rvc = rvc
+        self._warmup_failed = False
+
+    @property
+    def health_status(self) -> str:
+        state = self.health_state()
+        if state.kokoro_loaded and state.ffmpeg_available:
+            return "ok"
+        return "error" if self._warmup_failed else "loading"
+
+    def _ffmpeg_ready(self) -> bool:
+        if hasattr(self._ffmpeg, "ready"):
+            return bool(getattr(self._ffmpeg, "ready"))
+        return bool(getattr(self._ffmpeg, "available", False))
 
     def health_state(self) -> TtsEngineState:
         rvc_available = bool(self._rvc and self._rvc.available)
@@ -114,10 +127,28 @@ class TtsOrchestrator:
             rvc_error = getattr(self._rvc, "error", None) if self._rvc else "RVC unavailable"
         return TtsEngineState(
             kokoro_loaded=bool(getattr(self._kokoro, "ready", False)),
-            ffmpeg_available=bool(getattr(self._ffmpeg, "available", False)),
+            ffmpeg_available=self._ffmpeg_ready(),
             rvc_available=rvc_available,
             rvc_error=rvc_error,
         )
+
+    def warm_up(self) -> None:
+        try:
+            kokoro_warm_up = getattr(self._kokoro, "warm_up", None)
+            if callable(kokoro_warm_up):
+                kokoro_warm_up()
+            if not bool(getattr(self._kokoro, "ready", False)):
+                raise RuntimeError("Kokoro is unavailable")
+
+            ffmpeg_warm_up = getattr(self._ffmpeg, "warm_up", None)
+            if callable(ffmpeg_warm_up):
+                ffmpeg_warm_up()
+            elif not bool(getattr(self._ffmpeg, "available", False)):
+                raise RuntimeError("ffmpeg is unavailable")
+            self._warmup_failed = False
+        except Exception:
+            self._warmup_failed = True
+            raise
 
     def synthesize(self, text: str, use_rvc: bool) -> TtsResult:
         cleaned = validate_tts_text(

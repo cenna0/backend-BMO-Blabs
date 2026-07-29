@@ -46,3 +46,23 @@ def test_ffmpeg_converter_uses_canonical_mp3_command(tmp_path):
             str(output_mp3),
         ],
     ]
+
+
+def test_ffmpeg_warmup_caches_mandatory_readiness():
+    commands = []
+
+    def runner(command, **kwargs):
+        commands.append(command)
+        return Completed()
+
+    converter = FfmpegConverter(
+        Settings(internal_service_token="test-internal-token"),
+        runner=runner,
+    )
+
+    assert converter.ready is False
+    converter.warm_up()
+    converter.warm_up()
+
+    assert converter.ready is True
+    assert commands == [["ffmpeg", "-version"]]

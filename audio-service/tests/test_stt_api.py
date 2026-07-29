@@ -1,3 +1,7 @@
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
 from fastapi.testclient import TestClient
 
 from app.config import Settings
@@ -143,3 +147,46 @@ def test_transcribe_returns_no_speech_result():
         "language_probability": 0.0,
         "duration_seconds": 0.2,
     }
+
+
+class BlockingTranscriber:
+    ready = True
+
+    def __init__(self):
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def transcribe(self, audio_path):
+        self.started.set()
+        self.release.wait(timeout=2)
+        return TranscriptionResult("Hello BMO.", True, "en", 0.99, 0.2)
+
+
+def test_transcription_does_not_block_liveness():
+    transcriber = BlockingTranscriber()
+    app = create_app(
+        settings=Settings(internal_service_token="test-internal-token"),
+        transcriber=transcriber,
+    )
+
+    with TestClient(app) as client, ThreadPoolExecutor(max_workers=1) as executor:
+        voice = executor.submit(
+            client.post,
+            "/stt/transcribe",
+            content=make_wav(),
+            headers=auth_headers(),
+        )
+        assert transcriber.started.wait(timeout=1)
+        release_timer = threading.Timer(0.5, transcriber.release.set)
+        release_timer.start()
+        try:
+            started = time.monotonic()
+            liveness = client.get("/livez")
+            elapsed = time.monotonic() - started
+        finally:
+            transcriber.release.set()
+            release_timer.cancel()
+
+        assert liveness.status_code == 200
+        assert elapsed < 0.2
+        assert voice.result(timeout=1).status_code == 200

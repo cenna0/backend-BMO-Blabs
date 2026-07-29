@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from array import array
 from pathlib import Path
+from threading import Lock
 from typing import Callable
 import os
 import time
@@ -50,26 +51,46 @@ class KokoroSynthesizer:
         self._settings = settings
         self._pipeline_factory = pipeline_factory
         self._pipeline: object | None = None
+        self._load_failed = False
+        self._load_lock = Lock()
 
     @property
     def ready(self) -> bool:
         return self._pipeline is not None
 
+    @property
+    def health_status(self) -> str:
+        if self.ready:
+            return "ok"
+        return "error" if self._load_failed else "loading"
+
     def _load_pipeline(self) -> object:
         if self._pipeline is not None:
             return self._pipeline
-        factory = self._pipeline_factory
-        if factory is None:
-            os.environ.setdefault("HF_HOME", str(self._settings.hf_home))
-            os.environ.setdefault("TORCH_HOME", str(self._settings.torch_home))
-            os.environ.setdefault("XDG_CACHE_HOME", str(self._settings.xdg_cache_home))
+        with self._load_lock:
+            if self._pipeline is not None:
+                return self._pipeline
+            factory = self._pipeline_factory
+            if factory is None:
+                os.environ.setdefault("HF_HOME", str(self._settings.hf_home))
+                os.environ.setdefault("TORCH_HOME", str(self._settings.torch_home))
+                os.environ.setdefault("XDG_CACHE_HOME", str(self._settings.xdg_cache_home))
+                try:
+                    from kokoro import KPipeline
+                except ImportError as error:
+                    self._load_failed = True
+                    raise RuntimeError("kokoro dependency is not installed") from error
+                factory = KPipeline
             try:
-                from kokoro import KPipeline
-            except ImportError as error:
-                raise RuntimeError("kokoro dependency is not installed") from error
-            factory = KPipeline
-        self._pipeline = factory(self._settings.kokoro_lang_code)
-        return self._pipeline
+                self._pipeline = factory(self._settings.kokoro_lang_code)
+                self._load_failed = False
+                return self._pipeline
+            except Exception:
+                self._load_failed = True
+                raise
+
+    def warm_up(self) -> None:
+        self._load_pipeline()
 
     def synthesize_to_wav(self, text: str, output_path: Path) -> float:
         started = time.perf_counter()

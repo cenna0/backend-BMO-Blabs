@@ -535,7 +535,7 @@ postgres_env = parse_env_example(root / ".env.postgres.example")
 
 required_backend_env = {
     "NODE_ENV": "production",
-    "BACKEND_HOST": "0.0.0.0",
+    "BACKEND_HOST": "127.0.0.1",
     "BACKEND_PORT": "3000",
     "PUBLIC_BASE_URL": "https://api.personalbmo.web.id",
     "DEVICE_ID": "bmo-001",
@@ -548,7 +548,9 @@ required_backend_env = {
     "AUDIO_SERVICE_TTS_TIMEOUT_MS": "180000",
     "HERMES_SOFT_TIMEOUT_MS": "30000",
     "HERMES_HARD_TIMEOUT_MS": "180000",
+    "READINESS_PROBE_TIMEOUT_MS": "2000",
     "TOTAL_PIPELINE_TIMEOUT_MS": "300000",
+    "HARDWARE_TEST_MODE": "false",
     "WS_AUTH_TIMEOUT_MS": "5000",
     "WS_HEARTBEAT_INTERVAL_MS": "60000",
 }
@@ -564,6 +566,10 @@ for key in ["HERMES_API_URL", "HERMES_MODEL", "HERMES_CONVERSATION"]:
         errors.append(f".env.backend.example missing {key}")
 if "DATABASE_URL" in backend_env:
     errors.append(".env.backend.example must not make voice backend depend on PostgreSQL")
+if backend_env.get("HARDWARE_TEST_MODE") == "false" and "HARDWARE_TEST_MP3_PATH" in backend_env:
+    errors.append(
+        ".env.backend.example must omit HARDWARE_TEST_MP3_PATH when hardware test mode is disabled",
+    )
 
 required_audio_env = {
     "INTERNAL_SERVICE_TOKEN": backend_env.get("INTERNAL_SERVICE_TOKEN", ""),
@@ -578,7 +584,7 @@ required_audio_env = {
     "KOKORO_LANG_CODE": "a",
     "KOKORO_VOICE": "af_heart",
     "KOKORO_SPEED": "0.80",
-    "RVC_ENABLED": "true",
+    "RVC_ENABLED": "false",
     "RVC_MODEL_PATH": "<actual-path-to-be-resolved>",
     "RVC_INDEX_PATH": "",
     "OUTPUT_MP3_SAMPLE_RATE": "24000",

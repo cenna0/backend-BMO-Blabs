@@ -14,6 +14,7 @@ describe("parseEnv", () => {
   it("uses canonical P1 defaults with hardware test mode disabled", () => {
     const config = parseEnv(minimal);
 
+    expect(config.BACKEND_HOST).toBe("127.0.0.1");
     expect(config.HARDWARE_TEST_MODE).toBe(false);
     expect(config.MAX_AUDIO_BYTES).toBe(3_145_728);
     expect(config.MAX_AUDIO_DURATION_SECONDS).toBe(60);
@@ -41,10 +42,32 @@ describe("parseEnv", () => {
     expect(parseEnv({ ...minimal, HARDWARE_TEST_MODE: "false" }).HARDWARE_TEST_MODE).toBe(false);
   });
 
+  it("requires the hardware fixture only when hardware test mode is enabled", () => {
+    const { HARDWARE_TEST_MP3_PATH: _fixture, ...withoutFixture } = minimal;
+
+    expect(parseEnv(withoutFixture).HARDWARE_TEST_MP3_PATH).toBeUndefined();
+    expect(() =>
+      parseEnv({ ...withoutFixture, HARDWARE_TEST_MODE: "true" }),
+    ).toThrow(/HARDWARE_TEST_MP3_PATH/);
+  });
+
   it("rejects hardware test mode in production", () => {
     expect(() =>
       parseEnv({ ...minimal, NODE_ENV: "production", HARDWARE_TEST_MODE: "true" }),
     ).toThrow(/HARDWARE_TEST_MODE/);
+  });
+
+  it("requires a loopback backend binding in production", () => {
+    const production = {
+      ...minimal,
+      NODE_ENV: "production",
+      DEVICE_TOKEN: "strong-device-secret-1234567890",
+      INTERNAL_SERVICE_TOKEN: "strong-internal-secret-1234567890",
+      HERMES_API_KEY: "strong-hermes-secret-1234567890",
+    };
+
+    expect(parseEnv(production).BACKEND_HOST).toBe("127.0.0.1");
+    expect(() => parseEnv({ ...production, BACKEND_HOST: "0.0.0.0" })).toThrow(/BACKEND_HOST/);
   });
 
   it("rejects weak or missing device credentials", () => {

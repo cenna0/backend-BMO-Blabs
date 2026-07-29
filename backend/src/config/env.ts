@@ -11,7 +11,7 @@ const positiveInt = (fallback: number) =>
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    BACKEND_HOST: z.string().min(1).default("0.0.0.0"),
+    BACKEND_HOST: z.string().min(1).default("127.0.0.1"),
     BACKEND_PORT: positiveInt(3_000),
     PUBLIC_BASE_URL: z.string().url(),
     DEVICE_ID: z.string().min(1),
@@ -24,7 +24,7 @@ const envSchema = z
     MAX_AUDIO_BYTES: positiveInt(3_145_728),
     MAX_AUDIO_DURATION_SECONDS: positiveInt(60),
     HARDWARE_TEST_MODE: booleanString,
-    HARDWARE_TEST_MP3_PATH: z.string().min(1),
+    HARDWARE_TEST_MP3_PATH: z.string().min(1).optional(),
     AUDIO_SERVICE_URL: z.string().url().default("http://127.0.0.1:8001"),
     INTERNAL_SERVICE_TOKEN: z.string().min(16).default("local-internal-token"),
     AUDIO_SERVICE_STT_TIMEOUT_MS: positiveInt(90_000),
@@ -35,6 +35,7 @@ const envSchema = z
     HERMES_CONVERSATION: z.string().min(1).default("bmo-001"),
     HERMES_SOFT_TIMEOUT_MS: positiveInt(30_000),
     HERMES_HARD_TIMEOUT_MS: positiveInt(180_000),
+    READINESS_PROBE_TIMEOUT_MS: positiveInt(2_000),
     TOTAL_PIPELINE_TIMEOUT_MS: positiveInt(300_000),
     WS_AUTH_TIMEOUT_MS: positiveInt(5_000),
     WS_HEARTBEAT_INTERVAL_MS: positiveInt(60_000),
@@ -42,6 +43,13 @@ const envSchema = z
     WS_MAX_MESSAGE_BYTES: positiveInt(8_192),
   })
   .superRefine((value, context) => {
+    if (value.HARDWARE_TEST_MODE && !value.HARDWARE_TEST_MP3_PATH) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "HARDWARE_TEST_MP3_PATH is required when HARDWARE_TEST_MODE=true",
+        path: ["HARDWARE_TEST_MP3_PATH"],
+      });
+    }
     if (value.NODE_ENV === "production" && value.HARDWARE_TEST_MODE) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -50,6 +58,13 @@ const envSchema = z
       });
     }
     if (value.NODE_ENV === "production") {
+      if (value.BACKEND_HOST !== "127.0.0.1") {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "BACKEND_HOST must be 127.0.0.1 in production",
+          path: ["BACKEND_HOST"],
+        });
+      }
       const unsafeSecrets: Array<[keyof typeof value, string]> = [
         ["DEVICE_TOKEN", value.DEVICE_TOKEN],
         ["INTERNAL_SERVICE_TOKEN", value.INTERNAL_SERVICE_TOKEN],

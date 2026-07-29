@@ -1,5 +1,7 @@
 import wave
 
+import pytest
+
 from app.config import Settings
 from app.kokoro_tts import KokoroSynthesizer
 
@@ -43,3 +45,40 @@ def test_kokoro_synthesizer_merges_all_segments_into_one_24khz_wav(tmp_path):
         assert wav.getnchannels() == 1
         assert wav.getsampwidth() == 2
         assert wav.getnframes() == 5
+
+
+def test_kokoro_warmup_transitions_from_loading_to_ready_once():
+    loads = []
+
+    def factory(lang_code):
+        loads.append(lang_code)
+        return FakePipeline(lang_code)
+
+    synthesizer = KokoroSynthesizer(
+        Settings(internal_service_token="test-internal-token"),
+        pipeline_factory=factory,
+    )
+
+    assert synthesizer.health_status == "loading"
+    synthesizer.warm_up()
+    synthesizer.warm_up()
+
+    assert synthesizer.ready is True
+    assert synthesizer.health_status == "ok"
+    assert loads == ["a"]
+
+
+def test_kokoro_warmup_failure_becomes_readiness_error():
+    def factory(_lang_code):
+        raise RuntimeError("pipeline unavailable")
+
+    synthesizer = KokoroSynthesizer(
+        Settings(internal_service_token="test-internal-token"),
+        pipeline_factory=factory,
+    )
+
+    with pytest.raises(RuntimeError, match="pipeline unavailable"):
+        synthesizer.warm_up()
+
+    assert synthesizer.ready is False
+    assert synthesizer.health_status == "error"

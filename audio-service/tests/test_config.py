@@ -36,7 +36,7 @@ def test_settings_use_p3_tts_defaults():
     assert settings.output_mp3_bitrate == "96k"
     assert settings.tts_max_characters == 600
     assert settings.tts_max_sentences == 3
-    assert settings.rvc_enabled is True
+    assert settings.rvc_enabled is False
     assert settings.rvc_f0_up_key == 0
     assert settings.rvc_f0_method == "rmvpe"
     assert settings.rvc_model_repo == "Freaky98/CGO-adventure-time-BMO-rvc-v2-420e"

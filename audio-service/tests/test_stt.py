@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from app.config import Settings
 from app.stt import (
     FasterWhisperTranscriber,
@@ -93,3 +95,40 @@ def test_faster_whisper_adapter_uses_accuracy_model_config_and_hotwords():
     }
     assert result.text == "Hello BMO"
     assert result.speech_detected is True
+
+
+def test_faster_whisper_warmup_transitions_from_loading_to_ready_once():
+    loads = []
+
+    def factory(*args, **kwargs):
+        loads.append((args, kwargs))
+        return object()
+
+    transcriber = FasterWhisperTranscriber(
+        Settings(internal_service_token="test-internal-token"),
+        model_factory=factory,
+    )
+
+    assert transcriber.health_status == "loading"
+    transcriber.warm_up()
+    transcriber.warm_up()
+
+    assert transcriber.ready is True
+    assert transcriber.health_status == "ok"
+    assert len(loads) == 1
+
+
+def test_faster_whisper_warmup_failure_becomes_readiness_error():
+    def factory(*args, **kwargs):
+        raise RuntimeError("model unavailable")
+
+    transcriber = FasterWhisperTranscriber(
+        Settings(internal_service_token="test-internal-token"),
+        model_factory=factory,
+    )
+
+    with pytest.raises(RuntimeError, match="model unavailable"):
+        transcriber.warm_up()
+
+    assert transcriber.ready is False
+    assert transcriber.health_status == "error"

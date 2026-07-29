@@ -24,7 +24,7 @@ export interface VoiceRouteDependencies {
   requestStore: RequestStore;
   sockets: DeviceWebSocketServer;
   tempAudio: TempAudioService;
-  hardwareTest: HardwareTestService;
+  hardwareTest: HardwareTestService | undefined;
   pipeline?: VoicePipelineService;
   logger: Logger;
 }
@@ -159,7 +159,13 @@ export function createVoiceRouter(dependencies: VoiceRouteDependencies): Router 
       response.status(202).json({ request_id: context.requestId, status: "processing" });
       setImmediate(() => {
         if (config.HARDWARE_TEST_MODE) {
-          void hardwareTest.process(record);
+          if (hardwareTest) {
+            void hardwareTest.process(record);
+            return;
+          }
+          logger.error({ request_id: record.requestId }, "hardware test service unavailable");
+          requestStore.fail(record.requestId, "INTERNAL_ERROR");
+          sockets.sendRequestFailed(record.deviceId, record.requestId, "INTERNAL_ERROR");
           return;
         }
         if (pipeline) {
