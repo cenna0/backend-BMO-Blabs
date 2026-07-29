@@ -2,6 +2,7 @@
 
 **Status:** `VERIFIED`
 **Continued/verified:** 2026-07-28
+**Telegram group target reverified:** 2026-07-29
 **Authorized by:** explicit user instruction to continue P6 only from the current VPS state
 **P6 notification implementation commit:** `d3103da`
 **P6 evidence/status commit:** `d0ae312`
@@ -365,6 +366,44 @@ WARN full VPS reboot deferred
 WARN pre-existing cloud-init/wait-online failed state
 WARN Beszel 0.18.7 alert-model limitations
 ```
+
+### 11.1 Telegram group target migration
+
+On 2026-07-29, the operator explicitly authorized moving both P6 Telegram
+notification paths from the prior private chat to the `monitorvpsBMO` group.
+The numeric chat identifier remains omitted from this sanitized evidence.
+
+```text
+Telegram getChat HTTP/API validation        PASS
+Telegram chat type                          group
+Telegram chat title                         monitorvpsBMO
+Chat-ID replacement                         atomic same-directory rename
+Credential directory metadata               root:root 0700
+Token/chat file metadata                    root:root 0600 regular single-line
+Beszel settings update                      authenticated API PATCH
+Direct database settings edit               none
+Beszel managed internal relay targets       1
+Relay strict delivery                       HTTP 2xx + Telegram ok=true PASS
+Hermes strict delivery                      HTTP 2xx + Telegram ok=true PASS
+[BMO BESZEL GROUP TEST] receipt              operator confirmed
+[P6 HERMES GROUP TEST] receipt               operator confirmed
+Hermes timer/state                          enabled / active; clean
+P7                                          NOT_STARTED
+Git push                                    not performed
+```
+
+The relay rewrites only the byte-for-byte Beszel 0.18.7 built-in test payload
+to `[BMO BESZEL GROUP TEST]`. Seven near-match and ordinary payload cases prove
+that whitespace, punctuation, case, prefix, substring, and normal alert
+variations retain the existing `[BMO BESZEL]` label. The current notification
+suite passes 38 tests.
+
+The deployed notifier and relay match the verified repository sources.
+Systemd unit files and effective sandbox controls remain unchanged. The relay
+remains healthy, read-only, capability-free, non-privileged, without a
+published port, and with both credentials mounted read-only. Post-change scans
+found no active bot token or complete Shoutrrr target in notification logs,
+shell histories, or current process arguments.
 
 ## 12. Stop condition
 

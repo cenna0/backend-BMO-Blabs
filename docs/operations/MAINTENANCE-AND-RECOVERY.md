@@ -261,6 +261,39 @@ Required metadata is directory `root:root` mode `0700` and bot-token file
 `root:root` mode `0600`. Never print or inspect the value in a command
 transcript.
 
+Replace the Telegram chat destination with the same atomic, root-only pattern:
+
+```bash
+sudo bash -c '
+set -eu
+umask 077
+chat_id=
+trap '\''unset chat_id'\'' EXIT
+printf "Telegram group chat ID: " >/dev/tty
+IFS= read -r -s chat_id </dev/tty
+printf "\n" >/dev/tty
+if ! [[ "$chat_id" =~ ^-[0-9]+$ ]]; then
+  printf "Invalid Telegram group chat ID format\n" >/dev/tty
+  exit 1
+fi
+runtime_chat_file="$(mktemp /opt/bmo/config/telegram/.chat-id.XXXXXX)"
+trap '\''rm -f -- "$runtime_chat_file"; unset chat_id'\'' EXIT
+printf "%s\n" "$chat_id" >"$runtime_chat_file"
+chown root:root "$runtime_chat_file"
+chmod 0600 "$runtime_chat_file"
+mv -f -- "$runtime_chat_file" /opt/bmo/config/telegram/chat-id
+trap - EXIT
+unset chat_id
+'
+sudo stat -c '%A %U:%G %n' \
+  /opt/bmo/config/telegram \
+  /opt/bmo/config/telegram/chat-id
+```
+
+After replacing `chat-id`, force-recreate the relay so its read-only bind mount
+references the new inode. Reapply the managed Beszel target through the
+authenticated configuration helper; never edit Beszel's database directly.
+
 Beszel uses a token-free generic webhook to the private
 `bmo-telegram-relay` container. Do not switch it to the pinned Shoutrrr
 Telegram client: that client can falsely report success for a failed Telegram
@@ -282,11 +315,14 @@ systemctl status \
   --no-pager
 ```
 
-Confirm both the `[P6 HERMES PATH TEST]` and `[BMO BESZEL]` test messages
-before revoking an old token. Runtime logs and evidence may contain only
-sanitized status categories; never record the token, chat identifier, Telegram
-request URL, PocketBase authorization token, request/response bodies, or
-notification message contents.
+Confirm both the `[P6 HERMES GROUP TEST]` and `[BMO BESZEL GROUP TEST]`
+messages before revoking an old token or destination. The relay applies the
+group-test label only to the exact known Beszel built-in test payload; every
+other payload retains the normal `[BMO BESZEL]` label. Runtime logs and
+evidence may contain only sanitized status categories; never record the token,
+chat identifier, Telegram request URL, PocketBase authorization token,
+request/response bodies, complete Shoutrrr target, or notification message
+contents.
 
 Actual Hermes locations:
 
