@@ -116,6 +116,28 @@ def _artifact_evidence(artifact_path: Path) -> tuple[str, int]:
     return content_hash.hexdigest(), byte_size
 
 
+def _prepare_runtime_parents(runtime_snapshot: Path) -> None:
+    runtime_root = runtime_snapshot.parent.parent
+    for directory in (runtime_root, runtime_snapshot.parent):
+        directory.mkdir(parents=True, exist_ok=True)
+        if directory.is_symlink() or not directory.is_dir():
+            raise RuntimeError(f"runtime model directory is not a regular directory: {directory}")
+        directory.chmod(0o755)
+
+
+def _set_runtime_snapshot_permissions(snapshot: Path) -> None:
+    for path in snapshot.rglob("*"):
+        if path.is_symlink():
+            raise RuntimeError(f"runtime model snapshot contains a symlink: {path}")
+        if path.is_dir():
+            path.chmod(0o755)
+        elif path.is_file():
+            path.chmod(0o644)
+        else:
+            raise RuntimeError(f"runtime model snapshot contains a non-regular entry: {path}")
+    snapshot.chmod(0o755)
+
+
 def materialize_runtime_snapshot(
     *,
     upstream_snapshot: Path,
@@ -123,6 +145,7 @@ def materialize_runtime_snapshot(
     spec: ModelSpec,
 ) -> None:
     validate_upstream_snapshot(upstream_snapshot, spec)
+    _prepare_runtime_parents(runtime_snapshot)
     if runtime_snapshot.exists():
         validate_model_snapshot(runtime_snapshot, spec)
         mismatched = [
@@ -137,9 +160,9 @@ def materialize_runtime_snapshot(
                 f"{spec.name} existing runtime artifacts differ from pinned upstream: "
                 f"{mismatch_list}",
             )
+        _set_runtime_snapshot_permissions(runtime_snapshot)
         return
 
-    runtime_snapshot.parent.mkdir(parents=True, exist_ok=True)
     temporary_snapshot = Path(
         tempfile.mkdtemp(
             prefix=f".{spec.revision}.",
@@ -153,6 +176,7 @@ def materialize_runtime_snapshot(
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target, follow_symlinks=True)
         validate_model_snapshot(temporary_snapshot, spec)
+        _set_runtime_snapshot_permissions(temporary_snapshot)
         temporary_snapshot.rename(runtime_snapshot)
     finally:
         if temporary_snapshot.exists():
@@ -227,4 +251,5 @@ def build_model_manifest(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    manifest_path.chmod(0o644)
     return manifest

@@ -17,6 +17,13 @@ BACKEND_DOCKERFILE = ROOT / "backend" / "Dockerfile"
 AUDIO_DOCKERFILE = ROOT / "audio-service" / "Dockerfile"
 COMPOSE_FILE = ROOT / "docker-compose.yml"
 RUNTIME_LOCK = ROOT / "audio-service" / "requirements-runtime.lock"
+AUDIO_REQUIREMENTS = ROOT / "audio-service" / "requirements.txt"
+EN_CORE_WEB_SM_REQUIREMENT = (
+    "en-core-web-sm @ "
+    "https://github.com/explosion/spacy-models/releases/download/"
+    "en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
+    "#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85"
+)
 
 SHA256_IMAGE = re.compile(
     r"^FROM\s+\S+:[^\s@]+@sha256:[0-9a-f]{64}(?:\s+AS\s+\S+)?$",
@@ -56,6 +63,7 @@ class DockerfilePackagingTests(unittest.TestCase):
             dockerfile,
             r"pip install\s+--no-cache-dir\s+--requirement requirements-runtime\.lock",
         )
+        self.assertIn('spacy.load("en_core_web_sm")', dockerfile)
         self.assertIn("ffmpeg", dockerfile)
         self.assertIn("libsndfile1", dockerfile)
         self.assertRegex(dockerfile, r"(?m)^USER\s+bmo$")
@@ -88,6 +96,8 @@ class DockerfilePackagingTests(unittest.TestCase):
 
         self.assertGreater(len(requirements), 7)
         for requirement in requirements:
+            if requirement == EN_CORE_WEB_SM_REQUIREMENT:
+                continue
             self.assertRegex(requirement, EXACT_REQUIREMENT)
 
         normalized = {line.lower() for line in requirements}
@@ -101,6 +111,16 @@ class DockerfilePackagingTests(unittest.TestCase):
             "huggingface-hub==1.24.0",
         ):
             self.assertIn(direct, normalized)
+        self.assertIn("spacy==3.8.14", normalized)
+        self.assertIn("misaki==0.9.4", normalized)
+        self.assertEqual(requirements.count(EN_CORE_WEB_SM_REQUIREMENT), 1)
+
+        direct_requirements = {
+            line.strip()
+            for line in read(AUDIO_REQUIREMENTS).splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        self.assertIn(EN_CORE_WEB_SM_REQUIREMENT, direct_requirements)
 
     def test_packaging_files_do_not_contain_secret_values(self) -> None:
         paths = (
