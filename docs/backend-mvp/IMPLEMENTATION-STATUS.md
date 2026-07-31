@@ -1,61 +1,65 @@
 # BMO Backend MVP — Implementation Status
 
-**Last updated:** 2026-07-28
+**Last updated:** 2026-07-31
 **Backend reference lineage:** 1.0.1; current active documentation is date-audited and governed by this status file
 
 ## 1. Control state
 
 ```text
-Documentation package: AUDITED / HARDWARE HANDOFF ADDED
+Documentation package: CURRENT / P7 PRODUCTION CLOSED
 P1–P5 backend history: implemented/verified according to phase evidence below
-Current next implementation phase: P7 — Deploy Backend + Audio Service + Hermes Integration
+Current next implementation phase: P8 — Real RVC Verification and Voice Resource Benchmark
 P6 state: VERIFIED
 P6 execution authorization: COMPLETED
-P7 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
-P7–P10: PLANNED / dependency-gated
+P7 state: VERIFIED — PRODUCTION
+P7 execution: COMPLETED
+P8 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
+P9–P10: PLANNED / dependency-gated
 ```
 
-P6 is verified. P7 is the next dependency phase but is not started or
-authorized. Read `../NEXT-ACTION.md`, the P7 section of
-`../roadmap/P6-P10-ROADMAP.md`, and `P6-TEST-EVIDENCE.md` before a future P7
-execution. Do not infer P7 authorization from P6 completion.
+P6 is verified and P7 is `VERIFIED — PRODUCTION`. P8 is the next dependency
+phase but is not started or authorized. Read `../NEXT-ACTION.md`,
+`../roadmap/P8-EXECUTION-SPEC.md`, and `P7-TEST-EVIDENCE.md` before a future P8
+execution. Do not infer P8 authorization from P7 completion.
 
 ## 2. Documentation status
 
 | Document | Status | Verification |
 |---|---|---|
-| `../NEXT-ACTION.md` | CURRENT OPERATIONAL ENTRY | Explicitly selects P6 and prevents accidental P7+ execution |
-| `../roadmap/P6-EXECUTION-SPEC.md` | VERIFIED / LOCKED P6 RECORD | Exact P6 scope, authorization boundary, completed acceptance checklist, evidence, and stop condition |
+| `../NEXT-ACTION.md` | CURRENT P8 OPERATIONAL GATE | Selects P8 while requiring new explicit authorization and preventing accidental P9+ execution |
+| `../roadmap/P6-EXECUTION-SPEC.md` | HISTORICAL / LOCKED VERIFIED P6 RECORD | Exact completed P6 scope, acceptance checklist, evidence, and stop condition |
+| `../roadmap/P8-EXECUTION-SPEC.md` | NOT_STARTED / EXECUTION CONTRACT | Future P8 scope, safety gates, evidence requirements, and authorization stop |
 | `00-AGENT-EXECUTION-GUIDE.md` | VERIFIED | Workflow, boundary, phase control, stop condition tersedia |
 | `01-SCOPE-AND-DECISIONS.md` | VERIFIED / LOCKED | Backend source §1–§3 termigrasi |
 | `02-API-AND-WEBSOCKET-CONTRACT.md` | VERIFIED / LOCKED | Backend source §15–§17, §22 dan hardware contract dicocokkan |
 | `03-BACKEND-ARCHITECTURE.md` | VERIFIED | Backend source §7–§8, §18–§21, §23–§24 termigrasi |
 | `04-AUDIO-SERVICE.md` | AUDITED / CURRENT TUNING | Current STT `medium` + `BMO`; RVC real pending |
 | `05-TESTING-AND-ACCEPTANCE.md` | AUDITED / UPDATED | Future verification ownership split P6–P10 |
-| `06-DEPLOYMENT-AND-OPERATIONS.md` | AUDITED / TARGET DEFINED | Current VPS target defined; deployment itself not verified |
+| `06-DEPLOYMENT-AND-OPERATIONS.md` | VERIFIED — PRODUCTION | P7 deployment provenance, topology, runtime paths, rollback, and operations baseline |
 | `REQUIREMENT-TRACEABILITY.md` | VERIFIED | Seluruh source §1–§33 memiliki target primary |
 | `VERIFICATION-REPORT.md` | HISTORICAL PASS | Original 2026-07-18 package verification; not current implementation status |
 | `CHANGELOG.md` | VERIFIED | Baseline package tercatat |
 | `P6-TEST-EVIDENCE.md` | VERIFIED | Sanitized VPS evidence, strict dual Telegram receipt proof, recovery commands, residual risks, and no-P7 proof |
+| `P7-TEST-EVIDENCE.md` | VERIFIED — PRODUCTION | Immutable deployment/images, public 23/23 acceptance, final soak, rollback retention, and repository synchronization |
 
 ## 3. Implementation phases
 
 | Phase | Scope | Required docs | Status | Authorization | Evidence |
 |---|---|---|---|---|---|
 | P1 | Core backend transport + hardware test mode: health, WS auth/state, raw WAV upload, dummy MP3, fake ESP32 basic | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P1-TEST-EVIDENCE.md`](P1-TEST-EVIDENCE.md); external hardware validation deferred |
-| P2 | Audio Service bootstrap + faster-whisper STT | 01, 03, 04, 05, 06 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P2-TEST-EVIDENCE.md`](P2-TEST-EVIDENCE.md); real faster-whisper inference passed locally; deployed latency/resource benchmark now belongs to P7/P8 |
+| P2 | Audio Service bootstrap + faster-whisper STT | 01, 03, 04, 05, 06 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P2-TEST-EVIDENCE.md`](P2-TEST-EVIDENCE.md); real faster-whisper inference passed locally; P7 production/resource verification passed and RVC-specific benchmarking belongs to P8 |
 | P3 | Kokoro + FFmpeg + RVC fallback | 01, 03, 04, 05, 06 | IMPLEMENTED — not VERIFIED | AUTHORIZED BY USER | [`P3-TEST-EVIDENCE.md`](P3-TEST-EVIDENCE.md); real RVC inference runtime unavailable |
-| P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P4-TEST-EVIDENCE.md`](P4-TEST-EVIDENCE.md); real local Hermes pipeline passed; real Hermes host/VPS integration belongs to P7 |
+| P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P4-TEST-EVIDENCE.md`](P4-TEST-EVIDENCE.md); real local Hermes pipeline passed and P7 later verified host/VPS integration in production |
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P5-TEST-EVIDENCE.md`](P5-TEST-EVIDENCE.md) |
 | P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
-| P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | NOT_STARTED | AWAITING EXPLICIT USER AUTHORIZATION | — |
-| P8 | Real RVC inference + fallback verification + VPS resource benchmark | 04–06 + roadmap | NOT_STARTED | DEPENDS ON P7 VERIFIED | — |
+| P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | VERIFIED — PRODUCTION | COMPLETED | [`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md) |
+| P8 | Real RVC inference + fallback verification + VPS resource benchmark | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | NOT_STARTED | AWAITING EXPLICIT USER AUTHORIZATION | — |
 | P9 | PostgreSQL + Prisma ready-to-use application data layer + backup/restore | PRD + 06 + roadmap | NOT_STARTED | DEPENDS ON P8 COMPLETED/VERIFIED STATUS; EXECUTE AFTER P8 | — |
 | P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
 
-## 3.1 Post-P5/P6 implementation updates captured by this audit
+## 3.1 Post-P5/P6/P7 implementation updates captured by this audit
 
-- P6 now owns conditional Hermes host bootstrap: preserve/audit a proven installation when present; install/configure a maintainable loopback-only host runtime when preflight proves it absent. P7 remains integration-only and does not own initial Hermes installation.
+- P6 owned conditional Hermes host bootstrap: preserve/audit a proven installation when present; install/configure a maintainable loopback-only host runtime when preflight proved it absent. P7 remained integration-only and did not own initial Hermes installation.
 - The 2026-07-27 production VPS preflight reported Hermes `ABSENT`; P6
   re-confirmed that branch and bootstrapped Hermes 0.19.0 as the `hermes`
   host user with a systemd service, loopback-only listener, health check, and
@@ -69,10 +73,12 @@ execution. Do not infer P7 authorization from P6 completion.
   notification. Both labeled receipts were confirmed and sanitized secret
   scans passed.
 - STT accuracy investigation on 2026-07-25 selected `WHISPER_MODEL=medium` with `WHISPER_HOTWORDS=BMO`, while keeping CPU INT8, 4 threads, 1 worker, beam 5, VAD, and language auto-detect. The earlier `small` references in P2 evidence remain historical evidence of P2 at that time, not the current tuning target.
-- Kokoro manual listening selected `KOKORO_VOICE=af_heart` with `KOKORO_SPEED=0.80` as the current deployment target; earlier evidence that production remained at `1.0` is historical and superseded by this later project decision. Revalidate perceived tempo after real RVC integration.
-- Hermes real local `/v1/responses` integration is recorded in the P5 manual evidence addendum. This is not equivalent to VPS/public deployment verification.
+- Kokoro manual listening selected `KOKORO_VOICE=af_heart` with `KOKORO_SPEED=0.80`; P7 verified these as the current production values. Earlier evidence that production remained at `1.0` is historical. Revalidate perceived tempo after real RVC integration.
+- Hermes real local `/v1/responses` integration is recorded in the P5 manual evidence addendum, and P7 subsequently verified Hermes integration in production.
 - Real RVC inference remains unverified; Kokoro-only fallback is verified behavior.
-- The public production target is `api.personalbmo.web.id`, but it must not be called live/verified until P7 evidence updates the deployment handoff.
+- The public production endpoint `api.personalbmo.web.id` is live and verified.
+  Public fake-ESP32 acceptance passed `23/23`, and the P7 resource soak passed;
+  this does not verify a physical ESP32.
 
 ## 4. Verification types
 
@@ -100,7 +106,7 @@ Physical ESP32 test dan progressive hardware playback tetap requirement final di
 VERIFIED — LOCAL FUNCTIONAL
 ```
 
-Phase audio/backend terbukti secara lokal dengan dependency nyata, unit/integration test, typecheck/compile, build, dependency check, documentation verifier, contract consistency, dan scope audit. Benchmark latency/resource pada VPS kini dimiliki deployment/resource phases P7–P8, bukan blocker untuk historical local functional verification.
+Phase audio/backend terbukti secara lokal dengan dependency nyata, unit/integration test, typecheck/compile, build, dependency check, documentation verifier, contract consistency, dan scope audit. P7 production/resource verification has passed; RVC-specific latency/resource benchmarking remains P8 and is not a blocker for historical local functional verification.
 
 ## 5. Phase ownership and dependency
 
@@ -112,16 +118,16 @@ P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10
 - P2/P3 dapat memakai internal test harness, tetapi tidak boleh mengubah public interface.
 - P4 menyatukan seluruh pipeline setelah komponen individual terbukti.
 - P5 menutup edge case dan membuktikan acceptance criteria lengkap.
-- P6 menyiapkan fondasi VPS termasuk Hermes host runtime kondisional; P7 menjalankan deployment/public integration terhadap Hermes yang sudah diverifikasi P6; P8 membuktikan RVC dan resource benchmark; P9 menyiapkan database; P10 melakukan hardware handoff/physical verification.
+- P6 menyiapkan fondasi VPS termasuk Hermes host runtime kondisional; P7 telah menyelesaikan deployment/public integration terhadap Hermes yang diverifikasi P6; P8 berikutnya membuktikan RVC dan resource benchmark; P9 menyiapkan database; P10 melakukan final physical hardware verification.
 - Idle WebSocket soak satu jam menjadi bagian P5 reliability verification, bukan blocker untuk memulai P2.
 
 ## 6. External integration milestones
 
 ### HW-INTEGRATION-01
 
-Status: NOT_STARTED  
+Status: READY / NOT_STARTED
 Owner: Backend team + Hardware team  
-Dependency: P7 public endpoint verified; final physical verification is P10  
+Dependency: P7 public endpoint verified — satisfied; final physical verification remains P10
 Scope:
 
 - physical ESP32 WebSocket authentication;
@@ -133,8 +139,8 @@ Scope:
 
 ### P3-RVC-VERIFICATION
 
-Status: DEFERRED
-Dependency: P7 deployed Audio Service; execution owner is P8
+Status: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
+Dependency: P7 deployed Audio Service — satisfied; current execution owner is P8
 Scope:
 
 - install/pin compatible RVC inference runtime;

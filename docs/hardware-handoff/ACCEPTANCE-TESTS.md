@@ -2,6 +2,11 @@
 
 **Purpose:** Final verification that firmware behavior matches the canonical backend contract.
 
+**Current state:** the P7 public endpoint and fake-client matrix are verified,
+but this physical matrix has not run. `PHYSICAL_ESP32_STATUS: NOT_RUN` remains
+authoritative until P10 records real-device evidence. RVC status does not alter
+these protocol tests.
+
 ## Evidence header
 
 Record once per test session:

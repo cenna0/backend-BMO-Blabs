@@ -1,32 +1,14 @@
 # BMO Hardware Handoff — Deployment Configuration
 
-**Purpose:** Deployment-specific values that firmware needs. Protocol behavior remains defined by the canonical hardware contract.
+**Purpose:** Verified deployment-specific values that firmware needs. Protocol
+behavior remains defined by the canonical Hardware Contract v1.0.5.
 
 ## Current state
 
 ```text
-DEPLOYMENT_STATUS: NOT_VERIFIED
-PUBLIC_DOMAIN_TARGET: api.personalbmo.web.id
-HTTPS_BASE_URL: https://api.personalbmo.web.id
-WEBSOCKET_URL: wss://api.personalbmo.web.id/ws
-DEVICE_ID: bmo-001
-DEVICE_TOKEN: PROVIDED_OUT_OF_BAND
-PUBLIC_E2E_STATUS: NOT_RUN
-PHYSICAL_ESP32_STATUS: NOT_RUN
-```
-
-**Meaning:** the hostname is the agreed production target, but this document does not claim the BMO backend has already been deployed and proven reachable through it.
-
-Hardware must wait for `DEPLOYMENT_STATUS: VERIFIED` before treating this as a live integration endpoint.
-
-## Values after deployment verification
-
-The deployment executor must update this section only after testing from outside the VPS:
-
-```text
-DEPLOYMENT_STATUS: VERIFIED | BLOCKED
-VERIFIED_AT: <UTC timestamp>
-DEPLOYED_COMMIT: <git commit SHA>
+DEPLOYMENT_STATUS: VERIFIED
+VERIFIED_AT: 2026-07-31T03:22:12Z
+DEPLOYED_COMMIT: 4d7b472adc4c2243d8f7364032a491ad70efb6d3
 HTTPS_BASE_URL: https://api.personalbmo.web.id
 WEBSOCKET_URL: wss://api.personalbmo.web.id/ws
 HEALTH_URL: https://api.personalbmo.web.id/health
@@ -34,15 +16,24 @@ UPLOAD_URL: https://api.personalbmo.web.id/api/v1/voice
 AUDIO_URL_PATTERN: https://api.personalbmo.web.id/audio/<audio-uuid>.mp3
 DEVICE_ID: bmo-001
 DEVICE_TOKEN: PROVIDED_OUT_OF_BAND
-PUBLIC_E2E_STATUS: PASS | FAIL | BLOCKED
-PHYSICAL_ESP32_STATUS: PASS | FAIL | NOT_RUN | BLOCKED
+PUBLIC_E2E_STATUS: PASS
+PHYSICAL_ESP32_STATUS: NOT_RUN
 ```
+
+`VERIFIED_AT` is the authoritative end of the final P7 production soak and
+closure verification recorded in `P7-TEST-EVIDENCE.md`. The public endpoint is
+live, and the production fake-client matrix passed `23/23` checks. Physical
+ESP32 acceptance has not run and remains P10; this file does not claim
+`HARDWARE INTEGRATION VERIFIED`.
+
+The deployed commit is the application/image source. Later documentation-only
+repository commits do not change that running provenance.
 
 Do not paste the real device token into this file.
 
 ## Network ownership
 
-Expected production exposure:
+Verified production exposure:
 
 ```text
 Public internet:
@@ -50,23 +41,29 @@ Public internet:
   TCP 443 → Caddy HTTPS/WSS
 
 Not public:
-  3000 → BMO backend origin
-  8001 → Audio Service
-  8642 → Hermes
-  5432 → PostgreSQL
+  3000 → BMO backend origin at 127.0.0.1:3000
+  8001 → Audio Service at 127.0.0.1:8001
+  8642 → Hermes at 127.0.0.1:8642
+  5432 → PostgreSQL not deployed; must remain private if P9 activates it
   Beszel origin port → reverse proxy only
 
 Admin access:
-  SSH → planned through Tailscale after verified setup
+  SSH → Tailscale-only approved path
 ```
 
-Firmware uses only the public HTTPS/WSS routes. It does not need Tailscale membership.
+Firmware uses only the public HTTPS/WSS routes. It does not need Tailscale
+membership and must not call private origin ports.
 
 ## TLS requirement
 
-Production firmware must validate the TLS certificate chain for `api.personalbmo.web.id`. Do not ship with certificate validation disabled.
+Production firmware must validate the TLS certificate chain for
+`api.personalbmo.web.id`. Do not ship with certificate validation disabled.
 
-Before opening HTTPS/WSS, firmware must have a trustworthy wall clock (normally Wi-Fi + NTP/SNTP) so certificate validity checks can succeed. Do not solve TLS errors by disabling time/certificate verification. Prefer trusting the public CA/root used by the deployed certificate rather than pinning a short-lived leaf certificate; P10 records the actually deployed certificate/CA expectations after P7 TLS verification.
+Before opening HTTPS/WSS, firmware must have a trustworthy wall clock (normally
+Wi-Fi + NTP/SNTP) so certificate validity checks can succeed. Do not solve TLS
+errors by disabling time/certificate verification. Prefer trusting the public
+CA/root used by the deployed certificate rather than pinning a short-lived leaf
+certificate. P10 records the physical device's observed certificate/CA behavior.
 
 ## Credential handoff
 
@@ -77,20 +74,24 @@ device_id
 one device_token
 ```
 
-through a secure out-of-band channel. The token must not be committed to Git or documentation. Provision it through a firmware-secret/config path (for example build secret or protected device storage) rather than a public source file.
+through a secure out-of-band channel. The token must not be committed to Git or
+documentation. Provision it through a firmware-secret/config path, such as a
+build secret or protected device storage, rather than a public source file.
 
-## Deployment handoff gate
+## Verified deployment handoff evidence
 
-The deployment executor may mark this file `VERIFIED` only after all of the following pass:
+P7 marked this deployment `VERIFIED` only after all of the following passed:
 
-- DNS resolves to the intended public deployment path;
-- HTTPS certificate is valid;
-- WSS upgrade works through the reverse proxy;
-- `/health` responds through the public hostname;
-- valid WebSocket authentication works;
-- raw WAV upload works through HTTPS;
-- `thinking` and `audio_ready` arrive through WSS;
-- MP3 downloads through HTTPS;
-- fake ESP32 sends `audio_playback_done` successfully;
-- internal ports are not exposed publicly;
-- deployed commit SHA is recorded.
+- DNS and HTTPS certificate through the intended public path;
+- WSS upgrade and valid/invalid authentication behavior;
+- sanitized `/health` readiness through the public hostname;
+- raw WAV upload and canonical lifecycle through public HTTPS/WSS;
+- `thinking`, reconnect/resync, `audio_ready`, and MP3 download;
+- fake ESP32 playback completion and idempotency/error cases;
+- public fake-client matrix `23/23`;
+- no public exposure of `3000`, `8001`, or `8642`;
+- immutable deployment source and image digests recorded;
+- final 61m 5s soak with zero new OOM and zero application restarts.
+
+The remaining gate is physical P10 acceptance; `PHYSICAL_ESP32_STATUS` must
+remain `NOT_RUN` until real device evidence exists.

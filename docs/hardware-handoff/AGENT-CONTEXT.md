@@ -14,6 +14,11 @@ Implement ESP32-S3 firmware that conforms to the existing BMO voice MVP backend.
 
 If documents conflict, stop and report the conflict. Do not guess.
 
+Current deployment condition: `DEPLOYMENT-CONFIG.md` is `VERIFIED`, public
+fake-client E2E is `PASS`, and the HTTPS/WSS endpoint may be used for live
+firmware integration. `PHYSICAL_ESP32_STATUS` is still `NOT_RUN`; completing
+firmware or connecting to the endpoint does not by itself satisfy P10.
+
 ## Required firmware behavior
 
 ```text
@@ -119,7 +124,9 @@ playback_state = waiting | downloading | playing | done_pending_send | failed_pe
 
 Backend output contract is MP3 regardless of whether RVC was successfully applied. Firmware must not branch on RVC state.
 
-At documentation audit time, real RVC inference is not yet verified; Kokoro fallback is implemented. This is a backend concern, not a firmware protocol change.
+Real RVC inference is not verified and belongs to P8; verified production uses
+Kokoro fallback with RVC disabled. This is a backend concern, not a firmware
+protocol change.
 
 ## Definition of done
 

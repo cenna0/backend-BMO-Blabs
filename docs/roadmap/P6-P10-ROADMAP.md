@@ -1,10 +1,14 @@
 # BMO — P6–P10 Infrastructure and Hardware Readiness Roadmap
 
 **Status:** LOCKED ROADMAP / PHASE-BY-PHASE EXECUTION  
-**Current next phase:** P7 — `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Current next phase:** P8 — `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 **Reason for split:** the original P6 scope became too broad after adding full VPS foundation, public TLS, monitoring, real RVC, database readiness, backup/recovery, and hardware handoff.
 
-The split below follows dependencies, not equal workload. The current coding agent must use [`../NEXT-ACTION.md`](../NEXT-ACTION.md) and [`P6-EXECUTION-SPEC.md`](P6-EXECUTION-SPEC.md) for the next action.
+The split below follows dependencies, not equal workload. The current coding
+agent must use [`../NEXT-ACTION.md`](../NEXT-ACTION.md) and
+[`P8-EXECUTION-SPEC.md`](P8-EXECUTION-SPEC.md) for the next action.
+[`P6-EXECUTION-SPEC.md`](P6-EXECUTION-SPEC.md) remains the locked historical P6
+record.
 
 **Execution rule:** locked order is **P6 → P7 → P8 → P9 → P10**. Verify one phase, record evidence, stop, then load the next phase in a fresh execution turn. Technical dependencies listed below explain architecture; they do not authorize skipping the execution order.
 
@@ -69,7 +73,20 @@ None beyond safe access to the existing VPS and explicit authorization for risky
 
 ## P7 — Deploy Backend + Audio Service + Hermes Integration
 
-**Phase status:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Phase status:** `VERIFIED — PRODUCTION` — see
+[`../backend-mvp/P7-TEST-EVIDENCE.md`](../backend-mvp/P7-TEST-EVIDENCE.md).
+
+### Verified result
+
+- deployment source:
+  `4d7b472adc4c2243d8f7364032a491ad70efb6d3`;
+- immutable backend/audio image digests are recorded in the P7 evidence;
+- public HTTPS/WSS endpoint `api.personalbmo.web.id` is live and verified;
+- public fake-ESP32 acceptance passed `23/23`;
+- production/resource soak passed and P7 closure is complete;
+- `hardware-handoff/DEPLOYMENT-CONFIG.md` is verified, unlocking the live
+  endpoint for hardware integration work without claiming physical ESP32
+  acceptance.
 
 ### Goal
 Run the existing backend/audio implementation on the real VPS and expose it safely through the production API hostname.
@@ -117,11 +134,19 @@ Run the existing backend/audio implementation on the real VPS and expose it safe
 - regression tests pass in the deployment environment.
 
 ### Dependency
-P6.
+P6 — satisfied.
 
 ---
 
 ## P8 — Real RVC Verification and Voice Resource Benchmark
+
+**Phase status:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Dependency:** P7 `VERIFIED — PRODUCTION` — satisfied. Execution still
+requires a new explicit user authorization; P7 completion does not authorize
+P8.
+
+Detailed future execution contract:
+[`P8-EXECUTION-SPEC.md`](P8-EXECUTION-SPEC.md).
 
 ### Goal
 Turn RVC from implemented fallback-capable integration into a real verified BMO voice conversion path on the VPS.
@@ -129,7 +154,8 @@ Turn RVC from implemented fallback-capable integration into a real verified BMO 
 ### Inputs
 - P7 deployed Audio Service;
 - verified RVC asset revision/hash;
-- `/opt/bmo/models/rvc/bmo/` model location.
+- candidate future layout `/opt/bmo/models/rvc/bmo/`, subject to P8 audit; this
+  path was not provisioned or resolved by P7.
 
 ### Scope
 - install/pin compatible RVC inference runtime;
@@ -156,11 +182,13 @@ Turn RVC from implemented fallback-capable integration into a real verified BMO 
 - output remains compatible with the hardware MP3 contract.
 
 ### Dependency
-P7.
+P7 — satisfied. Explicit P8 execution authorization remains unsatisfied.
 
 ---
 
 ## P9 — PostgreSQL + Prisma Ready-to-Use Data Layer
+
+**Phase status:** `NOT_STARTED / dependency-gated after P8`
 
 ### Goal
 Prepare the application database for mobile/user/device/integration work without moving MVP voice request state into PostgreSQL.
@@ -195,11 +223,15 @@ Prepare the application database for mobile/user/device/integration work without
 - voice request store remains in-memory.
 
 ### Dependency
-Technical dependency: P6. **Execution order:** run P9 after P8 unless the user explicitly changes the roadmap; do not jump from P6 directly to P9 just because the DB is technically independent.
+Technical dependency: P6. **Execution order:** run P9 only after P8 has a
+completed/verified status and P9 receives explicit authorization; do not
+reinterpret P7 verification as permission to skip P8 and execute P9.
 
 ---
 
 ## P10 — Hardware Handoff Activation and Physical Integration
+
+**Phase status:** `NOT_STARTED / dependency-gated after P9`
 
 ### Goal
 Convert the documentation pack from protocol-ready to live-endpoint-ready and prove the physical ESP32 against the deployed backend.

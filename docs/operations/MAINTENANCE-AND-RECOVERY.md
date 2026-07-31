@@ -1,6 +1,6 @@
 # BMO VPS — Maintenance and Recovery Runbook
 
-**Status:** CURRENT OPERATIONAL TARGET  
+**Status:** CURRENT VERIFIED PRODUCTION RUNBOOK
 **Owner:** `bmo-admin` / Codex when explicitly authorized  
 **Applies from:** P6 foundation onward; service-specific steps activate when the related phase is deployed.
 
@@ -9,11 +9,11 @@
 ## 1. Authority and safety
 
 - `docs/NEXT-ACTION.md` decides the active phase.
-- `docs/backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` defines the deployment target.
+- `docs/backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` defines the verified P7 production baseline and operational controls.
 - Public firmware/backend behavior remains governed by the canonical hardware contract.
 - Never delete data, volumes, users, or unrelated services just to make a health check green.
 - **Hermes present:** never reinstall/change/migrate its proven ownership, config, data, path, or listener merely for cleanliness.
-- **Hermes absent:** P6 may bootstrap the host runtime under the conditional path in `P6-EXECUTION-SPEC.md`; do not defer that bootstrap to P7.
+- **Hermes absent on a fresh/replacement host:** use the recorded conditional P6 bootstrap procedure; P7 did not and does not own initial Hermes installation.
 - Hermes must remain a host runtime bound only to `127.0.0.1:8642`.
 - Never close the only known-good SSH path.
 - Before a risky maintenance action, capture current versions, service state, disk/RAM, current deployed commit/image, and a relevant backup when applicable.
@@ -30,7 +30,8 @@ As needed     → critical security fixes after backup/risk review; do not wait 
 Pre-deploy    → record current release + backup DB once DB exists + verify rollback target
 ```
 
-P6 may refine exact scheduling after the real VPS audit, but it must not silently remove these controls.
+P6 evidence reconciled the real VPS scheduling. Future maintenance may refine
+the cadence only with evidence and must not silently remove these controls.
 
 ## 3. Update policy
 
@@ -76,7 +77,12 @@ Default scheduler: use `systemd` timers when no existing healthy project schedul
 
 Backup material containing `.env`, Beszel data, notification credentials, database dumps, or other secrets must be access-restricted and encrypted/protected for off-server storage.
 
-Beszel data should be included in the weekly recovery set if practical because it may contain monitoring configuration/history. Treat it as sensitive. P6 must also inventory the actual Hermes runtime user, install/config/data paths, and startup/service mechanism, then document what is backup-worthy/portable. If copied, protect it as sensitive and do not alter a working Hermes installation.
+Beszel data should be included in the weekly recovery set if practical because
+it may contain monitoring configuration/history. Treat it as sensitive. P6
+evidence inventories the actual Hermes runtime user, install/config/data paths,
+and startup/service mechanism; use that record to decide what is
+backup-worthy/portable. If copied, protect it as sensitive and do not alter a
+working Hermes installation.
 
 A backup is not considered verified until a restore procedure has been exercised against a safe test location/service. Git/deploy SSH credentials, Tailscale machine credentials, and other host identity secrets should normally be re-provisioned out-of-band during recovery rather than copied into a general backup bundle unless an explicitly encrypted credential-backup process is approved.
 
@@ -149,7 +155,11 @@ Domain names are the stable device-facing address; a VPS migration should normal
 
 ## 8. Monitoring limitation
 
-Beszel running on the same VPS cannot reliably notify about every **whole-VPS / total-network outage**, because the monitor itself may be offline. P6 must document this limitation. An independent external uptime check can be added later if whole-host outage notification becomes required; do not pretend local monitoring covers that failure mode.
+Beszel running on the same VPS cannot reliably notify about every **whole-VPS /
+total-network outage**, because the monitor itself may be offline. P6 evidence
+documents this limitation. An independent external uptime check can be added
+later if whole-host outage notification becomes required; do not pretend local
+monitoring covers that failure mode.
 
 ## 9. Required maintenance evidence
 
@@ -169,7 +179,9 @@ known residual risk
 
 Never include live tokens/passwords/authorization headers in the evidence.
 
-The P6 evidence/runbook must record the actual Hermes startup/service mechanism plus its exact start, stop, restart, status, health-check, and recovery commands. Generic guessed commands are not a recovery procedure.
+The P6 evidence/runbook records the actual Hermes startup/service mechanism
+plus its exact start, stop, restart, status, health-check, and recovery
+commands. Generic guessed commands are not a recovery procedure.
 
 ## 10. Actual P6 VPS reconciliation — 2026-07-28
 

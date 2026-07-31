@@ -1,10 +1,45 @@
 # BMO Backend MVP — Deployment and Operations
 
-**Versi:** 1.1.0  
-**Status:** CURRENT DEPLOYMENT TARGET — NOT YET DEPLOYMENT VERIFIED  
-**Last audited:** 2026-07-26
+**Versi:** 1.2.0
+**Status:** VERIFIED — PRODUCTION
+**Last audited:** 2026-07-31
 
-> This file defines the agreed VPS target and operational rules. It does not claim the stack is already deployed. Public hardware endpoints become usable only after the deployment handoff is marked `VERIFIED`.
+> This file records the verified P7 production baseline and ongoing operational
+> rules. P8 RVC, P9 PostgreSQL/Prisma, and P10 physical ESP32 work remain
+> separate, unverified phases.
+
+## 0. Current verified P7 deployment
+
+```text
+Deployment source
+  4d7b472adc4c2243d8f7364032a491ad70efb6d3
+
+Backend image
+  bmo-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7
+
+Audio image
+  bmo-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e
+
+Public
+  HTTPS/WSS verified through Caddy on public TCP 80/443 only
+
+Private origins
+  backend       127.0.0.1:3000
+  Audio Service 127.0.0.1:8001
+  Hermes        127.0.0.1:8642
+
+Administration
+  SSH through the approved Tailscale-only path
+```
+
+P7 public acceptance passed `23/23`; the final 3,665-second resource soak
+passed `13/13` samples with no new OOM and zero application restarts. The fresh
+protected pre-cutover backup is `20260730T115645Z`. The retained P6 Caddy
+rollback source SHA-256 is
+`80150fb3cc50616638efdd4121a4061c18ad632e05d6e06d34448ddcf321554b`.
+
+Full sanitized evidence:
+[`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md).
 
 ## 1. Deployment principles
 
@@ -27,7 +62,7 @@ BMO API / WSS : api.personalbmo.web.id
 Monitoring    : monitor.personalbmo.web.id
 ```
 
-Target public URLs after verification:
+Verified public URLs:
 
 ```text
 https://api.personalbmo.web.id
@@ -39,7 +74,7 @@ Beszel may be publicly reachable through HTTPS/login, but its origin port must n
 
 ## 3. Host user model
 
-Target separation:
+Verified operational separation:
 
 ```text
 root
@@ -61,11 +96,14 @@ Do **not** create a Linux host user named `docker` just to run containers. Docke
 Before changing Hermes state, classify it from process, service/supervisor, listener, installation/runtime, and path evidence:
 
 - **If Hermes is present**, audit the actual user, service definition, install/config/data paths, listener, and health; a stable installation wins over cosmetic restructuring.
-- **If Hermes is absent**, P6 may install/configure the host runtime, bind it only to `127.0.0.1:8642`, choose ownership appropriate to the actual installation model, and create a maintainable startup/service mechanism.
+- **If Hermes is absent** on a fresh/replacement host, use the recorded P6
+  bootstrap procedure: install/configure the host runtime, bind it only to
+  `127.0.0.1:8642`, choose ownership appropriate to the actual installation
+  model, and create a maintainable startup/service mechanism.
 
 Do not create a dedicated Hermes Linux user unless the installation/runtime model or a proven security/operational need requires one. Record the actual decision and evidence.
 
-## 4. Target filesystem
+## 4. Current production filesystem
 
 ```text
 /opt/bmo/
@@ -79,24 +117,26 @@ Do not create a dedicated Hermes Linux user unless the installation/runtime mode
 ├── config/                   # runtime config; not Git
 │   ├── backend.env
 │   ├── audio.env
-│   ├── postgres.env
 │   └── caddy/
 │       └── Caddyfile
 │
-├── models/                   # persistent model/cache assets
-│   ├── hf-cache/
-│   ├── torch-cache/
-│   ├── kokoro/
-│   ├── rvc/
-│   │   └── bmo/
-│   └── MODEL_MANIFEST.md
+├── models/                   # provisioning + curated model assets
+│   ├── hf-cache/             # upstream provisioning cache
+│   └── runtime/              # curated read-only production mount
+│       └── MODEL_MANIFEST.json
+│
+├── cache/
+│   └── audio/                # Audio Service writable runtime cache
+│       ├── huggingface/
+│       ├── torch/
+│       └── xdg/
 │
 ├── data/                     # persistent writable service data
-│   ├── postgres/
 │   └── beszel/
 │
 ├── temp/
-│   └── audio/
+│   ├── audio/                # backend generated audio
+│   └── tts/                  # Audio Service intermediates
 │
 ├── backups/
 │   ├── database/
@@ -122,19 +162,29 @@ backups  = recovery material
 deploy   = release/rollback metadata
 ```
 
+Future/unprovisioned paths are not part of the P7 runtime baseline:
+
+```text
+/opt/bmo/models/rvc/bmo/  P8 only, after verified immutable provisioning
+/opt/bmo/data/postgres/   P9 only
+/opt/bmo/config/postgres.env  P9 only
+```
+
 ## 5. Ownership and permissions
 
-Baseline target:
+Verified P7 baseline:
 
 ```text
 /opt/bmo/app               → bmo-admin managed
 /opt/bmo/config            → restricted; deploy operator access only as required
 /opt/bmo/config/*.env      → baseline `bmo-admin:bmo-admin`, mode 600 (or a stricter root-owned scheme only if the proven sudo deploy workflow can still read them)
 /opt/bmo/config/caddy      → recoverable Caddy source; effective runtime Caddyfile must be readable by the Caddy service without granting Caddy access to secret env files
-/opt/bmo/models            → admin/bootstrap writable; runtime read-only where possible
-/opt/bmo/data/postgres     → PostgreSQL container runtime UID/GID
+/opt/bmo/models/hf-cache   → authorized provisioning only
+/opt/bmo/models/runtime    → curated production model mount, read-only
+/opt/bmo/cache/audio       → Audio UID/GID `10001:10001`, mode 0750
 /opt/bmo/data/beszel       → Beszel runtime ownership as required
-/opt/bmo/temp/audio        → backend runtime writable
+/opt/bmo/temp/audio        → backend UID/GID `1000:1000`, mode 0750
+/opt/bmo/temp/tts          → Audio UID/GID `10001:10001`, mode 0750
 /opt/bmo/backups           → restricted admin/recovery access
 ```
 
@@ -176,7 +226,7 @@ AUDIO_SERVICE_URL=http://127.0.0.1:8001
 INTERNAL_SERVICE_TOKEN=<shared-secret>
 
 # DATABASE_URL is intentionally absent until P9 activates PostgreSQL/Prisma.
-# Voice MVP P7 must run without PostgreSQL.
+# P7 production runs without PostgreSQL.
 
 TEMP_AUDIO_DIR=/opt/bmo/temp/audio
 TEMP_AUDIO_TTL_SECONDS=300
@@ -199,11 +249,19 @@ AUDIO_SERVICE_HOST=0.0.0.0
 AUDIO_SERVICE_PORT=8001
 INTERNAL_SERVICE_TOKEN=<same shared-secret as backend>
 
-HF_HOME=/opt/bmo/models/hf-cache
-TORCH_HOME=/opt/bmo/models/torch-cache
+HF_HOME=/opt/bmo/cache/audio/huggingface
+TORCH_HOME=/opt/bmo/cache/audio/torch
+XDG_CACHE_HOME=/opt/bmo/cache/audio/xdg
+RUNTIME_MODELS_ROOT=/opt/bmo/models/runtime
+MODEL_MANIFEST_PATH=/opt/bmo/models/runtime/MODEL_MANIFEST.json
+TTS_TEMP_DIR=/opt/bmo/temp/tts
 MODEL_DOWNLOAD_ALLOWED=false
+HF_HUB_OFFLINE=1
+TRANSFORMERS_OFFLINE=1
 
 WHISPER_MODEL=medium
+WHISPER_MODEL_REPO=Systran/faster-whisper-medium
+WHISPER_MODEL_REVISION=08e178d48790749d25932bbc082711ddcfdfbc4f
 WHISPER_HOTWORDS=BMO
 WHISPER_DEVICE=cpu
 WHISPER_COMPUTE_TYPE=int8
@@ -215,10 +273,11 @@ WHISPER_VAD=true
 KOKORO_LANG_CODE=a
 KOKORO_VOICE=af_heart
 KOKORO_SPEED=0.80
+KOKORO_MODEL_REPO=hexgrad/Kokoro-82M
+KOKORO_MODEL_REVISION=f3ff3571791e39611d31c381e3a41a3af07b4987
+KOKORO_SAMPLE_RATE=24000
 
-RVC_ENABLED=true
-RVC_MODEL_PATH=/opt/bmo/models/rvc/bmo/<actual-model-file>.pth
-RVC_INDEX_PATH=/opt/bmo/models/rvc/bmo/<actual-index-file>.index
+RVC_ENABLED=false
 RVC_F0_UP_KEY=0
 RVC_F0_METHOD=rmvpe
 
@@ -226,15 +285,20 @@ OUTPUT_MP3_SAMPLE_RATE=24000
 OUTPUT_MP3_BITRATE=96k
 ```
 
-Do not guess RVC filenames. Bootstrap/inspect the verified archive, then set paths to the actual extracted files.
+RVC artifacts are not provisioned in current production. P8 must safely
+bootstrap/inspect the verified archive and resolve actual `.pth`/`.index` paths
+before any future `RVC_MODEL_PATH` or `RVC_INDEX_PATH` is enabled. Do not guess
+filenames or use runtime downloads.
 
 ### `postgres.env` — P9 only
 
-The path may be reserved during P6, but do **not** create/require real database credentials during P6/P7. P9 generates the database name/user/password and activates `DATABASE_URL`. Do not commit it.
+PostgreSQL/Prisma is not implemented or deployed. P9 generates the database
+name/user/password and activates `DATABASE_URL`; do not create or require those
+credentials before P9 authorization, and never commit them.
 
 Real secret values must never appear in docs, Git history, logs, or deployment reports.
 
-## 7. Target runtime topology
+## 7. Current verified runtime topology
 
 ```text
 Internet
@@ -258,9 +322,17 @@ BMO backend
 
 ### 7.1 P7 application container networking
 
-P7 target networking keeps the original proven host-access model: `bmo-backend` uses Linux `network_mode: host`, binds the production origin to `127.0.0.1:3000`, and therefore can call the P6-verified host-loopback Hermes at `127.0.0.1:8642`. `bmo-audio-service` stays on normal container networking and publishes only `127.0.0.1:8001:8001`; P9 PostgreSQL, when activated, is private and may expose `127.0.0.1:5432` only for the host-network backend if required by the final Compose topology. Caddy is the only public path. If the P7 source audit proves a different host-access mechanism is already implemented and safer, document/test it before changing this target; never expose Hermes or change the public hardware contract merely to solve container networking.
+Verified P7 networking uses the original proven host-access model:
+`bmo-backend` uses Linux `network_mode: host`, binds the production origin to
+`127.0.0.1:3000`, and calls the P6-verified host-loopback Hermes at
+`127.0.0.1:8642`. `bmo-audio-service` stays on normal container networking and
+publishes only `127.0.0.1:8001:8001`. Caddy is the only public application
+path. P9 PostgreSQL, if later authorized, must remain private and may expose
+`127.0.0.1:5432` only if its reviewed topology requires it. Never expose
+backend, Audio Service, Hermes, or PostgreSQL merely to simplify networking.
 
-P7 performs backend/audio → Hermes integration only. Initial Hermes installation belongs to P6 when preflight proves it absent.
+P7 completed backend/audio → Hermes integration only. Initial Hermes
+installation remained P6 ownership when preflight proved it absent.
 
 Audio Service does not receive `HERMES_API_KEY` or device token.
 
@@ -298,11 +370,17 @@ Persistent mounts are reserved for items such as:
 - Beszel data;
 - explicitly required configuration.
 
-Docker logs must use bounded rotation (baseline `10m`, 3 files per service unless measurement justifies change). Health checks must reflect actual readiness, not process existence; P7 Audio Service health must allow a model-loading grace period (historical baseline up to ~300 s, then tune from VPS measurements).
+Docker logs use bounded rotation (`10m`, 3 files per service). Health checks
+reflect actual readiness, not process existence; P7 verified the Audio Service
+model-loading grace period and separated liveness from readiness to avoid
+restart loops during mandatory model initialization.
 
 ## 9. Reverse proxy and TLS
 
-Caddy is the selected reverse proxy for this deployment target and runs as a **host system service**. Keep a recoverable source under `/opt/bmo/config/caddy/`, but deploy the effective runtime file with explicit Caddy-readable ownership/permissions. Baseline: `/etc/caddy/Caddyfile` owned `root:caddy` mode `640`, installed from the recoverable source via an auditable `sudo` step. An equivalent proven layout is allowed, but Caddy must never need read access to backend/audio secret env files.
+Caddy is the verified production reverse proxy and runs as a **host system
+service**. A recoverable source remains under `/opt/bmo/config/caddy/`; the
+effective `/etc/caddy/Caddyfile` uses explicit Caddy-readable ownership and
+mode without granting Caddy access to backend/audio secret env files.
 
 Requirements:
 
@@ -324,7 +402,7 @@ GET  /audio/:audioId.mp3
 
 ## 10. Firewall and admin network
 
-Target public exposure:
+Verified public exposure:
 
 ```text
 80/tcp   public → Caddy
@@ -341,16 +419,9 @@ Private/internal only:
 Beszel origin port
 ```
 
-Current SSH access starts via public IP. Migration procedure:
-
-```text
-install/configure Tailscale on VPS
-→ configure admin device
-→ verify SSH through Tailscale in a second session
-→ only then restrict public SSH
-```
-
-Never close the only working SSH path before private admin access is proven.
+SSH administration is available only through the approved Tailscale path.
+Public SSH is not an approved production exposure. Never change firewall or
+Tailscale state in a way that closes the only working admin path.
 
 Tailscale is for server administration; BMO devices use the public domain through HTTPS/WSS.
 
@@ -358,7 +429,7 @@ Tailscale is for server administration; BMO devices use the public domain throug
 
 Beszel is required in the infrastructure plan; Portainer is currently skipped. Deploy a pinned/tested **Hub + local Agent** pair from `/opt/bmo/deploy/infra-compose.yml`. Bind/publish the Hub only to host loopback (baseline `127.0.0.1:8090`) so Caddy is the sole public path. Prefer a supported local Unix socket between Agent and Hub when available; otherwise keep the Agent listener private/local. Docker telemetry may use a read-only Docker socket mount. Never expose the Agent listener or Docker socket publicly.
 
-Target public dashboard:
+Verified public dashboard:
 
 ```text
 https://monitor.personalbmo.web.id
@@ -429,11 +500,11 @@ Large reproducible model/cache files and Docker images do not need to be copied 
 
 A backup does not count as verified until a restore test has been performed.
 
-## 13. RVC deployment ownership
+## 13. RVC deployment ownership — Future P8
 
 RVC belongs to Audio Service, not Express backend.
 
-Target asset path:
+Possible future asset path, not provisioned in P7:
 
 ```text
 /opt/bmo/models/rvc/bmo/
@@ -455,7 +526,11 @@ download exact model asset
 
 Express backend only calls Audio Service `/tts/synthesize`; it does not load RVC files directly.
 
-Current status at documentation audit: model asset/fallback orchestration exists, but real RVC inference is not yet verified.
+Current production status: `RVC_ENABLED=false`; no RVC production artifact is
+provisioned. Model metadata and fallback orchestration exist, but real RVC
+inference is not verified. P8 must follow
+[`../roadmap/P8-EXECUTION-SPEC.md`](../roadmap/P8-EXECUTION-SPEC.md) and requires
+explicit authorization before provisioning, testing, or rollout.
 
 ## 14. PostgreSQL readiness
 
@@ -559,11 +634,17 @@ Inspect:
 
 If free disk is below 20 GB, stop large model/runtime downloads and report a blocker.
 
-## 19. Approval boundary during P6
+## 19. Historical approval boundary during P6
 
-The architecture choices in this file are already selected. When the user explicitly authorizes **P6**, that authorization includes the non-destructive P6 setup described in `../roadmap/P6-EXECUTION-SPEC.md` (for example creating the approved filesystem/operator account, installing/configuring Docker/Compose, Caddy, Tailscale, Beszel, monitoring, and applying the safe firewall transition after alternate SSH is proven). When preflight proves Hermes absent, initial Hermes host bootstrap is authorized within P6.
+This section records the completed P6 authority boundary; it is not current
+execution authorization. The explicitly authorized P6 run included the
+non-destructive setup described in `../roadmap/P6-EXECUTION-SPEC.md` (for
+example approved filesystem/operator setup, Docker/Compose, Caddy, Tailscale,
+Beszel, monitoring, safe firewall transition, and conditional Hermes host
+bootstrap).
 
-Even with P6 authorized, stop and obtain approval before destructive/high-risk changes such as:
+The same safety principle remains: stop and obtain approval before
+destructive/high-risk changes such as:
 
 - deleting existing data/container/image/volume;
 - changing, reinstalling, or migrating a Hermes runtime/config/ownership that preflight found present;
@@ -574,18 +655,26 @@ Even with P6 authorized, stop and obtain approval before destructive/high-risk c
 - replacing existing host services;
 - using an unverified model/license.
 
-The current conversation has already selected the target domain/reverse proxy/network model, but the executor still must audit the VPS before applying changes.
+Future executors must audit the live VPS before applying changes and preserve
+the verified P7 domain/reverse-proxy/network baseline unless separately
+authorized evidence requires a change.
 
-## 20. Hardware handoff requirement
+## 20. Hardware deployment handoff
 
-Final deployment is not complete until:
+P7 deployment handoff is complete because:
 
-- [`../hardware-handoff/DEPLOYMENT-CONFIG.md`](../hardware-handoff/DEPLOYMENT-CONFIG.md) is updated from `NOT_VERIFIED` to `VERIFIED` with evidence;
-- fake ESP32 passes through the public HTTPS/WSS hostname;
+- [`../hardware-handoff/DEPLOYMENT-CONFIG.md`](../hardware-handoff/DEPLOYMENT-CONFIG.md) is `VERIFIED` with evidence;
+- fake ESP32 passed `23/23` through the public HTTPS/WSS hostname;
 - endpoint/payload/event behavior matches the canonical hardware contract;
 - no real credential is committed into docs;
 - the hardware team can use `docs/hardware-handoff/` without backend source access.
 
+This does not make physical hardware verified. `PHYSICAL_ESP32_STATUS` remains
+`NOT_RUN`; `HARDWARE INTEGRATION VERIFIED` remains a P10 classification.
+
 ## 21. Current phase split
 
-The former single P6 deployment scope is now too broad. Use the dependency-based plan in [`../roadmap/P6-P10-ROADMAP.md`](../roadmap/P6-P10-ROADMAP.md).
+P6 and P7 are complete. P8 real RVC verification is next but
+`NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`; P9/P10 remain
+dependency-gated. Use [`../NEXT-ACTION.md`](../NEXT-ACTION.md) and the roadmap in
+[`../roadmap/P6-P10-ROADMAP.md`](../roadmap/P6-P10-ROADMAP.md).

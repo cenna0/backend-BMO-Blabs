@@ -1,10 +1,12 @@
 # P7 — Backend, Audio Service, and Hermes Production Integration — Test Evidence
 
-**Status:** `P7_VERIFIED_READY`
+**Status:** `VERIFIED — PRODUCTION`
 **Execution date:** 2026-07-28 through 2026-07-31
+**Verified at:** `2026-07-31T03:22:12Z`
 **Authorized by:** explicit checkpoint-by-checkpoint user authorization for P7
 **Deployment source:** `4d7b472adc4c2243d8f7364032a491ad70efb6d3`
-**P8–P10 status:** `NOT_STARTED`
+**P8 status:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**P9–P10 status:** `NOT_STARTED / dependency-gated`
 
 This report is sanitized. It contains no device token, Hermes API key,
 internal-service token, authorization header, transcript, Hermes response
@@ -14,7 +16,9 @@ text, provider credential, Telegram credential, or other active secret.
 
 P7 source, packaging, offline-model, private-deployment, private-E2E, Caddy
 cutover, public fake-ESP32 acceptance, and final production-soak gates passed.
-All mandatory P7 closure criteria are satisfied.
+All mandatory P7 closure criteria are satisfied. Evidence review, evidence
+commit/push, and local/origin/live-remote synchronization were subsequently
+confirmed, so the formal P7 classification is `VERIFIED — PRODUCTION`.
 
 P7 preserves the locked hardware contract v1.0.5 and all P6 controls. P8 real
 RVC verification, P9 database work, and P10 physical ESP32 acceptance were not
@@ -363,7 +367,26 @@ Residual non-blocking limitations:
 
 ## 12. Stop condition
 
-Closure classification: `P7_VERIFIED_READY`.
+Closure classification: `VERIFIED — PRODUCTION`.
 
-Do not start P8, P9, or P10 from this evidence update. Do not delete the P6
-rollback anchor, protected backups, or superseded image candidates.
+Final repository synchronization:
+
+```text
+Original P7 evidence commit
+e7969e867c3bcc256b30f15736fd705a4a3c719c
+
+Synchronization result
+local main == origin/main == live remote main
+```
+
+The original P7 evidence commit was pushed and remote-verified. It is a
+documentation/evidence commit and does not change running image provenance.
+The production application remains built from deployment source
+`4d7b472adc4c2243d8f7364032a491ad70efb6d3`, with the immutable image digests
+recorded in section 3. Deployment source and later documentation-only
+repository HEADs must remain distinct.
+
+Final next phase: P8 `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`.
+P7 completion does not authorize P8. Do not start P8, P9, or P10 from this
+evidence update, and do not delete the P6 rollback anchor, protected backups,
+or superseded image candidates.

@@ -1,6 +1,6 @@
 # BMO Documentation — Start Here
 
-**Last audited:** 2026-07-28
+**Last audited:** 2026-07-31
 **Purpose:** Single documentation entry point for BMO voice MVP, especially hardware ↔ backend integration.
 
 ## 1. What to read
@@ -24,7 +24,7 @@ The handoff pack is intentionally shorter than the canonical contract. It must n
 For the **next implementation action**, read:
 
 1. [`NEXT-ACTION.md`](NEXT-ACTION.md) — current next phase and exact execution boundary.
-2. [`roadmap/P6-EXECUTION-SPEC.md`](roadmap/P6-EXECUTION-SPEC.md) — detailed P6 execution contract.
+2. [`roadmap/P8-EXECUTION-SPEC.md`](roadmap/P8-EXECUTION-SPEC.md) — future P8 execution contract; its existence is not authorization.
 3. [`backend-mvp/IMPLEMENTATION-STATUS.md`](backend-mvp/IMPLEMENTATION-STATUS.md) — current phase/status authority.
 4. [`backend-mvp/CURRENT-RUNTIME-CONFIG.md`](backend-mvp/CURRENT-RUNTIME-CONFIG.md) — current STT/TTS deployment values.
 5. [`backend-mvp/00-AGENT-EXECUTION-GUIDE.md`](backend-mvp/00-AGENT-EXECUTION-GUIDE.md) — general agent rules.
@@ -39,6 +39,9 @@ Then use the active backend references as needed:
 6. [`backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md`](backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md)
 7. [`operations/MAINTENANCE-AND-RECOVERY.md`](operations/MAINTENANCE-AND-RECOVERY.md) — host maintenance/update/recovery rules.
 8. [`roadmap/P6-P10-ROADMAP.md`](roadmap/P6-P10-ROADMAP.md)
+
+[`roadmap/P6-EXECUTION-SPEC.md`](roadmap/P6-EXECUTION-SPEC.md) remains the
+historical locked P6 execution record and is not the current next-phase action.
 
 ## 2. Source-of-truth hierarchy
 
@@ -58,8 +61,10 @@ Never resolve a conflict by silently changing firmware behavior or adding a new 
 
 `NEXT-ACTION.md` determines **what the coding agent should execute next**. It
 does not override the protocol/runtime source-of-truth hierarchy above. At this
-revision, **P6 is verified and P7 is next but not started or authorized**.
-Later phases must not be collapsed into the same execution turn.
+revision, **P6 is verified and P7 is `VERIFIED — PRODUCTION`**. P8 is next but
+remains `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`. P7 completion
+does not authorize P8, and later phases must not be collapsed into the same
+execution turn.
 
 ## 2.2 Hermes host bootstrap clarification
 
@@ -72,20 +77,32 @@ rules remain:
 - `PRESENT` → audit and preserve the proven installation; never reinstall/migrate for cleanliness.
 - `ABSENT` → P6 bootstraps a maintainable host runtime bound only to `127.0.0.1:8642`, then records health, ownership, paths, startup/restart, and recovery evidence.
 
-P7 integrates backend/audio with the P6-verified Hermes API; it does not install Hermes. This operational clarification supersedes the earlier “existing Hermes” assumption for phase execution, but does not modify the locked PRD snapshot or hardware contract.
+P7 integrated backend/audio with the P6-verified Hermes API in production; it
+did not install Hermes. This operational clarification supersedes the earlier
+“existing Hermes” assumption for phase execution, but does not modify the
+locked PRD snapshot or hardware contract.
 
 ## 3. Current verified boundary
 
 At this audit point:
 
-- backend HTTP/WebSocket transport, idempotency, reconnect, lifecycle, security guardrails, and failure mapping have local backend evidence;
-- faster-whisper, Kokoro, and FFmpeg have real local evidence;
-- Hermes real `/v1/responses` has local integration evidence;
-- RVC model assets and fallback behavior exist, but **real RVC inference is not yet verified**;
-- BMO backend has **not yet been verified as deployed on the VPS through the public production domain**;
-- physical ESP32 integration has **not yet been verified**.
+- the production backend and Audio Service are deployed from immutable images;
+- public HTTPS/WSS, sanitized readiness, canonical transport/lifecycle behavior,
+  and fake-ESP32 public acceptance are verified with `23/23` checks passed;
+- faster-whisper, Kokoro, and FFmpeg are real production dependencies running
+  from curated offline model artifacts;
+- Hermes `/v1/responses` integration is verified in production through the
+  private `127.0.0.1:8642` origin;
+- **real RVC inference is not verified** and belongs to P8; production remains
+  Kokoro-only with `RVC_ENABLED=false`;
+- **physical ESP32 integration is not verified** and belongs to P10;
+- PostgreSQL/Prisma is not implemented or deployed and belongs to P9.
 
-Therefore the protocol documentation is implementation-ready, but hardware must not treat a public endpoint as available until `hardware-handoff/DEPLOYMENT-CONFIG.md` says `DEPLOYMENT_STATUS: VERIFIED`.
+The hardware team may use
+[`hardware-handoff/DEPLOYMENT-CONFIG.md`](hardware-handoff/DEPLOYMENT-CONFIG.md)
+as the verified live endpoint source. The public fake-client result does not
+equal `HARDWARE INTEGRATION VERIFIED`; that classification requires P10
+physical ESP32 evidence.
 
 ## 4. Important current implementation override
 
@@ -107,7 +124,9 @@ KOKORO_VOICE=af_heart
 KOKORO_SPEED=0.80
 ```
 
-`KOKORO_SPEED=0.80` is the current deployment target selected after manual listening UAT. Real RVC integration must revalidate perceived tempo, but the firmware/public hardware contract does not change.
+`KOKORO_SPEED=0.80` is the verified P7 production value selected after manual
+listening UAT. Real RVC integration must revalidate perceived tempo, but the
+firmware/public hardware contract does not change.
 
 These runtime changes do **not** change the hardware API contract or WAV format. See [`backend-mvp/CURRENT-RUNTIME-CONFIG.md`](backend-mvp/CURRENT-RUNTIME-CONFIG.md), [`backend-mvp/P5-STT-ACCURACY-INVESTIGATION.md`](backend-mvp/P5-STT-ACCURACY-INVESTIGATION.md), and [`backend-mvp/P5-MANUAL-TEST-EVIDENCE.md`](backend-mvp/P5-MANUAL-TEST-EVIDENCE.md).
 

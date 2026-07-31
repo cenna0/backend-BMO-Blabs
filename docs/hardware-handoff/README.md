@@ -60,20 +60,29 @@ return IDLE
 
 ## 1. Alamat backend
 
-Target production hostname:
+Verified production endpoint:
 
 ```text
 HTTPS base : https://api.personalbmo.web.id
 WebSocket  : wss://api.personalbmo.web.id/ws
 ```
 
-**Do not hardcode these as usable until** [`DEPLOYMENT-CONFIG.md`](DEPLOYMENT-CONFIG.md) contains:
+The general gate is to use these URLs only when
+[`DEPLOYMENT-CONFIG.md`](DEPLOYMENT-CONFIG.md) contains:
 
 ```text
 DEPLOYMENT_STATUS: VERIFIED
 ```
 
-Production TLS prerequisite: before opening HTTPS/WSS, firmware must synchronize a trustworthy wall clock (normally NTP/SNTP), validate the server certificate chain, and never disable certificate verification as a workaround. The exact deployed CA/certificate expectation is recorded after P7 verification; avoid pinning a short-lived leaf certificate.
+That condition is now satisfied: the endpoint is live and the public
+fake-client matrix passed `23/23`. Physical ESP32 acceptance remains
+`NOT_RUN`/P10, so do not label firmware integration verified yet.
+
+Production TLS prerequisite: before opening HTTPS/WSS, firmware must
+synchronize a trustworthy wall clock (normally NTP/SNTP), validate the server
+certificate chain, and never disable certificate verification as a workaround.
+Avoid pinning a short-lived leaf certificate; P10 records physical-device TLS
+evidence.
 
 The physical BMO communicates through public HTTPS/WSS. Tailscale is an infrastructure/admin access mechanism and is **not** part of the firmware protocol.
 

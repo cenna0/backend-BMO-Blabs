@@ -97,7 +97,7 @@ State request pipeline suara MVP disimpan in-memory. Hilangnya request aktif saa
 - WAV dihapus setelah output MP3 selesai; MP3 dihapus setelah playback selesai/gagal atau TTL;
 - error diekspresikan oleh hardware dengan audio error lokal.
 
-**Current selected runtime yang wajib dipakai sebagai deployment target dan tetap dibenchmark di VPS:**
+**Verified P7 production runtime baseline:**
 
 - faster-whisper `medium` multilingual, CPU INT8, 4 threads, 1 worker, beam size 5, VAD aktif, language auto-detect, hotword `BMO`;
 - Kokoro `af_heart` dengan `KOKORO_SPEED=0.80`.
@@ -142,6 +142,11 @@ Aturan wajib:
 
 Evidence local historical yang diberikan user sudah memverifikasi `/v1/responses`, `/v1/chat/completions`, dan `/v1/models`. Evidence tersebut tidak membuktikan instalasi production VPS. Model pada body saat ini hanya label/cosmetic; model LLM aktual tetap ditentukan konfigurasi Hermes. Karena itu `/v1/models` boleh dipakai untuk diagnosis, tetapi jangan dijadikan dependency runtime backend.
 
-P6 wajib membuktikan health, listener `127.0.0.1:8642`, startup/restart, dan recovery procedure untuk branch present maupun absent. P7 kemudian menjalankan smoke/integration test backend ke `/v1/responses` dengan `stream:false`, menyimpan contoh struktur respons yang sudah disanitasi, lalu menggunakan adapter Responses-style yang telah terbukti. `/v1/chat/completions` hanya menjadi fallback jika `/v1/responses` benar-benar gagal atau berubah tidak kompatibel.
+P6 membuktikan health, listener `127.0.0.1:8642`, startup/restart, dan recovery
+procedure untuk branch present maupun absent. P7 kemudian menyelesaikan
+smoke/integration test production backend ke `/v1/responses` dengan
+`stream:false` dan adapter Responses-style yang telah terbukti, dengan evidence
+yang disanitasi. `/v1/chat/completions` tetap hanya menjadi fallback jika
+`/v1/responses` benar-benar gagal atau berubah tidak kompatibel.
 
 ---

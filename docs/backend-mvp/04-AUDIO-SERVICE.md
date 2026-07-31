@@ -3,7 +3,13 @@
 **Versi:** 1.0.1  
 **Status:** CANONICAL AUDIO IMPLEMENTATION REFERENCE
 
-> **2026-07-26 audit note:** konfigurasi STT aktif di bawah telah diselaraskan dengan investigasi P5 (`medium` + hotword `BMO`). Real RVC inference masih belum verified; fallback Kokoro-only tetap valid. Path production target memakai `/opt/bmo/models`; historical deployment paths are archive/evidence only.
+> **2026-07-31 audit note:** konfigurasi STT/Kokoro dan model/cache layout di
+> bawah adalah verified P7 production baseline. Real RVC inference masih belum
+> verified dan tetap scope P8; production memakai `RVC_ENABLED=false` dengan
+> fallback Kokoro-only. Production Compose/runtime environment overrides use the
+> verified paths below; unchanged non-production source fallback defaults may
+> still use earlier paths and are not production authority. Historical deployment
+> documents remain archive/evidence only.
 
 > **Status:** Canonical backend MVP documentation package  
 > **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
@@ -14,7 +20,9 @@
 
 File ini khusus Python/FastAPI Audio Service, model bootstrap/cache, faster-whisper, Kokoro, RVC, FFmpeg, dan internal API. Audio Service adalah bagian backend MVP tetapi merupakan runtime terpisah dari Express backend.
 
-RVC adalah enhancement dengan fallback Kokoro-only. STT, Kokoro, dan FFmpeg adalah dependency wajib. Baseline performa/format boleh berubah hanya setelah benchmark dan harus dicatat.
+RVC adalah future P8 enhancement dengan fallback Kokoro-only. STT, Kokoro, dan
+FFmpeg adalah dependency wajib yang sudah verified di production. Baseline
+performa/format boleh berubah hanya setelah benchmark dan harus dicatat.
 
 ## 9. Teknologi Audio Service
 
@@ -29,7 +37,7 @@ Kokoro
 soundfile
 PyTorch CPU
 FFmpeg
-RVC inference
+RVC inference (future P8; not installed or verified in P7 production)
 ```
 
 System dependency minimal:
@@ -47,14 +55,18 @@ apt-get update && apt-get install -y --no-install-recommends \
 
 Bersihkan apt lists setelah instalasi.
 
-Referensi upstream yang harus diverifikasi sebelum pin versi:
+Referensi upstream dan status pin:
 
 ```text
 faster-whisper:
 https://github.com/SYSTRAN/faster-whisper
+Production model: Systran/faster-whisper-medium
+Revision: 08e178d48790749d25932bbc082711ddcfdfbc4f
 
 Kokoro:
 https://github.com/hexgrad/kokoro
+Production model: hexgrad/Kokoro-82M
+Revision: f3ff3571791e39611d31c381e3a41a3af07b4987
 
 RVC:
 https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI
@@ -65,33 +77,57 @@ https://huggingface.co/Freaky98/CGO-adventure-time-BMO-rvc-v2-420e
 
 Jangan memakai floating dependency tanpa mencatat versi final yang benar-benar lolos test.
 
-### 9.1 Bootstrap dan cache model persisten
+### 9.1 Provisioning, curated models, dan runtime cache
 
-faster-whisper dan Kokoro dapat mengunduh model/voice saat pertama kali dipakai. Jangan membiarkan runtime container mengunduh ulang model setiap restart.
-
-Gunakan prosedur berikut:
-
-1. Buat script/container bootstrap satu kali yang memiliki akses tulis ke `/opt/bmo/models`.
-2. Download model Whisper yang dikonfigurasi (`medium` pada baseline implementasi saat ini), weight/voice Kokoro, dependency RVC, dan model BMO ke cache persisten.
-3. Catat source, revision, ukuran, dan SHA256 di `MODEL_MANIFEST.md`.
-4. Jalankan smoke inference saat cache masih writable.
-5. Setelah lengkap, runtime `bmo-audio-service` mount directory model sebagai read-only.
-6. Runtime production harus gagal dengan pesan jelas jika model wajib hilang; jangan diam-diam mengunduh model baru.
-
-Gunakan cache persisten:
+P7 memisahkan provisioning upstream dari production runtime. Production
+Whisper/Kokoro tidak diunduh secara lazy pada first use.
 
 ```text
-HF_HOME=/opt/bmo/models/hf-cache
-TORCH_HOME=/opt/bmo/models/torch-cache
+Provisioning root       /opt/bmo/models
+Upstream provisioning   /opt/bmo/models/hf-cache
+Curated runtime root    /opt/bmo/models/runtime
+Curated manifest        /opt/bmo/models/runtime/MODEL_MANIFEST.json
+
+Runtime library cache   /opt/bmo/cache/audio
+HF runtime cache        /opt/bmo/cache/audio/huggingface
+Torch runtime cache     /opt/bmo/cache/audio/torch
+XDG runtime cache       /opt/bmo/cache/audio/xdg
+TTS temp                /opt/bmo/temp/tts
 ```
 
-Cache sementara library lain dapat diarahkan ke `/tmp/cache`.
+Current production rules:
+
+1. Only an explicitly authorized provisioning step may access the network and
+   download exact immutable Whisper/Kokoro upstream revisions.
+2. Provisioning verifies the approved source/revision and materializes only
+   the seven approved runtime artifacts into `/opt/bmo/models/runtime`.
+3. `MODEL_MANIFEST.json` records curated artifact names, byte sizes, and
+   SHA-256 values. The approved aggregate fingerprint is
+   `d2761b191eed48e85128e774aa7057153d8e8994e2e4f40c07ffb05731ae7e9f`.
+4. Production mounts `/opt/bmo/models/runtime` read-only and runs with:
+
+   ```env
+   MODEL_DOWNLOAD_ALLOWED=false
+   HF_HUB_OFFLINE=1
+   TRANSFORMERS_OFFLINE=1
+   ```
+
+5. Writable library state is limited to the runtime cache paths above;
+   generated TTS intermediates use `/opt/bmo/temp/tts`.
+6. Production fails clearly if a mandatory curated artifact is missing or
+   invalid. It must never download a replacement during startup.
+
+The seven P7 artifacts cover Whisper and Kokoro only. RVC, HuBERT, RMVPE, and
+an RVC inference engine are not part of this curated production set. Their
+separate immutable provisioning and runtime layout belong to P8.
 
 Catatan kompatibilitas RVC:
 
 - Upstream RVC menyediakan `requirements-py311.txt`, tetapi dokumentasinya juga mencatat konflik dependency tertentu di atas Python 3.10.
 - Gunakan Python 3.10 sebagai baseline pertama.
-- Jika Hermes memilih Python 3.11, wajib memakai dependency path khusus Python 3.11 dan membuktikan seluruh inference test lulus sebelum melanjutkan.
+- P8 must resolve the RVC engine against the existing Python 3.10 Audio Service
+  runtime; Hermes is a separate host service and does not select the Audio
+  Service Python version.
 
 ---
 
@@ -112,7 +148,11 @@ Beam size     : 5
 Hotwords      : BMO
 ```
 
-`small` adalah baseline historis awal. Investigasi real pada 2026-07-25 memilih `medium` + hotword `BMO` karena lebih akurat pada utterance pendek/aksen yang diuji. Perubahan ini tidak mengubah kontrak hardware. Benchmark latency/resource pada VPS tetap wajib sebelum deployment dianggap verified.
+`small` adalah baseline historis awal. Investigasi real pada 2026-07-25 memilih
+`medium` + hotword `BMO` karena lebih akurat pada utterance pendek/aksen yang
+diuji. P7 kemudian memverifikasi konfigurasi ini, pinned model revision, real
+offline inference, dan resource soak di production. Deployment verification
+telah lulus; RVC-specific latency/resource benchmark tetap wajib di P8.
 
 Target implementasi:
 
@@ -205,7 +245,9 @@ KOKORO_VOICE=af_heart
 KOKORO_SPEED=0.80
 ```
 
-`KOKORO_SPEED=0.80` dipilih pada manual listening UAT dari kandidat `0.90`, `0.85`, `0.80`, dan `0.75`, lalu dipromosikan menjadi current deployment target. Revalidasi setelah real RVC tetap wajib.
+`KOKORO_SPEED=0.80` dipilih pada manual listening UAT dari kandidat `0.90`,
+`0.85`, `0.80`, dan `0.75`, lalu diverifikasi sebagai nilai P7 production.
+Revalidasi setelah real RVC tetap wajib.
 
 Aturan:
 
@@ -219,9 +261,11 @@ Aturan:
 
 ---
 
-## 12. RVC Voice BMO
+## 12. RVC Voice BMO — Future P8
 
-Gunakan community model sebagai aset eksperimental MVP, bukan model resmi yang dijamin kualitasnya.
+RVC belum diinstal atau diverifikasi di production P7. P8 menggunakan community
+model berikut sebagai aset eksperimental MVP, bukan model resmi yang dijamin
+kualitasnya. Metadata ini tidak membuktikan real inference.
 
 Repository model:
 
@@ -236,15 +280,18 @@ License   : openrail (model card sangat minim; perlakukan sebagai aset eksperime
 
 Prosedur:
 
-1. Download revision exact ke `/opt/bmo/models/rvc/bmo/`.
+1. Hanya setelah explicit P8 authorization, provision revision exact ke lokasi
+   RVC yang dipilih dan didokumentasikan; jangan menganggap direktori sudah ada.
 2. Verifikasi byte size dan SHA256 sebelum extract.
 3. Inspeksi isi archive sebelum extract.
 4. Jangan menjalankan script dari archive model.
 5. Hanya terima asset yang masuk akal seperti `.pth` dan opsional `.index`.
-6. Siapkan dependency inference RVC yang dibutuhkan, termasuk `hubert_base.pt` dan `rmvpe.pt` bila pipeline yang dipilih memerlukannya; catat source, revision, dan SHA256 di `MODEL_MANIFEST.md`.
+6. Siapkan dependency inference RVC yang dibutuhkan, termasuk `hubert_base.pt`
+   dan `rmvpe.pt` bila pipeline yang dipilih memerlukannya; catat source,
+   revision, size, dan SHA256 di manifest P8 terverifikasi.
 7. Pin revision kode RVC yang lolos CPU inference.
 8. Jalankan inference di audio-service container terisolasi, non-root, tanpa secret backend/Hermes.
-9. Loading `.pth` berbasis PyTorch berpotensi mengeksekusi pickle. Gunakan loader aman seperti `weights_only=True` jika kompatibel; jika tidak kompatibel, tetap jalankan hanya di container terisolasi tanpa secret, dengan filesystem read-only sebisa mungkin.
+9. Loading `.pth` berbasis PyTorch berpotensi mengeksekusi pickle. Gunakan loader aman seperti `weights_only=True` yang kompatibel; jika loader aman tidak tersedia, klasifikasikan P8 `BLOCKED`. Eksperimen compatibility yang pickle-capable memerlukan otorisasi terpisah dan sandbox disposable tanpa jaringan, host socket/device, writable host mount, atau secret; drop seluruh capability, aktifkan `no-new-privileges`/seccomp dan resource limit ketat, lalu ekspor hanya artifact non-executable yang tervalidasi secara sempit.
 10. Gunakan CPU kecuali GPU kompatibel ditambahkan kemudian.
 11. Inspeksi metadata/checkpoint untuk mengetahui sample rate model RVC. Resample WAV Kokoro ke sample rate input yang dibutuhkan RVC, lalu resample hasil akhir ke format MP3 yang lolos tes ESP32.
 12. Parameter awal RVC dibuat configurable; gunakan `f0_up_key=0` dan `f0_method=rmvpe` sebagai baseline test, lalu ubah hanya berdasarkan hasil dengar/benchmark.
@@ -322,17 +369,22 @@ Audio service hanya boleh diakses dari localhost.
 
 ### 14.1 `GET /health`
 
+Current P7 production state with RVC disabled:
+
 ```json
 {
-  "status": "ok",
+  "status": "degraded",
   "stt_loaded": true,
   "kokoro_loaded": true,
-  "rvc_available": true,
+  "rvc_available": false,
   "ffmpeg_available": true
 }
 ```
 
-Gunakan `loading` selama model wajib sedang dimuat, `degraded` jika Kokoro berfungsi tetapi RVC tidak tersedia, dan `error` jika STT/Kokoro/FFmpeg wajib tidak siap.
+`degraded` is readiness-healthy while mandatory STT/Kokoro/FFmpeg are ready and
+optional RVC is unavailable. Gunakan `loading` selama model wajib sedang
+dimuat, `ok` only when RVC is also available, dan `error` jika
+STT/Kokoro/FFmpeg wajib tidak siap.
 
 ### 14.2 `POST /stt/transcribe`
 

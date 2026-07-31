@@ -1,123 +1,149 @@
 # BMO — Next Execution Action
 
-**Last updated:** 2026-07-28
+**Last updated:** 2026-07-31
 **Audience:** Codex / infrastructure-backend coding agent
-**Current next phase:** **P7 — Deploy Backend + Audio Service + Hermes Integration**
+**Current next phase:** **P8 — Real RVC Verification and Voice Resource Benchmark**
 **Phase state:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 
-> P6 is `VERIFIED`. This file identifies the next phase but does not authorize
-> it. Do not start P7 merely because its dependency is satisfied.
+> P7 is `VERIFIED — PRODUCTION`. P7 completion does **not** authorize P8.
+> A future P8 run requires a new explicit instruction such as **“execute P8”**
+> or equivalent.
 
 ## 1. Current checkpoint
 
-P6 VPS Foundation and Operations Baseline is complete. Sanitized proof is in
-[`backend-mvp/P6-TEST-EVIDENCE.md`](backend-mvp/P6-TEST-EVIDENCE.md).
+P6 VPS Foundation and Operations Baseline remains `VERIFIED`. P7 backend,
+Audio Service, and Hermes production integration is `VERIFIED — PRODUCTION`.
+Sanitized proof is in
+[`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
 
-Verified P6 outcomes include:
+Verified P7 outcomes include:
 
-- Hermes 0.19.0 healthy on loopback `127.0.0.1:8642`, enabled under systemd,
-  with restart/recovery evidence;
-- Docker/Compose, `/opt/bmo`, Caddy TLS, Tailscale-only SSH firewall access,
-  and protected backup/restore foundations;
-- Beszel host/container/six-unit systemd telemetry and supported host alerts;
-- a private strict Beszel-to-Telegram relay plus an independent Hermes health
-  notifier with three-failure threshold and single recovery notification;
-- both labeled Telegram receipt tests confirmed by the operator;
-- no P7 backend/audio containers, public API readiness claim, or P7 listeners.
+- immutable deployment source
+  `4d7b472adc4c2243d8f7364032a491ad70efb6d3`;
+- backend image
+  `bmo-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7`;
+- Audio Service image
+  `bmo-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e`;
+- verified public HTTPS API and WSS at `api.personalbmo.web.id`;
+- private origins only: backend `127.0.0.1:3000`, Audio Service
+  `127.0.0.1:8001`, and Hermes `127.0.0.1:8642`;
+- production Whisper/Kokoro inference from pinned curated artifacts with
+  runtime downloads disabled, plus FFmpeg output;
+- production Hermes integration through the P6 host runtime;
+- public fake-ESP32 acceptance passed `23/23`;
+- final resource soak passed for 3,665 seconds / 61 minutes 5 seconds with
+  `13/13` samples, zero new OOM events, and zero backend/audio restarts;
+- minimum `MemAvailable` was 3.209 GiB and minimum relevant free disk was
+  59.137 GiB;
+- protected backup `20260730T115645Z` and the P6 Caddy rollback anchor remain
+  retained;
+- [`hardware-handoff/DEPLOYMENT-CONFIG.md`](hardware-handoff/DEPLOYMENT-CONFIG.md)
+  is the verified live endpoint handoff.
 
-The current turn must stop after recording P6. P7 requires a new explicit user
-command such as **“execute P7”** or **“continue with P7.”**
+Production intentionally remains Kokoro-only with `RVC_ENABLED=false`. Real
+RVC inference is not verified. Physical ESP32 acceptance is not run, and
+PostgreSQL/Prisma is not implemented or deployed.
 
 ## 2. Locked execution order
 
 ```text
 P6 VPS foundation                         VERIFIED
-  ↓ explicit next-phase authorization
-P7 backend/audio deployment + public API NOT_STARTED
+  ↓
+P7 backend/audio production deployment   VERIFIED — PRODUCTION
+  ↓ explicit new authorization required
+P8 real RVC verification + benchmark     NOT_STARTED
+  ↓ completed/verified status + explicit authorization
+P9 PostgreSQL + Prisma readiness         NOT_STARTED / dependency-gated
   ↓ VERIFIED + explicit authorization
-P8 real RVC verification + benchmark
-  ↓ completed/verified + explicit authorization
-P9 PostgreSQL + Prisma readiness
-  ↓ VERIFIED + explicit authorization
-P10 physical hardware acceptance
+P10 physical ESP32 acceptance            NOT_STARTED / dependency-gated
 ```
 
 Do not collapse phases or infer execution authority from technical readiness.
+P7 completion does not permit P8 to start, and P8 completion must not
+automatically start P9.
 
-## 3. Read before a future P7 execution
+## 3. Read before a future P8 execution
 
 Read in this order:
 
-1. `NEXT-ACTION.md` — this file.
-2. `roadmap/P6-P10-ROADMAP.md` — P7 goal, scope, outputs, and acceptance.
+1. `NEXT-ACTION.md` — this operational gate.
+2. `roadmap/P8-EXECUTION-SPEC.md` — future P8 execution contract.
 3. `backend-mvp/IMPLEMENTATION-STATUS.md` — current status authority.
-4. `backend-mvp/P6-TEST-EVIDENCE.md` — foundation and residual risks P7 must
-   preserve.
-5. `backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` — deployment target.
-6. `backend-mvp/00-AGENT-EXECUTION-GUIDE.md` — general execution rules.
-7. `backend-mvp/CURRENT-RUNTIME-CONFIG.md` — runtime values to preserve.
+4. `backend-mvp/P7-TEST-EVIDENCE.md` — immutable P7 baseline and headroom.
+5. `backend-mvp/04-AUDIO-SERVICE.md` — current adapter/model rules.
+6. `backend-mvp/CURRENT-RUNTIME-CONFIG.md` — verified P7 runtime values.
+7. `backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` — verified production
+   topology and operational controls.
 8. `hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — read-only
    public protocol contract.
 9. `operations/MAINTENANCE-AND-RECOVERY.md` — live recovery procedures.
 
-Historical P1–P5 plans and evidence remain evidence, not next-step authority.
+Historical P1–P7 plans/evidence remain evidence, not execution authority.
 
-## 4. P7 boundary
+## 4. P8 boundary
 
-P7 may:
+P8 may:
 
-- audit source behavior against current docs and the hardware contract;
-- select the exact `main` commit to deploy;
-- build immutable backend/audio images tied to that commit;
-- configure runtime secrets outside Git;
-- deploy backend/audio with health, restart, and rollback controls;
-- integrate backend with the P6-verified Hermes host API;
-- activate the Caddy API route;
-- run public HTTPS/WSS and fake-ESP32 end-to-end tests;
-- record baseline resource/latency and deployment evidence.
+- audit, select, and pin a compatible RVC inference runtime;
+- validate the existing BMO RVC model asset;
+- resolve required HuBERT/RMVPE assets;
+- perform isolated real Kokoro → RVC → FFmpeg inference;
+- test forced RVC failure and Kokoro-only fallback;
+- benchmark RVC CPU, RAM, latency, `MemAvailable`, disk, restart, and OOM
+  behavior;
+- compare Kokoro-only output with RVC output;
+- perform listening/quality evidence;
+- determine whether production has enough resource headroom;
+- update P8 evidence and RVC-specific deployment/runtime documentation when
+  verified.
 
-P7 must not:
+P8 must not:
 
-- reinstall, relocate, Dockerize, or cosmetically restructure Hermes;
-- expose Hermes, Beszel, Audio Service, or backend origin ports publicly;
-- require PostgreSQL or activate `DATABASE_URL`; that is P9;
-- claim real RVC verification; that is P8;
-- hand off a live credential to physical hardware or claim final physical
-  integration; that is P10;
-- change the locked hardware/backend contract without explicit authorization.
+- change the locked public hardware contract;
+- invent endpoints, events, fields, or protocol behavior;
+- implement P9 database work;
+- perform P10 physical ESP32 acceptance;
+- remove the Kokoro-only fallback;
+- expose backend, Hermes, or device secrets to RVC;
+- turn RVC on in production before its validation and deployment gates pass;
+- silently use mutable or unverified RVC dependencies/assets;
+- auto-start P9 after finishing.
 
 ## 5. Authorization and first action
 
-Documentation does not authorize P7. After an explicit user command, start with
-a read-only source/runtime reconciliation:
+This documentation does not authorize P8. After a new explicit user command
+such as **“execute P8”**, begin with a fresh read-only source/runtime audit and
+create an isolated branch/worktree. Resolve the compatible inference engine and
+its immutable dependency set from evidence during P8; do not assume an engine
+or version merely because this gate exists.
+
+Document and stop on any conflict with the locked hardware contract, P7
+production provenance, secret isolation, offline model policy, or Kokoro
+fallback requirement.
+
+## 6. P8 finish line
+
+P8 may finish as `VERIFIED`, `PARTIALLY VERIFIED`, or `BLOCKED`. The final
+classification must be evidence-backed and must not claim real RVC success
+unless real Kokoro → RVC → FFmpeg inference, output validation, fallback
+regression, quality review, and resource measurements support it.
+
+At minimum, closure must record:
 
 ```text
-local main commit and fetch state
-source routes/events/env behavior vs canonical docs
-P6 service/listener/firewall baseline
-Hermes health and loopback listener
-available build tooling and pinned base images
-runtime secret-file presence/metadata without values
-rollback anchors and current backup state
+exact pinned RVC engine/runtime and immutable dependencies, or blocker
+verified model/archive and resolved .pth/.index paths
+HuBERT/RMVPE provenance when required
+isolated real inference result
+hardware-compatible MP3 result
+forced-RVC-failure Kokoro-only fallback result
+RVC and total pipeline latency
+CPU/RAM/MemAvailable/disk/OOM/restart evidence
+comparison against the P7 production baseline and headroom
+safe production rollout decision
+post-deploy public regression if and only if rollout is separately gated
 ```
 
-Document any conflict before changing public behavior or the live stack.
-
-## 6. P7 finish line
-
-P7 is verified only when:
-
-```text
-immutable backend/audio images are tied to a recorded commit
-backend and Audio Service are healthy with private origins
-backend integrates with the existing Hermes host runtime
-https://api.personalbmo.web.id/health succeeds through Caddy
-public WSS authentication and canonical events pass
-valid WAV upload, MP3 retrieval, and completion flow pass
-fake ESP32 public-domain E2E passes
-internal ports remain non-public
-rollback and resource evidence are recorded
-Hermes and all P6 controls remain healthy
-```
-
-After P7 evidence is recorded, stop again. Do not auto-run P8.
+Kokoro-only fallback must remain working even if P8 is partially verified or
+blocked. After P8 evidence and status are recorded, stop. Do not execute P9
+without another explicit user authorization.

@@ -2,6 +2,10 @@
 
 Use together with [`README.md`](README.md) and the canonical [`../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md).
 
+Current gate: `DEPLOYMENT-CONFIG.md` is `VERIFIED` and the live endpoint is
+available. This checklist is still incomplete until physical P10 evidence is
+recorded; `PHYSICAL_ESP32_STATUS` remains `NOT_RUN`.
+
 - [ ] Synchronize trustworthy device time (NTP/SNTP or equivalent) before production HTTPS/WSS certificate validation.
 - [ ] Validate the server certificate chain; never disable TLS verification to make production connection work.
 - [ ] Connect using the production hostname (not hardcoded VPS IP) so DNS migration and TLS/SNI remain valid.
@@ -142,6 +146,7 @@ playback_state = waiting | downloading | playing | done_pending_send | failed_pe
 ## K. Security / production transport
 
 - [ ] Use HTTPS/WSS production endpoint only after deployment is verified.
+- [ ] Confirm the current `DEPLOYMENT-CONFIG.md` still says `VERIFIED` before each physical test session.
 - [ ] Validate TLS certificates.
 - [ ] Do not log device token.
 - [ ] Do not send credentials to internal service ports.

@@ -2,6 +2,26 @@
 
 > Entries under **Historical package changelog** preserve the phase ownership/runtime facts as they were recorded at that time. They are evidence, not current next-step authority. Use `../NEXT-ACTION.md` and `IMPLEMENTATION-STATUS.md` for current ownership.
 
+## 2026-07-31 — P7 VERIFIED — PRODUCTION / P8 handoff
+
+- Closed P7 as `VERIFIED — PRODUCTION` from deployment source
+  `4d7b472adc4c2243d8f7364032a491ad70efb6d3`.
+- Recorded immutable running images
+  `bmo-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7`
+  and
+  `bmo-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e`.
+- Public fake-ESP32 acceptance passed `23/23`; the final 3,665-second / 61m 5s
+  production soak passed `13/13` samples with zero new OOM and zero
+  backend/audio restarts.
+- Marked the hardware deployment handoff `VERIFIED`, making the live public
+  HTTPS/WSS endpoint available for firmware integration without claiming
+  physical ESP32 acceptance.
+- Preserved Kokoro-only production behavior with `RVC_ENABLED=false`; real RVC
+  remains unverified and P8 becomes the next phase, still awaiting explicit
+  user authorization.
+- Kept physical ESP32 verification in P10 and PostgreSQL/Prisma in P9 after
+  P8; neither was implemented or verified by P7 closure.
+
 ## 2026-07-26 — Final execution-readiness audit
 
 - Reconciled P6 authorization semantics so one explicit `execute P6` instruction covers the planned non-destructive P6 installs/configuration while destructive/unexpected actions still require separate approval.
