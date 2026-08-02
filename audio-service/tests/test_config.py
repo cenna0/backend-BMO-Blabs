@@ -52,6 +52,17 @@ def test_settings_use_p3_tts_defaults():
     assert settings.rvc_model_expected_size == 63_780_149
     assert settings.rvc_model_expected_sha256 == "dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0"
     assert settings.rvc_model_path is None
+    assert settings.rvc_index_path is None
+    assert settings.rvc_hubert_path is None
+    assert settings.rvc_rmvpe_path is None
+    assert settings.rvc_manifest_path is None
+    assert settings.rvc_infer_command is None
+    assert settings.rvc_device == "cpu"
+    assert settings.rvc_index_rate == 0.75
+    assert settings.rvc_protect == 0.33
+    assert settings.rvc_rms_mix_rate == 0.25
+    assert settings.rvc_cpu_threads == 4
+    assert settings.rvc_timeout_seconds == 120.0
 
 
 @pytest.mark.parametrize(
@@ -75,3 +86,45 @@ def test_model_identity_settings_reject_unapproved_overrides(field, value):
 def test_settings_reject_short_internal_service_token():
     with pytest.raises(ValidationError):
         Settings(internal_service_token="short")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("rvc_model_repo", "mutable/model"),
+        ("rvc_model_revision", "main"),
+        ("rvc_model_archive", "replacement.zip"),
+        ("rvc_model_expected_size", 1),
+        ("rvc_model_expected_sha256", "0" * 64),
+        ("rvc_f0_method", "harvest"),
+        ("rvc_device", "cuda:0"),
+        ("rvc_infer_command", "python arbitrary.py"),
+        ("rvc_timeout_seconds", 0),
+        ("rvc_timeout_seconds", 301),
+        ("rvc_index_rate", -0.01),
+        ("rvc_index_rate", 1.01),
+        ("rvc_protect", -0.01),
+        ("rvc_protect", 0.51),
+        ("rvc_rms_mix_rate", -0.01),
+        ("rvc_rms_mix_rate", 1.01),
+        ("rvc_cpu_threads", 0),
+        ("rvc_cpu_threads", 5),
+    ],
+)
+def test_settings_reject_unapproved_rvc_runtime_values(field, value):
+    with pytest.raises(ValidationError):
+        Settings(
+            internal_service_token="test-internal-token",
+            **{field: value},
+        )
+
+
+def test_settings_accept_exact_pinned_rvc_worker_command():
+    settings = Settings(
+        internal_service_token="test-internal-token",
+        rvc_infer_command="/opt/rvc-venv/bin/python /app/scripts/rvc_infer.py",
+    )
+
+    assert settings.rvc_infer_command == (
+        "/opt/rvc-venv/bin/python /app/scripts/rvc_infer.py"
+    )

@@ -7,6 +7,7 @@ import subprocess
 import time
 
 from app.config import Settings
+from app.audio_validation import AudioValidationError, validate_mp3_metadata
 
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
@@ -60,14 +61,34 @@ class FfmpegConverter:
         started = time.perf_counter()
         result = self._runner(command, capture_output=True, text=True, check=False)
         if result.returncode != 0:
-            raise RuntimeError(f"ffmpeg failed: {str(result.stderr)[:300]}")
+            raise RuntimeError("ffmpeg failed")
         if not output_mp3.is_file() or output_mp3.stat().st_size <= 0:
             raise RuntimeError("ffmpeg produced no MP3 output")
+        try:
+            metadata = probe_audio(
+                output_mp3,
+                ffprobe_binary=self._settings.ffprobe_binary,
+                runner=self._runner,
+            )
+            validate_mp3_metadata(
+                metadata,
+                expected_sample_rate=self._settings.output_mp3_sample_rate,
+                expected_bitrate=self._settings.output_mp3_bitrate,
+            )
+        except (AudioValidationError, RuntimeError) as error:
+            output_mp3.unlink(missing_ok=True)
+            raise RuntimeError("ffmpeg produced invalid MP3 output") from error
         return round(time.perf_counter() - started, 3)
 
 
-def probe_audio(path: Path, ffprobe_binary: str = "ffprobe") -> dict[str, object]:
-    result = subprocess.run(
+def probe_audio(
+    path: Path,
+    ffprobe_binary: str = "ffprobe",
+    *,
+    runner: Runner | None = None,
+) -> dict[str, object]:
+    resolved_runner = runner or subprocess.run
+    result = resolved_runner(
         [
             ffprobe_binary,
             "-v",
@@ -85,16 +106,22 @@ def probe_audio(path: Path, ffprobe_binary: str = "ffprobe") -> dict[str, object
         check=False,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"ffprobe failed: {result.stderr[:300]}")
-    data = json.loads(result.stdout)
+        raise RuntimeError("ffprobe failed")
+    try:
+        data = json.loads(result.stdout)
+    except (json.JSONDecodeError, TypeError) as error:
+        raise RuntimeError("ffprobe returned invalid metadata") from error
     streams = data.get("streams") or []
     if not streams:
         raise RuntimeError("ffprobe found no audio stream")
     stream = streams[0]
-    return {
-        "codec": stream.get("codec_name"),
-        "sample_rate": int(stream.get("sample_rate") or 0),
-        "channels": int(stream.get("channels") or 0),
-        "bit_rate": int(float(stream.get("bit_rate") or 0)),
-        "duration": float(stream.get("duration") or 0.0),
-    }
+    try:
+        return {
+            "codec": stream.get("codec_name"),
+            "sample_rate": int(stream.get("sample_rate") or 0),
+            "channels": int(stream.get("channels") or 0),
+            "bit_rate": int(float(stream.get("bit_rate") or 0)),
+            "duration": float(stream.get("duration") or 0.0),
+        }
+    except (TypeError, ValueError) as error:
+        raise RuntimeError("ffprobe returned invalid metadata") from error

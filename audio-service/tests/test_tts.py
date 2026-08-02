@@ -1,4 +1,7 @@
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event, Lock
+import time
 
 import pytest
 
@@ -110,6 +113,21 @@ def test_synthesize_falls_back_to_kokoro_when_rvc_fails_and_cleans_temp_files(tm
     assert not list(tmp_path.glob("*"))
 
 
+def test_synthesize_does_not_log_raw_rvc_failure_details(tmp_path, caplog):
+    class SensitiveFailure(FakeRvcFailure):
+        def convert(self, input_wav: Path, output_wav: Path) -> float:
+            raise RuntimeError("secret-token /private/model/path")
+
+    orchestrator = make_orchestrator(tmp_path, SensitiveFailure())
+
+    result = orchestrator.synthesize("Hi! BMO is ready to help.", use_rvc=True)
+
+    assert result.rvc_applied is False
+    assert "secret-token" not in caplog.text
+    assert "/private/model/path" not in caplog.text
+    assert "RVC failed; falling back to Kokoro-only" in caplog.text
+
+
 def test_synthesize_uses_rvc_when_available_and_cleans_temp_files(tmp_path):
     ffmpeg = FakeFfmpeg()
     orchestrator = make_orchestrator(tmp_path, FakeRvcSuccess(), ffmpeg)
@@ -158,3 +176,62 @@ def test_health_state_is_degraded_when_rvc_unavailable_but_required_components_r
         rvc_available=False,
         rvc_error="RVC unavailable",
     )
+
+
+def test_synthesis_is_serialized_and_request_temp_paths_do_not_collide(tmp_path):
+    state_lock = Lock()
+    first_started = Event()
+    release_first = Event()
+    active = 0
+    max_active = 0
+    observed_parents = []
+
+    class ConcurrentKokoro:
+        ready = True
+
+        def synthesize_to_wav(self, _text: str, output_path: Path) -> float:
+            nonlocal active, max_active
+            with state_lock:
+                active += 1
+                max_active = max(max_active, active)
+                observed_parents.append(output_path.parent)
+                call_number = len(observed_parents)
+            if call_number == 1:
+                first_started.set()
+                release_first.wait(timeout=1)
+            write_wav_file(output_path)
+            with state_lock:
+                active -= 1
+            return 0.1
+
+    orchestrator = TtsOrchestrator(
+        settings=Settings(
+            internal_service_token="test-internal-token",
+            tts_temp_dir=tmp_path,
+        ),
+        kokoro=ConcurrentKokoro(),
+        ffmpeg=FakeFfmpeg(),
+        rvc=None,
+    )
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(
+            orchestrator.synthesize,
+            "Hi! BMO is ready to help.",
+            False,
+        )
+        assert first_started.wait(timeout=1)
+        second = executor.submit(
+            orchestrator.synthesize,
+            "Hi! BMO is ready to help.",
+            False,
+        )
+        time.sleep(0.05)
+        assert max_active == 1
+        assert second.done() is False
+        release_first.set()
+        assert first.result(timeout=2).engine == "kokoro"
+        assert second.result(timeout=2).engine == "kokoro"
+
+    assert max_active == 1
+    assert len(set(observed_parents)) == 2
+    assert not list(tmp_path.glob("bmo-tts-*"))

@@ -7,6 +7,7 @@ import logging
 import re
 import shutil
 import tempfile
+from threading import Lock
 
 from app.config import Settings
 
@@ -107,6 +108,7 @@ class TtsOrchestrator:
         self._ffmpeg = ffmpeg
         self._rvc = rvc
         self._warmup_failed = False
+        self._synthesis_lock = Lock()
 
     @property
     def health_status(self) -> str:
@@ -156,6 +158,10 @@ class TtsOrchestrator:
             max_characters=self._settings.tts_max_characters,
             max_sentences=self._settings.tts_max_sentences,
         )
+        with self._synthesis_lock:
+            return self._synthesize_serialized(cleaned, use_rvc)
+
+    def _synthesize_serialized(self, cleaned: str, use_rvc: bool) -> TtsResult:
         self._settings.tts_temp_dir.mkdir(parents=True, exist_ok=True)
         request_dir = Path(tempfile.mkdtemp(prefix="bmo-tts-", dir=self._settings.tts_temp_dir))
         kokoro_wav = request_dir / "kokoro.wav"
@@ -174,8 +180,8 @@ class TtsOrchestrator:
                     ffmpeg_input = rvc_wav
                     rvc_applied = True
                     engine = "kokoro-rvc"
-                except Exception as error:
-                    LOGGER.warning("RVC failed; falling back to Kokoro-only: %s", error)
+                except Exception:
+                    LOGGER.warning("RVC failed; falling back to Kokoro-only")
 
             ffmpeg_seconds = self._ffmpeg.convert_wav_to_mp3(ffmpeg_input, output_mp3)
             return TtsResult(

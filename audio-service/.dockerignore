@@ -8,7 +8,6 @@ __pycache__
 models
 temp
 tests
-scripts
 *.pyc
 *.pyo
 *.log

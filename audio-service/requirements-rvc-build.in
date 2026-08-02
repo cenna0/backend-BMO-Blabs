@@ -1,0 +1,5 @@
+# Exact tools needed to build the two pinned source distributions and Fairseq.
+numpy==1.26.3
+cython==3.0.8
+setuptools==75.8.2
+wheel==0.45.1

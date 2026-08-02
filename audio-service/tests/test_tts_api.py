@@ -72,6 +72,38 @@ def test_tts_synthesize_returns_mp3_headers_and_bytes():
     assert fake.calls == [("Hi! BMO is ready to help.", True)]
 
 
+class FallbackSynthesizer(FakeSynthesizer):
+    def synthesize(self, text: str, use_rvc: bool) -> TtsResult:
+        self.calls.append((text, use_rvc))
+        return TtsResult(
+            audio=b"kokoro-fallback-mp3",
+            rvc_applied=False,
+            engine="kokoro",
+            kokoro_seconds=0.1,
+            rvc_seconds=None,
+            ffmpeg_seconds=0.3,
+        )
+
+
+def test_tts_requested_rvc_failure_preserves_success_and_reports_fallback_headers():
+    fake = FallbackSynthesizer()
+    response = make_client(fake).post(
+        "/tts/synthesize",
+        json={
+            "request_id": "33333333-3333-4333-8333-333333333333",
+            "text": "Hi! BMO is ready to help.",
+            "use_rvc": True,
+        },
+        headers=auth_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"kokoro-fallback-mp3"
+    assert response.headers["x-rvc-applied"] == "false"
+    assert response.headers["x-tts-engine"] == "kokoro"
+    assert fake.calls == [("Hi! BMO is ready to help.", True)]
+
+
 def test_tts_synthesize_rejects_missing_internal_token():
     response = make_client().post(
         "/tts/synthesize",

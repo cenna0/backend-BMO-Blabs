@@ -51,15 +51,35 @@ class Settings(BaseSettings):
     output_mp3_bitrate: str = "96k"
 
     rvc_enabled: bool = False
-    rvc_model_repo: str = "Freaky98/CGO-adventure-time-BMO-rvc-v2-420e"
-    rvc_model_revision: str = "82a8bc529bd41b930589188ead30f073d4f99fc0"
-    rvc_model_archive: str = "CGO-adventure-time-BMO-rvc-v2-420e.zip"
-    rvc_model_expected_size: int = 63_780_149
-    rvc_model_expected_sha256: str = "dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0"
+    rvc_model_repo: Literal["Freaky98/CGO-adventure-time-BMO-rvc-v2-420e"] = (
+        "Freaky98/CGO-adventure-time-BMO-rvc-v2-420e"
+    )
+    rvc_model_revision: Literal["82a8bc529bd41b930589188ead30f073d4f99fc0"] = (
+        "82a8bc529bd41b930589188ead30f073d4f99fc0"
+    )
+    rvc_model_archive: Literal["CGO-adventure-time-BMO-rvc-v2-420e.zip"] = (
+        "CGO-adventure-time-BMO-rvc-v2-420e.zip"
+    )
+    rvc_model_expected_size: Literal[63_780_149] = 63_780_149
+    rvc_model_expected_sha256: Literal[
+        "dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0"
+    ] = "dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0"
     rvc_model_path: Path | None = None
     rvc_index_path: Path | None = None
-    rvc_f0_up_key: int = 0
-    rvc_f0_method: str = "rmvpe"
-    rvc_infer_command: str | None = None
+    rvc_hubert_path: Path | None = None
+    rvc_rmvpe_path: Path | None = None
+    rvc_manifest_path: Path | None = None
+    rvc_f0_up_key: int = Field(default=0, ge=-24, le=24)
+    rvc_f0_method: Literal["rmvpe"] = "rmvpe"
+    rvc_device: Literal["cpu"] = "cpu"
+    rvc_index_rate: float = Field(default=0.75, ge=0.0, le=1.0)
+    rvc_protect: float = Field(default=0.33, ge=0.0, le=0.5)
+    rvc_rms_mix_rate: float = Field(default=0.25, ge=0.0, le=1.0)
+    rvc_cpu_threads: int = Field(default=4, ge=1, le=4)
+    rvc_infer_command: Literal[
+        "/opt/rvc-venv/bin/python /app/scripts/rvc_infer.py"
+    ] | None = None
+    rvc_timeout_seconds: float = Field(default=120.0, gt=0, le=300)
+    rvc_capture_limit_bytes: int = Field(default=16_384, ge=1_024, le=1_048_576)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
