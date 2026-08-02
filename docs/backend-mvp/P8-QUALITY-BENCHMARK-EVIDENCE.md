@@ -1,6 +1,6 @@
 # P8 RVC quality benchmark evidence
 
-Status: **BENCHMARK BLOCKED**
+Status: **PROMPT 2 BLOCKED; PROMPT 3 CANARY REQUIRES A LARGER HOST**
 
 Date: 2026-08-02
 
@@ -8,7 +8,9 @@ Branch: `feat/p8-rvc-foundation`
 
 Worktree: `/opt/bmo/app/.worktrees/p8-rvc-foundation`
 
-Base and current `HEAD`: `cfbd718f3206ccdc1ea8157b2dc177f235d8181f`
+Base SHA: `cfbd718f3206ccdc1ea8157b2dc177f235d8181f`
+
+Prompt 3 checkpoint `HEAD`: `d7c207cef2c68c05a8799a6cd87d6d2fb906934b`
 
 Foundation evidence: `docs/backend-mvp/P8-FOUNDATION-EVIDENCE.md`
 
@@ -407,3 +409,23 @@ Initial and final read-only sanity both found public `/health=200`, `/livez=404`
 45,904,248,832 bytes. The kernel `oom_kill` counter was five: its only Prompt 2
 increment was correlated to the isolated candidate cgroup failure, not either
 production container.
+
+## Prompt 3 replacement-canary amendment
+
+Prompt 3 did not repeat the Prompt 2 simultaneous-residency mistake. It stopped only
+P7 Audio, ran the rebuilt candidate as the loopback replacement, and continuously
+monitored the host and candidate. Fully loaded candidate idle memory averaged
+2,210,562,726 bytes. A real 16 kHz WAV completed Whisper transcription in 31.590409
+seconds. The following valid Hermes-boundary response then entered the baseline
+Kokoro/RVC path.
+
+During that request, candidate memory grew to the 5,368,709,120-byte cgroup limit and
+the request-local RVC worker remained active. At 2026-08-02 16:20:33 CEST Docker
+recorded `OOMKilled=true`; the kernel `oom_kill` counter changed from 5 to 6. The
+monitor invoked the mandatory abort before host memory crossed any configured host
+threshold. No result MP3 was returned.
+
+All remaining quality, warm, stability, failure, shutdown, parameter, and listening
+work stopped. No candidate was retained and no listening archive was produced. The
+exact outcome, rollback proof, and current-VPS decision are in
+`docs/backend-mvp/P8-CANARY-EVIDENCE.md`.

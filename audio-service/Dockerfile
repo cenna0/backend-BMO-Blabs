@@ -64,6 +64,7 @@ RUN apt-get update \
         ffmpeg \
         libgomp1 \
         libsndfile1 \
+        tini=0.19.0-1+b3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 10001 bmo \
@@ -85,4 +86,5 @@ USER bmo
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/livez', timeout=2).read()"]
 
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python", "scripts/audio_service_entrypoint.py"]

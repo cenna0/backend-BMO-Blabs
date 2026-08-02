@@ -1,8 +1,11 @@
 # P8 RVC Foundation Evidence (Draft)
 
-Status: **FOUNDATION READY FOR REVIEW**
+Status: **FOUNDATION CHECKPOINTED; CANARY REQUIRES A LARGER HOST**
 
-This is an uncommitted candidate checkpoint. It does not mark P8 verified, approve
+The foundation is preserved in local checkpoint
+`d7c207cef2c68c05a8799a6cd87d6d2fb906934b`. The Prompt 3 Tini/test changes were
+retained uncommitted for Prompt 4 closure review and are included in the local RVC
+closure commit that contains this evidence. This does not mark P8 verified, approve
 voice quality, enable RVC in production, or authorize deployment.
 
 ## Scope and isolation
@@ -415,3 +418,21 @@ reserve. The production containers did not restart and remained healthy. This do
 not invalidate the isolated technical foundation proof, but it prevents production
 candidacy, full listening-candidate selection, or a completed combined-residency
 claim. See `docs/backend-mvp/P8-QUALITY-BENCHMARK-EVIDENCE.md`.
+
+## Prompt 3 canary amendment — 2026-08-02
+
+The authorized replacement canary removed P7 Audio residency before starting the P8
+candidate. The rebuilt image used native Tini as PID 1 and passed six immediate-start
+stops in 125–190 ms, but the first full replacement request reached its 5 GiB cgroup
+limit during real RVC inference. Docker recorded `OOMKilled=true`, the kernel
+`oom_kill` counter increased from 5 to 6, and the monitor immediately invoked P7
+rollback. Host `MemAvailable` was still 1,562,701,824 bytes at the OOM sample, so no
+host warning/controlled/emergency threshold was crossed before the stricter cgroup
+limit stopped the candidate.
+
+P7 was restored on the exact approved image with `RVC_ENABLED=false`; Backend, Audio,
+Hermes, public routing, checksums, model artifacts, and loopback listeners all passed
+the final restoration audit. The parameter matrix, complete listening bundle,
+20-request stability run, real-inference SIGTERM matrix, and long-form artifact were
+not run after the mandatory abort. See
+`docs/backend-mvp/P8-CANARY-EVIDENCE.md` for the complete result.

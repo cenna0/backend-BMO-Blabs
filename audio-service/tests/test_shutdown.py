@@ -7,6 +7,8 @@ import signal
 import sys
 import time
 
+import pytest
+
 from scripts import audio_service_entrypoint
 
 
@@ -58,6 +60,16 @@ def test_runtime_entrypoint_uses_only_the_fixed_uvicorn_command():
         "--port",
         "8001",
     )
+
+
+def test_container_installs_native_pid1_before_python_supervisor():
+    dockerfile = (Path(__file__).resolve().parents[1] / "Dockerfile").read_text(
+        encoding="utf-8",
+    )
+
+    assert "tini=0.19.0-1+b3" in dockerfile
+    assert 'ENTRYPOINT ["/usr/bin/tini", "--"]' in dockerfile
+    assert 'CMD ["python", "scripts/audio_service_entrypoint.py"]' in dockerfile
 
 
 def test_supervisor_forwards_sigterm_and_exits_cleanly_for_cooperative_child(tmp_path):
@@ -174,3 +186,41 @@ while True:
     assert supervisor.exitcode == 0
     assert not request_dir.exists()
     assert (unrelated / "keep.txt").read_text(encoding="utf-8") == "keep"
+
+
+@pytest.mark.parametrize(
+    "phase",
+    [
+        "model-loading",
+        "warm-up",
+        "kokoro",
+        "rvc-inference",
+        "ffmpeg",
+        "fallback",
+    ],
+)
+def test_supervisor_stops_cleanly_during_pipeline_phase(tmp_path, phase):
+    marker = tmp_path / f"{phase}.started"
+    child = write_script(
+        tmp_path / f"{phase}.py",
+        f"""
+from pathlib import Path
+import signal
+import time
+Path({str(marker)!r}).write_text('started', encoding='utf-8')
+signal.signal(signal.SIGTERM, lambda *_args: raise_exit())
+def raise_exit():
+    raise SystemExit(0)
+while True:
+    time.sleep(0.1)
+""",
+    )
+    supervisor = start_supervisor((sys.executable, str(child)), tmp_path)
+    wait_for_file(marker)
+
+    started = time.monotonic()
+    os.kill(supervisor.pid, signal.SIGTERM)
+    supervisor.join(timeout=2)
+
+    assert supervisor.exitcode == 0
+    assert time.monotonic() - started < 1
