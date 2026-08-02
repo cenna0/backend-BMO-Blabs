@@ -1,0 +1,12 @@
+**
+!piper-candidate/
+!piper-candidate/bmo_piper/
+!piper-candidate/bmo_piper/**
+!piper-candidate/tests/
+!piper-candidate/tests/**
+!piper-candidate/requirements-runtime.lock
+!piper-candidate/requirements-verify.lock
+!piper-candidate/comparison-text.json
+!piper-candidate/Dockerfile
+!wheelhouse/
+!wheelhouse/**

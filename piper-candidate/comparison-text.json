@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "phrases": [
+    {
+      "id": "short_greeting",
+      "class": "short",
+      "text": "Hi! BMO is ready to help."
+    },
+    {
+      "id": "reassuring_line",
+      "class": "short",
+      "text": "Do not worry. BMO is right here with you."
+    },
+    {
+      "id": "excited_line",
+      "class": "short",
+      "text": "Yay! BMO found the answer."
+    },
+    {
+      "id": "calm_medium",
+      "class": "medium",
+      "text": "Let us slow down for a moment, check each step carefully, and choose the answer that feels clear and safe."
+    },
+    {
+      "id": "excited_medium",
+      "class": "medium",
+      "text": "Oh, this is exciting! BMO spotted a bright little clue, and now the whole puzzle is starting to make sense."
+    },
+    {
+      "id": "names_numbers",
+      "class": "medium",
+      "text": "Dr. Rivera scheduled 42 tests for 7:45 p.m., but NASA sent an update: should BMO move test number 8 to Friday?"
+    },
+    {
+      "id": "long_normal",
+      "class": "long",
+      "text": "BMO checked the map, compared the two safest routes, and marked the quiet path beside the river. We can leave after breakfast, carry one small bag, and arrive before the afternoon rain begins."
+    },
+    {
+      "id": "continuous",
+      "class": "continuous",
+      "text": "Good evening, Maya; at 7:45 p.m., BMO checked 12 tiny lights and found every one glowing softly, so we can take a calm breath and begin. Then, surprise, a little green button blinked twice; BMO laughed, counted 3, 2, 1, and asked, shall we solve the puzzle together? There is no need to worry, because each clue is safe, each step is clear, and even if the clock chimes, we have plenty of time; BMO will stay right here, cheering gently until the adventure ends with a warm smile and a friendly good night."
+    }
+  ]
+}

@@ -189,3 +189,21 @@ removing fallback.
 Do not execute P8 solely because this spec exists. Explicit user authorization
 is still required. After P8 is classified and its evidence is recorded, stop;
 do not auto-start P9.
+
+## H. Prompt 4 feasibility outcome (2026-08-02)
+
+Prompt 4 was explicitly authorized and is recorded in
+`docs/backend-mvp/P8-PIPER-FEASIBILITY-EVIDENCE.md`.
+
+- The RVC experiment was closed locally at commit
+  `8420d4192a16025f439c040cd7a32a50b41fe52b`; its classification remains
+  `P8_CANARY_NEEDS_LARGER_HOST` and it was not merged or pushed.
+- Isolated Piper `en_GB-semaine-medium`, `prudence` / ID `0`, passed offline
+  cold, persistent warm, 33.312-second continuous, 20-request, failure,
+  shutdown, resource, and MP3-contract gates while P7 remained online.
+- Technical classification is
+  `P8_PIPER_FEASIBILITY_VERIFIED_AWAITING_LISTENING_APPROVAL`.
+- Piper is not production-active. P7 remains Kokoro-only with
+  `RVC_ENABLED=false`.
+- Prompt 5 may consider a controlled Piper deployment only after explicit
+  operator listening approval. P8 itself is not marked `VERIFIED` here.

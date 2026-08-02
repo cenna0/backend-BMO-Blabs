@@ -1,6 +1,6 @@
 # BMO Voice MVP — Current Runtime Configuration
 
-**Updated:** 2026-07-31
+**Updated:** 2026-08-02
 **Status:** VERIFIED P7 PRODUCTION BASELINE
 **Scope:** STT/TTS runtime values only; the public hardware contract is unchanged.
 
@@ -102,3 +102,20 @@ None. These runtime values do **not** change:
 - retry/idempotency/error behavior.
 
 Hardware Contract v1.0.5 remains unchanged.
+
+## P8 feasibility candidates (not production)
+
+The RVC canary was closed on its unmerged feature branch as
+`P8_CANARY_NEEDS_LARGER_HOST`. It remains disabled in production.
+
+An isolated, unmerged Piper feasibility branch pinned
+`OHF-Voice/piper1-gpl` v1.6.0 at
+`f04d52c5528ac7cf2d73757f57990ff490f75005` and voice
+`en_GB-semaine-medium` at
+`9f967d15e9ccdf43078586d1476ee70f314401bd`, selecting `prudence` / speaker
+ID `0`. Its technical gates passed, but operator listening approval and a
+separate controlled deployment/canary are still required.
+
+These feasibility results do not change the current runtime values above:
+production remains the approved P7 Kokoro configuration, no Piper process or
+container is retained, and `RVC_ENABLED=false`.
