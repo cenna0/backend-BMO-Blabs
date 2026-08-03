@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "acquired_at": "2026-08-02T19:48:46+02:00",
+  "engine": {
+    "repository": "https://github.com/OHF-Voice/piper1-gpl",
+    "revision": "f04d52c5528ac7cf2d73757f57990ff490f75005",
+    "release": "v1.6.0",
+    "package": "piper-tts==1.6.0",
+    "license": "GPL-3.0-or-later"
+  },
+  "voice": {
+    "repository": "https://huggingface.co/rhasspy/piper-voices",
+    "revision": "9f967d15e9ccdf43078586d1476ee70f314401bd",
+    "name": "en_GB-semaine-medium",
+    "speaker_name": "prudence",
+    "speaker_id": 0,
+    "sample_rate": 22050,
+    "num_speakers": 4,
+    "phoneme_type": "espeak",
+    "espeak_voice": "en-gb-x-rp",
+    "license": "CC-BY-NC-SA-4.0",
+    "dataset_repository": "https://github.com/marytts/dfki-semaine-data",
+    "dataset_revision": "cbeb97b9bb0deecf4355220fcfba280a7b30983a",
+    "dataset_license": "CC-BY-NC-SA-4.0"
+  },
+  "artifacts": [
+    {
+      "role": "model",
+      "filename": "en_GB-semaine-medium.onnx",
+      "size_bytes": 76737711,
+      "sha256": "d6dab6f3b92db43ea3f78c7f20dc8eadb47a1f15d8a1c9d451cf3ccd201a2f66"
+    },
+    {
+      "role": "config",
+      "filename": "en_GB-semaine-medium.onnx.json",
+      "size_bytes": 5076,
+      "sha256": "6425dcb878684043b77d772b173ae006d86a583b110303edda48b8438ecee5ee"
+    },
+    {
+      "role": "model_card",
+      "filename": "MODEL_CARD",
+      "size_bytes": 332,
+      "sha256": "d3c370c9c73b69347f9487cc24b0cfa5f2a400c47d209f0aa4ce20123562e46d"
+    },
+    {
+      "role": "dataset_license",
+      "filename": "DFKI-SEMAINE-LICENSE.md",
+      "size_bytes": 19124,
+      "sha256": "c0b81b610f4d9e0e0bb29ac4441106d0b4fb570b67d95f253df0c5db68c92eca"
+    }
+  ]
+}

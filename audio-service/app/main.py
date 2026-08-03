@@ -9,7 +9,7 @@ from app.auth import require_internal_token
 from app.config import Settings
 from app.ffmpeg import FfmpegConverter
 from app.kokoro_tts import KokoroSynthesizer
-from app.rvc import RvcCommandConverter
+from app.piper_tts import PiperSynthesizer
 from app.schemas import HealthResponse, TranscribeResponse, TtsRequest
 from app.stt import FasterWhisperTranscriber, Transcriber
 from app.tts import (
@@ -37,7 +37,8 @@ def create_app(
         settings=resolved_settings,
         kokoro=KokoroSynthesizer(resolved_settings),
         ffmpeg=FfmpegConverter(resolved_settings),
-        rvc=RvcCommandConverter(resolved_settings),
+        rvc=None,
+        piper=PiperSynthesizer(resolved_settings),
     )
 
     async def warm_up_component(component: object) -> None:
@@ -64,6 +65,9 @@ def create_app(
             warmup_task.cancel()
         with suppress(asyncio.CancelledError):
             await warmup_task
+        close = getattr(resolved_synthesizer, "close", None)
+        if callable(close):
+            close()
 
     app = FastAPI(title="BMO Audio Service", version="0.1.0", lifespan=lifespan)
     app.state.settings = resolved_settings
@@ -78,13 +82,22 @@ def create_app(
             "ok" if stt_loaded else "error",
         )
         tts_state = app.state.synthesizer.health_state()
-        tts_ready = tts_state.kokoro_loaded and tts_state.ffmpeg_available
+        tts_ready = (
+            tts_state.piper_loaded
+            and tts_state.kokoro_loaded
+            and tts_state.ffmpeg_available
+        )
         tts_status = getattr(
             app.state.synthesizer,
             "health_status",
             "ok" if tts_ready else "error",
         )
-        if stt_loaded and tts_state.kokoro_loaded and tts_state.ffmpeg_available:
+        if (
+            stt_loaded
+            and tts_state.piper_loaded
+            and tts_state.kokoro_loaded
+            and tts_state.ffmpeg_available
+        ):
             status_value = "ok" if tts_state.rvc_available else "degraded"
         elif stt_status == "loading" or tts_status == "loading":
             status_value = "loading"

@@ -47,6 +47,12 @@ services:
       TRANSFORMERS_OFFLINE: "1"
       HF_HUB_DISABLE_TELEMETRY: "1"
       RVC_ENABLED: "false"
+      TTS_PRIMARY_ENGINE: "piper"
+      PIPER_MODEL: en_GB-semaine-medium
+      PIPER_SPEAKER: prudence
+      PIPER_SPEAKER_ID: "0"
+      PIPER_MANIFEST_PATH: /opt/bmo/models/piper/PIPER_ASSET_MANIFEST.json
+      TTS_FALLBACK_ENGINE: kokoro
       RUNTIME_MODELS_ROOT: /opt/bmo/models/runtime
       MODEL_MANIFEST_PATH: /opt/bmo/models/runtime/MODEL_MANIFEST.json
       HF_HOME: /opt/bmo/cache/audio/huggingface
@@ -66,6 +72,12 @@ services:
         bind:
           create_host_path: false
       - type: bind
+        source: /opt/bmo/models/piper
+        target: /opt/bmo/models/piper
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
         source: /opt/bmo/cache/audio
         target: /opt/bmo/cache/audio
         bind:
@@ -78,6 +90,10 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=256m
+    mem_limit: 5g
+    memswap_limit: 5g
+    cpus: "4.0"
+    pids_limit: 128
     cap_drop:
       - ALL
     security_opt:

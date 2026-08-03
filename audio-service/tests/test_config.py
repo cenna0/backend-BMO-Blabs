@@ -54,6 +54,39 @@ def test_settings_use_p3_tts_defaults():
     assert settings.rvc_model_path is None
 
 
+def test_settings_use_fixed_piper_primary_and_kokoro_fallback_defaults():
+    settings = Settings(internal_service_token="test-internal-token")
+
+    assert settings.tts_primary_engine == "piper"
+    assert settings.piper_model == "en_GB-semaine-medium"
+    assert settings.piper_speaker == "prudence"
+    assert settings.piper_speaker_id == 0
+    assert settings.piper_engine_revision == "f04d52c5528ac7cf2d73757f57990ff490f75005"
+    assert settings.piper_voice_revision == "9f967d15e9ccdf43078586d1476ee70f314401bd"
+    assert settings.piper_manifest_path == Path("/opt/bmo/models/piper/PIPER_ASSET_MANIFEST.json")
+    assert settings.tts_fallback_engine == "kokoro"
+    assert settings.kokoro_voice == "af_heart"
+    assert settings.kokoro_speed == 0.80
+    assert settings.model_download_allowed is False
+    assert settings.rvc_enabled is False
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("tts_primary_engine", "kokoro"),
+        ("piper_model", "en_US-lessac-medium"),
+        ("piper_speaker", "spike"),
+        ("piper_speaker_id", 1),
+        ("tts_fallback_engine", "piper"),
+        ("piper_manifest_path", "/tmp/arbitrary-model.json"),
+    ],
+)
+def test_fixed_voice_settings_reject_unapproved_overrides(field, value):
+    with pytest.raises(ValidationError):
+        Settings(internal_service_token="test-internal-token", **{field: value})
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

@@ -60,6 +60,8 @@ networkx==3.4.2
 num2words==0.5.14
 numpy==2.2.6
 onnxruntime==1.23.2
+piper-tts==1.6.0
+pathvalidate==3.3.1
 packaging==26.2
 phonemizer-fork==3.3.2
 preshed==3.0.13
