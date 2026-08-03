@@ -1,18 +1,20 @@
 # BMO — Next Execution Action
 
-**Last updated:** 2026-07-31
+**Last updated:** 2026-08-03
 **Audience:** Codex / infrastructure-backend coding agent
-**Current next phase:** **P8 — Real RVC Verification and Voice Resource Benchmark**
-**Phase state:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Current next phase:** **P9 — PostgreSQL and persistent user/device data**
+**Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9 NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 
-> P7 is `VERIFIED — PRODUCTION`. P7 completion does **not** authorize P8.
-> A future P8 run requires a new explicit instruction such as **“execute P8”**
+> P8 is `P8_PIPER_PRODUCTION_VERIFIED`. P8 completion does **not** authorize
+> P9. A future P9 run requires a new explicit instruction such as **“execute P9”**
 > or equivalent.
 
 ## 1. Current checkpoint
 
 P6 VPS Foundation and Operations Baseline remains `VERIFIED`. P7 backend,
 Audio Service, and Hermes production integration is `VERIFIED — PRODUCTION`.
+P7 is `VERIFIED — PRODUCTION`. P8 is `P8_PIPER_PRODUCTION_VERIFIED`.
+P8 completion does **not** authorize P9. Do not execute P10 from this gate.
 Sanitized proof is in
 [`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
 
@@ -40,9 +42,10 @@ Verified P7 outcomes include:
 - [`hardware-handoff/DEPLOYMENT-CONFIG.md`](hardware-handoff/DEPLOYMENT-CONFIG.md)
   is the verified live endpoint handoff.
 
-Production intentionally remains Kokoro-only with `RVC_ENABLED=false`. Real
-RVC inference is not verified. Physical ESP32 acceptance is not run, and
-PostgreSQL/Prisma is not implemented or deployed.
+Production uses fixed Piper Prudence as primary, Kokoro `af_heart` at `0.80` as
+fallback, and `RVC_ENABLED=false`. Real RVC inference is not verified and was
+not deployed. Physical ESP32 acceptance is not run, and PostgreSQL/Prisma is
+not implemented or deployed.
 
 ## 2. Locked execution order
 
@@ -51,7 +54,7 @@ P6 VPS foundation                         VERIFIED
   ↓
 P7 backend/audio production deployment   VERIFIED — PRODUCTION
   ↓ explicit new authorization required
-P8 real RVC verification + benchmark     NOT_STARTED
+P8 fixed Piper primary + Kokoro fallback VERIFIED — PRODUCTION
   ↓ completed/verified status + explicit authorization
 P9 PostgreSQL + Prisma readiness         NOT_STARTED / dependency-gated
   ↓ VERIFIED + explicit authorization
@@ -59,30 +62,30 @@ P10 physical ESP32 acceptance            NOT_STARTED / dependency-gated
 ```
 
 Do not collapse phases or infer execution authority from technical readiness.
-P7 completion does not permit P8 to start, and P8 completion must not
-automatically start P9.
+P8 completion does not automatically start P9.
 
-## 3. Read before a future P8 execution
+## 3. Read before a future P9 execution
 
 Read in this order:
 
 1. `NEXT-ACTION.md` — this operational gate.
-2. `roadmap/P8-EXECUTION-SPEC.md` — future P8 execution contract.
-3. `backend-mvp/IMPLEMENTATION-STATUS.md` — current status authority.
-4. `backend-mvp/P7-TEST-EVIDENCE.md` — immutable P7 baseline and headroom.
-5. `backend-mvp/04-AUDIO-SERVICE.md` — current adapter/model rules.
-6. `backend-mvp/CURRENT-RUNTIME-CONFIG.md` — verified P7 runtime values.
-7. `backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` — verified production
+2. `backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md` — closed P8 evidence.
+3. `roadmap/P8-EXECUTION-SPEC.md` — P8 closure and boundaries.
+4. `backend-mvp/IMPLEMENTATION-STATUS.md` — current status authority.
+5. `backend-mvp/P7-TEST-EVIDENCE.md` — immutable P7 baseline and headroom.
+6. `backend-mvp/04-AUDIO-SERVICE.md` — current adapter/model rules.
+7. `backend-mvp/CURRENT-RUNTIME-CONFIG.md` — verified P8 runtime values.
+8. `backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` — verified production
    topology and operational controls.
-8. `hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — read-only
+9. `hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — read-only
    public protocol contract.
-9. `operations/MAINTENANCE-AND-RECOVERY.md` — live recovery procedures.
+10. `operations/MAINTENANCE-AND-RECOVERY.md` — live recovery procedures.
 
 Historical P1–P7 plans/evidence remain evidence, not execution authority.
 
-## 4. P8 boundary
+## 4. P8 closed boundary
 
-P8 may:
+P8 delivered:
 
 - audit, select, and pin a compatible RVC inference runtime;
 - validate the existing BMO RVC model asset;
@@ -94,10 +97,11 @@ P8 may:
 - compare Kokoro-only output with RVC output;
 - perform listening/quality evidence;
 - determine whether production has enough resource headroom;
-- update P8 evidence and RVC-specific deployment/runtime documentation when
-  verified.
+- fixed Piper Prudence primary TTS with Kokoro fallback;
+- offline pinned asset provisioning and integrated persistent worker controls;
+- production canary, acceptance, public regression, and soak evidence.
 
-P8 must not:
+P8 did not:
 
 - change the locked public hardware contract;
 - invent endpoints, events, fields, or protocol behavior;
@@ -107,15 +111,14 @@ P8 must not:
 - expose backend, Hermes, or device secrets to RVC;
 - turn RVC on in production before its validation and deployment gates pass;
 - silently use mutable or unverified RVC dependencies/assets;
-- auto-start P9 after finishing.
+- merge or deploy RVC; `RVC_ENABLED=false` remains.
 
-## 5. Authorization and first action
+## 5. P9 authorization and first action
 
-This documentation does not authorize P8. After a new explicit user command
-such as **“execute P8”**, begin with a fresh read-only source/runtime audit and
-create an isolated branch/worktree. Resolve the compatible inference engine and
-its immutable dependency set from evidence during P8; do not assume an engine
-or version merely because this gate exists.
+This documentation does not authorize P9. After a new explicit user command
+such as **“execute P9”**, begin with a fresh read-only source/runtime audit and
+create an isolated branch/worktree. Do not start database work from this
+closure.
 
 Document and stop on any conflict with the locked hardware contract, P7
 production provenance, secret isolation, offline model policy, or Kokoro

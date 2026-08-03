@@ -2,11 +2,27 @@
 
 **Versi:** 1.2.0
 **Status:** VERIFIED — PRODUCTION
-**Last audited:** 2026-07-31
+**Last audited:** 2026-08-03
 
-> This file records the verified P7 production baseline and ongoing operational
-> rules. P8 RVC, P9 PostgreSQL/Prisma, and P10 physical ESP32 work remain
-> separate, unverified phases.
+> This file records the verified P8 production runtime and ongoing operational
+> rules. Piper Prudence is fixed primary TTS; Kokoro `af_heart` at `0.80` is
+> automatic fallback; RVC remains disabled. P9 PostgreSQL/Prisma and P10
+> physical ESP32 work remain separate phases.
+
+## 0.1 Current P8 TTS deployment
+
+```text
+Primary        Piper en_GB-semaine-medium / prudence / speaker ID 0
+Fallback       Kokoro af_heart / speed 0.80
+RVC            RVC_ENABLED=false
+Architecture   integrated persistent Piper worker inside Audio Service
+Piper assets    /opt/bmo/models/piper (read-only, outside Git)
+Voice selector not implemented
+Database       not implemented; P9 is next
+```
+
+The complete source/image/canary/rollback record is
+[`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md).
 
 ## 0. Current verified P7 deployment
 
@@ -277,6 +293,12 @@ KOKORO_MODEL_REPO=hexgrad/Kokoro-82M
 KOKORO_MODEL_REVISION=f3ff3571791e39611d31c381e3a41a3af07b4987
 KOKORO_SAMPLE_RATE=24000
 
+TTS_PRIMARY_ENGINE=piper
+PIPER_MODEL=en_GB-semaine-medium
+PIPER_SPEAKER=prudence
+PIPER_SPEAKER_ID=0
+PIPER_ASSET_MANIFEST_PATH=/opt/bmo/models/piper/PIPER_ASSET_MANIFEST.json
+
 RVC_ENABLED=false
 RVC_F0_UP_KEY=0
 RVC_F0_METHOD=rmvpe
@@ -285,10 +307,9 @@ OUTPUT_MP3_SAMPLE_RATE=24000
 OUTPUT_MP3_BITRATE=96k
 ```
 
-RVC artifacts are not provisioned in current production. P8 must safely
-bootstrap/inspect the verified archive and resolve actual `.pth`/`.index` paths
-before any future `RVC_MODEL_PATH` or `RVC_INDEX_PATH` is enabled. Do not guess
-filenames or use runtime downloads.
+RVC artifacts are not provisioned in current production. The P8 RVC branch is
+archived and was not merged because its canary required a larger host. Do not
+guess filenames, enable RVC, or use runtime downloads.
 
 ### `postgres.env` — P9 only
 

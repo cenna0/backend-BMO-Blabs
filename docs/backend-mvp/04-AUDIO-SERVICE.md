@@ -3,13 +3,12 @@
 **Versi:** 1.0.1  
 **Status:** CANONICAL AUDIO IMPLEMENTATION REFERENCE
 
-> **2026-07-31 audit note:** konfigurasi STT/Kokoro dan model/cache layout di
-> bawah adalah verified P7 production baseline. Real RVC inference masih belum
-> verified dan tetap scope P8; production memakai `RVC_ENABLED=false` dengan
-> fallback Kokoro-only. Production Compose/runtime environment overrides use the
-> verified paths below; unchanged non-production source fallback defaults may
-> still use earlier paths and are not production authority. Historical deployment
-> documents remain archive/evidence only.
+> **2026-08-03 production note:** P8 deployed the fixed Piper Prudence voice as
+> primary TTS after explicit operator listening approval and a controlled
+> production canary. Kokoro `af_heart` at speed `0.80` remains the automatic
+> fallback. Real RVC inference remains unverified and RVC stays disabled.
+> Production-only values are authoritative; historical RVC sections below are
+> archived design constraints, not an enabled runtime.
 
 > **Status:** Canonical backend MVP documentation package  
 > **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
@@ -18,11 +17,38 @@
 
 ## Cara menggunakan file ini
 
-File ini khusus Python/FastAPI Audio Service, model bootstrap/cache, faster-whisper, Kokoro, RVC, FFmpeg, dan internal API. Audio Service adalah bagian backend MVP tetapi merupakan runtime terpisah dari Express backend.
+File ini khusus Python/FastAPI Audio Service, model bootstrap/cache,
+faster-whisper, fixed Piper primary, Kokoro fallback, RVC archive boundary,
+FFmpeg, dan internal API. Audio Service adalah bagian backend MVP tetapi
+merupakan runtime terpisah dari Express backend.
 
-RVC adalah future P8 enhancement dengan fallback Kokoro-only. STT, Kokoro, dan
-FFmpeg adalah dependency wajib yang sudah verified di production. Baseline
-performa/format boleh berubah hanya setelah benchmark dan harus dicatat.
+RVC is not a production dependency. STT, Piper, Kokoro, and FFmpeg are the
+verified production audio path. Baseline performance/format may change only
+after benchmark and must be recorded in P8 rollout evidence.
+
+### 9.2 Fixed production TTS routing
+
+```text
+Hermes text
+  → persistent Piper worker
+  → en_GB-semaine-medium / prudence / speaker 0
+  → WAV validation
+  → FFmpeg
+  → mono 24 kHz target 96 kbps MP3
+  → existing audio lifecycle and audio_ready
+```
+
+If Piper fails in a bounded way (worker crash/unavailable, timeout, malformed,
+zero-byte, non-finite, unreasonable-duration, or output-path-invalid output),
+the same request automatically uses Kokoro `af_heart` at speed `0.80`. If
+Kokoro succeeds, the request remains a normal success and no hardware-visible
+payload changes. If both engines fail, existing TTS failure semantics remain.
+
+The worker is integrated and persistent, so warm requests do not reload the
+model. It is private, non-root, offline-only, and constrained by the
+production Compose resource/security controls. No public schema or firmware
+event exposes engine internals, model paths, speaker IDs, stack traces, or
+host paths.
 
 ## 9. Teknologi Audio Service
 

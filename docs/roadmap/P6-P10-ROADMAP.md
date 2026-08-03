@@ -1,7 +1,7 @@
 # BMO — P6–P10 Infrastructure and Hardware Readiness Roadmap
 
 **Status:** LOCKED ROADMAP / PHASE-BY-PHASE EXECUTION  
-**Current next phase:** P8 — `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Current next phase:** P9 — `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 **Reason for split:** the original P6 scope became too broad after adding full VPS foundation, public TLS, monitoring, real RVC, database readiness, backup/recovery, and hardware handoff.
 
 The split below follows dependencies, not equal workload. The current coding
@@ -138,18 +138,18 @@ P6 — satisfied.
 
 ---
 
-## P8 — Real RVC Verification and Voice Resource Benchmark
+## P8 — Fixed Piper Production TTS and RVC Boundary
 
-**Phase status:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
-**Dependency:** P7 `VERIFIED — PRODUCTION` — satisfied. Execution still
-requires a new explicit user authorization; P7 completion does not authorize
-P8.
+**Phase status:** `VERIFIED — PRODUCTION`
+**Classification:** `P8_PIPER_PRODUCTION_VERIFIED`
 
-Detailed future execution contract:
+Closure and execution record:
 [`P8-EXECUTION-SPEC.md`](P8-EXECUTION-SPEC.md).
 
-### Goal
-Turn RVC from implemented fallback-capable integration into a real verified BMO voice conversion path on the VPS.
+### Goal and verified result
+Deploy one fixed Piper Prudence primary voice with Kokoro fallback while
+preserving the public contract. RVC was intentionally not deployed because
+the archived experimental branch remains host-capacity blocked.
 
 ### Inputs
 - P7 deployed Audio Service;
@@ -158,31 +158,30 @@ Turn RVC from implemented fallback-capable integration into a real verified BMO 
   path was not provisioned or resolved by P7.
 
 ### Scope
-- install/pin compatible RVC inference runtime;
-- verify `.pth` and optional `.index` paths;
-- verify required HuBERT/RMVPE assets when needed;
-- run real Kokoro → RVC → FFmpeg;
-- compare Kokoro-only and RVC output;
-- use `KOKORO_VOICE=af_heart` and `KOKORO_SPEED=0.80` as the current pre-RVC target, then revalidate perceived tempo after RVC;
-- forced RVC failure fallback test;
-- benchmark peak CPU/RAM, RVC latency, total pipeline;
-- assess 4-core/8-GB VPS headroom using Beszel evidence.
+- fixed Piper `en_GB-semaine-medium`, `prudence`, speaker `0`;
+- automatic Kokoro `af_heart` / `0.80` fallback;
+- offline pinned assets, integrated persistent worker, resource controls;
+- production replacement canary, public regression, failure/shutdown tests,
+  and bounded soak;
+- preserve `RVC_ENABLED=false` and the RVC archived evidence.
 
 ### Output
-- RVC verified or documented blocker;
-- model manifest/path/config;
-- audio samples/metadata and benchmark report;
-- resource recommendation.
+- fixed Piper production runtime and manifest/path/config;
+- fallback/recovery and resource evidence;
+- production rollout and rollback evidence;
+- RVC documented as unverified/archived, with no public contract change.
 
 ### Acceptance criteria
-- real RVC inference succeeds, **or** phase is honestly `BLOCKED/PARTIALLY VERIFIED` with fallback still proven;
-- fallback Kokoro-only remains functional;
-- no secret is exposed to the RVC runtime unnecessarily;
+- Piper Prudence is the fixed primary and operator-approved;
+- Kokoro fallback succeeds after bounded Piper failures;
 - model files are not re-downloaded on routine restart;
-- output remains compatible with the hardware MP3 contract.
+- output remains compatible with the hardware MP3 contract;
+- public API, WebSocket, hardware events, IDs, lifecycle, and errors remain
+  unchanged;
+- RVC remains disabled.
 
 ### Dependency
-P7 — satisfied. Explicit P8 execution authorization remains unsatisfied.
+P7 — satisfied. Prompt 5 authorization and all closure gates — satisfied.
 
 ---
 

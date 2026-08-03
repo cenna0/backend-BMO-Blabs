@@ -126,17 +126,15 @@ if archive.is_file():
 
 status = (bm / "IMPLEMENTATION-STATUS.md").read_text(encoding="utf-8")
 control_state = [
-    "Documentation package: CURRENT / P7 PRODUCTION CLOSED",
-    (
-        "Current next implementation phase: P8 — Real RVC Verification and "
-        "Voice Resource Benchmark"
-    ),
+    "Documentation package: CURRENT / P8 PRODUCTION CLOSED",
+    "Current next implementation phase: P9 — PostgreSQL and persistent user/device data",
     "P6 state: VERIFIED",
     "P6 execution authorization: COMPLETED",
     "P7 state: VERIFIED — PRODUCTION",
     "P7 execution: COMPLETED",
-    "P8 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
-    "P9–P10: PLANNED / dependency-gated",
+    "P8 state: P8_PIPER_PRODUCTION_VERIFIED",
+    "P9 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
+    "P10 state: NOT_STARTED / dependency-gated after P9",
 ]
 for value in control_state:
     if value not in status:
@@ -163,11 +161,8 @@ expected_phase_rows = {
     "P5": ("VERIFIED — BACKEND", "AUTHORIZED BY USER"),
     "P6": ("VERIFIED", "COMPLETED"),
     "P7": ("VERIFIED — PRODUCTION", "COMPLETED"),
-    "P8": ("NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"),
-    "P9": (
-        "NOT_STARTED",
-        "DEPENDS ON P8 COMPLETED/VERIFIED STATUS; EXECUTE AFTER P8",
-    ),
+    "P8": ("VERIFIED — PRODUCTION", "COMPLETED"),
+    "P9": ("NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"),
     "P10": (
         "NOT_STARTED",
         "DEPENDS ON P9 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS",
@@ -191,8 +186,8 @@ if len(p7_rows) != 1 or "P7-TEST-EVIDENCE.md" not in p7_rows[0]:
     errors.append("P7 must remain VERIFIED — PRODUCTION with P7 evidence")
 
 p8_rows = [line for line in status.splitlines() if line.startswith("| P8 |")]
-if len(p8_rows) != 1 or "P8-EXECUTION-SPEC.md" not in p8_rows[0]:
-    errors.append("P8 must remain NOT_STARTED and point to its execution spec")
+if len(p8_rows) != 1 or "P8-EXECUTION-SPEC.md" not in p8_rows[0] or "P8-PRODUCTION-ROLLOUT-EVIDENCE.md" not in p8_rows[0]:
+    errors.append("P8 must remain VERIFIED — PRODUCTION with closure evidence")
 
 # Stable filenames: status belongs in tracker, not filename suffixes.
 for path in bm.glob("*.md"):
@@ -292,12 +287,13 @@ current_doc_requirements = {
         next_action,
         [
             "Current next phase:",
-            "P8 — Real RVC Verification and Voice Resource Benchmark",
-            "Phase state:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
+            "P9 — PostgreSQL and persistent user/device data",
+            "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9 NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
             "P7 is `VERIFIED — PRODUCTION`",
-            "P7 completion does **not** authorize P8",
-            "execute P8",
-            "Do not execute P9",
+            "P8 is `P8_PIPER_PRODUCTION_VERIFIED`",
+            "P8 completion does **not** authorize P9",
+            "execute P9",
+            "Do not execute P10",
         ],
     ),
     "docs/roadmap/P6-EXECUTION-SPEC.md": (
@@ -311,7 +307,7 @@ current_doc_requirements = {
     "docs/roadmap/P8-EXECUTION-SPEC.md": (
         p8_spec,
         [
-            "Status:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
+            "Status:** `P8_PIPER_PRODUCTION_VERIFIED`",
             "Dependency:** P7 `VERIFIED — PRODUCTION`",
             "../backend-mvp/P7-TEST-EVIDENCE.md",
             "audio-service/app/rvc.py",
@@ -332,8 +328,8 @@ current_doc_requirements = {
             "P6 → P7 → P8 → P9 → P10",
             "P7 — Deploy Backend + Audio Service + Hermes Integration",
             "Phase status:** `VERIFIED — PRODUCTION`",
-            "P8 — Real RVC Verification and Voice Resource Benchmark",
-            "Phase status:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
+            "P8 — Fixed Piper Production TTS and RVC Boundary",
+            "Phase status:** `VERIFIED — PRODUCTION`",
             "P9 — PostgreSQL + Prisma Ready-to-Use Data Layer",
             "P10 — Hardware Handoff Activation and Physical Integration",
         ],
@@ -410,25 +406,25 @@ unique_state_declarations = [
         "docs/NEXT-ACTION.md phase state",
         next_action,
         r"^\*\*Phase state:\*\*\s*`([^`]+)`\s*$",
-        "NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
+        "P8_PIPER_PRODUCTION_VERIFIED; P9 NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
     ),
     (
         "docs/roadmap/P8-EXECUTION-SPEC.md status",
         p8_spec,
         r"^\*\*Status:\*\*\s*`([^`]+)`\s*$",
-        "NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
+        "P8_PIPER_PRODUCTION_VERIFIED",
     ),
     (
         "docs/roadmap/P6-P10-ROADMAP.md current next phase",
         roadmap,
         r"^\*\*Current next phase:\*\*\s*(.+?)\s*$",
-        "P8 — `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
+        "P9 — `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
     ),
     (
         "docs/backend-mvp/IMPLEMENTATION-STATUS.md P8 control state",
         implementation_status,
         r"^P8 state:\s*(.+?)\s*$",
-        "NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
+        "P8_PIPER_PRODUCTION_VERIFIED",
     ),
 ]
 for label, text, pattern, expected_value in unique_state_declarations:
@@ -450,8 +446,8 @@ for line in deployment_config.splitlines():
 
 expected_deployment_values = {
     "DEPLOYMENT_STATUS": "VERIFIED",
-    "VERIFIED_AT": "2026-07-31T03:22:12Z",
-    "DEPLOYED_COMMIT": "4d7b472adc4c2243d8f7364032a491ad70efb6d3",
+    "VERIFIED_AT": "2026-08-03T06:33:47+02:00",
+    "DEPLOYED_COMMIT": "ff55eb4ea1c8d58e96b647d0c03f471dd4c58994",
     "HTTPS_BASE_URL": "https://api.personalbmo.web.id",
     "WEBSOCKET_URL": "wss://api.personalbmo.web.id/ws",
     "HEALTH_URL": "https://api.personalbmo.web.id/health",
@@ -459,7 +455,7 @@ expected_deployment_values = {
     "AUDIO_URL_PATTERN": "https://api.personalbmo.web.id/audio/<audio-uuid>.mp3",
     "DEVICE_ID": "bmo-001",
     "DEVICE_TOKEN": "PROVIDED_OUT_OF_BAND",
-    "PUBLIC_E2E_STATUS": "PASS",
+    "PUBLIC_E2E_STATUS": "PASS — P8 NATIVE EQUIVALENT 12/12",
     "PHYSICAL_ESP32_STATUS": "NOT_RUN",
 }
 for key, expected_value in expected_deployment_values.items():

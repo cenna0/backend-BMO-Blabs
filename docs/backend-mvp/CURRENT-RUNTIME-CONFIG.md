@@ -1,7 +1,7 @@
 # BMO Voice MVP — Current Runtime Configuration
 
-**Updated:** 2026-08-02
-**Status:** VERIFIED P7 PRODUCTION BASELINE
+**Updated:** 2026-08-03
+**Status:** VERIFIED P8 PRODUCTION — FIXED PIPER PRIMARY
 **Scope:** STT/TTS runtime values only; the public hardware contract is unchanged.
 
 These are the actual values verified in P7 production, not future deployment
@@ -41,7 +41,31 @@ The P5 real regression matrix passed English, Indonesian, mixed, silence, and
 noise. P7 then verified the pinned model in production, offline, including real
 inference and the final 61-minute resource soak.
 
-## Kokoro TTS
+## Primary Piper TTS
+
+```env
+TTS_PRIMARY_ENGINE=piper
+PIPER_MODEL=en_GB-semaine-medium
+PIPER_SPEAKER=prudence
+PIPER_SPEAKER_ID=0
+PIPER_ENGINE_VERSION=1.6.0
+PIPER_ENGINE_REVISION=f04d52c5528ac7cf2d73757f57990ff490f75005
+PIPER_VOICE_REVISION=9f967d15e9ccdf43078586d1476ee70f314401bd
+PIPER_ASSET_MANIFEST_PATH=/opt/bmo/models/piper/PIPER_ASSET_MANIFEST.json
+```
+
+Piper is the single fixed production voice approved by explicit operator
+listening approval for personal, noncommercial use. The integrated worker
+loads the pinned model once and keeps it warm for serialized requests. No
+voice selector, speaker catalog, model registry, arbitrary model path, or
+request-level voice choice exists.
+
+The exact ONNX, config, model-card, dataset-license, and manifest hashes are
+recorded in [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md)
+and `audio-service/PIPER_ASSET_MANIFEST.json`. Assets are provisioned outside
+Git and mounted read-only; runtime model downloads are disabled.
+
+## Kokoro fallback TTS
 
 ```env
 KOKORO_LANG_CODE=a
@@ -78,10 +102,9 @@ is:
 d2761b191eed48e85128e774aa7057153d8e8994e2e4f40c07ffb05731ae7e9f
 ```
 
-Real RVC inference remains unverified and belongs to P8. P8 may change
-RVC-specific runtime configuration only after the engine, dependencies, model
-paths, inference, fallback, quality, resource, and rollout gates pass. It must
-not silently change the verified Whisper/Kokoro baseline or hardware contract.
+Real RVC inference remains unverified and is archived experimental work. It was
+not deployed in P8. Production keeps `RVC_ENABLED=false`; Piper failure routes
+automatically to Kokoro `af_heart` at speed `0.80`.
 
 P7 production/resource verification passed with `13/13` soak samples, zero new
 OOM events, zero backend/audio restarts, minimum `MemAvailable` 3.209 GiB, and
@@ -103,19 +126,20 @@ None. These runtime values do **not** change:
 
 Hardware Contract v1.0.5 remains unchanged.
 
-## P8 feasibility candidates (not production)
+## P8 production result and archived experiments
 
 The RVC canary was closed on its unmerged feature branch as
 `P8_CANARY_NEEDS_LARGER_HOST`. It remains disabled in production.
 
-An isolated, unmerged Piper feasibility branch pinned
-`OHF-Voice/piper1-gpl` v1.6.0 at
-`f04d52c5528ac7cf2d73757f57990ff490f75005` and voice
-`en_GB-semaine-medium` at
-`9f967d15e9ccdf43078586d1476ee70f314401bd`, selecting `prudence` / speaker
-ID `0`. Its technical gates passed, but operator listening approval and a
-separate controlled deployment/canary are still required.
+The Piper feasibility branch was followed by the controlled production
+integration branch `feat/p8-piper-production`. Its operator approval,
+replacement canary, fallback/recovery tests, public regression, and soak are
+recorded in [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md).
 
-These feasibility results do not change the current runtime values above:
-production remains the approved P7 Kokoro configuration, no Piper process or
-container is retained, and `RVC_ENABLED=false`.
+The RVC experiment remains archived at
+`feat/p8-rvc-foundation` / `8420d4192a16025f439c040cd7a32a50b41fe52b` with
+classification `P8_CANARY_NEEDS_LARGER_HOST`. It was not merged or deployed.
+
+Database persistence is not implemented. P9 PostgreSQL and persistent
+user/device data remains the next major phase; mobile voice settings are not
+implemented.

@@ -1,34 +1,36 @@
 # BMO Backend MVP — Implementation Status
 
-**Last updated:** 2026-07-31
+**Last updated:** 2026-08-03
 **Backend reference lineage:** 1.0.1; current active documentation is date-audited and governed by this status file
 
 ## 1. Control state
 
 ```text
-Documentation package: CURRENT / P7 PRODUCTION CLOSED
+Documentation package: CURRENT / P8 PRODUCTION CLOSED
 P1–P5 backend history: implemented/verified according to phase evidence below
-Current next implementation phase: P8 — Real RVC Verification and Voice Resource Benchmark
+Current next implementation phase: P9 — PostgreSQL and persistent user/device data
 P6 state: VERIFIED
 P6 execution authorization: COMPLETED
 P7 state: VERIFIED — PRODUCTION
 P7 execution: COMPLETED
-P8 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
-P9–P10: PLANNED / dependency-gated
+P8 state: P8_PIPER_PRODUCTION_VERIFIED
+P9 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
+P10 state: NOT_STARTED / dependency-gated after P9
 ```
 
-P6 is verified and P7 is `VERIFIED — PRODUCTION`. P8 is the next dependency
-phase but is not started or authorized. Read `../NEXT-ACTION.md`,
-`../roadmap/P8-EXECUTION-SPEC.md`, and `P7-TEST-EVIDENCE.md` before a future P8
-execution. Do not infer P8 authorization from P7 completion.
+P6, P7, and P8 are verified. P8 deployed fixed Piper Prudence as primary TTS
+with Kokoro fallback and left RVC disabled. Read
+`P8-PRODUCTION-ROLLOUT-EVIDENCE.md` for the closure record. P9 is the next
+dependency phase but is not started or authorized; do not infer P9
+authorization from P8 completion.
 
 ## 2. Documentation status
 
 | Document | Status | Verification |
 |---|---|---|
-| `../NEXT-ACTION.md` | CURRENT P8 OPERATIONAL GATE | Selects P8 while requiring new explicit authorization and preventing accidental P9+ execution |
+| `../NEXT-ACTION.md` | CURRENT P9 OPERATIONAL GATE | Selects P9 while requiring new explicit authorization and preventing accidental P10 execution |
 | `../roadmap/P6-EXECUTION-SPEC.md` | HISTORICAL / LOCKED VERIFIED P6 RECORD | Exact completed P6 scope, acceptance checklist, evidence, and stop condition |
-| `../roadmap/P8-EXECUTION-SPEC.md` | NOT_STARTED / EXECUTION CONTRACT | Future P8 scope, safety gates, evidence requirements, and authorization stop |
+| `../roadmap/P8-EXECUTION-SPEC.md` | VERIFIED P8 CLOSURE | Piper production closure, archived RVC boundary, evidence, and P9 stop |
 | `00-AGENT-EXECUTION-GUIDE.md` | VERIFIED | Workflow, boundary, phase control, stop condition tersedia |
 | `01-SCOPE-AND-DECISIONS.md` | VERIFIED / LOCKED | Backend source §1–§3 termigrasi |
 | `02-API-AND-WEBSOCKET-CONTRACT.md` | VERIFIED / LOCKED | Backend source §15–§17, §22 dan hardware contract dicocokkan |
@@ -41,6 +43,7 @@ execution. Do not infer P8 authorization from P7 completion.
 | `CHANGELOG.md` | VERIFIED | Baseline package tercatat |
 | `P6-TEST-EVIDENCE.md` | VERIFIED | Sanitized VPS evidence, strict dual Telegram receipt proof, recovery commands, residual risks, and no-P7 proof |
 | `P7-TEST-EVIDENCE.md` | VERIFIED — PRODUCTION | Immutable deployment/images, public 23/23 acceptance, final soak, rollback retention, and repository synchronization |
+| `P8-PRODUCTION-ROLLOUT-EVIDENCE.md` | VERIFIED — PRODUCTION | Fixed Piper primary, Kokoro fallback, canary, regression, soak, rollback, and closure |
 
 ## 3. Implementation phases
 
@@ -53,8 +56,8 @@ execution. Do not infer P8 authorization from P7 completion.
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P5-TEST-EVIDENCE.md`](P5-TEST-EVIDENCE.md) |
 | P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
 | P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | VERIFIED — PRODUCTION | COMPLETED | [`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md) |
-| P8 | Real RVC inference + fallback verification + VPS resource benchmark | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | NOT_STARTED | AWAITING EXPLICIT USER AUTHORIZATION | — |
-| P9 | PostgreSQL + Prisma ready-to-use application data layer + backup/restore | PRD + 06 + roadmap | NOT_STARTED | DEPENDS ON P8 COMPLETED/VERIFIED STATUS; EXECUTE AFTER P8 | — |
+| P8 | Fixed Piper Prudence primary + Kokoro fallback + production acceptance; RVC remains disabled | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | VERIFIED — PRODUCTION | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
+| P9 | PostgreSQL + Prisma ready-to-use application data layer + backup/restore | PRD + 06 + roadmap | NOT_STARTED | AWAITING EXPLICIT USER AUTHORIZATION | — |
 | P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
 
 ## 3.1 Post-P5/P6/P7 implementation updates captured by this audit

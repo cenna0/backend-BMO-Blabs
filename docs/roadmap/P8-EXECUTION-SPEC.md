@@ -1,10 +1,16 @@
-# BMO — P8 Real RVC Verification and Voice Resource Benchmark Execution Spec
+# BMO — P8 Execution Spec and Piper Production Closure
 
-**Status:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Status:** `P8_PIPER_PRODUCTION_VERIFIED`
 **Dependency:** P7 `VERIFIED — PRODUCTION`
 **Evidence baseline:**
 [`../backend-mvp/P7-TEST-EVIDENCE.md`](../backend-mvp/P7-TEST-EVIDENCE.md)
-**Contract type:** FUTURE EXECUTION CONTRACT — not authorization to execute P8
+**Contract type:** COMPLETED EXECUTION RECORD — Prompt 5 production closure
+
+> P8 Prompt 5 completed the authorized fixed Piper Prudence production
+> rollout. The historical RVC verification requirements in this document were
+> not enabled or merged; RVC remains disabled and its experimental branch is
+> archived. See [`../backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](../backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md)
+> for authoritative deployment evidence. P9 remains next and is not started.
 
 ## A. Goal
 
@@ -203,7 +209,21 @@ Prompt 4 was explicitly authorized and is recorded in
   shutdown, resource, and MP3-contract gates while P7 remained online.
 - Technical classification is
   `P8_PIPER_FEASIBILITY_VERIFIED_AWAITING_LISTENING_APPROVAL`.
-- Piper is not production-active. P7 remains Kokoro-only with
-  `RVC_ENABLED=false`.
-- Prompt 5 may consider a controlled Piper deployment only after explicit
-  operator listening approval. P8 itself is not marked `VERIFIED` here.
+- Prompt 5 received explicit operator listening approval and completed the
+  controlled Piper deployment. Piper Prudence is now the fixed primary,
+  Kokoro `af_heart` at `0.80` is fallback, and `RVC_ENABLED=false` remains.
+
+## I. Prompt 5 production closure (2026-08-03)
+
+- `feat/p8-piper-production` was based exactly on the feasibility commit and
+  used an integrated persistent Piper worker.
+- Pinned model assets were provisioned outside Git with manifest and artifact
+  hash verification and read-only runtime mounting.
+- Isolated smoke, fallback/recovery, process/shutdown, public contract,
+  sequential/queueing, production acceptance, and soak gates passed.
+- The final main-built image, post-redeployment smoke, final 15-minute soak,
+  and source synchronization are recorded in the rollout evidence and final
+  closure update.
+- The RVC branch was not merged. No public schema, hardware event, database,
+  mobile setting, voice selector, multi-model support, P9, or P10 behavior was
+  added.

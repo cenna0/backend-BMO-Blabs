@@ -1,6 +1,6 @@
 # BMO Hardware Handoff — Current Backend Status
 
-**Audited:** 2026-08-02
+**Audited:** 2026-08-03
 **Deployment state:** `VERIFIED — PRODUCTION`
 **Physical hardware state:** `NOT_RUN` — P10
 
@@ -26,15 +26,14 @@ device, decoder, speaker, timing, or Wi-Fi behavior.
 | Production domain `api.personalbmo.web.id` | **LIVE / VERIFIED** | public HTTPS/WSS |
 | Public fake ESP32 end-to-end matrix | **PASS — 23/23** | P7 public acceptance |
 | Kokoro fallback with RVC disabled | **VERIFIED — PRODUCTION** | `RVC_ENABLED=false` |
-| Piper Prudence feasibility | **TECHNICALLY PASSED — NOT DEPLOYED** | P8 private evidence; awaiting operator listening |
+| Piper Prudence fixed primary | **VERIFIED — PRODUCTION** | P8 rollout evidence; operator-approved personal/noncommercial use |
 
 ## Not verified
 
 | Capability | Current status | Owner |
 |---|---|---|
-| Real RVC inference | **NOT VERIFIED** | P8 evidence boundary |
+| Real RVC inference | **NOT VERIFIED** | P8 archived experimental boundary; RVC disabled |
 | Tested RVC replacement architecture | **HOST-CAPACITY BLOCKED** | P8 canary; production restored to P7 |
-| Piper subjective voice approval / production canary | **NOT RUN** | P8 Prompt 5, only after operator approval |
 | Physical ESP32 integration | **NOT RUN** | P10 |
 | PostgreSQL/Prisma application data layer | **NOT IMPLEMENTED/DEPLOYED** | P9 |
 
