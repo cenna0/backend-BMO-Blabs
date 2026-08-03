@@ -1,10 +1,17 @@
 # P8 — Piper Prudence Production Rollout Evidence
 
-**Classification:** `P8_PIPER_PRODUCTION_VERIFIED`
+**Classification:** `P8_PIPER_PRODUCTION_ROLLED_BACK`
 **Execution date:** 2026-08-03
 **Operator approval:** explicit manual listening approval recorded in this report
 **Scope:** fixed Piper primary TTS integration, Kokoro fallback, production canary,
 acceptance, and bounded soak. RVC was not deployed.
+
+The Piper implementation, isolated smoke test, production replacement canary,
+fallback/recovery tests, public regression, and final redeployment checks
+passed. The rollout was nevertheless rolled back because the final local
+`main` revision could not be pushed or verified against `origin/main` from
+this environment: GitHub CLI, SSH credentials, HTTPS credentials, and the
+connected GitHub app were unavailable. P7 is the restored production state.
 
 This report is sanitized. It contains no device token, Hermes API key,
 internal-service token, authorization header, transcript, provider credential,
@@ -113,9 +120,10 @@ Audio env checksum: 3ced8033d38533d473abdbe53cacb6c3cf3ea58fb40fb2368a50abcc0b3a
 P7 Compose checksum: 3040cf3ea479536cbae0cfd7a0d35d11ab9bed7df69ba285e6496cf6354b855c
 ```
 
-The offline rollback verifier passed before maintenance. No rollback was
-needed; the P7 image was also restored after isolated replacement testing and
-verified healthy before the production canary.
+The offline rollback references were verified before maintenance. Rollback was
+performed after the final push gate failed. The exact P7 image and original
+configuration references are now active and healthy; the rollback bundle is
+retained outside Git.
 
 ## 5. Candidate and resource controls
 
@@ -255,12 +263,14 @@ rerun. RVC remains disabled and its archived evidence remains preserved.
 
 ## 9. Closure
 
-P8 is closed as `P8_PIPER_PRODUCTION_VERIFIED` after the final main-built image
-deployment, final post-redeployment smoke, final 15-minute soak, remote-main
-verification, and deployed-source equality checks recorded in the final
-closure update. The final image digest and merged main SHA are intentionally
-recorded by that final closure update after the main merge; the candidate
-identity above is the image that passed the replacement canary.
+The final Piper image built from local main was briefly redeployed and passed
+the final smoke and 15-minute soak, but the required remote synchronization
+gate failed. It was not safe to leave that image running without a verified
+remote source revision. Production was restored to the exact P7 Kokoro image;
+local `main` was restored to the original clean SHA and the Piper branch was
+preserved as unmerged evidence.
+
+Final classification: `P8_PIPER_PRODUCTION_ROLLED_BACK`.
 
 Piper Prudence is the fixed primary production TTS. Kokoro `af_heart` at speed
 `0.80` is the automatic fallback. RVC is disabled. The public Backend,

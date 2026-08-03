@@ -3,18 +3,19 @@
 **Last updated:** 2026-08-03
 **Audience:** Codex / infrastructure-backend coding agent
 **Current next phase:** **P9 — PostgreSQL and persistent user/device data**
-**Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9 NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Phase state:** `P8_PIPER_PRODUCTION_ROLLED_BACK; P9 NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 
-> P8 is `P8_PIPER_PRODUCTION_VERIFIED`. P8 completion does **not** authorize
-> P9. A future P9 run requires a new explicit instruction such as **“execute P9”**
+> P8 is `P8_PIPER_PRODUCTION_ROLLED_BACK`; P7 is restored. P8 completion does
+> **not** authorize P9. A future P9 run requires a new explicit instruction such as **“execute P9”**
 > or equivalent.
 
 ## 1. Current checkpoint
 
 P6 VPS Foundation and Operations Baseline remains `VERIFIED`. P7 backend,
 Audio Service, and Hermes production integration is `VERIFIED — PRODUCTION`.
-P7 is `VERIFIED — PRODUCTION`. P8 is `P8_PIPER_PRODUCTION_VERIFIED`.
-P8 completion does **not** authorize P9. Do not execute P10 from this gate.
+P7 is `VERIFIED — PRODUCTION`. P8 is `P8_PIPER_PRODUCTION_ROLLED_BACK` and P7
+is restored. P8 completion does **not** authorize P9. Do not execute P10 from
+this gate.
 Sanitized proof is in
 [`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
 
@@ -42,10 +43,10 @@ Verified P7 outcomes include:
 - [`hardware-handoff/DEPLOYMENT-CONFIG.md`](hardware-handoff/DEPLOYMENT-CONFIG.md)
   is the verified live endpoint handoff.
 
-Production uses fixed Piper Prudence as primary, Kokoro `af_heart` at `0.80` as
-fallback, and `RVC_ENABLED=false`. Real RVC inference is not verified and was
-not deployed. Physical ESP32 acceptance is not run, and PostgreSQL/Prisma is
-not implemented or deployed.
+The restored production uses Kokoro `af_heart` at `0.80`; the approved fixed
+Piper Prudence candidate passed its canary but was rolled back. RVC remains
+disabled. Physical ESP32 acceptance is not run, and PostgreSQL/Prisma is not
+implemented or deployed.
 
 ## 2. Locked execution order
 
@@ -54,7 +55,7 @@ P6 VPS foundation                         VERIFIED
   ↓
 P7 backend/audio production deployment   VERIFIED — PRODUCTION
   ↓ explicit new authorization required
-P8 fixed Piper primary + Kokoro fallback VERIFIED — PRODUCTION
+P8 fixed Piper primary + Kokoro fallback ROLLED BACK — P7 RESTORED
   ↓ completed/verified status + explicit authorization
 P9 PostgreSQL + Prisma readiness         NOT_STARTED / dependency-gated
   ↓ VERIFIED + explicit authorization

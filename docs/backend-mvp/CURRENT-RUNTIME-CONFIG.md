@@ -1,12 +1,12 @@
 # BMO Voice MVP — Current Runtime Configuration
 
 **Updated:** 2026-08-03
-**Status:** VERIFIED P8 PRODUCTION — FIXED PIPER PRIMARY
+**Status:** VERIFIED P7 PRODUCTION — KOKORO PRIMARY; P8 PIPER ROLLED BACK
 **Scope:** STT/TTS runtime values only; the public hardware contract is unchanged.
 
-These are the actual values verified in P7 production, not future deployment
-targets. Historical evidence may contain older values because it preserves what
-was tested at that earlier phase.
+These are the actual values currently restored in production. Piper values
+below are the approved, tested P8 candidate configuration; they are not
+currently deployed after the P8 rollout rollback.
 
 ## Whisper STT
 
@@ -135,6 +135,8 @@ The Piper feasibility branch was followed by the controlled production
 integration branch `feat/p8-piper-production`. Its operator approval,
 replacement canary, fallback/recovery tests, public regression, and soak are
 recorded in [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md).
+The rollout was restored to P7 because the final source push could not be
+authenticated or verified; Piper is not the current running primary.
 
 The RVC experiment remains archived at
 `feat/p8-rvc-foundation` / `8420d4192a16025f439c040cd7a32a50b41fe52b` with

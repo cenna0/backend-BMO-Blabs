@@ -6,9 +6,9 @@ behavior remains defined by the canonical Hardware Contract v1.0.5.
 ## Current state
 
 ```text
-DEPLOYMENT_STATUS: VERIFIED
-VERIFIED_AT: 2026-08-03T06:33:47+02:00
-DEPLOYED_COMMIT: ff55eb4ea1c8d58e96b647d0c03f471dd4c58994
+DEPLOYMENT_STATUS: VERIFIED — P7 RESTORED; P8 ROLLED BACK
+VERIFIED_AT: 2026-08-03T08:23:43+02:00
+DEPLOYED_COMMIT: 4d7b472adc4c2243d8f7364032a491ad70efb6d3
 HTTPS_BASE_URL: https://api.personalbmo.web.id
 WEBSOCKET_URL: wss://api.personalbmo.web.id/ws
 HEALTH_URL: https://api.personalbmo.web.id/health
@@ -16,7 +16,7 @@ UPLOAD_URL: https://api.personalbmo.web.id/api/v1/voice
 AUDIO_URL_PATTERN: https://api.personalbmo.web.id/audio/<audio-uuid>.mp3
 DEVICE_ID: bmo-001
 DEVICE_TOKEN: PROVIDED_OUT_OF_BAND
-PUBLIC_E2E_STATUS: PASS — P8 NATIVE EQUIVALENT 12/12
+PUBLIC_E2E_STATUS: PASS — P7 23/23
 PHYSICAL_ESP32_STATUS: NOT_RUN
 ```
 
@@ -26,10 +26,9 @@ live, and the production fake-client matrix passed `23/23` checks. Physical
 ESP32 acceptance has not run and remains P10; this file does not claim
 `HARDWARE INTEGRATION VERIFIED`.
 
-The deployed commit is the current P8 canary application/image source. The
-final main-built image and merged main provenance are recorded in
-`../backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md` after final redeployment.
-Later documentation-only repository commits do not change running provenance.
+P8 Piper implementation and canary evidence is preserved on the unmerged
+feature branch. The P8 rollout was restored to this exact P7 deployment when
+the final local-main push could not be authenticated or verified.
 
 Do not paste the real device token into this file.
 
