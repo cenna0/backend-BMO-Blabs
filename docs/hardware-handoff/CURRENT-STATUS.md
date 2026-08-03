@@ -1,7 +1,7 @@
 # BMO Hardware Handoff — Current Backend Status
 
 **Audited:** 2026-08-03
-**Deployment state:** `VERIFIED — PRODUCTION (P7 RESTORED; P8 ROLLED BACK)`
+**Deployment state:** `VERIFIED — PRODUCTION (P8 PIPER PRIMARY)`
 **Physical hardware state:** `NOT_RUN` — P10
 
 This file separates verified public production behavior from future physical
@@ -26,7 +26,7 @@ device, decoder, speaker, timing, or Wi-Fi behavior.
 | Production domain `api.personalbmo.web.id` | **LIVE / VERIFIED** | public HTTPS/WSS |
 | Public fake ESP32 end-to-end matrix | **PASS — 23/23** | P7 public acceptance |
 | Kokoro fallback with RVC disabled | **VERIFIED — PRODUCTION** | `RVC_ENABLED=false` |
-| Piper Prudence fixed primary | **CANARY PASSED; ROLLED BACK** | P8 rollout evidence; remote source synchronization unavailable |
+| Piper Prudence fixed primary | **VERIFIED — PRODUCTION** | P8 rollout evidence; fixed speaker prudence / ID 0 |
 
 ## Not verified
 

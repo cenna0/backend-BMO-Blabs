@@ -446,8 +446,8 @@ for line in deployment_config.splitlines():
 
 expected_deployment_values = {
     "DEPLOYMENT_STATUS": "VERIFIED",
-    "VERIFIED_AT": "2026-08-03T06:33:47+02:00",
-    "DEPLOYED_COMMIT": "ff55eb4ea1c8d58e96b647d0c03f471dd4c58994",
+    "VERIFIED_AT": "2026-08-03",
+    "DEPLOYED_COMMIT": "4e2cbda3f8eb02e27120821a11233e7848699249",
     "HTTPS_BASE_URL": "https://api.personalbmo.web.id",
     "WEBSOCKET_URL": "wss://api.personalbmo.web.id/ws",
     "HEALTH_URL": "https://api.personalbmo.web.id/health",

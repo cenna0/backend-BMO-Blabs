@@ -1,16 +1,15 @@
 # BMO — P8 Execution Spec and Piper Production Closure
 
-**Status:** `P8_PIPER_PRODUCTION_ROLLED_BACK`
+**Status:** `P8_PIPER_PRODUCTION_VERIFIED`
 **Dependency:** P7 `VERIFIED — PRODUCTION`
 **Evidence baseline:**
 [`../backend-mvp/P7-TEST-EVIDENCE.md`](../backend-mvp/P7-TEST-EVIDENCE.md)
 **Contract type:** COMPLETED EXECUTION RECORD — Prompt 5 production closure
 
-> P8 Prompt 5 completed the authorized fixed Piper Prudence implementation and
-> controlled canary, but the rollout was restored to P7 when remote `main`
-> synchronization could not be authenticated or verified. The historical RVC
-> verification requirements in this document were not enabled or merged; RVC
-> remains disabled and its experimental branch is archived. See
+> P8 Prompt 5 completed the authorized fixed Piper Prudence implementation,
+> controlled canary, remote synchronization, and final production closure. The
+> historical RVC verification requirements in this document were not enabled
+> or merged; RVC remains disabled and its experimental branch is archived. See
 > [`../backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](../backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md)
 > for authoritative evidence. P9 remains next and is not started.
 

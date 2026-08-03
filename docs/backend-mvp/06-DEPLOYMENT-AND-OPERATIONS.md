@@ -695,7 +695,7 @@ This does not make physical hardware verified. `PHYSICAL_ESP32_STATUS` remains
 
 ## 21. Current phase split
 
-P6 and P7 are complete. P8 real RVC verification is next but
-`NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`; P9/P10 remain
-dependency-gated. Use [`../NEXT-ACTION.md`](../NEXT-ACTION.md) and the roadmap in
+P6, P7, and P8 are complete. P8 fixed Piper Prudence as primary, retains
+Kokoro fallback, and leaves real RVC inference archived and disabled. P9/P10
+remain dependency-gated. Use [`../NEXT-ACTION.md`](../NEXT-ACTION.md) and the roadmap in
 [`../roadmap/P6-P10-ROADMAP.md`](../roadmap/P6-P10-ROADMAP.md).

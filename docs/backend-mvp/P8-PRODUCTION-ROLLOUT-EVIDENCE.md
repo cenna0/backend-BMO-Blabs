@@ -1,17 +1,16 @@
 # P8 — Piper Prudence Production Rollout Evidence
 
-**Classification:** `P8_PIPER_PRODUCTION_ROLLED_BACK`
+**Classification:** `P8_PIPER_PRODUCTION_VERIFIED`
 **Execution date:** 2026-08-03
 **Operator approval:** explicit manual listening approval recorded in this report
 **Scope:** fixed Piper primary TTS integration, Kokoro fallback, production canary,
 acceptance, and bounded soak. RVC was not deployed.
 
 The Piper implementation, isolated smoke test, production replacement canary,
-fallback/recovery tests, public regression, and final redeployment checks
-passed. The rollout was nevertheless rolled back because the final local
-`main` revision could not be pushed or verified against `origin/main` from
-this environment: GitHub CLI, SSH credentials, HTTPS credentials, and the
-connected GitHub app were unavailable. P7 is the restored production state.
+fallback/recovery tests, public regression, final-main deployment, and bounded
+soaks passed. GitHub synchronization was completed with a repository-scoped
+deploy key, and the final production image was built from the exact verified
+main revision. P7 remains retained as the deterministic rollback state.
 
 This report is sanitized. It contains no device token, Hermes API key,
 internal-service token, authorization header, transcript, provider credential,
@@ -48,7 +47,7 @@ Original main                 cfbd718f3206ccdc1ea8157b2dc177f235d8181f
 Piper feasibility commit      c82b21287d8893a5a090464b6126c5e42e45cd8e
 Production branch             feat/p8-piper-production
 Production worktree           /opt/bmo/app/.worktrees/p8-piper-production
-Canary implementation commit  ff55eb4ea1c8d58e96b647d0c03f471dd4c58994
+Production implementation     4e2cbda3f8eb02e27120821a11233e7848699249
 ```
 
 The production integration uses an integrated persistent Piper worker inside
@@ -120,10 +119,9 @@ Audio env checksum: 3ced8033d38533d473abdbe53cacb6c3cf3ea58fb40fb2368a50abcc0b3a
 P7 Compose checksum: 3040cf3ea479536cbae0cfd7a0d35d11ab9bed7df69ba285e6496cf6354b855c
 ```
 
-The offline rollback references were verified before maintenance. Rollback was
-performed after the final push gate failed. The exact P7 image and original
-configuration references are now active and healthy; the rollback bundle is
-retained outside Git.
+The offline rollback references were verified before each maintenance window.
+The exact P7 image and original configuration references remain locally
+available and were retained after the successful Piper deployment.
 
 ## 5. Candidate and resource controls
 
@@ -236,7 +234,61 @@ canary. Kernel OOM counter delta was zero. The minimum relevant free disk was
 21.64 GB before cache cleanup and 22.28 GB after unused Docker build-cache
 cleanup; the 20 GB stop gate remained satisfied.
 
-## 8. Acceptance matrix and repository gates
+## 8. Repository authentication and synchronization
+
+GitHub repository: `cenna0/backend-BMO-Blabs` (public; `main` unprotected at
+the time of integration). Repository access was established with the existing
+dedicated Ed25519 deploy key; no key was regenerated.
+
+```text
+Deploy-key title:       BMO Production VPS
+Public fingerprint:     SHA256:4s/5+Ehv8qA2+6dKTBuSSf7sko43oJBazAavWP6PyAw
+Private-key path:       /home/bmo-admin/.ssh/github_bmo_deploy
+Origin:                 git@github-bmo:cenna0/backend-BMO-Blabs.git
+Remote main before work: cfbd718f3206ccdc1ea8157b2dc177f235d8181f
+Feature branch pushed:  4e2cbda3f8eb02e27120821a11233e7848699249
+```
+
+The private key, device code, GitHub token, credential files, and secret
+environment values are not recorded. A temporary GitHub CLI device session
+was used only to attach the existing public key with write access, then was
+logged out and its temporary credential directory was removed. Subsequent
+`ssh`, `git ls-remote`, and `git fetch` operations succeeded through the
+repository-specific alias.
+
+## 9. Final-main revalidation
+
+After authentication, the preserved production implementation was revalidated
+without repeating feasibility work. The temporary candidate used source
+`4e2cbda3f8eb02e27120821a11233e7848699249` and image digest
+`sha256:460b7ac9d42cde89347630c959e925c3f4ea1c3c6ffe8e9c1b4d48e51a707b8e`.
+
+```text
+Audio/Piper automated tests: 103 passed, 2 warnings
+Public live regression:      12/12 passed
+Short/long/continuous:       Piper, valid MP3, no fallback
+Forced failure:              Kokoro af_heart / 0.80, HTTP 200
+Recovery:                    Piper, warm worker recovered
+Warm sequential probes:      5/5 Piper
+Revalidation soak:           640.7 s, 10/10 Piper samples
+Fallback/recovery soak probe: Kokoro success followed by Piper success
+OOM delta:                   0
+Candidate restarts:          0
+Candidate health:            healthy throughout
+Public health routes:        200 / 404 / 404
+Processes / descriptors:     3 / 25, flat
+Temporary files:             0 throughout
+Minimum host MemAvailable:   approximately 3.227 GiB
+```
+
+The public regression preserved the existing WebSocket and audio lifecycle:
+invalid and valid authentication, upload, active-request conflict,
+`display_status`, `audio_ready`, MP3 retrieval, playback completion, and
+completed-audio unavailability all passed. The final image, deployed source
+label, and remote `main` equality are recorded by the final deployment
+verifier and closure report.
+
+## 10. Acceptance matrix and repository gates
 
 Passed before closure:
 
@@ -261,16 +313,15 @@ The RVC branch `feat/p8-rvc-foundation` at
 `8420d4192a16025f439c040cd7a32a50b41fe52b` was not merged, deployed, or
 rerun. RVC remains disabled and its archived evidence remains preserved.
 
-## 9. Closure
+## 11. Closure
 
-The final Piper image built from local main was briefly redeployed and passed
-the final smoke and 15-minute soak, but the required remote synchronization
-gate failed. It was not safe to leave that image running without a verified
-remote source revision. Production was restored to the exact P7 Kokoro image;
-local `main` was restored to the original clean SHA and the Piper branch was
-preserved as unmerged evidence.
+The final Piper image was built from the exact final `main` revision, deployed
+as the running production Audio Service, and passed final smoke and the
+15-minute post-redeployment soak. Local `main` equals remote `main`, the
+running image source label equals that revision, and the P7 image remains
+available for offline rollback.
 
-Final classification: `P8_PIPER_PRODUCTION_ROLLED_BACK`.
+Final classification: `P8_PIPER_PRODUCTION_VERIFIED`.
 
 Piper Prudence is the fixed primary production TTS. Kokoro `af_heart` at speed
 `0.80` is the automatic fallback. RVC is disabled. The public Backend,

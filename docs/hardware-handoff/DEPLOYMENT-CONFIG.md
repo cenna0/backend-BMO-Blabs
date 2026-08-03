@@ -6,9 +6,9 @@ behavior remains defined by the canonical Hardware Contract v1.0.5.
 ## Current state
 
 ```text
-DEPLOYMENT_STATUS: VERIFIED — P7 RESTORED; P8 ROLLED BACK
-VERIFIED_AT: 2026-08-03T08:23:43+02:00
-DEPLOYED_COMMIT: 4d7b472adc4c2243d8f7364032a491ad70efb6d3
+DEPLOYMENT_STATUS: VERIFIED
+VERIFIED_AT: 2026-08-03
+DEPLOYED_COMMIT: 4e2cbda3f8eb02e27120821a11233e7848699249
 HTTPS_BASE_URL: https://api.personalbmo.web.id
 WEBSOCKET_URL: wss://api.personalbmo.web.id/ws
 HEALTH_URL: https://api.personalbmo.web.id/health
@@ -16,7 +16,7 @@ UPLOAD_URL: https://api.personalbmo.web.id/api/v1/voice
 AUDIO_URL_PATTERN: https://api.personalbmo.web.id/audio/<audio-uuid>.mp3
 DEVICE_ID: bmo-001
 DEVICE_TOKEN: PROVIDED_OUT_OF_BAND
-PUBLIC_E2E_STATUS: PASS — P7 23/23
+PUBLIC_E2E_STATUS: PASS — P8 NATIVE EQUIVALENT 12/12
 PHYSICAL_ESP32_STATUS: NOT_RUN
 ```
 
@@ -26,9 +26,10 @@ live, and the production fake-client matrix passed `23/23` checks. Physical
 ESP32 acceptance has not run and remains P10; this file does not claim
 `HARDWARE INTEGRATION VERIFIED`.
 
-P8 Piper implementation and canary evidence is preserved on the unmerged
-feature branch. The P8 rollout was restored to this exact P7 deployment when
-the final local-main push could not be authenticated or verified.
+P8 Piper implementation, final-main synchronization, deployment, and soak
+evidence are recorded in
+[`../backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](../backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md).
+The P7 image remains retained as the deterministic offline rollback.
 
 Do not paste the real device token into this file.
 

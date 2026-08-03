@@ -6,23 +6,23 @@
 ## 1. Control state
 
 ```text
-Documentation package: CURRENT / P8 ROLLED BACK TO P7
+Documentation package: CURRENT / P8 PRODUCTION CLOSED
 P1–P5 backend history: implemented/verified according to phase evidence below
 Current next implementation phase: P9 — PostgreSQL and persistent user/device data
 P6 state: VERIFIED
 P6 execution authorization: COMPLETED
 P7 state: VERIFIED — PRODUCTION
 P7 execution: COMPLETED
-P8 state: P8_PIPER_PRODUCTION_ROLLED_BACK
+P8 state: P8_PIPER_PRODUCTION_VERIFIED
 P9 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
 P10 state: NOT_STARTED / dependency-gated after P9
 ```
 
-P6 and P7 are verified. P8 implementation and canary evidence passed, but the
-rollout was restored to P7 when the required remote source synchronization
-could not be authenticated or verified. Read `P8-PRODUCTION-ROLLOUT-EVIDENCE.md`
-for the rollback record. P9 is the next dependency phase but is not started or
-authorized.
+P6, P7, and P8 are verified. P8 fixed Piper Prudence as the production primary,
+retains Kokoro as automatic fallback, and preserves the public contract. Read
+`P8-PRODUCTION-ROLLOUT-EVIDENCE.md` for source synchronization, deployment,
+acceptance, and soak evidence. P9 is the next dependency phase but is not
+started or authorized.
 
 ## 2. Documentation status
 
@@ -30,7 +30,7 @@ authorized.
 |---|---|---|
 | `../NEXT-ACTION.md` | CURRENT P9 OPERATIONAL GATE | Selects P9 while requiring new explicit authorization and preventing accidental P10 execution |
 | `../roadmap/P6-EXECUTION-SPEC.md` | HISTORICAL / LOCKED VERIFIED P6 RECORD | Exact completed P6 scope, acceptance checklist, evidence, and stop condition |
-| `../roadmap/P8-EXECUTION-SPEC.md` | P8 ROLLED BACK | Piper canary evidence, rollback, archived RVC boundary, and P9 stop |
+| `../roadmap/P8-EXECUTION-SPEC.md` | P8 VERIFIED | Piper production closure, rollback, archived RVC boundary, and P9 stop |
 | `00-AGENT-EXECUTION-GUIDE.md` | VERIFIED | Workflow, boundary, phase control, stop condition tersedia |
 | `01-SCOPE-AND-DECISIONS.md` | VERIFIED / LOCKED | Backend source §1–§3 termigrasi |
 | `02-API-AND-WEBSOCKET-CONTRACT.md` | VERIFIED / LOCKED | Backend source §15–§17, §22 dan hardware contract dicocokkan |
@@ -43,7 +43,7 @@ authorized.
 | `CHANGELOG.md` | VERIFIED | Baseline package tercatat |
 | `P6-TEST-EVIDENCE.md` | VERIFIED | Sanitized VPS evidence, strict dual Telegram receipt proof, recovery commands, residual risks, and no-P7 proof |
 | `P7-TEST-EVIDENCE.md` | VERIFIED — PRODUCTION | Immutable deployment/images, public 23/23 acceptance, final soak, rollback retention, and repository synchronization |
-| `P8-PRODUCTION-ROLLOUT-EVIDENCE.md` | ROLLED BACK — P7 RESTORED | Fixed Piper candidate, Kokoro fallback, canary, regression, soak, and rollback |
+| `P8-PRODUCTION-ROLLOUT-EVIDENCE.md` | VERIFIED — PRODUCTION | Fixed Piper primary, Kokoro fallback, canary, regression, soak, and rollback |
 
 ## 3. Implementation phases
 
@@ -56,7 +56,7 @@ authorized.
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P5-TEST-EVIDENCE.md`](P5-TEST-EVIDENCE.md) |
 | P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
 | P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | VERIFIED — PRODUCTION | COMPLETED | [`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md) |
-| P8 | Fixed Piper Prudence primary + Kokoro fallback + production acceptance; RVC remains disabled | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | ROLLED BACK — P7 RESTORED | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
+| P8 | Fixed Piper Prudence primary + Kokoro fallback + production acceptance; RVC remains disabled | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | VERIFIED — PRODUCTION | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
 | P9 | PostgreSQL + Prisma ready-to-use application data layer + backup/restore | PRD + 06 + roadmap | NOT_STARTED | AWAITING EXPLICIT USER AUTHORIZATION | — |
 | P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
 

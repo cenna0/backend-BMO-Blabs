@@ -1,12 +1,11 @@
 # BMO Voice MVP — Current Runtime Configuration
 
 **Updated:** 2026-08-03
-**Status:** VERIFIED P7 PRODUCTION — KOKORO PRIMARY; P8 PIPER ROLLED BACK
+**Status:** VERIFIED P8 PRODUCTION — PIPER PRIMARY; KOKORO FALLBACK
 **Scope:** STT/TTS runtime values only; the public hardware contract is unchanged.
 
-These are the actual values currently restored in production. Piper values
-below are the approved, tested P8 candidate configuration; they are not
-currently deployed after the P8 rollout rollback.
+These are the actual values currently deployed in production. Piper Prudence
+is the fixed primary; Kokoro remains the automatic fallback.
 
 ## Whisper STT
 
@@ -106,11 +105,9 @@ Real RVC inference remains unverified and is archived experimental work. It was
 not deployed in P8. Production keeps `RVC_ENABLED=false`; Piper failure routes
 automatically to Kokoro `af_heart` at speed `0.80`.
 
-P7 production/resource verification passed with `13/13` soak samples, zero new
-OOM events, zero backend/audio restarts, minimum `MemAvailable` 3.209 GiB, and
-minimum relevant free disk 59.137 GiB. The earlier requirement to benchmark
-these values before deployment verification is therefore satisfied.
-RVC-specific resource benchmarking remains mandatory in P8.
+P8 production/resource verification passed with zero new OOM events, zero
+Audio restarts, safe host reserve, and no material process, descriptor, memory,
+or temporary-file growth. The P7 rollback image remains available locally.
 
 ## Hardware impact
 
@@ -133,10 +130,10 @@ The RVC canary was closed on its unmerged feature branch as
 
 The Piper feasibility branch was followed by the controlled production
 integration branch `feat/p8-piper-production`. Its operator approval,
-replacement canary, fallback/recovery tests, public regression, and soak are
-recorded in [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md).
-The rollout was restored to P7 because the final source push could not be
-authenticated or verified; Piper is not the current running primary.
+replacement canary, fallback/recovery tests, public regression, final-main
+deployment, and soaks are recorded in
+[`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md).
+Piper is the current running primary.
 
 The RVC experiment remains archived at
 `feat/p8-rvc-foundation` / `8420d4192a16025f439c040cd7a32a50b41fe52b` with

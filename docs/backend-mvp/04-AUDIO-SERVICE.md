@@ -63,7 +63,8 @@ Kokoro
 soundfile
 PyTorch CPU
 FFmpeg
-RVC inference (future P8; not installed or verified in P7 production)
+integrated Piper persistent worker with Kokoro fallback
+RVC inference (archived experimental boundary; disabled)
 ```
 
 System dependency minimal:
@@ -177,8 +178,8 @@ Hotwords      : BMO
 `small` adalah baseline historis awal. Investigasi real pada 2026-07-25 memilih
 `medium` + hotword `BMO` karena lebih akurat pada utterance pendek/aksen yang
 diuji. P7 kemudian memverifikasi konfigurasi ini, pinned model revision, real
-offline inference, dan resource soak di production. Deployment verification
-telah lulus; RVC-specific latency/resource benchmark tetap wajib di P8.
+offline inference, dan resource soak di production. P8 revalidated the full
+Piper production path and retained RVC as disabled archived work.
 
 Target implementasi:
 
@@ -273,7 +274,7 @@ KOKORO_SPEED=0.80
 
 `KOKORO_SPEED=0.80` dipilih pada manual listening UAT dari kandidat `0.90`,
 `0.85`, `0.80`, dan `0.75`, lalu diverifikasi sebagai nilai P7 production.
-Revalidasi setelah real RVC tetap wajib.
+P8 revalidation also covers Piper fallback and recovery; RVC remains disabled.
 
 Aturan:
 
@@ -287,9 +288,9 @@ Aturan:
 
 ---
 
-## 12. RVC Voice BMO — Future P8
+## 12. RVC Voice BMO — Archived P8 experimental boundary
 
-RVC belum diinstal atau diverifikasi di production P7. P8 menggunakan community
+RVC belum diinstal atau diverifikasi di production P8. P8 archived the community
 model berikut sebagai aset eksperimental MVP, bukan model resmi yang dijamin
 kualitasnya. Metadata ini tidak membuktikan real inference.
 
@@ -395,7 +396,7 @@ Audio service hanya boleh diakses dari localhost.
 
 ### 14.1 `GET /health`
 
-Current P7 production state with RVC disabled:
+Current P8 production state with RVC disabled:
 
 ```json
 {
@@ -472,8 +473,8 @@ Header hasil:
 
 ```http
 Content-Type: audio/mpeg
-X-RVC-Applied: true
-X-TTS-Engine: kokoro-rvc
+X-RVC-Applied: false
+X-TTS-Engine: piper
 ```
 
 Fallback:
