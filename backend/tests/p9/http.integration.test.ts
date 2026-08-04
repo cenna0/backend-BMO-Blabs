@@ -6,9 +6,11 @@ const integration = process.env.P9_INTEGRATION === "true";
 const baseUrl = (process.env.P9_TEST_BASE_URL ?? "http://backend:3010/api/v1").replace(/\/$/, "");
 const invitationA = process.env.P9_TEST_INVITATION_A;
 const invitationB = process.env.P9_TEST_INVITATION_B;
+const invitationC = process.env.P9_TEST_INVITATION_C;
 const configuredEmailA = process.env.P9_TEST_EMAIL_A;
 const configuredEmailB = process.env.P9_TEST_EMAIL_B;
-const password = process.env.P9_TEST_PASSWORD ?? "P9-Integration-Password-2026!";
+const configuredEmailC = process.env.P9_TEST_EMAIL_C;
+const password = process.env.P9_TEST_PASSWORD;
 
 async function callApi(path: string, init: RequestInit = {}): Promise<{ status: number; body: JsonObject | undefined }> {
   const headers = new Headers(init.headers);
@@ -41,10 +43,13 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
   it("runs the invite-only auth, session, ownership, pairing, and settings contracts", async () => {
     expect(invitationA).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(invitationB).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(invitationC).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(password).toBeTruthy();
 
     const suffix = `${Date.now()}`;
     const emailA = configuredEmailA ?? `p9-a-${suffix}@example.com`;
     const emailB = configuredEmailB ?? `p9-b-${suffix}@example.com`;
+    const emailC = configuredEmailC ?? `p9-c-${suffix}@example.com`;
     const registration = await json("POST", "/auth/register", {
       invitationToken: invitationA,
       email: emailA,
@@ -59,6 +64,14 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     const refreshA = String(sessionA.refreshToken);
     expect(userA.email).toBe(emailA);
     expect(JSON.stringify(registration.body)).not.toMatch(/passwordHash|tokenHash|pairingCode/);
+    expect((await json("POST", "/auth/register", { invitationToken: "invalid-invitation", email: emailA, password })).status).toBe(400);
+    expect((await json("POST", "/auth/register", { invitationToken: invitationA, email: emailA, password })).status).toBe(400);
+
+    const concurrentRegistrations = await Promise.all([
+      json("POST", "/auth/register", { invitationToken: invitationC, email: emailC, password, displayName: "P9 User C" }),
+      json("POST", "/auth/register", { invitationToken: invitationC, email: emailC, password, displayName: "P9 User C" }),
+    ]);
+    expect(concurrentRegistrations.map((result) => result.status).sort()).toEqual([201, 400]);
 
     const login = await json("POST", "/auth/login", { email: emailA.toUpperCase(), password });
     expect(login.status).toBe(200);
@@ -111,12 +124,23 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     }, accessLogin);
     expect(staleClaim.status).toBe(409);
 
-    const claim = await json("POST", `/pairing/${secondPairingId}/claim`, {
-      code: secondCode,
-      hardwareId: `hw-${suffix}`,
-      deviceName: "P9 Device",
-      deviceCredential: "device-credential-0123456789",
-    }, accessLogin);
+    const concurrentClaims = await Promise.all([
+      json("POST", `/pairing/${secondPairingId}/claim`, {
+        code: secondCode,
+        hardwareId: `hw-${suffix}`,
+        deviceName: "P9 Device",
+        deviceCredential: "device-credential-0123456789",
+      }, accessLogin),
+      json("POST", `/pairing/${secondPairingId}/claim`, {
+        code: secondCode,
+        hardwareId: `hw-race-${suffix}`,
+        deviceName: "Race Device",
+        deviceCredential: "race-device-credential-0123456789",
+      }, accessLogin),
+    ]);
+    expect(concurrentClaims.map((result) => result.status).sort()).toEqual([201, 409]);
+    const claim = concurrentClaims.find((result) => result.status === 201)!;
+    expect(claim).toBeDefined();
     expect(claim.status).toBe(201);
     const device = required(required(claim.body).device);
     const deviceId = String(device.id);
@@ -149,8 +173,13 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     expect((await json("PATCH", `/settings/devices/${deviceId}`, { voiceProfileId: "unsupported" }, accessLogin)).status).toBe(400);
     expect((await get(`/devices/not-a-uuid`, accessLogin)).status).toBe(404);
 
-    const rotated = await json("POST", "/auth/refresh", { refreshToken: refreshA });
-    expect(rotated.status).toBe(200);
+    const concurrentRefreshes = await Promise.all([
+      json("POST", "/auth/refresh", { refreshToken: refreshA }),
+      json("POST", "/auth/refresh", { refreshToken: refreshA }),
+    ]);
+    expect(concurrentRefreshes.map((result) => result.status).sort()).toEqual([200, 401]);
+    const rotated = concurrentRefreshes.find((result) => result.status === 200)!;
+    expect(rotated).toBeDefined();
     const rotatedSession = required(required(rotated.body).session);
     expect(rotatedSession.refreshToken).not.toBe(refreshA);
     expect((await json("POST", "/auth/refresh", { refreshToken: refreshA })).status).toBe(401);

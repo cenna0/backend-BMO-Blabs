@@ -15,7 +15,8 @@ P7 state: VERIFIED — PRODUCTION
 P7 execution: COMPLETED
 P8 state: P8_PIPER_PRODUCTION_VERIFIED
 P9.1 architecture state: LOCKED / APPROVED
-P9 implementation state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
+P9.1 implementation state: ISOLATED CANDIDATE IMPLEMENTED / READY FOR REVIEW
+P9.2–P9.6 implementation state: NOT IMPLEMENTED
 P10 state: NOT_STARTED / dependency-gated after P9.6
 ```
 
@@ -45,7 +46,7 @@ started or authorized.
 | `P6-TEST-EVIDENCE.md` | VERIFIED | Sanitized VPS evidence, strict dual Telegram receipt proof, recovery commands, residual risks, and no-P7 proof |
 | `P7-TEST-EVIDENCE.md` | VERIFIED — PRODUCTION | Immutable deployment/images, public 23/23 acceptance, final soak, rollback retention, and repository synchronization |
 | `P8-PRODUCTION-ROLLOUT-EVIDENCE.md` | VERIFIED — PRODUCTION | Fixed Piper primary, Kokoro fallback, canary, regression, soak, and rollback |
-| `../p9/README.md` | PROPOSED — READY FOR REVIEW | Final application-platform architecture; no runtime implementation claim |
+| `../p9/README.md` | P9.1 CANDIDATE EVIDENCE ATTACHED | Architecture remains locked; isolated implementation evidence is in `../p9/P9.1-IMPLEMENTATION-EVIDENCE.md`; no production implementation claim |
 
 ## 3. Implementation phases
 
@@ -59,7 +60,7 @@ started or authorized.
 | P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
 | P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | VERIFIED — PRODUCTION | COMPLETED | [`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md) |
 | P8 | Fixed Piper Prudence primary + Kokoro fallback + production acceptance; RVC remains disabled | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | VERIFIED — PRODUCTION | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
-| P9.1 | PostgreSQL + Prisma, invite auth, pairing, user/device settings, backup/restore baseline | PRD + `../p9/` + roadmap | ARCHITECTURE LOCKED; NOT_STARTED | AWAITING EXPLICIT USER AUTHORIZATION | — |
+| P9.1 | PostgreSQL + Prisma, invite auth, pairing, user/device settings, backup/restore baseline | PRD + `../p9/` + roadmap | IMPLEMENTED — ISOLATED / READY FOR REVIEW | AUTHORIZED | [`../p9/P9.1-IMPLEMENTATION-EVIDENCE.md`](../p9/P9.1-IMPLEMENTATION-EVIDENCE.md) |
 | P9.2–P9.6 | Chat/memory, scheduler, integrations, hardening, final acceptance | `../p9/` | PROPOSED; NOT_STARTED | DEPENDS ON PREDECESSOR GATES | — |
 | P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9.6 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
 

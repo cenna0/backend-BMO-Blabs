@@ -42,7 +42,7 @@ async function main(): Promise<void> {
 
   await prepareTarget();
   const decrypt = spawn("gpg", ["--batch", "--yes", "--pinentry-mode", "loopback", "--passphrase-file", passphraseFile, "--decrypt", backupPath], { stdio: ["ignore", "pipe", "ignore"] });
-  const restoreShell = `set -eu; export PGPASSWORD=$(cat /run/secrets/postgres_password); exec pg_restore --format=custom --no-owner --no-privileges --exit-on-error --dbname='${targetDatabase}'`;
+  const restoreShell = `set -eu; export PGPASSWORD=$(cat /run/secrets/postgres_password); exec pg_restore --format=custom --no-owner --no-privileges --exit-on-error --username="$POSTGRES_USER" --dbname='${targetDatabase}'`;
   const restore = spawn("docker", composeArgs(["exec", "-T", "postgres", "sh", "-c", restoreShell]), { stdio: ["pipe", "ignore", "ignore"] });
   decrypt.stdout?.pipe(restore.stdin);
   await Promise.all([waitForProcess(decrypt, "backup decryption"), waitForProcess(restore, "pg_restore")]);

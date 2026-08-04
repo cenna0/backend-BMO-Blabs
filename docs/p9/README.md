@@ -1,6 +1,6 @@
 # BMO P9 — Final Architecture and Product Lock
 
-**Status:** `P9.1 ARCHITECTURE LOCKED; P9.2–P9.6 PROPOSED`
+**Status:** `P9.1 ARCHITECTURE LOCKED; ISOLATED P9.1 CANDIDATE READY FOR REVIEW; P9.2–P9.6 PROPOSED`
 **Architecture branch:** `docs/p9-final-architecture`
 **Base main:** `159ce6d9081928eca6d68921c3f64cdb36fce5bb`
 **Date:** 2026-08-04
@@ -8,9 +8,9 @@
 This directory is the P9 application-platform architecture set. P9.1 has been
 approved and its authentication, timezone, pairing, database, settings,
 migration, backup, and audit decisions are locked. P9.2–P9.6 remain proposed
-execution stages. Nothing in this directory claims that PostgreSQL, Prisma,
-authentication, mobile APIs, memory, scheduling, Spotify, WhatsApp, or voice
-settings are implemented.
+execution stages and are not implemented. The isolated P9.1 implementation
+evidence is recorded in [`P9.1-IMPLEMENTATION-EVIDENCE.md`](P9.1-IMPLEMENTATION-EVIDENCE.md);
+no P9.1 candidate is deployed to production.
 
 ## Status vocabulary
 
@@ -19,8 +19,8 @@ settings are implemented.
 - **PROPOSED** — architecture selected for review and later implementation.
 - **OPEN** — an explicit decision still required before the affected phase.
 - **DEFERRED** — intentionally excluded from the current phase or foundation.
-- **IMPLEMENTED / VERIFIED** — reserved for code and evidence; no P9.1 item in
-  this directory uses those statuses.
+- **IMPLEMENTED / VERIFIED** — used only by implementation evidence; the
+  architecture documents remain the source of locked decisions.
 
 ## Reading order
 
