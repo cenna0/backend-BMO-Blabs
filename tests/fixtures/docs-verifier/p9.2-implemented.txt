@@ -1,0 +1,4 @@
+P9.1 implementation state: ISOLATED CANDIDATE IMPLEMENTED / READY FOR REVIEW
+P9.2–P9.6 implementation state: IMPLEMENTED — CHAT AND MEMORY
+| P9.1 | scope | docs | IMPLEMENTED — ISOLATED / READY FOR REVIEW | AUTHORIZED | evidence |
+| P9.2–P9.6 | scope | docs | IMPLEMENTED — CHAT AND MEMORY | AUTHORIZED | evidence |

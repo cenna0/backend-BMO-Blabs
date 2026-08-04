@@ -1,0 +1,4 @@
+P9.1 implementation state: ISOLATED CANDIDATE IMPLEMENTED / READY FOR REVIEW
+P9.2–P9.6 implementation state: NOT IMPLEMENTED
+| P9.1 | scope | docs | IMPLEMENTED — ISOLATED / READY FOR REVIEW | AUTHORIZED | evidence |
+| P9.2–P9.6 | scope | docs | PROPOSED; NOT_STARTED | DEPENDS ON PREDECESSOR GATES | evidence |

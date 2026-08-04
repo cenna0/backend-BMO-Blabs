@@ -4,12 +4,116 @@ import hashlib
 import re
 import sys
 
-root = Path(__file__).resolve().parents[1]
+def resolve_root() -> Path:
+    if len(sys.argv) == 3 and sys.argv[1] == "--root":
+        return Path(sys.argv[2]).resolve()
+    return Path(__file__).resolve().parents[1]
+
+
+root = resolve_root()
 docs = root / "docs"
 bm = root / "docs" / "backend-mvp"
 hw_copy = root / "docs" / "hardware-contract" / "BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md"
 prd = root / "docs" / "product" / "BMO-BY-BLABS-PRD-v1.2.4.md"
 archive = root / "docs" / "archive" / "BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md"
+
+PRE_P9_IMPLEMENTATION_STATE = "P9 implementation state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION"
+P9_1_ISOLATED_IMPLEMENTATION_STATE = "P9.1 implementation state: ISOLATED CANDIDATE IMPLEMENTED / READY FOR REVIEW"
+
+
+def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
+    """Validate the pre-P9 and isolated P9.1 implementation-control states."""
+    errors: list[str] = []
+    candidate_expected_value = P9_1_ISOLATED_IMPLEMENTATION_STATE.split(": ", 1)[1]
+    pre_p9_expected_value = PRE_P9_IMPLEMENTATION_STATE.split(": ", 1)[1]
+    candidate_declarations = re.findall(
+        r"^P9\.1 implementation state:\s*(.+?)\s*$",
+        status,
+        re.MULTILINE,
+    )
+    pre_p9_declarations = re.findall(
+        r"^P9 implementation state:\s*(.+?)\s*$",
+        status,
+        re.MULTILINE,
+    )
+
+    if candidate_declarations == [candidate_expected_value] and not pre_p9_declarations:
+        stage = "P9.1-isolated-candidate"
+    elif pre_p9_declarations == [pre_p9_expected_value] and not candidate_declarations:
+        stage = "pre-P9"
+    else:
+        stage = "unknown"
+        declared = " ".join(candidate_declarations + pre_p9_declarations)
+        if re.search(r"\b(?:PRODUCTION|DEPLOYED|ACTIVE)\b", declared, re.IGNORECASE):
+            errors.append("P9.1 isolated candidate must not be marked production")
+        else:
+            errors.append(f"unrecognized P9 implementation state: {declared or '<missing>'}")
+
+    common_control_state = [
+        "Documentation package: CURRENT / P8 PRODUCTION CLOSED",
+        "Current next implementation phase: P9.1 — PostgreSQL, auth, pairing, settings foundation",
+        "P6 state: VERIFIED",
+        "P6 execution authorization: COMPLETED",
+        "P7 state: VERIFIED — PRODUCTION",
+        "P7 execution: COMPLETED",
+        "P8 state: P8_PIPER_PRODUCTION_VERIFIED",
+        "P9.1 architecture state: LOCKED / APPROVED",
+        "P10 state: NOT_STARTED / dependency-gated after P9.6",
+    ]
+    for value in common_control_state:
+        if value not in status:
+            errors.append(f"status missing current control state: {value}")
+
+    if stage == "P9.1-isolated-candidate" and "P9.2–P9.6 implementation state: NOT IMPLEMENTED" not in status:
+        errors.append("P9.2–P9.6 must remain PROPOSED; NOT_STARTED")
+
+    phase_rows: dict[str, tuple[str, str]] = {}
+    for line in status.splitlines():
+        if not re.match(r"^\| (?:P[1-8]|P9\.1|P9\.2–P9\.6|P10) \|", line):
+            continue
+        columns = [column.strip() for column in line.strip().strip("|").split("|")]
+        if len(columns) != 6:
+            errors.append(f"malformed implementation phase row: {line}")
+            continue
+        phase, _scope, _required_docs, phase_status, authorization, _evidence = columns
+        if phase in phase_rows:
+            errors.append(f"duplicate implementation phase row: {phase}")
+        phase_rows[phase] = (phase_status, authorization)
+
+    expected_p9_1 = (
+        ("IMPLEMENTED — ISOLATED / READY FOR REVIEW", "AUTHORIZED")
+        if stage == "P9.1-isolated-candidate"
+        else ("ARCHITECTURE LOCKED; NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION")
+    )
+    expected_phase_rows = {
+        "P1": ("VERIFIED — BACKEND", "AUTHORIZED BY USER"),
+        "P2": ("VERIFIED — LOCAL FUNCTIONAL", "AUTHORIZED BY USER"),
+        "P3": ("IMPLEMENTED — not VERIFIED", "AUTHORIZED BY USER"),
+        "P4": ("VERIFIED — LOCAL FUNCTIONAL", "AUTHORIZED BY USER"),
+        "P5": ("VERIFIED — BACKEND", "AUTHORIZED BY USER"),
+        "P6": ("VERIFIED", "COMPLETED"),
+        "P7": ("VERIFIED — PRODUCTION", "COMPLETED"),
+        "P8": ("VERIFIED — PRODUCTION", "COMPLETED"),
+        "P9.1": expected_p9_1,
+        "P9.2–P9.6": ("PROPOSED; NOT_STARTED", "DEPENDS ON PREDECESSOR GATES"),
+        "P10": (
+            "NOT_STARTED",
+            "DEPENDS ON P9.6 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS",
+        ),
+    }
+    if set(phase_rows) != set(expected_phase_rows):
+        errors.append("implementation phase table must contain P1-P10 exactly once")
+    for phase, expected_state in expected_phase_rows.items():
+        if phase_rows.get(phase) != expected_state:
+            errors.append(
+                f"invalid current phase state {phase}: {phase_rows.get(phase)}, "
+                f"expected {expected_state}",
+            )
+            if phase == "P9.2–P9.6":
+                errors.append("P9.2–P9.6 must remain PROPOSED; NOT_STARTED")
+
+    return stage, errors
+
 
 expected = [
     "00-AGENT-EXECUTION-GUIDE.md",
@@ -125,59 +229,8 @@ if archive.is_file():
         errors.append(f"source numbered sections are not exactly §1–§33: {numbers}")
 
 status = (bm / "IMPLEMENTATION-STATUS.md").read_text(encoding="utf-8")
-control_state = [
-    "Documentation package: CURRENT / P8 PRODUCTION CLOSED",
-    "Current next implementation phase: P9.1 — PostgreSQL, auth, pairing, settings foundation",
-    "P6 state: VERIFIED",
-    "P6 execution authorization: COMPLETED",
-    "P7 state: VERIFIED — PRODUCTION",
-    "P7 execution: COMPLETED",
-    "P8 state: P8_PIPER_PRODUCTION_VERIFIED",
-    "P9.1 architecture state: LOCKED / APPROVED",
-    "P9 implementation state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
-    "P10 state: NOT_STARTED / dependency-gated after P9.6",
-]
-for value in control_state:
-    if value not in status:
-        errors.append(f"status missing current control state: {value}")
-
-phase_rows = {}
-for line in status.splitlines():
-    if not re.match(r"^\| (?:P[1-8]|P9\.1|P9\.2–P9\.6|P10) \|", line):
-        continue
-    columns = [column.strip() for column in line.strip().strip("|").split("|")]
-    if len(columns) != 6:
-        errors.append(f"malformed implementation phase row: {line}")
-        continue
-    phase, _scope, _required_docs, phase_status, authorization, _evidence = columns
-    if phase in phase_rows:
-        errors.append(f"duplicate implementation phase row: {phase}")
-    phase_rows[phase] = (phase_status, authorization)
-
-expected_phase_rows = {
-    "P1": ("VERIFIED — BACKEND", "AUTHORIZED BY USER"),
-    "P2": ("VERIFIED — LOCAL FUNCTIONAL", "AUTHORIZED BY USER"),
-    "P3": ("IMPLEMENTED — not VERIFIED", "AUTHORIZED BY USER"),
-    "P4": ("VERIFIED — LOCAL FUNCTIONAL", "AUTHORIZED BY USER"),
-    "P5": ("VERIFIED — BACKEND", "AUTHORIZED BY USER"),
-    "P6": ("VERIFIED", "COMPLETED"),
-    "P7": ("VERIFIED — PRODUCTION", "COMPLETED"),
-    "P8": ("VERIFIED — PRODUCTION", "COMPLETED"),
-    "P9.1": ("ARCHITECTURE LOCKED; NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"),
-    "P9.2–P9.6": ("PROPOSED; NOT_STARTED", "DEPENDS ON PREDECESSOR GATES"),
-    "P10": (
-        "NOT_STARTED",
-        "DEPENDS ON P9.6 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS",
-    ),
-}
-if set(phase_rows) != set(expected_phase_rows):
-    errors.append("implementation phase table must contain P1-P10 exactly once")
-for phase, expected_state in expected_phase_rows.items():
-    if phase_rows.get(phase) != expected_state:
-        errors.append(
-            f"invalid current phase state {phase}: {phase_rows.get(phase)}, "
-            f"expected {expected_state}",
-        )
+p9_stage, p9_stage_errors = validate_p9_phase_status(status)
+errors.extend(p9_stage_errors)
 
 p10_rows = [line for line in status.splitlines() if line.startswith("| P10 |")]
 if len(p10_rows) != 1 or "physical ESP32 acceptance" not in p10_rows[0]:
@@ -271,6 +324,44 @@ execution_guide = active_doc_text[bm / "00-AGENT-EXECUTION-GUIDE.md"]
 testing_doc = active_doc_text[bm / "05-TESTING-AND-ACCEPTANCE.md"]
 hardware_status = active_doc_text[docs / "hardware-handoff" / "CURRENT-STATUS.md"]
 deployment_config = active_doc_text[docs / "hardware-handoff" / "DEPLOYMENT-CONFIG.md"]
+
+if p9_stage == "P9.1-isolated-candidate":
+    p9_readme = read_utf8(docs / "p9" / "README.md")
+    p9_implementation_evidence = read_utf8(docs / "p9" / "P9.1-IMPLEMENTATION-EVIDENCE.md")
+    p9_review_evidence = read_utf8(docs / "p9" / "P9.1-FOUNDATION-REVIEW.md")
+    candidate_evidence_requirements = {
+        "docs/p9/README.md": (
+            p9_readme,
+            [
+                "no P9.1 candidate is deployed to production",
+                "P9.2–P9.6 remain proposed",
+                "not implemented",
+            ],
+        ),
+        "docs/p9/P9.1-IMPLEMENTATION-EVIDENCE.md": (
+            p9_implementation_evidence,
+            [
+                "This evidence is for the isolated candidate only.",
+                "does not authorize a",
+                "production deployment",
+                "No production Compose, Caddy, DNS, service, or Audio behavior was changed.",
+                "P9.2–P9.6: not implemented",
+            ],
+        ),
+        "docs/p9/P9.1-FOUNDATION-REVIEW.md": (
+            p9_review_evidence,
+            [
+                "P9_1_FOUNDATION_REVIEW_APPROVED",
+                "No merge, production deployment, production restart, production",
+                "No production",
+                "Compose, Caddy, DNS, Backend, Audio, Hermes, or Hardware Contract file was",
+            ],
+        ),
+    }
+    for label, (text, required_values) in candidate_evidence_requirements.items():
+        for value in required_values:
+            if value not in text:
+                errors.append(f"{label} missing isolated P9.1 safety assertion: {value}")
 
 current_doc_requirements = {
     "docs/README.md": (
@@ -733,8 +824,19 @@ for label, (text, required_values) in runtime_source_requirements.items():
 voice_runtime_text = "\n".join(
     text
     for path, text in active_source_text.items()
-    if (root / "backend" / "src") in path.parents
-    or (root / "audio-service" / "app") in path.parents
+    if (
+        (
+            (root / "backend" / "src") in path.parents
+            and not (
+                p9_stage == "P9.1-isolated-candidate"
+                and (
+                    (root / "backend" / "src" / "p9") in path.parents
+                    or (root / "backend" / "src" / "generated" / "prisma") in path.parents
+                )
+            )
+        )
+        or (root / "audio-service" / "app") in path.parents
+    )
 )
 if re.search(r"\b(POSTGRES|DATABASE_URL|PRISMA)\b", voice_runtime_text, re.IGNORECASE):
     errors.append("PostgreSQL/Prisma leaked into active voice runtime source before P9")
