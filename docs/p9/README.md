@@ -30,15 +30,17 @@ P9.1 is deployed.
    ownership, file, mount, and service-isolation source of truth.
 4. [`P9.1-BACKUP-MONITORING-AND-RESTORE.md`](P9.1-BACKUP-MONITORING-AND-RESTORE.md)
    — local backup, manual PC pull, monitoring, and restore policy.
-5. [`P9.1-PRODUCTION-MIGRATION-PLAN.md`](P9.1-PRODUCTION-MIGRATION-PLAN.md) —
+5. [`P9.1-WINDOWS-OFF-VPS-BACKUP-GUIDE.md`](P9.1-WINDOWS-OFF-VPS-BACKUP-GUIDE.md)
+   — canonical Windows PowerShell/Tailscale/SCP/Gpg4win transfer procedure.
+6. [`P9.1-PRODUCTION-MIGRATION-PLAN.md`](P9.1-PRODUCTION-MIGRATION-PLAN.md) —
    private initialization and migration sequence.
-6. [`P9.1-PRODUCTION-CANARY-PLAN.md`](P9.1-PRODUCTION-CANARY-PLAN.md) — future
+7. [`P9.1-PRODUCTION-CANARY-PLAN.md`](P9.1-PRODUCTION-CANARY-PLAN.md) — future
    staged canary topology.
-7. [`P9.1-PRODUCTION-ROLLBACK-RUNBOOK.md`](P9.1-PRODUCTION-ROLLBACK-RUNBOOK.md)
+8. [`P9.1-PRODUCTION-ROLLBACK-RUNBOOK.md`](P9.1-PRODUCTION-ROLLBACK-RUNBOOK.md)
    — rollback and failure matrix.
-8. [`P9.1-PRODUCTION-OBSERVABILITY.md`](P9.1-PRODUCTION-OBSERVABILITY.md) —
+9. [`P9.1-PRODUCTION-OBSERVABILITY.md`](P9.1-PRODUCTION-OBSERVABILITY.md) —
    private operational signals.
-9. [`P9.1-PRODUCTION-ACCEPTANCE-MATRIX.md`](P9.1-PRODUCTION-ACCEPTANCE-MATRIX.md)
+10. [`P9.1-PRODUCTION-ACCEPTANCE-MATRIX.md`](P9.1-PRODUCTION-ACCEPTANCE-MATRIX.md)
    — command-level future acceptance gates.
 
 The deep secret reference is [`P9.1-PRODUCTION-SECRET-AND-KEY-MANAGEMENT.md`](P9.1-PRODUCTION-SECRET-AND-KEY-MANAGEMENT.md),

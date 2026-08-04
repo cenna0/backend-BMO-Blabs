@@ -100,6 +100,8 @@ Read in this order:
     provisioning, validation, rotation, recovery, and incident handoff.
 13. `p9/P9.1-PRODUCTION-SECRET-MATRIX.md` — service isolation and mount
     boundary.
+14. `p9/P9.1-WINDOWS-OFF-VPS-BACKUP-GUIDE.md` — locked Windows manual
+    off-VPS backup pull and restore-rehearsal procedure.
 
 Historical P1–P7 plans/evidence remain evidence, not execution authority.
 
