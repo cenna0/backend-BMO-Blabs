@@ -43,6 +43,7 @@
     "@types/pg": "8.20.3",
     "@types/supertest": "6.0.3",
     "@types/ws": "8.18.1",
+    "prisma": "7.9.1",
     "supertest": "7.1.4",
     "tsx": "4.20.3",
     "typescript": "5.8.3",

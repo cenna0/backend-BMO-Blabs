@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum InvitationStatus {
+  ACTIVE
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum DeviceStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+}
+
+enum PairingStatus {
+  ISSUED
+  CLAIMED
+  EXPIRED
+  REVOKED
+  INVALIDATED
+  FAILED
+}
+
+enum ResponseLength {
+  BRIEF
+  STANDARD
+  DETAILED
+}
+
+enum NotificationBehavior {
+  ALL
+  IMPORTANT
+  NONE
+}
+
+model User {
+  id                 String             @id @default(uuid()) @db.Uuid
+  email              String             @unique @db.VarChar(320)
+  displayName        String?            @db.VarChar(120)
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
+  identities         AuthIdentity[]
+  passwordCredential PasswordCredential?
+  invitations        Invitation[]
+  sessions           Session[]
+  devices            Device[]
+  pairings           DevicePairing[]
+  userSettings       UserSettings?
+  auditEvents        AuditEvent[]
+}
+
+model PasswordCredential {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @unique @db.Uuid
+  passwordHash String  @db.VarChar(255)
+  algorithm  String   @default("argon2id") @db.VarChar(32)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuthIdentity {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  provider       String   @db.VarChar(32)
+  providerSubject String  @db.VarChar(255)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@index([userId])
+}
+
+model Invitation {
+  id         String           @id @default(uuid()) @db.Uuid
+  email      String           @db.VarChar(320)
+  tokenHash  String           @unique @db.Char(64)
+  status     InvitationStatus @default(ACTIVE)
+  expiresAt  DateTime         @db.Timestamptz(3)
+  acceptedAt DateTime?        @db.Timestamptz(3)
+  revokedAt  DateTime?        @db.Timestamptz(3)
+  createdAt  DateTime         @default(now()) @db.Timestamptz(3)
+  createdBy  String?          @db.Uuid
+  user       User?            @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([email, status, expiresAt])
+}
+
+model Session {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @db.Uuid
+  clientDeviceId String?        @db.Uuid
+  familyId       String         @db.Uuid
+  expiresAt      DateTime       @db.Timestamptz(3)
+  revokedAt      DateTime?      @db.Timestamptz(3)
+  revokedReason  String?        @db.VarChar(64)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  lastUsedAt     DateTime?      @db.Timestamptz(3)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens  RefreshToken[]
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([userId, clientDeviceId])
+  @@index([familyId])
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  sessionId  String    @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  familyId   String    @db.Uuid
+  issuedAt   DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  usedAt     DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, familyId, expiresAt])
+  @@index([familyId, usedAt, revokedAt])
+}
+
+model Device {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  hardwareId String         @unique @db.VarChar(128)
+  name       String         @db.VarChar(120)
+  tokenHash  String         @db.Char(64)
+  status     DeviceStatus   @default(PENDING)
+  pairedAt   DateTime?      @db.Timestamptz(3)
+  revokedAt  DateTime?      @db.Timestamptz(3)
+  lastSeenAt DateTime?      @db.Timestamptz(3)
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime       @updatedAt @db.Timestamptz(3)
+  user       User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  pairings   DevicePairing[]
+  settings   DeviceSettings?
+  auditEvents AuditEvent[]
+
+  @@index([userId, status])
+}
+
+model DevicePairing {
+  id           String        @id @default(uuid()) @db.Uuid
+  userId       String        @db.Uuid
+  deviceId     String?       @db.Uuid
+  codeHash     String        @db.Char(64)
+  status       PairingStatus @default(ISSUED)
+  expiresAt    DateTime      @db.Timestamptz(3)
+  attemptCount Int           @default(0)
+  maxAttempts  Int           @default(5)
+  lastAttemptAt DateTime?    @db.Timestamptz(3)
+  claimedAt    DateTime?     @db.Timestamptz(3)
+  revokedAt    DateTime?     @db.Timestamptz(3)
+  invalidatedAt DateTime?    @db.Timestamptz(3)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device       Device?       @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, expiresAt])
+  @@index([codeHash, status])
+}
+
+model UserSettings {
+  id                        String         @id @default(uuid()) @db.Uuid
+  userId                    String         @unique @db.Uuid
+  language                  String         @default("en") @db.VarChar(16)
+  responseLength            ResponseLength @default(STANDARD)
+  automaticMemoryCandidates Boolean        @default(true)
+  timezone                  String         @default("Asia/Jakarta") @db.VarChar(64)
+  createdAt                 DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime       @updatedAt @db.Timestamptz(3)
+  user                      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DeviceSettings {
+  id                   String               @id @default(uuid()) @db.Uuid
+  deviceId             String               @unique @db.Uuid
+  displayName          String?              @db.VarChar(120)
+  defaultDevice        Boolean              @default(false)
+  playbackVolume       Int                  @default(80)
+  quietHours           Json?
+  notificationBehavior NotificationBehavior @default(ALL)
+  voiceProfileId       String               @default("prudence") @db.VarChar(32)
+  speechSpeed          Float                @default(1.0)
+  enabled              Boolean              @default(true)
+  createdAt            DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime             @updatedAt @db.Timestamptz(3)
+  device               Device               @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+
+model AuditEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @db.Uuid
+  deviceId     String?  @db.Uuid
+  actorType    String   @db.VarChar(32)
+  eventType    String   @db.VarChar(64)
+  outcome      String   @db.VarChar(32)
+  resourceType String   @db.VarChar(64)
+  resourceId   String?  @db.VarChar(128)
+  requestId    String?  @db.VarChar(128)
+  metadata     Json?
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  device       Device?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([deviceId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([resourceType, resourceId])
+}
