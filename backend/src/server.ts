@@ -5,6 +5,7 @@ import express, { type Express } from "express";
 import { pino, type Logger } from "pino";
 
 import { parseEnv, type BackendConfig } from "./config/env.js";
+import { createP9Runtime, type P9Runtime } from "./p9/index.js";
 import { RequestStore } from "./domain/request-store.js";
 import { createAudioRouter } from "./http/audio.route.js";
 import { createHealthRouter } from "./http/health.route.js";
@@ -25,6 +26,7 @@ export interface BackendRuntime {
   requestStore: RequestStore;
   sockets: DeviceWebSocketServer;
   tempAudio: TempAudioService;
+  p9?: P9Runtime;
   runMaintenance(): Promise<void>;
   start(port?: number): Promise<AddressInfo>;
   stop(): Promise<void>;
@@ -43,6 +45,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   const tempAudio = new TempAudioService(config.TEMP_AUDIO_DIR, config.TEMP_AUDIO_TTL_SECONDS);
   let publicBaseUrl = config.PUBLIC_BASE_URL.replace(/\/$/, "");
   let cleanupInterval: NodeJS.Timeout | undefined;
+  let p9: P9Runtime | undefined;
 
   const removeOutput = async (deviceId: string, requestId: string, failed: boolean) => {
     const record = requestStore.get(requestId);
@@ -153,6 +156,10 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   };
 
   app.use(createHealthRouter({ hardwareTestMode: config.HARDWARE_TEST_MODE, readiness }));
+  if (config.p9.enabled) {
+    p9 = createP9Runtime(config.p9);
+    app.use(p9.router);
+  }
   app.use(createVoiceRouter({ config, requestStore, sockets, tempAudio, hardwareTest, pipeline, logger }));
   app.use(createAudioRouter(tempAudio, { requestStore, sockets }));
   app.use(createVoiceErrorHandler(config.MAX_AUDIO_BYTES));
@@ -166,6 +173,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     requestStore,
     sockets,
     tempAudio,
+    ...(p9 === undefined ? {} : { p9 }),
     runMaintenance,
     async start(port = config.BACKEND_PORT) {
       await tempAudio.initialize();
@@ -206,6 +214,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
         clearInterval(cleanupInterval);
         cleanupInterval = undefined;
       }
+      if (p9) await p9.close();
       await sockets.close();
       if (httpServer.listening) {
         await new Promise<void>((resolve, reject) => {

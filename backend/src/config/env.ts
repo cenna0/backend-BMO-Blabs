@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { parseP9Config, type P9Config } from "../p9/config.js";
+
 const booleanString = z
   .enum(["true", "false"])
   .default("false")
@@ -91,8 +93,8 @@ const envSchema = z
     }
   });
 
-export type BackendConfig = z.infer<typeof envSchema>;
+export type BackendConfig = z.infer<typeof envSchema> & { p9: P9Config };
 
 export function parseEnv(input: Record<string, unknown>): BackendConfig {
-  return envSchema.parse(input);
+  return { ...envSchema.parse(input), p9: parseP9Config(input) };
 }
