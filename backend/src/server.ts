@@ -158,7 +158,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   app.use(createHealthRouter({ hardwareTestMode: config.HARDWARE_TEST_MODE, readiness }));
   if (config.p9.enabled) {
     p9 = createP9Runtime(config.p9);
-    app.use(p9.router);
+    app.use("/api/v1", p9.router);
   }
   app.use(createVoiceRouter({ config, requestStore, sockets, tempAudio, hardwareTest, pipeline, logger }));
   app.use(createAudioRouter(tempAudio, { requestStore, sockets }));

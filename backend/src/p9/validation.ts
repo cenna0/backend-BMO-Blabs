@@ -55,6 +55,10 @@ export function normalizeEmail(value: string): string {
   return emailSchema.parse(normalized);
 }
 
+export function isUuid(value: string): boolean {
+  return z.string().uuid().safeParse(value).success;
+}
+
 export function parseQuietHours(value: unknown): QuietHours | null {
   if (value === null || value === undefined) return null;
   const parsed = quietHoursSchema.parse(value);

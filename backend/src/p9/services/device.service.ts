@@ -3,6 +3,7 @@ import { sha256Hex } from "../crypto.js";
 import { withP9Transaction } from "../db/client.js";
 import { P9Repositories } from "../db/repositories.js";
 import { P9Error } from "../errors.js";
+import { isUuid } from "../validation.js";
 import type { SafeDevice } from "../types.js";
 import { AuditService } from "./audit.service.js";
 
@@ -40,6 +41,7 @@ export class DeviceService {
   }
 
   async get(userId: string, deviceId: string): Promise<SafeDevice> {
+    if (!isUuid(deviceId)) throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
     const device = await this.repositories.device.findFirst({ where: { id: deviceId, userId } });
     if (!device) throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
     return publicDevice(device);
@@ -63,6 +65,7 @@ export class DeviceService {
   }
 
   async unpair(userId: string, deviceId: string, requestId?: string): Promise<void> {
+    if (!isUuid(deviceId)) throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
     await withP9Transaction(this.client, async (transaction) => {
       const repositories = new P9Repositories(transaction);
       await repositories.lockUser(userId);

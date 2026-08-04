@@ -5,6 +5,7 @@ import { P9Repositories } from "../db/repositories.js";
 import { P9Error } from "../errors.js";
 import { publicDevice, DeviceService } from "./device.service.js";
 import { AuditService } from "./audit.service.js";
+import { isUuid } from "../validation.js";
 
 export function isPairingCode(value: string): boolean {
   return /^\d{6}$/.test(value);
@@ -86,6 +87,7 @@ export class PairingService {
   }
 
   async status(userId: string, pairingId: string): Promise<ReturnType<typeof publicPairingStatus>> {
+    if (!isUuid(pairingId)) throw new P9Error("PAIRING_INVALID", 404, "Pairing not found");
     const pairing = await this.options.repositories.devicePairing.findFirst({ where: { id: pairingId, userId } });
     if (!pairing) throw new P9Error("PAIRING_INVALID", 404, "Pairing not found");
     if (pairing.status === "ISSUED" && pairing.expiresAt <= new Date()) {
@@ -99,6 +101,7 @@ export class PairingService {
   }
 
   async revoke(userId: string, pairingId: string, requestId?: string): Promise<void> {
+    if (!isUuid(pairingId)) throw new P9Error("PAIRING_INVALID", 404, "Pairing not found");
     const updated = await this.options.repositories.devicePairing.updateMany({ where: { id: pairingId, userId, status: "ISSUED" }, data: { status: "REVOKED", revokedAt: new Date() } });
     if (updated.count !== 1) throw new P9Error("PAIRING_INVALID", 404, "Pairing not found");
     await new AuditService(this.options.repositories).record({
@@ -113,7 +116,7 @@ export class PairingService {
   }
 
   async claim(userId: string, input: PairingClaimInput, requestId?: string) {
-    if (!isPairingCode(input.code) || input.hardwareId.trim().length < 1 || input.hardwareId.length > 128 || input.deviceName.trim().length < 1 || input.deviceName.length > 120 || input.deviceCredential.length < 16 || input.deviceCredential.length > 256) {
+    if (!isUuid(input.pairingId) || !isPairingCode(input.code) || input.hardwareId.trim().length < 1 || input.hardwareId.length > 128 || input.deviceName.trim().length < 1 || input.deviceName.length > 120 || input.deviceCredential.length < 16 || input.deviceCredential.length > 256) {
       throw new P9Error("PAIRING_INVALID", 400, "Pairing is not valid");
     }
     try {

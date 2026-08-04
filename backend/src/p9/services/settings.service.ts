@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from "../../generated/prisma/client.js";
 import { withP9Transaction } from "../db/client.js";
 import { P9Repositories } from "../db/repositories.js";
 import { P9Error } from "../errors.js";
-import { parseDeviceSettings, parseUserSettings, type QuietHours } from "../validation.js";
+import { isUuid, parseDeviceSettings, parseUserSettings, type QuietHours } from "../validation.js";
 import { AuditService } from "./audit.service.js";
 
 const responseLengthFromDatabase = (value: string): "brief" | "standard" | "detailed" => value.toLowerCase() as "brief" | "standard" | "detailed";
@@ -88,12 +88,14 @@ export class SettingsService {
   }
 
   async getDeviceSettings(userId: string, deviceId: string) {
+    if (!isUuid(deviceId)) throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
     const device = await this.repositories.device.findFirst({ where: { id: deviceId, userId, status: "ACTIVE" }, include: { settings: true } });
     if (!device?.settings) throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
     return publicDeviceSettings(device.settings);
   }
 
   async updateDeviceSettings(userId: string, deviceId: string, input: unknown, requestId?: string) {
+    if (!isUuid(deviceId)) throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
     const parsed = parseDeviceSettings(input);
     return withP9Transaction(this.client, async (transaction) => {
       const repositories = new P9Repositories(transaction);

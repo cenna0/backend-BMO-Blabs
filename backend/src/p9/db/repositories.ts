@@ -9,7 +9,7 @@ export class P9Repositories {
   }
 
   async lockUser(userId: string): Promise<void> {
-    await this.db.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
+    await this.db.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
   }
 
   async migrationStatus(): Promise<Array<{ name: string; finishedAt: Date | null }>> {
