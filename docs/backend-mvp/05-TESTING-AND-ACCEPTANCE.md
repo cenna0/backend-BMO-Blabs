@@ -7,6 +7,12 @@
 > **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
 > **Scope:** Backend voice MVP only. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
 
+> **P8 status override:** P8 production acceptance is complete with Piper
+> Prudence primary, Kokoro fallback, and RVC disabled/removed from production.
+> Historical RVC test rows below are preserved as evidence boundaries and must
+> not be read as current production requirements. P9 application tests are
+> defined in [`../p9/23-test-acceptance-matrix.md`](../p9/23-test-acceptance-matrix.md).
+
 
 ## Cara menggunakan file ini
 

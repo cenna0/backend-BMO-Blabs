@@ -199,15 +199,19 @@ Prepare the application database for mobile/user/device/integration work without
 - backup storage policy.
 
 ### Scope
-- re-audit the PRD schema baseline against the latest approved mobile/auth/device-pairing specification before creating migrations; do not freeze an outdated schema merely because it appears in an older product snapshot;
-- PostgreSQL container/private storage;
-- `postgres.env` secret generation;
-- Prisma configuration/migration baseline;
-- healthcheck;
-- persistent volume ownership;
-- daily/weekly backup;
-- restore test;
-- private-only DB network exposure.
+- P9.1: PostgreSQL, Prisma, auth, users, devices, pairing, and settings foundation;
+- P9.2: chat sessions/messages, voice transcripts, curated memory,
+  `PostgresMemoryGateway`, deletion, and export;
+- P9.3: schedules, schedule runs, delivery attempts, worker, reminders,
+  alarms, and additive proactive-device delivery proposal;
+- P9.4: Spotify OAuth, encrypted tokens, playback actions, and mobile status;
+- P9.5: WhatsApp connection/rules, confirmation, and Hermes session recovery;
+- P9.6: security hardening, backup/restore, observability, resource/load tests,
+  rollout/rollback rehearsal, and final acceptance.
+
+The detailed architecture, preliminary schema, entity/API mapping, and gates
+are [`../p9/README.md`](../p9/README.md). This roadmap entry does not
+authorize implementation, PostgreSQL installation, or migrations.
 
 ### Output
 - ready database service;
@@ -215,11 +219,15 @@ Prepare the application database for mobile/user/device/integration work without
 - backup/restore evidence.
 
 ### Acceptance criteria
-- DB survives container restart/recreate;
-- migration procedure is reproducible;
-- backup and restore test pass;
+- each authorized P9 subphase passes its own documented gate;
+- DB survives container restart/recreate once P9.1 is implemented;
+- migration procedure is reproducible and restore-tested;
 - port 5432 is not public;
-- voice request store remains in-memory.
+- voice request store remains in-memory;
+- chat history and curated memory remain separate;
+- scheduler is not represented as memory;
+- Spotify/WhatsApp credentials remain Backend-owned;
+- Hardware Contract v1.0.5 remains unchanged.
 
 ### Dependency
 Technical dependency: P6. **Execution order:** run P9 only after P8 has a

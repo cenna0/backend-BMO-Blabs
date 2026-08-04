@@ -8,6 +8,11 @@
 **P8 status:** `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 **P9–P10 status:** `NOT_STARTED / dependency-gated`
 
+> Historical evidence snapshot: the P8/P9 status lines in this report describe
+> the state at the time of the P7 verification. Current state is governed by
+> `P8-PRODUCTION-ROLLOUT-EVIDENCE.md`, `IMPLEMENTATION-STATUS.md`, and
+> `../p9/README.md`; P8 is now production-verified and P9 is architecture-only.
+
 This report is sanitized. It contains no device token, Hermes API key,
 internal-service token, authorization header, transcript, Hermes response
 text, provider credential, Telegram credential, or other active secret.

@@ -101,9 +101,12 @@ is:
 d2761b191eed48e85128e774aa7057153d8e8994e2e4f40c07ffb05731ae7e9f
 ```
 
-Real RVC inference remains unverified and is archived experimental work. It was
-not deployed in P8. Production keeps `RVC_ENABLED=false`; Piper failure routes
-automatically to Kokoro `af_heart` at speed `0.80`.
+RVC is archived experimental work, is not a production dependency, and is not
+enabled. Production keeps `RVC_ENABLED=false`; Piper failure routes
+automatically to Kokoro `af_heart` at speed `0.80`. The compact RVC evidence
+and Git history remain archived for provenance only.
+Historical status: Real RVC inference remains unverified; this does not
+describe a current production runtime.
 
 P8 production/resource verification passed with zero new OOM events, zero
 Audio restarts, safe host reserve, and no material process, descriptor, memory,
@@ -122,6 +125,15 @@ None. These runtime values do **not** change:
 - retry/idempotency/error behavior.
 
 Hardware Contract v1.0.5 remains unchanged.
+
+## P9 voice-settings boundary
+
+P9 may add mobile-editable, Backend-validated settings for the fixed Prudence
+profile, safe speech speed, playback volume, response-length preference,
+preview, and reset-to-default. No voice selector, custom model, checkpoint,
+voice cloning, RVC, or runtime model download is implemented by P9
+architecture. Production values above remain authoritative until a later
+implementation phase provides fresh evidence.
 
 ## P8 production result and archived experiments
 

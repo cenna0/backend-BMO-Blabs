@@ -29,7 +29,7 @@ expected = [
 ]
 
 source_hashes = {
-    prd: "85022140f9825cb9256b7b29ce49b8407cc854108dbf720b4377581304b7e53f",
+    prd: "24b31e8268d516f6a7d22bfcdefd149fe56e0be08723ad1a32ce53d5287d5d52",
     archive: "d1554d8d2cdbd6e32cf7acca75ce17031adcc47463b8577f64cdc288fa076853",
     hw_copy: "633e398a7fa39a3ebc469af7f9ca46fd04890339bb132ec7de2c2286207c6a44",
 }
@@ -525,16 +525,16 @@ for label, text in current_authorities.items():
             "P10 has a contradictory authorized/active/verified state",
         ),
         (
-            r"\bP(?:8|9|10) is (?:READY|AUTHORIZED|IN_PROGRESS|VERIFIED)\b",
+            r"\bP(?:9|10) is (?:READY|AUTHORIZED|IN_PROGRESS|VERIFIED)\b",
             "a gated future phase is described as ready/authorized/active/verified",
         ),
         (
-            r"\bP(?:8|9|10) (?:may|can|should|must) "
+            r"\bP(?:9|10) (?:may|can|should|must) "
             r"(?:be )?(?:executed|started|begun|execute|start|begin)(?: now)?\b",
             "a gated future phase is allowed to execute/start",
         ),
         (
-            r"\bP(?:8|9|10) (?:execution )?is authorized to "
+            r"\bP(?:9|10) (?:execution )?is authorized to "
             r"(?:execute|start|begin)\b",
             "a gated future phase is authorized to execute/start",
         ),

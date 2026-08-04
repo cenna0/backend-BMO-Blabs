@@ -25,7 +25,7 @@ device, decoder, speaker, timing, or Wi-Fi behavior.
 | Hermes `/v1/responses` production integration | **VERIFIED — PRODUCTION** | loopback Hermes + P7 E2E |
 | Production domain `api.personalbmo.web.id` | **LIVE / VERIFIED** | public HTTPS/WSS |
 | Public fake ESP32 end-to-end matrix | **PASS — 23/23** | P7 public acceptance |
-| Kokoro fallback with RVC disabled | **VERIFIED — PRODUCTION** | `RVC_ENABLED=false` |
+| Piper Prudence → Kokoro fallback | **VERIFIED — PRODUCTION** | P8 rollout; `RVC_ENABLED=false` |
 | Piper Prudence fixed primary | **VERIFIED — PRODUCTION** | P8 rollout evidence; fixed speaker prudence / ID 0 |
 
 ## Not verified
@@ -33,7 +33,7 @@ device, decoder, speaker, timing, or Wi-Fi behavior.
 | Capability | Current status | Owner |
 |---|---|---|
 | Real RVC inference | **NOT VERIFIED** | P8 archived experimental boundary; RVC disabled |
-| Tested RVC replacement architecture | **HOST-CAPACITY BLOCKED** | P8 canary; production restored to P7 |
+| RVC replacement architecture | **ARCHIVED / NOT A PRODUCTION DEPENDENCY** | compact P8 evidence and Git history retained |
 | Physical ESP32 integration | **NOT RUN** | P10 |
 | PostgreSQL/Prisma application data layer | **NOT IMPLEMENTED/DEPLOYED** | P9 |
 

@@ -15,8 +15,10 @@ P6 VPS Foundation and Operations Baseline remains `VERIFIED`. P7 backend,
 Audio Service, and Hermes production integration is `VERIFIED — PRODUCTION`.
 P7 is `VERIFIED — PRODUCTION`. P8 is `P8_PIPER_PRODUCTION_VERIFIED` with Piper
 Prudence primary, Kokoro fallback, and RVC disabled. P8 completion does **not**
-authorize P9. Do not execute P10 from this gate.
-P8 completion does **not** authorize P9
+authorize P9 implementation. The P9 architecture set is available for review
+under [`p9/README.md`](p9/README.md); do not install a database or execute
+P9.1 from this documentation gate. Do not execute P10 from this gate.
+P8 completion does **not** authorize P9.
 Sanitized proof is in
 [`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
 
@@ -72,7 +74,7 @@ Read in this order:
 
 1. `NEXT-ACTION.md` — this operational gate.
 2. `backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md` — closed P8 evidence.
-3. `roadmap/P8-EXECUTION-SPEC.md` — P8 closure and boundaries.
+3. `roadmap/P8-EXECUTION-SPEC.md` — historical P8 closure boundaries.
 4. `backend-mvp/IMPLEMENTATION-STATUS.md` — current status authority.
 5. `backend-mvp/P7-TEST-EVIDENCE.md` — immutable P7 baseline and headroom.
 6. `backend-mvp/04-AUDIO-SERVICE.md` — current adapter/model rules.
@@ -82,26 +84,21 @@ Read in this order:
 9. `hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — read-only
    public protocol contract.
 10. `operations/MAINTENANCE-AND-RECOVERY.md` — live recovery procedures.
+11. `p9/README.md` — reviewed P9 architecture and subphase gates.
 
 Historical P1–P7 plans/evidence remain evidence, not execution authority.
 
 ## 4. P8 closed boundary
 
-P8 delivered:
+P8 closed with the fixed Piper Prudence primary, Kokoro fallback, offline
+pinned assets, integrated persistent worker controls, production canary,
+fallback/recovery tests, public regression, resource soak, rollback retention,
+and sanitized evidence. The exact result is in
+[`backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md).
 
-- audit, select, and pin a compatible RVC inference runtime;
-- validate the existing BMO RVC model asset;
-- resolve required HuBERT/RMVPE assets;
-- perform isolated real Kokoro → RVC → FFmpeg inference;
-- test forced RVC failure and Kokoro-only fallback;
-- benchmark RVC CPU, RAM, latency, `MemAvailable`, disk, restart, and OOM
-  behavior;
-- compare Kokoro-only output with RVC output;
-- perform listening/quality evidence;
-- determine whether production has enough resource headroom;
-- fixed Piper Prudence primary TTS with Kokoro fallback;
-- offline pinned asset provisioning and integrated persistent worker controls;
-- production canary, acceptance, public regression, and soak evidence.
+The RVC experiment was not deployed. Its compact evidence and Git history are
+archived; no RVC runtime or Docker artifact is part of production and
+`RVC_ENABLED=false` remains locked.
 
 P8 did not:
 
@@ -109,18 +106,18 @@ P8 did not:
 - invent endpoints, events, fields, or protocol behavior;
 - implement P9 database work;
 - perform P10 physical ESP32 acceptance;
-- remove the Kokoro-only fallback;
-- expose backend, Hermes, or device secrets to RVC;
-- turn RVC on in production before its validation and deployment gates pass;
-- silently use mutable or unverified RVC dependencies/assets;
-- merge or deploy RVC; `RVC_ENABLED=false` remains.
+- remove the Kokoro fallback;
+- expose backend, Hermes, or device secrets to any audio runtime;
+- change the public hardware contract;
+- begin P9 implementation without a new explicit authorization.
 
 ## 5. P9 authorization and first action
 
-This documentation does not authorize P9. After a new explicit user command
-such as **“execute P9”**, begin with a fresh read-only source/runtime audit and
-create an isolated branch/worktree. Do not start database work from this
-closure.
+This documentation does not authorize P9 implementation. After a new explicit
+user command such as **“execute P9.1”**, begin with a fresh read-only
+source/runtime audit, read the approved P9.1 gate, and create an isolated
+implementation branch/worktree. Do not start database work from this
+architecture branch. P9.2–P9.6 require their own completed predecessor gate.
 
 Document and stop on any conflict with the locked hardware contract, P7
 production provenance, secret isolation, offline model policy, or Kokoro
@@ -128,27 +125,7 @@ fallback requirement.
 
 ## 6. P8 finish line
 
-P8 may finish as `VERIFIED`, `PARTIALLY VERIFIED`, or `BLOCKED`. The final
-classification must be evidence-backed and must not claim real RVC success
-unless real Kokoro → RVC → FFmpeg inference, output validation, fallback
-regression, quality review, and resource measurements support it.
-
-At minimum, closure must record:
-
-```text
-exact pinned RVC engine/runtime and immutable dependencies, or blocker
-verified model/archive and resolved .pth/.index paths
-HuBERT/RMVPE provenance when required
-isolated real inference result
-hardware-compatible MP3 result
-forced-RVC-failure Kokoro-only fallback result
-RVC and total pipeline latency
-CPU/RAM/MemAvailable/disk/OOM/restart evidence
-comparison against the P7 production baseline and headroom
-safe production rollout decision
-post-deploy public regression if and only if rollout is separately gated
-```
-
-Kokoro-only fallback must remain working even if P8 is partially verified or
-blocked. After P8 evidence and status are recorded, stop. Do not execute P9
-without another explicit user authorization.
+P8 is closed as `P8_PIPER_PRODUCTION_VERIFIED`. Do not repeat P8 work from this
+gate. P9 implementation requires the explicit authorization described in §5;
+the architecture branch only supplies the reviewable design and execution
+gates.

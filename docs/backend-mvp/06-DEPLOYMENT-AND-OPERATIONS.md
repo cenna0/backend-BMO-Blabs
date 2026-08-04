@@ -181,7 +181,7 @@ deploy   = release/rollback metadata
 Future/unprovisioned paths are not part of the P7 runtime baseline:
 
 ```text
-/opt/bmo/models/rvc/bmo/  P8 only, after verified immutable provisioning
+/opt/bmo/models/rvc/      removed from production; archived evidence is outside runtime tree
 /opt/bmo/data/postgres/   P9 only
 /opt/bmo/config/postgres.env  P9 only
 ```
@@ -300,8 +300,7 @@ PIPER_SPEAKER_ID=0
 PIPER_ASSET_MANIFEST_PATH=/opt/bmo/models/piper/PIPER_ASSET_MANIFEST.json
 
 RVC_ENABLED=false
-RVC_F0_UP_KEY=0
-RVC_F0_METHOD=rmvpe
+# Archived RVC runtime settings are intentionally absent from production.
 
 OUTPUT_MP3_SAMPLE_RATE=24000
 OUTPUT_MP3_BITRATE=96k
@@ -521,7 +520,7 @@ Large reproducible model/cache files and Docker images do not need to be copied 
 
 A backup does not count as verified until a restore test has been performed.
 
-## 13. RVC deployment ownership — Future P8
+## 13. RVC deployment ownership — Archived P8 boundary
 
 RVC belongs to Audio Service, not Express backend.
 
@@ -531,7 +530,14 @@ Possible future asset path, not provisioned in P7:
 /opt/bmo/models/rvc/bmo/
 ```
 
-Flow:
+The following flow is retained as historical P8 planning/evidence context only;
+it is not a current production deployment instruction:
+
+```text
+RVC evidence/archive boundary — no runtime artifact or enablement
+```
+
+Historical flow:
 
 ```text
 download exact model asset
@@ -547,15 +553,14 @@ download exact model asset
 
 Express backend only calls Audio Service `/tts/synthesize`; it does not load RVC files directly.
 
-Current production status: `RVC_ENABLED=false`; no RVC production artifact is
-provisioned. Model metadata and fallback orchestration exist, but real RVC
-inference is not verified. P8 must follow
-[`../roadmap/P8-EXECUTION-SPEC.md`](../roadmap/P8-EXECUTION-SPEC.md) and requires
-explicit authorization before provisioning, testing, or rollout.
+Current production status: `RVC_ENABLED=false`; RVC runtime and Docker
+artifacts were removed after P8 cleanup. Compact evidence and Git history are
+retained. The current production TTS boundary is Piper Prudence → Kokoro
+fallback; no RVC provisioning or rollout is authorized by this file.
 
 ## 14. PostgreSQL readiness
 
-PostgreSQL + Prisma are future application-data infrastructure and are intentionally separate from voice request state.
+PostgreSQL + Prisma are future application-data infrastructure and are intentionally separate from voice request state. The final P9 application-platform proposal is in [`../p9/README.md`](../p9/README.md); it is not implementation evidence.
 
 PostgreSQL will hold future data such as user/device ownership/settings/integrations. Voice request state remains in-memory for this MVP.
 

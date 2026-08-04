@@ -35,7 +35,7 @@ started or authorized.
 | `01-SCOPE-AND-DECISIONS.md` | VERIFIED / LOCKED | Backend source §1–§3 termigrasi |
 | `02-API-AND-WEBSOCKET-CONTRACT.md` | VERIFIED / LOCKED | Backend source §15–§17, §22 dan hardware contract dicocokkan |
 | `03-BACKEND-ARCHITECTURE.md` | VERIFIED | Backend source §7–§8, §18–§21, §23–§24 termigrasi |
-| `04-AUDIO-SERVICE.md` | AUDITED / CURRENT TUNING | Current STT `medium` + `BMO`; RVC real pending |
+| `04-AUDIO-SERVICE.md` | AUDITED / CURRENT TUNING | Current STT `medium` + `BMO`; RVC archived/disabled |
 | `05-TESTING-AND-ACCEPTANCE.md` | AUDITED / UPDATED | Future verification ownership split P6–P10 |
 | `06-DEPLOYMENT-AND-OPERATIONS.md` | VERIFIED — PRODUCTION | P7 deployment provenance, topology, runtime paths, rollback, and operations baseline |
 | `REQUIREMENT-TRACEABILITY.md` | VERIFIED | Seluruh source §1–§33 memiliki target primary |
@@ -44,14 +44,15 @@ started or authorized.
 | `P6-TEST-EVIDENCE.md` | VERIFIED | Sanitized VPS evidence, strict dual Telegram receipt proof, recovery commands, residual risks, and no-P7 proof |
 | `P7-TEST-EVIDENCE.md` | VERIFIED — PRODUCTION | Immutable deployment/images, public 23/23 acceptance, final soak, rollback retention, and repository synchronization |
 | `P8-PRODUCTION-ROLLOUT-EVIDENCE.md` | VERIFIED — PRODUCTION | Fixed Piper primary, Kokoro fallback, canary, regression, soak, and rollback |
+| `../p9/README.md` | PROPOSED — READY FOR REVIEW | Final application-platform architecture; no runtime implementation claim |
 
 ## 3. Implementation phases
 
 | Phase | Scope | Required docs | Status | Authorization | Evidence |
 |---|---|---|---|---|---|
 | P1 | Core backend transport + hardware test mode: health, WS auth/state, raw WAV upload, dummy MP3, fake ESP32 basic | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P1-TEST-EVIDENCE.md`](P1-TEST-EVIDENCE.md); external hardware validation deferred |
-| P2 | Audio Service bootstrap + faster-whisper STT | 01, 03, 04, 05, 06 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P2-TEST-EVIDENCE.md`](P2-TEST-EVIDENCE.md); real faster-whisper inference passed locally; P7 production/resource verification passed and RVC-specific benchmarking belongs to P8 |
-| P3 | Kokoro + FFmpeg + RVC fallback | 01, 03, 04, 05, 06 | IMPLEMENTED — not VERIFIED | AUTHORIZED BY USER | [`P3-TEST-EVIDENCE.md`](P3-TEST-EVIDENCE.md); real RVC inference runtime unavailable |
+| P2 | Audio Service bootstrap + faster-whisper STT | 01, 03, 04, 05, 06 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P2-TEST-EVIDENCE.md`](P2-TEST-EVIDENCE.md); real faster-whisper inference passed locally; P7 production/resource verification passed; RVC-specific benchmarking is historical P2 wording |
+| P3 | Historical Kokoro + FFmpeg + optional RVC fallback boundary | 01, 03, 04, 05, 06 | IMPLEMENTED — not VERIFIED | AUTHORIZED BY USER | [`P3-TEST-EVIDENCE.md`](P3-TEST-EVIDENCE.md); RVC is archived and not production |
 | P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P4-TEST-EVIDENCE.md`](P4-TEST-EVIDENCE.md); real local Hermes pipeline passed and P7 later verified host/VPS integration in production |
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P5-TEST-EVIDENCE.md`](P5-TEST-EVIDENCE.md) |
 | P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
@@ -76,9 +77,16 @@ started or authorized.
   notification. Both labeled receipts were confirmed and sanitized secret
   scans passed.
 - STT accuracy investigation on 2026-07-25 selected `WHISPER_MODEL=medium` with `WHISPER_HOTWORDS=BMO`, while keeping CPU INT8, 4 threads, 1 worker, beam 5, VAD, and language auto-detect. The earlier `small` references in P2 evidence remain historical evidence of P2 at that time, not the current tuning target.
-- Kokoro manual listening selected `KOKORO_VOICE=af_heart` with `KOKORO_SPEED=0.80`; P7 verified these as the current production values. Earlier evidence that production remained at `1.0` is historical. Revalidate perceived tempo after real RVC integration.
+- Kokoro manual listening selected `KOKORO_VOICE=af_heart` with `KOKORO_SPEED=0.80`; P8 verified this as the fallback value. Earlier evidence that production remained at `1.0` is historical. No RVC revalidation path is active.
 - Hermes real local `/v1/responses` integration is recorded in the P5 manual evidence addendum, and P7 subsequently verified Hermes integration in production.
-- Real RVC inference remains unverified; Kokoro-only fallback is verified behavior.
+- P8 production fixed Piper Prudence as primary and retained Kokoro-only
+  fallback. RVC runtime and Docker artifacts were removed from production;
+  compact evidence and Git history remain archived.
+- Real RVC inference remains unverified; this is an archived experimental
+  status, not a production dependency.
+- P9 architecture now separates PostgreSQL-backed chat/memory/scheduler data
+  from Hermes runtime context. None of those application features is
+  implemented by this documentation branch.
 - The public production endpoint `api.personalbmo.web.id` is live and verified.
   Public fake-ESP32 acceptance passed `23/23`, and the P7 resource soak passed;
   this does not verify a physical ESP32.
@@ -109,7 +117,7 @@ Physical ESP32 test dan progressive hardware playback tetap requirement final di
 VERIFIED — LOCAL FUNCTIONAL
 ```
 
-Phase audio/backend terbukti secara lokal dengan dependency nyata, unit/integration test, typecheck/compile, build, dependency check, documentation verifier, contract consistency, dan scope audit. P7 production/resource verification has passed; RVC-specific latency/resource benchmarking remains P8 and is not a blocker for historical local functional verification.
+Phase audio/backend terbukti secara lokal dengan dependency nyata, unit/integration test, typecheck/compile, build, dependency check, documentation verifier, contract consistency, dan scope audit. P7 production/resource verification and P8 Piper closure have passed; archived RVC benchmarking is not a current acceptance gate.
 
 ## 5. Phase ownership and dependency
 
@@ -121,7 +129,7 @@ P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10
 - P2/P3 dapat memakai internal test harness, tetapi tidak boleh mengubah public interface.
 - P4 menyatukan seluruh pipeline setelah komponen individual terbukti.
 - P5 menutup edge case dan membuktikan acceptance criteria lengkap.
-- P6 menyiapkan fondasi VPS termasuk Hermes host runtime kondisional; P7 telah menyelesaikan deployment/public integration terhadap Hermes yang diverifikasi P6; P8 berikutnya membuktikan RVC dan resource benchmark; P9 menyiapkan database; P10 melakukan final physical hardware verification.
+- P6 menyiapkan fondasi VPS termasuk Hermes host runtime kondisional; P7 menyelesaikan deployment/public integration terhadap Hermes yang diverifikasi P6; P8 menutup Piper production/resource/fallback evidence with RVC disabled; P9 menyiapkan application platform; P10 melakukan final physical hardware verification.
 - Idle WebSocket soak satu jam menjadi bagian P5 reliability verification, bukan blocker untuk memulai P2.
 
 ## 6. External integration milestones
@@ -140,17 +148,12 @@ Scope:
 - playback_done/playback_failed;
 - reconnect dan duplicate-event handling.
 
-### P3-RVC-VERIFICATION
+### P3-RVC-VERIFICATION — ARCHIVED
 
-Status: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
+Status: ARCHIVED EXPERIMENTAL EVIDENCE / NOT A CURRENT PRODUCTION MILESTONE
 Dependency: P7 deployed Audio Service — satisfied; current execution owner is P8
-Scope:
-
-- install/pin compatible RVC inference runtime;
-- real Kokoro → RVC → FFmpeg inference;
-- validate BMO `.pth` dan `.index`;
-- record latency, output metadata, and listening samples;
-- rerun P3 regressions.
+Scope: retained historical RVC evidence and Git lineage only. No RVC runtime,
+artifact, Docker image, or production rollout is authorized by P9.
 
 P3 yang belum verified penuh tidak memblokir P4 karena Kokoro-only fallback sudah terbukti dan RVC bukan single point of failure.
 

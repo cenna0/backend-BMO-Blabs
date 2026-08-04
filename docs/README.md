@@ -1,7 +1,8 @@
 # BMO Documentation — Start Here
 
-**Last audited:** 2026-07-31
-**Purpose:** Single documentation entry point for BMO voice MVP, especially hardware ↔ backend integration.
+**Last audited:** 2026-08-04
+**Purpose:** Documentation entry point for the verified voice MVP and the P9
+final application-platform architecture.
 
 ## 1. What to read
 
@@ -24,7 +25,7 @@ The handoff pack is intentionally shorter than the canonical contract. It must n
 For the **next implementation action**, read:
 
 1. [`NEXT-ACTION.md`](NEXT-ACTION.md) — current next phase and exact execution boundary.
-2. [`roadmap/P8-EXECUTION-SPEC.md`](roadmap/P8-EXECUTION-SPEC.md) — future P8 execution contract; its existence is not authorization.
+2. [`backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md) — verified P8 production evidence.
 3. [`backend-mvp/IMPLEMENTATION-STATUS.md`](backend-mvp/IMPLEMENTATION-STATUS.md) — current phase/status authority.
 4. [`backend-mvp/CURRENT-RUNTIME-CONFIG.md`](backend-mvp/CURRENT-RUNTIME-CONFIG.md) — current STT/TTS deployment values.
 5. [`backend-mvp/00-AGENT-EXECUTION-GUIDE.md`](backend-mvp/00-AGENT-EXECUTION-GUIDE.md) — general agent rules.
@@ -39,6 +40,8 @@ Then use the active backend references as needed:
 6. [`backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md`](backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md)
 7. [`operations/MAINTENANCE-AND-RECOVERY.md`](operations/MAINTENANCE-AND-RECOVERY.md) — host maintenance/update/recovery rules.
 8. [`roadmap/P6-P10-ROADMAP.md`](roadmap/P6-P10-ROADMAP.md)
+9. [`p9/README.md`](p9/README.md) — P9 architecture and product lock; proposal only until implementation evidence exists.
+10. [`roadmap/P8-EXECUTION-SPEC.md`](roadmap/P8-EXECUTION-SPEC.md) — historical P8 closure/specification record.
 
 [`roadmap/P6-EXECUTION-SPEC.md`](roadmap/P6-EXECUTION-SPEC.md) remains the
 historical locked P6 execution record and is not the current next-phase action.
@@ -52,8 +55,10 @@ If two documents disagree, use this order:
 3. **Actual implementation status/evidence:** `backend-mvp/IMPLEMENTATION-STATUS.md` plus the latest phase/manual evidence.
 4. **Backend/audio implementation details:** active `backend-mvp/` reference documents.
 5. **Deployment-specific values:** `hardware-handoff/DEPLOYMENT-CONFIG.md` after those values are marked `VERIFIED`.
-6. **Product context:** `product/BMO-BY-BLABS-PRD-v1.2.4.md`.
-7. **Archive:** `archive/` is historical reference only.
+6. **P9 platform architecture:** `p9/README.md` and linked documents; these
+   are proposed boundaries and do not claim implementation.
+7. **Product context:** `product/BMO-BY-BLABS-PRD-v1.2.4.md`.
+8. **Archive:** `archive/` is historical reference only.
 
 Never resolve a conflict by silently changing firmware behavior or adding a new endpoint/event.
 
@@ -61,10 +66,14 @@ Never resolve a conflict by silently changing firmware behavior or adding a new 
 
 `NEXT-ACTION.md` determines **what the coding agent should execute next**. It
 does not override the protocol/runtime source-of-truth hierarchy above. At this
-revision, **P6 is verified and P7 is `VERIFIED — PRODUCTION`**. P8 is next but
-remains `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`. P7 completion
-does not authorize P8, and later phases must not be collapsed into the same
-execution turn.
+revision, **P6, P7, and P8 are verified**, with P8 production using Piper
+Prudence primary, Kokoro fallback, and RVC disabled. P9 implementation remains
+`NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`; its architecture is
+documented under `p9/`. Later phases must not be collapsed into one execution
+turn.
+
+P7 is `VERIFIED — PRODUCTION`; real RVC inference is not verified and is not a
+production dependency; its compact evidence and Git history are archived.
 
 ## 2.2 Hermes host bootstrap clarification
 
@@ -89,14 +98,16 @@ At this audit point:
 - the production backend and Audio Service are deployed from immutable images;
 - public HTTPS/WSS, sanitized readiness, canonical transport/lifecycle behavior,
   and fake-ESP32 public acceptance are verified with `23/23` checks passed;
-- faster-whisper, Kokoro, and FFmpeg are real production dependencies running
-  from curated offline model artifacts;
+- faster-whisper, Piper, Kokoro fallback, and FFmpeg are real production
+  dependencies running from curated offline model artifacts;
 - Hermes `/v1/responses` integration is verified in production through the
   private `127.0.0.1:8642` origin;
-- **real RVC inference is not verified** and belongs to P8; production remains
-  Kokoro-only with `RVC_ENABLED=false`;
+- **Piper Prudence is the fixed P8 production primary**, with Kokoro `af_heart`
+  at speed `0.80` as fallback; `RVC_ENABLED=false` and no RVC runtime artifact
+  is in production;
 - **physical ESP32 integration is not verified** and belongs to P10;
-- PostgreSQL/Prisma is not implemented or deployed and belongs to P9.
+- PostgreSQL/Prisma is not implemented or deployed; it belongs to P9.1 and
+  remains blocked until a separate implementation authorization.
 
 The hardware team may use
 [`hardware-handoff/DEPLOYMENT-CONFIG.md`](hardware-handoff/DEPLOYMENT-CONFIG.md)
@@ -124,11 +135,19 @@ KOKORO_VOICE=af_heart
 KOKORO_SPEED=0.80
 ```
 
-`KOKORO_SPEED=0.80` is the verified P7 production value selected after manual
-listening UAT. Real RVC integration must revalidate perceived tempo, but the
-firmware/public hardware contract does not change.
+`KOKORO_SPEED=0.80` is the verified fallback value selected after manual
+listening UAT. Piper Prudence is the production primary; archived RVC evidence
+does not represent a production dependency, and the firmware/public hardware
+contract does not change.
 
 These runtime changes do **not** change the hardware API contract or WAV format. See [`backend-mvp/CURRENT-RUNTIME-CONFIG.md`](backend-mvp/CURRENT-RUNTIME-CONFIG.md), [`backend-mvp/P5-STT-ACCURACY-INVESTIGATION.md`](backend-mvp/P5-STT-ACCURACY-INVESTIGATION.md), and [`backend-mvp/P5-MANUAL-TEST-EVIDENCE.md`](backend-mvp/P5-MANUAL-TEST-EVIDENCE.md).
+
+## 4.1 P9 architecture boundary
+
+P9 architecture is documented under [`p9/`](p9/). PostgreSQL is the proposed
+application source of truth; chat history, curated memory, schedules,
+integrations, and settings are proposed Backend-owned capabilities. No P9
+runtime is installed or active from this documentation branch.
 
 ## 5. Secrets
 

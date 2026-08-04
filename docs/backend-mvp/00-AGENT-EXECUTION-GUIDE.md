@@ -1,7 +1,7 @@
 # BMO Backend MVP — Agent Execution Guide
 
 **Backend reference lineage:** 1.0.1 (historical split-package lineage)  
-**Current docs audit:** 2026-07-31
+**Current docs audit:** 2026-08-04
 **Status dokumentasi:** CURRENT / AUDITED  
 **Active implementation phase:** lihat `IMPLEMENTATION-STATUS.md` — jangan gunakan status statis dari snapshot package lama
 
@@ -12,19 +12,21 @@
 
 ## 0. Current next action
 
-For the current project state, P7 is `VERIFIED — PRODUCTION` and the next
-implementation phase is **P8 — Real RVC Verification and Voice Resource
-Benchmark**. Before using the general workflow in this file, read:
+For the current project state, P8 is `P8_PIPER_PRODUCTION_VERIFIED` and the
+next implementation phase is **P9 — Final Application-Platform Architecture**.
+P9 implementation is not started or authorized by this documentation branch.
+Before using the general workflow in this file, read:
 
 1. `../NEXT-ACTION.md`
-2. `../roadmap/P8-EXECUTION-SPEC.md`
+2. `../p9/README.md`
 3. `IMPLEMENTATION-STATUS.md`
 4. `../operations/MAINTENANCE-AND-RECOVERY.md` for P6+ host operation/recovery rules
 
-P8 is `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`. P7 completion and
-the existence of the P8 execution spec do not authorize P8. A new explicit user
-instruction such as `execute P8` is required; after P8, stop and do not
-automatically continue into P9.
+P8 production closure is recorded in `P8-PRODUCTION-ROLLOUT-EVIDENCE.md`.
+P9 architecture is ready for review, but no PostgreSQL, Prisma, auth, mobile,
+memory, scheduler, Spotify, WhatsApp, or proactive-audio implementation is
+authorized by this branch. A future implementation prompt must explicitly
+authorize a single P9 subphase and stop at its acceptance gate.
 
 ## 1. Tujuan file ini
 

@@ -8,6 +8,12 @@
 > **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
 > **Scope:** Backend voice MVP only. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
 
+> **P8 current-runtime override:** Production TTS is Piper `en_GB-semaine-medium`
+> Prudence speaker `0`, with Kokoro `af_heart` at `0.80` as fallback. RVC is
+> disabled and removed from production; RVC references below are historical
+> voice-MVP design/evidence, not a current production claim. P9 architecture
+> and future application ownership are defined in [`../p9/README.md`](../p9/README.md).
+
 
 ## Cara menggunakan file ini
 
@@ -56,8 +62,8 @@ Implementasikan hanya:
 ESP32 upload satu WAV utuh
 → faster-whisper STT
 → Hermes menghasilkan jawaban teks English
-→ Kokoro TTS
-→ RVC voice conversion BMO bila tersedia
+→ Piper Prudence primary TTS
+→ Kokoro fallback bila Piper gagal
 → FFmpeg menghasilkan MP3
 → backend membuat URL audio sementara
 → backend memberi tahu ESP32 melalui WebSocket
@@ -90,7 +96,7 @@ State request pipeline suara MVP disimpan in-memory. Hilangnya request aktif saa
 - state request in-memory, tanpa PostgreSQL untuk voice MVP;
 - faster-whisper multilingual dengan auto-detect Indonesia/English/mixed;
 - BMO selalu menjawab dalam English;
-- Kokoro + RVC BMO dengan fallback Kokoro-only;
+- Piper Prudence primary dengan fallback Kokoro-only; RVC production disabled;
 - MP3 dikirim sebagai URL dan diambil melalui HTTP;
 - mode display MVP hanya `idle`, `thinking`, `speaking`, dan `error`; backend hanya mengirim `thinking`;
 - retry download MP3 satu kali dari awal;
@@ -109,7 +115,7 @@ State request pipeline suara MVP disimpan in-memory. Hilangnya request aktif saa
 - retry upload maksimal dua kali setelah percobaan awal;
 - batas upload 3 MB;
 - tombstone 10 menit;
-- parameter RVC `f0_up_key=0` dan `rmvpe`;
+- historical RVC parameters are retained only in archived evidence;
 - Node.js 22, Python 3.10, Zod/Pino/Vitest sebagai pilihan implementasi awal.
 
 Implementation executor boleh menyesuaikan baseline teknis hanya setelah test/benchmark dan wajib mencatat alasan serta dampaknya. Keputusan locked atau kontrak event/endpoint tidak boleh diubah tanpa approval user.

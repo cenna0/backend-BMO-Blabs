@@ -700,17 +700,21 @@ Hardware does not implement or call these steps, but this explains what happens 
 WAV upload
 → faster-whisper STT
 → Hermes response
-→ Kokoro TTS
-→ RVC when available, otherwise Kokoro fallback
+→ Piper Prudence TTS
+→ Kokoro `af_heart` speed `0.80` fallback if Piper fails
 → FFmpeg MP3
 → audio_ready
 ```
 
 Current STT implementation uses `medium` multilingual CPU INT8 with `BMO` hotword after local accuracy tuning. This does not change the hardware contract.
 
-Current Kokoro runtime target is `af_heart` with speed `0.80`. This is backend-internal tuning; firmware still receives the same MP3 contract.
+P8 production uses Piper Prudence speaker ID `0` as primary. Kokoro `af_heart`
+at speed `0.80` is the internal fallback; firmware still receives the same MP3
+contract.
 
-Real RVC inference is not yet verified at the time of this documentation audit. Firmware must not depend on whether RVC was applied; it always receives MP3 through the same `audio_ready` contract.
+RVC runtime artifacts are removed from production and retained only as archived
+evidence/history. Firmware must not depend on RVC state; it always receives MP3
+through the same `audio_ready` contract.
 
 ---
 

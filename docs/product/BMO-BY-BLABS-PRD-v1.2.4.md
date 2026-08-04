@@ -1,14 +1,18 @@
 # BMO BY B-LABS — Product Requirements Document (PRD)
 
-**Versi:** 1.2.4  
-**Tanggal:** 2026-07-26  
-**Status:** Active Development — sprint 2 minggu, tanpa hard deadline
+**Versi:** 1.3.0
+**Tanggal:** 2026-08-04
+**Status:** P9 architecture locked for review; implementation not started
 
 > Dokumen ini menjadi konteks produk utama BMO by B-Labs. Isinya menjelaskan visi, arsitektur, tech stack, scope, keputusan desain, roadmap, dan status project.
 >
 > Untuk detail voice MVP, gunakan hierarchy dokumentasi current di `docs/README.md`. Public firmware ↔ backend protocol dikunci oleh `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`; detail implementasi backend/audio berada pada active `docs/backend-mvp/` references. Snapshot `BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md` berada di archive dan bukan current execution authority.
 >
 > Jika terdapat perbedaan pada endpoint, event, payload, timeout, retry, lifecycle file, runtime config, atau deployment status, gunakan hierarchy pada Bab 18 dan jangan menyelesaikan konflik dengan membuat behavior baru.
+>
+> P9 architecture and application-platform ownership are defined in
+> [`docs/p9/README.md`](../p9/README.md). P9 documents are proposed design
+> until the relevant subphase is separately authorized and verified.
 
 ---
 
@@ -47,8 +51,8 @@ ESP32 merekam satu WAV utuh
 → upload WAV melalui HTTP
 → faster-whisper melakukan STT lokal
 → Hermes menghasilkan jawaban English
-→ Kokoro menghasilkan suara dasar
-→ RVC mengubah karakter suara jika tersedia
+→ Piper Prudence menghasilkan suara utama
+→ Kokoro `af_heart` speed `0.80` menjadi fallback otomatis
 → FFmpeg menghasilkan MP3
 → backend mengirim URL MP3 melalui WebSocket
 → ESP32 download dan memutar MP3
@@ -80,19 +84,20 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 
 | Layer | Teknologi | Keterangan |
 |---|---|---|
-| AI Agent | Hermes Agent | Berjalan langsung di host VPS; menangani personality, context, memory, dan kemampuan agent |
+| AI Agent | Hermes Agent | Berjalan langsung di host VPS; menangani personality, reasoning context, dan kemampuan agent; Backend owns application memory |
 | LLM | Diatur melalui konfigurasi Hermes | DeepSeek/MiMo menjadi kandidat cost-efficient untuk production; model dapat berubah tanpa mengubah kontrak backend |
 | Backend | Express.js + TypeScript | REST API, WebSocket server, voice pipeline orchestration, Spotify, auth, dan integrasi aplikasi |
-| Local Audio Service | Python + FastAPI | STT, TTS, RVC, FFmpeg, audio validation, dan audio processing |
-| Database aplikasi | PostgreSQL | User, device, Spotify account, settings, dan notification rules |
+| Local Audio Service | Python + FastAPI | STT, Piper primary, Kokoro fallback, FFmpeg, audio validation, dan audio processing |
+| Database aplikasi | PostgreSQL | User, device, chat, curated memory, schedules, settings, and integration metadata |
 | ORM | Prisma ORM | Schema, migration, relational query, dan type-safe client |
 | Voice request state MVP | In-memory | Request aktif dan tombstone idempotency; tidak menggunakan PostgreSQL pada voice MVP |
 | Mobile App | React Native | Satu codebase untuk iOS dan Android |
 | State Management | Zustand | State aplikasi mobile yang ringan dan modular |
 | Mobile Auth | Google SSO | Backend memvalidasi Google ID token dan menerbitkan session aplikasi |
 | STT | faster-whisper lokal | Current selected runtime: `medium` multilingual, CPU INT8, auto-detect Indonesia/English/mixed, hotword `BMO` |
-| TTS | Kokoro lokal | Voice `af_heart`; current selected runtime speed `0.80` untuk suara BMO yang lebih natural |
-| Voice Conversion | RVC lokal | Mengubah karakter suara agar mendekati BMO; fallback Kokoro-only wajib tersedia |
+| TTS | Piper lokal | `en_GB-semaine-medium`, Prudence, speaker ID `0`; fixed P8 production primary |
+| TTS fallback | Kokoro lokal | Voice `af_heart`, speed `0.80`; automatic fallback |
+| Voice Conversion | Archived only | RVC runtime/Docker artifacts removed from production; compact evidence and Git history retained |
 | Audio Processing | FFmpeg | Normalisasi, resampling, dan output MP3 untuk ESP32 |
 | Spotify | Spotify Web API | BMO bertindak sebagai controller; playback berlangsung pada perangkat Spotify user |
 | WhatsApp | Hermes WhatsApp gateway | Session dan gateway dikelola internal Hermes |
@@ -174,6 +179,12 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 
 ### 4.2 Tanggung Jawab Komponen
 
+**P8 current-runtime note:** the diagram's historical RVC label is superseded
+by Piper Prudence primary with Kokoro fallback. RVC is not a production
+service or artifact. P9 adds Backend-owned application data and capability
+boundaries described in [`../p9/README.md`](../p9/README.md), without changing
+the existing voice transport.
+
 #### ESP32-S3
 
 - Mendeteksi wake word secara lokal.
@@ -199,11 +210,12 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 - Memvalidasi credentials, request ID, ukuran, metadata WAV, dan idempotency.
 - Menjamin satu request aktif per device.
 - Menyimpan state request voice MVP secara in-memory.
-- Mengorkestrasi STT → Hermes → TTS/RVC → MP3.
+- Mengorkestrasi STT → Hermes → Piper/Kokoro → MP3.
 - Menyimpan MP3 sementara dengan URL acak dan TTL.
 - Mengirim event real-time ke ESP32 melalui WebSocket.
 - Menghapus file sementara berdasarkan playback result dan TTL.
-- Pada fase berikutnya: menangani Google auth, Spotify, mobile API, dan bridge WhatsApp.
+- Pada P9, menjadi pemilik application API, chat, settings, memory gateway,
+  scheduler, and provider action execution.
 
 #### Hermes Agent
 
@@ -212,7 +224,9 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 - Deployment/development VPS dieksekusi oleh Codex/operator project; Hermes diperlakukan sebagai runtime dependency existing yang harus tetap sehat, bukan sebagai executor infrastructure.
 - Memahami input Indonesia, English, dan campuran.
 - Selalu menghasilkan jawaban suara dalam English.
-- Menjaga personality BMO, context, memory, skills, dan kemampuan agent.
+- Menjaga personality BMO, reasoning context, skills, dan kemampuan agent.
+- Tidak menjadi source of truth untuk chat history atau application memory;
+  Backend menyediakan scoped context melalui application contracts.
 - Mengembalikan teks jawaban yang akan diproses TTS.
 - Mengelola WhatsApp gateway pada fase integrasi.
 - Pada fase berikutnya, membantu intent/action seperti Spotify dan WhatsApp.
@@ -221,9 +235,9 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 
 - Berjalan hanya pada localhost.
 - Menjalankan faster-whisper `medium` multilingual, CPU INT8, auto-detect, dengan hotword `BMO`.
-- Menjalankan Kokoro `af_heart` untuk English TTS dengan target speed `0.80`.
-- Menjalankan RVC bila model tersedia dan stabil.
-- Menggunakan Kokoro-only sebagai fallback jika RVC gagal.
+- Menjalankan Piper Prudence sebagai production primary.
+- Menggunakan Kokoro `af_heart` speed `0.80` sebagai fallback otomatis.
+- Tidak menjalankan RVC; archived evidence is not a runtime dependency.
 - Menggabungkan waveform TTS menjadi satu audio utuh.
 - Menghasilkan MP3 melalui FFmpeg.
 - Memuat model saat startup dan menggunakan cache model persisten.
@@ -233,18 +247,17 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 - Menjadi database utama aplikasi BMO pada fase integrasi fitur.
 - Menyimpan user, device, Spotify account, notification settings, dan konfigurasi aplikasi.
 - Tidak menyimpan state request aktif voice MVP.
-- Tidak menyimpan memory internal Hermes.
+- Tidak menyimpan memory internal Hermes sebagai source of truth; P9
+  `PostgresMemoryGateway` owns application memory records.
 - Tidak menyimpan WhatsApp session Hermes.
 
 #### React Native Mobile App
 
 - Menjadi entry point setup dan konfigurasi user.
-- Menangani Google SSO.
-- Menangani Spotify OAuth.
-- Menampilkan WhatsApp QR setup.
-- Menampilkan status device dan integrasi.
-- Menyediakan settings BMO.
-- Fitur manual control masih TBD.
+- Menangani authentication/session dan device pairing melalui Backend.
+- Menampilkan chat/history, curated memory controls, schedules, settings,
+  voice preview, Spotify status, and WhatsApp connection/rules.
+- Tidak memanggil Hermes, PostgreSQL, Spotify, atau WhatsApp directly.
 
 ---
 
@@ -269,8 +282,8 @@ Step 13  Jika tidak ada speech yang berguna, backend mengirim request_failed: NO
 Step 14  Backend mengirim transcript ke Hermes POST /v1/responses.
 Step 15  Hermes menghasilkan jawaban English plain text.
 Step 16  Backend mengirim jawaban utuh ke Local Audio Service /tts/synthesize.
-Step 17  Kokoro menghasilkan WAV dasar.
-Step 18  RVC diterapkan jika tersedia; jika gagal, pipeline memakai Kokoro-only.
+Step 17  Piper Prudence menghasilkan WAV utama.
+Step 18  Jika Piper gagal, Audio Service memakai Kokoro `af_heart` speed `0.80`.
 Step 19  FFmpeg menghasilkan MP3 utuh.
 Step 20  Backend menghapus WAV input setelah MP3 berhasil dibuat.
 Step 21  Backend menyimpan MP3 sementara dengan TTL 5 menit.
@@ -742,7 +755,7 @@ App
     │   - Spotify status
     │   - WhatsApp status
     │
-    ├── ControlScreen — TBD
+    ├── ControlScreen — proposed device/integration status and controls
     │
     └── SettingsStack
         ├── SpotifySettingsScreen
@@ -800,12 +813,14 @@ Jawaban suara BMO:
 ### 13.4 Voice Pipeline
 
 ```text
-Kokoro English TTS
-→ RVC BMO jika tersedia
+Piper Prudence English TTS
+→ Kokoro `af_heart` speed `0.80` fallback if Piper fails
 → FFmpeg MP3
 ```
 
-Jika RVC gagal, BMO tetap berbicara memakai Kokoro-only. RVC adalah enhancement, bukan single point of failure.
+Production voice is fixed to Piper Prudence, speaker ID `0`. RVC is removed
+from production and retained only as archived evidence/history. Kokoro remains
+the internal fallback and is not user-selectable.
 
 ---
 
@@ -813,14 +828,16 @@ Jika RVC gagal, BMO tetap berbicara memakai Kokoro-only. RVC adalah enhancement,
 
 ### 14.1 Current State and Deployment Boundary
 
-Status per 2026-07-26:
+Status per 2026-08-04:
 
-- voice backend P1, P2, P4, dan P5 telah memiliki verification evidence sesuai scope masing-masing; P3 sudah implemented dengan Kokoro/FFmpeg dan fallback RVC, tetapi full P3 belum VERIFIED karena real RVC inference masih menunggu P8;
+- voice backend P1, P2, P4, dan P5 memiliki verification evidence sesuai
+  scope; P8 production is verified with Piper Prudence primary and Kokoro
+  fallback; RVC runtime artifacts are removed and archived;
 - faster-whisper menggunakan `medium` multilingual + hotword `BMO` sebagai current runtime target;
-- Kokoro menggunakan `af_heart` dengan speed `0.80` sebagai current runtime target;
-- real RVC inference belum verified dan dimiliki P8;
-- backend BMO belum boleh disebut live melalui public production domain sampai P7 lulus public E2E;
-- P6 adalah next execution phase dan hanya menyiapkan fondasi VPS/operations.
+- Kokoro menggunakan `af_heart` dengan speed `0.80` sebagai fallback;
+- backend BMO public HTTPS/WSS dan Hermes integration are verified by P7/P8;
+- PostgreSQL/Prisma, mobile, memory, scheduler, Spotify, WhatsApp, and
+  editable voice settings remain unimplemented P9 scope.
 
 Operational execution authority berada di `docs/NEXT-ACTION.md` dan roadmap P6–P10, bukan di sprint log historis PRD.
 
@@ -847,9 +864,8 @@ Source code, config/secrets, model, persistent data, temp file, dan backup dipis
 ├── models/
 │   ├── hf-cache/
 │   ├── torch-cache/
+│   ├── piper/
 │   ├── kokoro/
-│   ├── rvc/
-│   │   └── bmo/
 │   └── MODEL_MANIFEST.md
 │
 ├── data/
@@ -871,7 +887,7 @@ Source code, config/secrets, model, persistent data, temp file, dan backup dipis
     └── history/
 ```
 
-`/opt/bmo/app` bersifat replaceable dari Git/build. `config`, `models`, `data`, dan `backups` tidak boleh bergantung pada checkout Git dan tidak boleh hilang saat source di-update.
+`/opt/bmo/app` bersifat replaceable dari Git/build. `config`, `models`, `data`, dan `backups` tidak boleh bergantung pada checkout Git dan tidak boleh hilang saat source di-update. Archived RVC evidence is outside the production model tree.
 
 ### 14.3 Target VPS Topology
 
@@ -903,7 +919,9 @@ Rules:
 - Hermes existing tetap host service dan tidak dimigrasi ke Docker hanya demi kerapihan.
 - Codex adalah executor infrastructure/deployment P6+; Hermes adalah runtime dependency BMO.
 - Backend/audio source dibangun menjadi immutable Docker image. Source host tidak di-bind-mount live ke production runtime.
-- Audio Service memiliki model path RVC; Express backend hanya memanggil Audio Service melalui internal service interface.
+- Audio Service memakai pinned Piper assets plus Kokoro fallback; RVC is not a
+  production model path. Express backend only calls Audio Service through the
+  internal service interface.
 - PostgreSQL tidak digunakan untuk voice request state MVP; request aktif tetap in-memory.
 
 ### 14.4 Public and Private Networking
@@ -996,15 +1014,19 @@ KOKORO_LANG_CODE=a
 KOKORO_VOICE=af_heart
 KOKORO_SPEED=0.80
 
-RVC_ENABLED=true
-RVC_MODEL_PATH=/opt/bmo/models/rvc/bmo/<actual-model-file>.pth
-RVC_INDEX_PATH=
+TTS_PRIMARY_ENGINE=piper
+PIPER_MODEL=en_GB-semaine-medium
+PIPER_SPEAKER=prudence
+PIPER_SPEAKER_ID=0
+RVC_ENABLED=false
 
 OUTPUT_MP3_SAMPLE_RATE=24000
 OUTPUT_MP3_BITRATE=96k
 ```
 
-Nama file `.pth`/`.index` RVC ditentukan dari inspeksi aset aktual; jangan ditebak. Real RVC verification tetap P8.
+Piper assets are pinned and mounted read-only outside Git. RVC paths are not
+part of the current production configuration; archived RVC evidence must not
+be provisioned or enabled by P9.
 
 ### 14.7 Monitoring and Alerting
 
@@ -1071,12 +1093,15 @@ Execution order yang dikunci untuk coding agent adalah **P6 → P7 → P8 → P9
 ```text
 P1 → VERIFIED — BACKEND
 P2 → VERIFIED — LOCAL FUNCTIONAL
-P3 → IMPLEMENTED — not VERIFIED (real RVC pending P8)
+P3 → historical implemented boundary; RVC archived and disabled in production
 P4 → VERIFIED — LOCAL FUNCTIONAL
 P5 → VERIFIED — BACKEND
 ```
 
-Mencakup backend HTTP/WebSocket contract, Audio Service/STT/TTS/FFmpeg local integration, Hermes adapter/pipeline, reliability/security/lifecycle, dan current STT/Kokoro tuning. Real RVC inference belum boleh dianggap verified sampai P8. Evidence tetap berada di `docs/backend-mvp/`.
+Mencakup backend HTTP/WebSocket contract, Audio Service/STT/TTS/FFmpeg local
+integration, Hermes adapter/pipeline, reliability/security/lifecycle, and
+current STT/Piper/Kokoro tuning. P8 production is verified; RVC is archived
+and disabled. Evidence remains in `docs/backend-mvp/`.
 
 ### 15.2 P6 — VPS Foundation and Operations Baseline — READY
 
@@ -1112,17 +1137,19 @@ Goal:
 
 `api.personalbmo.web.id` baru boleh disebut live setelah P7 evidence pass. Pada titik itu deployment config boleh berubah menjadi `VERIFIED` dan tim HW dapat mulai live endpoint integration; final physical acceptance tetap P10.
 
-### 15.4 P8 — Real RVC + Resource Benchmark
+### 15.4 P8 — Piper Production TTS and Resource Closure — VERIFIED
 
 Dependency: P7 `VERIFIED`.
 
-Goal:
+Result:
 
-- place/verify RVC assets under `/opt/bmo/models/rvc/bmo`;
-- prove real RVC inference;
-- prove Kokoro-only fallback;
-- benchmark STT/Hermes/Kokoro/RVC/FFmpeg, CPU/RAM/swap/disk impact;
-- keep public HW contract unchanged.
+- Piper `en_GB-semaine-medium`, Prudence, speaker ID `0` is the fixed primary;
+- Kokoro `af_heart` at speed `0.80` is the automatic fallback;
+- RVC runtime/container artifacts were removed; compact evidence and Git
+  history remain archived;
+- production canary, fallback/recovery, public regression, resource soak, and
+  rollback evidence passed;
+- Hardware Contract v1.0.5 and all public voice events remain unchanged.
 
 ### 15.5 P9 — PostgreSQL + Prisma Readiness
 
@@ -1133,9 +1160,15 @@ Goal:
 - PostgreSQL persistent deployment;
 - Prisma schema/migration readiness;
 - backup + restore verification;
-- application data layer ready for device/user/settings/future feature data.
+- application data layer ready for device/user/settings/future feature data;
+- isolated P9.1–P9.6 execution covering auth/pairing, chat/memory, scheduler,
+  proactive speech, Spotify, WhatsApp, security, observability, and acceptance.
 
 Voice request state remains in-memory for the MVP contract.
+
+The detailed P9 product lock, preliminary schema, API mapping, memory policy,
+scheduler boundary, additive hardware proposal, and decision register are in
+[`../p9/README.md`](../p9/README.md). They are not implementation evidence.
 
 ### 15.6 P10 — Hardware Handoff Activation and Physical Verification
 
@@ -1170,8 +1203,9 @@ Spotify, WhatsApp, full mobile app integration, device provisioning, settings, a
 | BMO response language | Final | Selalu English |
 | STT language | Final voice MVP | Auto-detect Indonesia, English, dan mixed |
 | STT runtime | Final MVP | faster-whisper lokal |
-| TTS runtime | Final MVP | Kokoro lokal |
-| Voice conversion | Final MVP | RVC lokal dengan fallback Kokoro-only |
+| TTS runtime | Final MVP | Piper Prudence lokal |
+| TTS fallback | Final MVP | Kokoro `af_heart`, speed `0.80` |
+| Voice conversion | Archived only | RVC disabled; no production runtime |
 | MP3 TTL | Final voice MVP | 5 menit |
 | Download retry | Final voice MVP | Satu retry dari awal, tanpa HTTP Range |
 | Database aplikasi | Final | PostgreSQL + Prisma |
@@ -1189,10 +1223,11 @@ Spotify, WhatsApp, full mobile app integration, device provisioning, settings, a
 - Batas upload 3 MB.
 - MP3 mono 24 kHz/96 kbps.
 - faster-whisper `medium` multilingual, CPU INT8, 4 threads, beam size 5, VAD aktif, dan hotword `BMO`; konfigurasi ini sudah dipilih dari investigasi akurasi lokal tetapi latency/resource tetap wajib dibenchmark di VPS.
-- Kokoro voice `af_heart` dengan speed `0.80`; nilai ini dipilih dari UAT listening lokal dan wajib diverifikasi ulang bersama RVC serta decoder ESP32 di VPS.
-- Parameter pitch/index RVC.
+- Kokoro voice `af_heart` dengan speed `0.80` is the verified fallback value;
+  decoder compatibility remains a P10 hardware gate.
 - Timeout per tahap; total pipeline baseline maksimal 300 detik.
-- Kualitas community model RVC BMO.
+- RVC quality/model assumptions are archived and do not gate current
+  production; no RVC runtime is part of P9.
 - Latency end-to-end pada VPS uji.
 
 Baseline boleh berubah berdasarkan hasil benchmark tanpa mengubah kontrak produk yang sudah dikunci.
@@ -1205,14 +1240,14 @@ Baseline boleh berubah berdasarkan hasil benchmark tanpa mengubah kontrak produk
 |---|---|---|---|
 | P6 VPS foundation / Caddy / Tailscale / Beszel / firewall / backup baseline | High | SW / Codex | READY |
 | P7 deploy backend + Audio Service + Hermes host integration + public HTTPS/WSS E2E | High | SW / Codex | Depends on P6 |
-| P8 real RVC inference + Kokoro fallback regression + VPS resource benchmark | High | SW / Codex | Depends on P7 |
+| P8 Piper production closure + fallback regression + VPS resource benchmark | High | SW / Codex | VERIFIED |
 | P9 PostgreSQL + Prisma ready-to-use + migration + backup/restore | Medium | SW / Codex | Technical dep P6; execute after P8 |
 | P10 physical ESP32 integration + final hardware handoff activation | High | SW + HW | Technical dep P7+P8 status; execute after P9 |
 | Uji MP3 24 kHz/96 kbps pada decoder ESP32 | High | SW + HW | P10 |
 | Provisioning device token yang lebih aman / multi-device readiness | Medium | SW + HW | Future |
 | Spotify no-active-device UX | Medium | SW | Future |
 | WhatsApp persistent session reliability | Medium | SW | Future |
-| Mobile ControlScreen feature list | Medium | SW | TBD |
+| P9 mobile screen/API traceability and ControlScreen scope | High | SW/mobile | Proposed in `docs/p9/` |
 | Push notification mobile saat BMO offline/error | Low | SW | Future |
 | OTA firmware update | Low | HW + SW | Future |
 
@@ -1241,7 +1276,7 @@ Baseline boleh berubah berdasarkan hasil benchmark tanpa mengubah kontrak produk
 | Kokoro current target | `af_heart`, speed `0.80` |
 | Voice display modes | `idle`, `thinking`, `speaking`, `error` |
 | Temp MP3 TTL | 300 detik |
-| RVC failure handling | Fallback Kokoro-only |
+| RVC production status | Disabled and removed; archived evidence only |
 
 ---
 
@@ -1255,8 +1290,9 @@ Urutan authority current:
 4. Active `docs/backend-mvp/` references — backend/audio implementation details.
 5. `docs/hardware-handoff/DEPLOYMENT-CONFIG.md` — deployment-specific public values after marked `VERIFIED`.
 6. `docs/NEXT-ACTION.md` + `docs/roadmap/` — operational next phase/execution boundary.
-7. PRD ini — product context, architecture, decisions, and roadmap summary.
-8. `docs/archive/` — historical reference only.
+7. `docs/p9/` — proposed final application-platform architecture; implementation status remains in the active status/evidence files.
+8. PRD ini — product context, architecture, decisions, and roadmap summary.
+9. `docs/archive/` — historical reference only.
 
 Jika dokumen bertentangan, jangan mengubah firmware/backend contract secara diam-diam. Gunakan hierarchy di atas, catat konflik, dan update dokumen current yang stale.
 
@@ -1266,6 +1302,7 @@ Jika dokumen bertentangan, jangan mengubah firmware/backend contract secara diam
 
 | Tanggal | Versi | Perubahan |
 |---|---|---|
+| 2026-08-04 | 1.3.0 | P9 final architecture/product lock: current Piper Prudence production, removed/archived RVC boundary, Backend-owned PostgreSQL application source of truth, chat/history versus curated memory, scheduler/proactive speech proposal, additive future hardware events, auth/pairing, mobile API mapping, Spotify/WhatsApp boundaries, voice settings, security/recovery/resource/acceptance plan; Hardware Contract v1.0.5 unchanged. |
 | 2026-07-26 | 1.2.4 | Authority/operations hardening: memperbaiki canonical document references, mengunci execution order P6→P10, menambah maintenance/update/recovery policy, source-audit gate sebelum P7 public verification, Beszel Hub+Agent/private-origin guidance, Caddy config permission model, dan coverage HW acceptance; public HW protocol tetap v1.0.5. |
 | 2026-07-26 | 1.2.3 | Final execution-readiness sync: memperjelas Caddy host service, infra Compose Beszel, secret deploy permissions, P9-only database activation, deterministic image tagging/rollback, dan TLS prerequisite firmware; public HW protocol tidak berubah. |
 | 2026-07-26 | 1.2.2 | Menyelaraskan product context dengan operational docs current: `/opt/bmo`, `main` production source, Caddy, `api.personalbmo.web.id`, Beszel/Telegram, Tailscale, backup/rollback, Codex executor, dan dependency-based P6–P10; public HW contract tidak berubah. |

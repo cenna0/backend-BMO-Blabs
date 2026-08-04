@@ -124,9 +124,10 @@ playback_state = waiting | downloading | playing | done_pending_send | failed_pe
 
 Backend output contract is MP3 regardless of whether RVC was successfully applied. Firmware must not branch on RVC state.
 
-Real RVC inference is not verified and belongs to P8; verified production uses
-Kokoro fallback with RVC disabled. This is a backend concern, not a firmware
-protocol change.
+P8 production uses Piper Prudence primary with Kokoro fallback and
+`RVC_ENABLED=false`; real RVC inference remains archived/unverified and is not
+a production dependency. This is a backend concern, not a firmware protocol
+change.
 
 ## Definition of done
 

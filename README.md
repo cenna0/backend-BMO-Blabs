@@ -21,10 +21,14 @@ Rules:
 - Active docs override historical/archive evidence.
 - P6 is `VERIFIED`; P7 is `VERIFIED — PRODUCTION`. See
   [`docs/backend-mvp/P7-TEST-EVIDENCE.md`](docs/backend-mvp/P7-TEST-EVIDENCE.md).
-- P8 is next but remains `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`.
-  P7 completion does not authorize it. P9 and P10 remain dependency-gated.
+- P8 is `VERIFIED — PRODUCTION`: Piper Prudence is primary, Kokoro `af_heart`
+  at speed `0.80` is fallback, and `RVC_ENABLED=false` remains locked.
+- P9 architecture is documented under `docs/p9/`; P9 implementation remains
+  `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`. P10 remains
+  dependency-gated.
 - The public hardware endpoint is live and verified. Physical ESP32 acceptance
-  remains pending P10, and real RVC inference remains pending P8.
+  remains pending P10. RVC runtime artifacts are removed from production and
+  retained only as archived evidence/history.
 - [`docs/roadmap/P6-EXECUTION-SPEC.md`](docs/roadmap/P6-EXECUTION-SPEC.md)
   remains the historical locked P6 record, not the current execution contract.
 - Do not start P8–P10 or change locked hardware/backend contracts without explicit phase authorization.
