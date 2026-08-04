@@ -1,6 +1,6 @@
 # BMO Backend MVP — Implementation Status
 
-**Last updated:** 2026-08-03
+**Last updated:** 2026-08-04
 **Backend reference lineage:** 1.0.1; current active documentation is date-audited and governed by this status file
 
 ## 1. Control state
@@ -8,14 +8,15 @@
 ```text
 Documentation package: CURRENT / P8 PRODUCTION CLOSED
 P1–P5 backend history: implemented/verified according to phase evidence below
-Current next implementation phase: P9 — PostgreSQL and persistent user/device data
+Current next implementation phase: P9.1 — PostgreSQL, auth, pairing, settings foundation
 P6 state: VERIFIED
 P6 execution authorization: COMPLETED
 P7 state: VERIFIED — PRODUCTION
 P7 execution: COMPLETED
 P8 state: P8_PIPER_PRODUCTION_VERIFIED
-P9 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
-P10 state: NOT_STARTED / dependency-gated after P9
+P9.1 architecture state: LOCKED / APPROVED
+P9 implementation state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION
+P10 state: NOT_STARTED / dependency-gated after P9.6
 ```
 
 P6, P7, and P8 are verified. P8 fixed Piper Prudence as the production primary,
@@ -58,8 +59,9 @@ started or authorized.
 | P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
 | P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | VERIFIED — PRODUCTION | COMPLETED | [`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md) |
 | P8 | Fixed Piper Prudence primary + Kokoro fallback + production acceptance; RVC remains disabled | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | VERIFIED — PRODUCTION | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
-| P9 | PostgreSQL + Prisma ready-to-use application data layer + backup/restore | PRD + 06 + roadmap | NOT_STARTED | AWAITING EXPLICIT USER AUTHORIZATION | — |
-| P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
+| P9.1 | PostgreSQL + Prisma, invite auth, pairing, user/device settings, backup/restore baseline | PRD + `../p9/` + roadmap | ARCHITECTURE LOCKED; NOT_STARTED | AWAITING EXPLICIT USER AUTHORIZATION | — |
+| P9.2–P9.6 | Chat/memory, scheduler, integrations, hardening, final acceptance | `../p9/` | PROPOSED; NOT_STARTED | DEPENDS ON PREDECESSOR GATES | — |
+| P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9.6 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
 
 ## 3.1 Post-P5/P6/P7 implementation updates captured by this audit
 

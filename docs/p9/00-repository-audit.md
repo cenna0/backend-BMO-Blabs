@@ -1,6 +1,6 @@
 # P9 Repository Audit
 
-**Status:** `PROPOSED — AUDIT COMPLETE`
+**Status:** `P9.1 LOCKED — AUDIT COMPLETE`
 **Audit date:** 2026-08-04
 **Base:** `159ce6d9081928eca6d68921c3f64cdb36fce5bb`
 

@@ -23,6 +23,12 @@ runner such as pg-boss may be evaluated during P9.3, but it is not installed or
 selected by this documentation task. The durable schedule tables remain the
 domain source of truth regardless of worker library.
 
+The initial product has one server-enforced schedule timezone: `Asia/Jakarta`.
+Mobile displays and submits schedule times in that timezone; timezone is not a
+user-editable setting. Database timestamps remain UTC-compatible `timestamptz`
+values. Future multi-timezone support would require a separate product
+decision.
+
 ## Delivery policy
 
 - One-time and recurring schedules are supported.

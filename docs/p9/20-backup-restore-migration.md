@@ -1,19 +1,22 @@
 # Backup, Restore, and Migration Plan
 
-**Status:** `PROPOSED`
+**Status:** `P9.1 LOCKED BASELINE; DESTINATION OPEN`
 
 ## Backup policy
 
 | Artifact | Frequency/retention | Protection |
 |---|---|---|
-| PostgreSQL logical backup | daily; retain 7–14 days after P9 activation | encrypted, checksum, outside active DB volume |
-| PostgreSQL + config recovery bundle | weekly; retain 4 weeks | encrypted, access-restricted |
-| Off-server recovery copy | monthly/manual | separate storage and key boundary |
+| Scheduled `pg_dump` | seven daily backups | encrypted, checksum, outside active DB volume |
+| PostgreSQL + config recovery bundle | four weekly backups | encrypted, access-restricted |
+| Off-VPS recovery copy | required before final production sign-off | destination remains OPEN; separate key boundary |
 | Model/cache provenance | manifest/hash, not mandatory full copy | reproducible source and revision |
 | Pre-deploy snapshot | before every DB-affecting rollout | commit/image/schema/config record |
 
 The current single-VPS `/opt/bmo/backups` layout remains the target operational
-shape. No backup is complete until a restore has been exercised.
+shape. Checksums and encryption are mandatory. No backup is complete until an
+isolated restore has been exercised and verified. An off-VPS destination is
+required before final production sign-off, but its provider/location remains
+OPEN.
 
 ## Restore rehearsal
 
@@ -31,6 +34,10 @@ shape. No backup is complete until a restore has been exercised.
 
 - Migrations are committed, reviewed, deterministic, and forward-only in the
   normal rollout path.
+- Use `prisma migrate dev` only in development and `prisma migrate deploy` for
+  controlled production rollout. Never use `prisma db push` in production.
+- Do not run migrations automatically during container startup and do not use
+  destructive reset or blind down migration.
 - Prefer expand → deploy compatible code → backfill → contract cleanup.
 - No migration drops/renames data in the same release as code that still needs
   the old shape.

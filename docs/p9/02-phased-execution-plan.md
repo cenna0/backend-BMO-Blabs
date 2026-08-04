@@ -1,6 +1,6 @@
 # P9 Phased Execution Plan
 
-**Status:** `PROPOSED`
+**Status:** `P9.1 LOCKED; P9.2–P9.6 PROPOSED`
 **Execution rule:** one subphase per authorized implementation turn; stop at
   the acceptance gate and record evidence before starting the next.
 
@@ -8,38 +8,55 @@ The sequence preserves the requested P9.1–P9.6 baseline. P9 architecture work
 is complete only when the documents are reviewed; no item below is an
 implementation claim.
 
-## P9.1 — PostgreSQL, Prisma, auth, users, devices, pairing, settings
+## P9.1 — PostgreSQL, Prisma, auth, users, devices, pairing, settings — LOCKED
 
 - **Prerequisites:** P8 production evidence reviewed; P6/P7 deployment and
-  backup paths available; P9 architecture approved; secrets supplied
-  out-of-band; no public contract change.
-- **Scope:** private PostgreSQL service; Prisma bootstrap; users and sessions;
-  devices, ownership, pairing challenges, revocation; user/device settings;
-  audit events; readiness and health checks; migration/backup baseline.
-- **Non-goals:** chat, memory, scheduler, Spotify, WhatsApp, mobile UI,
-  proactive audio, changing voice pipeline, or moving voice request state out
-  of memory.
-- **Schema impact:** `User`, `AuthIdentity`, `Session`, `Device`,
-  `DevicePairing`, `UserSettings`, `DeviceSettings`, `AuditEvent`.
-- **API impact:** `/auth/*`, `/me`, `/devices`, `/pairing/*`, `/settings`,
-  authenticated health/readiness only; versioned under `/api/v1`.
+  backup paths available; P9.1 decisions approved; secrets supplied out of
+  band; no public contract change.
+- **Scope:** one pinned-major private PostgreSQL container; Prisma bootstrap;
+  invite-only registration; email/password login with Argon2id; approximately
+  15-minute access tokens; opaque random rotating refresh tokens with hashes
+  only in PostgreSQL; per-device session revocation; provider-neutral identity
+  schema; devices, ownership, six-digit pairing, revocation; server-enforced
+  `Asia/Jakarta`; user/device settings; audit events; readiness and health
+  checks; migration/backup baseline.
+- **Non-goals:** chat history, long-term memory, scheduler runtime, alarms,
+  proactive audio, Spotify, WhatsApp, pgvector, Mem0, Qdrant, Obsidian,
+  Markdown import, custom voices, RVC, HW Contract v1.1.0, dynamic Audio
+  Service settings integration, mobile visual design, or moving voice request
+  state out of memory.
+- **Schema impact:** `Invitation`, `User`, `PasswordCredential`,
+  `AuthIdentity`, `Session`, `RefreshToken`, `Device`, `DevicePairing`,
+  `UserSettings`, `DeviceSettings`, `AuditEvent`.
+- **API impact:** `/auth/register`, `/auth/login`, `/auth/refresh`,
+  `/auth/logout`, session revocation, `/me`, `/devices`, `/pairing/*`,
+  `/settings`, and authenticated health/readiness; versioned under `/api/v1`.
 - **Hermes impact:** none; existing voice request contract and conversation
   adapter remain intact.
-- **Mobile impact:** auth bootstrap, pairing, device list, settings foundation;
-  no chat screen yet.
+- **Mobile impact:** invite/email-password auth bootstrap, pairing, device
+  list, settings foundation; no editable timezone and no chat screen yet.
 - **Hardware impact:** none; v1.0.5 remains read-only.
-- **Tests:** migration-from-empty, migration-repeat, auth/session expiry,
-  ownership isolation, pairing expiry/replay/revocation, settings validation,
-  DB restart persistence, backup/restore, private-port and secret scans.
-- **Migration:** additive schema only; create a pre-migration backup and record
-  commit, image, schema version, and rollback target.
+- **Tests:** migration-from-empty, migration-repeat, Argon2id verification,
+  invite-only registration, access-token expiry, refresh-token rotation and
+  replay handling, per-device session revocation, ownership isolation, pairing
+  expiry/replay/attempt limits/revocation, settings validation and timezone
+  enforcement, audit redaction, DB restart persistence, scheduled `pg_dump`,
+  checksum/encryption, isolated restore, private-port and secret scans.
+- **Migration:** `prisma migrate dev` only in development; controlled rollout
+  uses `prisma migrate deploy`; never use `prisma db push` in production, never
+  migrate automatically at container startup, never reset destructively, and
+  use expand/contract changes. Create a pre-migration backup and record commit,
+  image, schema version, and rollback target.
 - **Rollback:** stop new API routes, restore previous image/config, keep the DB
-  volume; if data rollback is required, restore a verified backup into an
-  isolated database and obtain explicit approval before replacement.
-- **Acceptance gate:** users can authenticate, pair/revoke a device, read/write
-  settings, and survive service restart; voice fake-device acceptance remains
-  green; no public `5432`; zero production deployment in the implementation
-  turn unless separately authorized.
+  volume; do not use a blind down migration. If data rollback is required,
+  restore a verified backup into an isolated database and obtain explicit
+  approval before replacement.
+- **Acceptance gate:** invite-only users can authenticate, refresh/revoke a
+  session, pair/revoke a device, read/write approved settings, and survive
+  service restart; voice fake-device acceptance remains green; no public
+  `5432`; encrypted local backup and isolated restore verification are
+  evidenced; the required off-VPS backup destination is recorded as an open
+  prerequisite for final production sign-off.
 
 ## P9.2 — Chat sessions, messages, curated memory, gateway, deletion/export
 

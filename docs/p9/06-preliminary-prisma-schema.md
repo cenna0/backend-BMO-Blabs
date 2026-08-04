@@ -1,18 +1,23 @@
 # Preliminary Prisma Schema
 
-**Status:** `PROPOSED — NOT IMPLEMENTED`
+**Status:** `P9.1 foundation LOCKED; future entities PROPOSED — NOT IMPLEMENTED`
 **Rule:** this is a design artifact, not `backend/prisma/schema.prisma`; no
 PostgreSQL service, extension, or migration is created by P9 architecture.
 
 The following draft establishes names, ownership, and deletion boundaries. The
 first implementation must run Prisma validation and migration review against
-the approved version before any database is activated.
+the approved version before any database is activated. Every `DateTime` field
+is required to map to UTC-compatible PostgreSQL `timestamptz`; application
+timezone interpretation is separately server-enforced as `Asia/Jakarta`.
 
 ```prisma
+enum InvitationStatus { ACTIVE ACCEPTED EXPIRED REVOKED }
 enum DeviceStatus { PENDING ACTIVE REVOKED }
 enum PairingStatus { PENDING CONSUMED EXPIRED REVOKED }
 enum ChatRole { USER ASSISTANT SYSTEM }
 enum ChatKind { TEXT VOICE_TRANSCRIPT }
+enum ResponseLength { BRIEF STANDARD DETAILED }
+enum NotificationBehavior { ALL IMPORTANT NONE }
 enum MemoryType { FACT PREFERENCE INSTRUCTION PROJECT GOAL DEADLINE RELATIONSHIP EPISODIC_SUMMARY }
 enum MemoryStatus { ACTIVE DELETED }
 enum CandidateStatus { PENDING ACCEPTED REJECTED EXPIRED }
@@ -28,11 +33,12 @@ enum ActionStatus { PROPOSED CONFIRMATION_REQUIRED ACCEPTED EXECUTING SUCCEEDED 
 
 model User {
   id              String          @id @default(uuid())
-  email           String?         @unique
+  email           String          @unique
   displayName     String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   identities      AuthIdentity[]
+  passwordCredential PasswordCredential?
   sessions        Session[]
   devices         Device[]
   pairing         DevicePairing[]
@@ -50,6 +56,28 @@ model User {
   auditEvents     AuditEvent[]
 }
 
+model Invitation {
+  id          String           @id @default(uuid())
+  email       String
+  tokenHash   String           @unique
+  status      InvitationStatus @default(ACTIVE)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime         @default(now())
+  @@index([email, status, expiresAt])
+}
+
+model PasswordCredential {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  passwordHash String
+  algorithm    String   @default("argon2id")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model AuthIdentity {
   id             String   @id @default(uuid())
   userId         String
@@ -62,14 +90,30 @@ model AuthIdentity {
 }
 
 model Session {
+  id             String         @id @default(uuid())
+  userId         String
+  clientDeviceId String?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokedReason  String?
+  createdAt      DateTime       @default(now())
+  lastUsedAt     DateTime?
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens  RefreshToken[]
+  @@index([userId, clientDeviceId, revokedAt, expiresAt])
+}
+
+model RefreshToken {
   id         String    @id @default(uuid())
-  userId     String
+  sessionId  String
   tokenHash  String    @unique
+  familyId   String
+  issuedAt   DateTime  @default(now())
   expiresAt  DateTime
+  usedAt     DateTime?
   revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@index([userId, expiresAt])
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@index([sessionId, familyId, expiresAt])
 }
 
 model Device {
@@ -94,42 +138,50 @@ model Device {
 }
 
 model DevicePairing {
-  id         String        @id @default(uuid())
-  userId     String
-  deviceId   String?
-  challengeHash String
-  status     PairingStatus @default(PENDING)
-  expiresAt  DateTime
-  consumedAt DateTime?
-  createdAt  DateTime      @default(now())
-  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  device     Device?       @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  id            String        @id @default(uuid())
+  userId        String
+  deviceId      String?
+  codeHash      String
+  status        PairingStatus @default(PENDING)
+  expiresAt     DateTime
+  attemptCount  Int           @default(0)
+  maxAttempts   Int           @default(5)
+  lastAttemptAt DateTime?
+  consumedAt    DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime      @default(now())
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device        Device?       @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   @@index([userId, status, expiresAt])
-  @@index([challengeHash])
+  @@index([codeHash])
 }
 
 model UserSettings {
-  id                    String   @id @default(uuid())
-  userId                String   @unique
-  timezone              String   @default("UTC")
-  voiceProfileId        String   @default("prudence")
-  speechSpeed           Float    @default(1.0)
-  playbackVolume        Int      @default(80)
-  responseLength        String   @default("standard")
-  automaticMemoryCandidates Boolean @default(true)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                       String         @id @default(uuid())
+  userId                   String         @unique
+  language                 String         @default("en")
+  responseLength           ResponseLength @default(STANDARD)
+  automaticMemoryCandidates Boolean       @default(true)
+  timezone                 String         @default("Asia/Jakarta")
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+  user                     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model DeviceSettings {
-  id         String   @id @default(uuid())
-  deviceId   String   @unique
-  displayName String?
-  enabled    Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  id                   String              @id @default(uuid())
+  deviceId             String              @unique
+  displayName          String?
+  defaultDevice        Boolean             @default(false)
+  playbackVolume       Int                 @default(80)
+  quietHours           Json?
+  notificationBehavior NotificationBehavior @default(ALL)
+  voiceProfileId       String              @default("prudence")
+  speechSpeed          Float               @default(1.0)
+  enabled              Boolean             @default(true)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  device               Device              @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 }
 
 model ChatSession {
@@ -249,7 +301,7 @@ model Schedule {
   deliveryTargetId String
   name            String
   kind            ScheduleKind
-  timezone        String
+  timezone        String          @default("Asia/Jakarta")
   runAt           DateTime?
   recurrence      Json?
   status          ScheduleStatus  @default(ACTIVE)

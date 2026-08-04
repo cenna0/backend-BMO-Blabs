@@ -1,39 +1,45 @@
 # Authentication and Device-Pairing Flow
 
-**Status:** `PROPOSED`
+**Status:** `P9.1 LOCKED`
 
-## Authentication
+## Authentication — locked P9.1 contract
 
-1. Mobile starts an approved identity-provider login.
-2. Backend verifies the provider assertion server-side, maps the immutable
-   provider subject to `AuthIdentity`, and creates a short-lived session plus
-   rotating refresh/session material according to the security policy.
-3. Mobile calls Backend only over TLS using the session.
-4. Backend authorizes every user-owned resource from the session subject; a
-   client-supplied `user_id` is never trusted.
-5. Session expiry, explicit logout, suspected compromise, and key rotation
-   revoke server-side session state.
+1. Registration is invite-only. The invitation is single-use, expiring, and
+   stored by hash; registration cannot proceed without a valid invitation.
+2. Mobile submits email and password over TLS to Backend. Backend verifies the
+   password with Argon2id and never stores or logs the plaintext password.
+3. Backend issues a short-lived access token targeted at approximately 15
+   minutes plus an opaque cryptographically random refresh token.
+4. Only the refresh-token hash is stored in PostgreSQL. Refresh rotates the
+   token; reuse/replay revokes the affected token family/session.
+5. Mobile calls Backend only over TLS. Backend authorizes every resource from
+   the server-side session subject; a client-supplied `user_id` is never
+   trusted.
+6. Logout, expiry, explicit per-device revocation, suspected compromise, and
+   security action revoke server-side session state.
 
-The existing PRD names Google SSO as the initial identity provider. Provider
-configuration and exact SDK are implementation-phase decisions; the Backend
-contract is provider-neutral.
+The identity schema remains provider-neutral for future expansion, but P9.1
+has no social login or external identity provider. Production email delivery
+and password-reset strategy remain OPEN and are not silently added to P9.1.
 
-## Pairing
+## Pairing — locked P9.1 contract
 
 ```text
 Authenticated mobile
   → POST /api/v1/pairing/challenges
-  ← one-time challenge display/QR payload (short TTL)
-Device presents challenge over existing authenticated device channel
-  → Backend verifies challenge, hardware identity, and ownership policy
+  ← six-digit numeric code, valid for 10 minutes
+Device presents the code over the existing device channel
+  → Backend verifies code, hardware identity, and ownership policy
+  → authenticated user claims the device in one transaction
   → transaction creates Device + hashed device credential + audit event
   ← mobile receives device summary, never the stored credential
 ```
 
-Pairing challenges are single-use, short-lived, rate-limited, bound to the
-requesting user, and invalidated after consumption, expiry, logout, or failed
-attempt threshold. A device already owned by another user cannot be silently
-claimed.
+Pairing codes are single-use, valid for 10 minutes, rate-limited, replay-
+protected, bound to the authenticated user, and invalidated after consumption,
+expiry, or failed-attempt threshold. Generating a new code invalidates the
+previous active code. Only a hash is persisted; full expired codes are never
+logged. A device already owned by another user cannot be silently claimed.
 
 ## Recovery and revocation
 
@@ -45,12 +51,17 @@ claimed.
 - Pairing is an application workflow; it does not alter the current ESP32
   WebSocket event schema.
 
+All pairing lifecycle events are audited: requested, succeeded, failed,
+expired, revoked, and device unpaired.
+
 ## Proposed API groups
 
 ```text
-POST   /api/v1/auth/provider/callback
+POST   /api/v1/auth/register
+POST   /api/v1/auth/login
 POST   /api/v1/auth/refresh
 POST   /api/v1/auth/logout
+POST   /api/v1/auth/sessions/:sessionId/revoke
 GET    /api/v1/me
 POST   /api/v1/pairing/challenges
 POST   /api/v1/pairing/complete

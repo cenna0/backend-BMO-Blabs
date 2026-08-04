@@ -1,6 +1,6 @@
 # Voice Settings Boundary
 
-**Status:** `LOCKED + PROPOSED`
+**Status:** `P9.1 LOCKED PERSISTENCE; FUTURE INTEGRATION PROPOSED`
 
 ## Initial user-editable settings
 
@@ -16,6 +16,16 @@
 The speed range is a proposed safety boundary and requires listening,
 latency, and decoder acceptance during P9.1/P9.6. It must not be inferred from
 unvalidated model behavior.
+
+## P9.1 persisted boundary
+
+P9.1 persists only the approved device settings: display name, default-device
+flag, playback volume, quiet hours, notification behavior, voice profile ID,
+and speech speed. The profile is fixed to Prudence. P9.1 does not dynamically
+apply these values inside Audio Service; that integration is a later phase.
+User settings separately persist language, response-length preference,
+automatic-memory-candidate preference, and the server-enforced
+`Asia/Jakarta` timezone. Timezone is not user-editable.
 
 ## Boundary
 

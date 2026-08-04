@@ -1,8 +1,8 @@
 # BMO BY B-LABS — Product Requirements Document (PRD)
 
-**Versi:** 1.3.0
+**Versi:** 1.3.1
 **Tanggal:** 2026-08-04
-**Status:** P9 architecture locked for review; implementation not started
+**Status:** P9.1 architecture locked and approved; P9 implementation not started
 
 > Dokumen ini menjadi konteks produk utama BMO by B-Labs. Isinya menjelaskan visi, arsitektur, tech stack, scope, keputusan desain, roadmap, dan status project.
 >
@@ -11,8 +11,9 @@
 > Jika terdapat perbedaan pada endpoint, event, payload, timeout, retry, lifecycle file, runtime config, atau deployment status, gunakan hierarchy pada Bab 18 dan jangan menyelesaikan konflik dengan membuat behavior baru.
 >
 > P9 architecture and application-platform ownership are defined in
-> [`docs/p9/README.md`](../p9/README.md). P9 documents are proposed design
-> until the relevant subphase is separately authorized and verified.
+> [`docs/p9/README.md`](../p9/README.md). P9.1 decisions are locked as design;
+> P9.1–P9.6 runtime implementation still requires separate authorization and
+> verification.
 
 ---
 
@@ -93,7 +94,7 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 | Voice request state MVP | In-memory | Request aktif dan tombstone idempotency; tidak menggunakan PostgreSQL pada voice MVP |
 | Mobile App | React Native | Satu codebase untuk iOS dan Android |
 | State Management | Zustand | State aplikasi mobile yang ringan dan modular |
-| Mobile Auth | Google SSO | Backend memvalidasi Google ID token dan menerbitkan session aplikasi |
+| Mobile Auth | Invite-only email/password | Backend verifies Argon2id password, issues short-lived access token, and rotates opaque refresh tokens by hash |
 | STT | faster-whisper lokal | Current selected runtime: `medium` multilingual, CPU INT8, auto-detect Indonesia/English/mixed, hotword `BMO` |
 | TTS | Piper lokal | `en_GB-semaine-medium`, Prudence, speaker ID `0`; fixed P8 production primary |
 | TTS fallback | Kokoro lokal | Voice `af_heart`, speed `0.80`; automatic fallback |
@@ -167,7 +168,7 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 
               ┌──────────────────────────────┐
               │ React Native App             │
-              │ - Google SSO                 │
+              │ - invite/email-password auth│
               │ - Spotify OAuth              │
               │ - WhatsApp setup             │
               │ - settings & status          │
@@ -250,6 +251,19 @@ the existing voice transport.
 - Tidak menyimpan memory internal Hermes sebagai source of truth; P9
   `PostgresMemoryGateway` owns application memory records.
 - Tidak menyimpan WhatsApp session Hermes.
+
+P9.1 locks one pinned-major private PostgreSQL container with persistent data
+outside Git, an initial 768 MiB memory target, Prisma pool target 5, and an
+approximately 20-connection target pending isolated capacity testing. All
+initial product times use server-enforced `Asia/Jakarta`; the timezone is not
+user-editable and database timestamps are UTC-compatible `timestamptz`.
+
+P9.1 persisted settings are fixed as follows: user settings contain language,
+response-length preference, automatic-memory-candidate preference, and the
+server-enforced timezone; device settings contain display name, default-device
+flag, playback volume, quiet hours, notification behavior, Prudence voice
+profile ID, and speech speed. Dynamic Audio Service settings application is
+deferred beyond P9.1.
 
 #### React Native Mobile App
 
@@ -597,7 +611,11 @@ users 1 ─── 1 notification_settings
 notification_settings 1 ─── N notification_rules
 ```
 
-### 11.2 Prisma Schema Awal
+### 11.2 Prisma Schema Awal — historical baseline
+
+The schema excerpt below is retained as product history. The approved P9.1
+schema authority is [`docs/p9/06-preliminary-prisma-schema.md`](../p9/06-preliminary-prisma-schema.md),
+which supersedes the old Google-specific identity and UTC-default assumptions.
 
 ```prisma
 generator client {
@@ -723,12 +741,15 @@ model NotificationRule {
 
 ## 12. React Native Mobile App
 
-### 12.1 Auth dan Session
+### 12.1 Auth dan Session — approved P9.1 boundary
 
-- Google SSO sebagai metode login.
-- Backend memvalidasi Google ID token.
-- Backend menerbitkan JWT aplikasi.
-- JWT disimpan melalui secure storage.
+- Registration invite-only; login email/password.
+- Password hash Argon2id.
+- Access token short-lived, targeted approximately 15 minutes.
+- Refresh token opaque, cryptographically random, rotated, with only its hash
+  stored in PostgreSQL.
+- Per-device session revocation is supported; no social login or external
+  identity provider is included in P9.1.
 
 ### 12.2 Zustand Stores
 
@@ -768,7 +789,11 @@ App
 
 | Method | Endpoint | Deskripsi |
 |---|---|---|
-| POST | `/api/auth/google` | Google ID token → app session |
+| POST | `/api/v1/auth/register` | Invite + email/password → app session |
+| POST | `/api/v1/auth/login` | Email/password → short-lived access + refresh session |
+| POST | `/api/v1/auth/refresh` | Rotate refresh token and issue access token |
+| POST | `/api/v1/auth/logout` | Revoke current session |
+| POST | `/api/v1/auth/sessions/:sessionId/revoke` | Revoke one client/device session |
 | GET | `/api/bmo/status` | Status BMO dan current mode |
 | GET | `/api/spotify/auth-url` | Spotify authorization URL |
 | GET | `/api/spotify/status` | Status koneksi Spotify |
@@ -1045,9 +1070,9 @@ Portainer tidak digunakan pada fase saat ini.
 Target policy:
 
 ```text
-Daily PostgreSQL backup    → retain 7–14 hari setelah P9 aktif
-Weekly DB/config backup    → retain 4 minggu
-Monthly off-server pull    → manual bundle ke storage di luar VPS
+Scheduled `pg_dump`         → seven daily encrypted/checksummed backups
+Weekly DB/config backup    → four weekly encrypted backups
+Off-VPS recovery copy       → required before final production sign-off; destination OPEN
 Pre-deploy                 → DB backup (jika DB aktif) + record current commit SHA
 Restore test               → wajib dibuktikan; backup tanpa restore test tidak dianggap cukup
 ```
@@ -1241,7 +1266,7 @@ Baseline boleh berubah berdasarkan hasil benchmark tanpa mengubah kontrak produk
 | P6 VPS foundation / Caddy / Tailscale / Beszel / firewall / backup baseline | High | SW / Codex | READY |
 | P7 deploy backend + Audio Service + Hermes host integration + public HTTPS/WSS E2E | High | SW / Codex | Depends on P6 |
 | P8 Piper production closure + fallback regression + VPS resource benchmark | High | SW / Codex | VERIFIED |
-| P9 PostgreSQL + Prisma ready-to-use + migration + backup/restore | Medium | SW / Codex | Technical dep P6; execute after P8 |
+| P9.1 PostgreSQL + Prisma/auth/pairing/settings + migration + backup/restore | High | SW / Codex | Architecture locked; implementation requires explicit P9.1 authorization |
 | P10 physical ESP32 integration + final hardware handoff activation | High | SW + HW | Technical dep P7+P8 status; execute after P9 |
 | Uji MP3 24 kHz/96 kbps pada decoder ESP32 | High | SW + HW | P10 |
 | Provisioning device token yang lebih aman / multi-device readiness | Medium | SW + HW | Future |
@@ -1278,6 +1303,9 @@ Baseline boleh berubah berdasarkan hasil benchmark tanpa mengubah kontrak produk
 | Temp MP3 TTL | 300 detik |
 | RVC production status | Disabled and removed; archived evidence only |
 
+| P9.1 timezone | `Asia/Jakarta`, server-enforced and not user-editable |
+| P9.1 pairing | Six-digit numeric code, ten-minute TTL, single-use, rate-limited, audited |
+
 ---
 
 ## 18. Document Hierarchy
@@ -1302,6 +1330,7 @@ Jika dokumen bertentangan, jangan mengubah firmware/backend contract secara diam
 
 | Tanggal | Versi | Perubahan |
 |---|---|---|
+| 2026-08-04 | 1.3.1 | P9.1 architecture approval: invite-only email/password + Argon2id, rotating hashed refresh tokens, server-enforced `Asia/Jakarta`, six-digit pairing, private PostgreSQL targets, persisted user/device settings, controlled Prisma migration, backup/restore baseline, audit/redaction controls; P9.2–P9.6 remain unimplemented and Hardware Contract v1.0.5 unchanged. |
 | 2026-08-04 | 1.3.0 | P9 final architecture/product lock: current Piper Prudence production, removed/archived RVC boundary, Backend-owned PostgreSQL application source of truth, chat/history versus curated memory, scheduler/proactive speech proposal, additive future hardware events, auth/pairing, mobile API mapping, Spotify/WhatsApp boundaries, voice settings, security/recovery/resource/acceptance plan; Hardware Contract v1.0.5 unchanged. |
 | 2026-07-26 | 1.2.4 | Authority/operations hardening: memperbaiki canonical document references, mengunci execution order P6→P10, menambah maintenance/update/recovery policy, source-audit gate sebelum P7 public verification, Beszel Hub+Agent/private-origin guidance, Caddy config permission model, dan coverage HW acceptance; public HW protocol tetap v1.0.5. |
 | 2026-07-26 | 1.2.3 | Final execution-readiness sync: memperjelas Caddy host service, infra Compose Beszel, secret deploy permissions, P9-only database activation, deterministic image tagging/rollback, dan TLS prerequisite firmware; public HW protocol tidak berubah. |

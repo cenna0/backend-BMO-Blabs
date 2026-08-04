@@ -1,6 +1,6 @@
 # P9 System Architecture
 
-**Status:** `PROPOSED`
+**Status:** `P9.1 LOCKED; P9.2–P9.6 PROPOSED`
 
 ## Target topology
 
@@ -28,13 +28,17 @@ Future additive path:
 
 The single VPS remains the initial deployment shape. Backend, Audio Service,
 and PostgreSQL are private origins; Caddy is the only public application edge.
+P9.1 PostgreSQL is one pinned-major container with an initial 768 MiB memory
+target, Prisma pool target 5, and approximately 20 database connections;
+capacity testing may revise exact caps before implementation acceptance.
 Hermes remains a host runtime at `127.0.0.1:8642`. Existing production Piper
 and Kokoro behavior is an internal audio implementation detail and is not
 replaced by P9.
 
 ## Trust boundaries
 
-1. **Mobile ↔ Backend:** bearer session, TLS, user authorization, rate limits,
+1. **Mobile ↔ Backend:** email/password authentication, short-lived access
+   token, opaque rotating refresh token, TLS, user authorization, rate limits,
    response filtering.
 2. **Device ↔ Backend:** existing device credential/WebSocket/HTTP contract;
    v1.0.5 is immutable.
@@ -87,3 +91,10 @@ Schedule → due ScheduleRun → idempotent worker claim
 ```
 
 No scheduled flow writes memory merely because it produced speech.
+
+## P9.1 time and settings rule
+
+All initial user-facing and mobile schedule times are interpreted and displayed
+in `Asia/Jakarta`. The timezone is server-enforced and not user-editable.
+Persisted database timestamps use UTC-compatible PostgreSQL `timestamptz`;
+future schedule metadata also defaults to `Asia/Jakarta`.

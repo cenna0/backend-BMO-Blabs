@@ -1,9 +1,9 @@
 # BMO — Next Execution Action
 
-**Last updated:** 2026-08-03
+**Last updated:** 2026-08-04
 **Audience:** Codex / infrastructure-backend coding agent
-**Current next phase:** **P9 — PostgreSQL and persistent user/device data**
-**Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9 NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Current next phase:** **P9.1 — PostgreSQL, auth, pairing, and settings foundation**
+**Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 
 > P8 is `P8_PIPER_PRODUCTION_VERIFIED`. P8 completion does **not** authorize
 > P9. A future P9 run requires a new explicit instruction such as **“execute P9”**
@@ -17,7 +17,7 @@ P7 is `VERIFIED — PRODUCTION`. P8 is `P8_PIPER_PRODUCTION_VERIFIED` with Piper
 Prudence primary, Kokoro fallback, and RVC disabled. P8 completion does **not**
 authorize P9 implementation. The P9 architecture set is available for review
 under [`p9/README.md`](p9/README.md); do not install a database or execute
-P9.1 from this documentation gate. Do not execute P10 from this gate.
+P9.1 implementation from this documentation gate. Do not execute P10 from this gate.
 P8 completion does **not** authorize P9.
 Sanitized proof is in
 [`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
@@ -50,6 +50,13 @@ Production uses Piper Prudence as the fixed primary and Kokoro `af_heart` at
 `0.80` as automatic fallback; real RVC inference is not verified and RVC
 remains disabled. Physical ESP32 acceptance
 is not run, and PostgreSQL/Prisma is not implemented or deployed.
+
+P9.1 architecture is now approved and locked for invite-only email/password
+authentication, Argon2id, short-lived access tokens, rotating opaque refresh
+tokens by hash, server-enforced `Asia/Jakarta`, six-digit ten-minute pairing,
+private PostgreSQL targets, persisted user/device settings, migration policy,
+backup/restore, and audit/redaction controls. P9.1 implementation remains
+unstarted and requires a separate explicit execution prompt.
 
 ## 2. Locked execution order
 
@@ -84,7 +91,7 @@ Read in this order:
 9. `hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — read-only
    public protocol contract.
 10. `operations/MAINTENANCE-AND-RECOVERY.md` — live recovery procedures.
-11. `p9/README.md` — reviewed P9 architecture and subphase gates.
+11. `p9/README.md` — approved P9.1 architecture lock and later subphase gates.
 
 Historical P1–P7 plans/evidence remain evidence, not execution authority.
 

@@ -1,7 +1,7 @@
 # BMO — P6–P10 Infrastructure and Hardware Readiness Roadmap
 
 **Status:** LOCKED ROADMAP / PHASE-BY-PHASE EXECUTION  
-**Current next phase:** P9 — `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Current next phase:** P9.1 — `ARCHITECTURE LOCKED; NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 **Reason for split:** the original P6 scope became too broad after adding full VPS foundation, public TLS, monitoring, real RVC, database readiness, backup/recovery, and hardware handoff.
 
 The split below follows dependencies, not equal workload. The current coding
@@ -10,7 +10,7 @@ agent must use [`../NEXT-ACTION.md`](../NEXT-ACTION.md) and
 [`P6-EXECUTION-SPEC.md`](P6-EXECUTION-SPEC.md) remains the locked historical P6
 record.
 
-**Execution rule:** locked order is **P6 → P7 → P8 → P9 → P10**. Verify one phase, record evidence, stop, then load the next phase in a fresh execution turn. Technical dependencies listed below explain architecture; they do not authorize skipping the execution order.
+**Execution rule:** locked order is **P6 → P7 → P8 → P9.1 → P9.2 → P9.3 → P9.4 → P9.5 → P9.6 → P10**. Verify one phase, record evidence, stop, then load the next phase in a fresh execution turn. Technical dependencies listed below explain architecture; they do not authorize skipping the execution order.
 
 ## P6 — VPS Foundation and Operations Baseline
 
@@ -187,7 +187,7 @@ P7 — satisfied. Prompt 5 authorization and all closure gates — satisfied.
 
 ## P9 — PostgreSQL + Prisma Ready-to-Use Data Layer
 
-**Phase status:** `NOT_STARTED / dependency-gated after P8`
+**Phase status:** `P9.1 ARCHITECTURE LOCKED / P9 implementation NOT_STARTED`
 
 ### Goal
 Prepare the application database for mobile/user/device/integration work without moving MVP voice request state into PostgreSQL.
@@ -195,7 +195,7 @@ Prepare the application database for mobile/user/device/integration work without
 ### Inputs
 - P6 foundation;
 - application schema baseline from this PRD;
-- the latest approved mobile-app/auth/device-pairing requirements available at P9 execution time;
+- the approved P9.1 mobile/auth/device-pairing/settings decisions in `docs/p9/`;
 - backup storage policy.
 
 ### Scope
@@ -210,8 +210,9 @@ Prepare the application database for mobile/user/device/integration work without
   rollout/rollback rehearsal, and final acceptance.
 
 The detailed architecture, preliminary schema, entity/API mapping, and gates
-are [`../p9/README.md`](../p9/README.md). This roadmap entry does not
-authorize implementation, PostgreSQL installation, or migrations.
+are [`../p9/README.md`](../p9/README.md). P9.1 is architecture-locked but
+implementation still requires explicit authorization. This roadmap entry does
+not authorize implementation, PostgreSQL installation, or migrations.
 
 ### Output
 - ready database service;

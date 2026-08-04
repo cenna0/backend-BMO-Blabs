@@ -48,7 +48,8 @@ type ActionIntent =
 The final implementation uses strict schemas, length limits, allowlists,
 provider/device ownership checks, per-kind confirmation requirements, and
 safe result types. It never evaluates arbitrary `schedule` or provider input
-as code.
+as code. Schedule intents use the server-enforced `Asia/Jakarta` timezone;
+clients cannot select a different timezone in the initial product.
 
 ## Result envelope
 

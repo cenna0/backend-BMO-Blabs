@@ -1,6 +1,6 @@
 # P9 Product Scope and Non-Goals
 
-**Status:** `LOCKED + PROPOSED`
+**Status:** `P9.1 LOCKED + P9.2–P9.6 PROPOSED`
 
 ## Current verified baseline
 
@@ -26,6 +26,32 @@ The Backend is the application boundary. Hermes remains the BMO reasoning and
 personality runtime, but it must communicate with application capabilities
 through explicit contracts. Mobile clients never call Hermes, PostgreSQL,
 Spotify, WhatsApp, or hardware directly.
+
+## Approved P9.1 boundary
+
+- Registration is invite-only; login uses email and password.
+- Passwords use Argon2id. Access tokens are short-lived, targeted at
+  approximately 15 minutes. Refresh tokens are opaque, cryptographically
+  random, rotated, and represented in PostgreSQL only by hashes.
+- The initial identity schema is provider-neutral, but no social login or
+  external identity provider is implemented in P9.1.
+- All initial product time interpretation and display uses the server-enforced
+  canonical timezone `Asia/Jakarta`. It is not user-editable; timestamps are
+  UTC-compatible PostgreSQL `timestamptz` values.
+- Pairing uses a six-digit numeric code, valid for 10 minutes, single-use,
+  authenticated-user claimed, rate-limited, replay-protected, and audited.
+- PostgreSQL is one pinned-major private container with persistent data outside
+  Git. Initial targets are 768 MiB memory, Prisma pool 5, and approximately 20
+  PostgreSQL connections, subject to isolated capacity testing.
+- P9.1 persists the approved user/device settings and audit events without
+  requiring dynamic Audio Service voice-settings integration.
+
+## P9.1 non-goals
+
+P9.1 does not implement chat history, long-term memory, scheduler runtime,
+alarms, proactive speech, Spotify, WhatsApp, pgvector retrieval, Mem0,
+Qdrant, Obsidian runtime or Markdown import, custom voices, RVC, HW Contract
+v1.1.0, or any change to Hardware Contract v1.0.5.
 
 ## In scope
 

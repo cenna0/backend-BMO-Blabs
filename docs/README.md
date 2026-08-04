@@ -67,7 +67,8 @@ Never resolve a conflict by silently changing firmware behavior or adding a new 
 `NEXT-ACTION.md` determines **what the coding agent should execute next**. It
 does not override the protocol/runtime source-of-truth hierarchy above. At this
 revision, **P6, P7, and P8 are verified**, with P8 production using Piper
-Prudence primary, Kokoro fallback, and RVC disabled. P9 implementation remains
+Prudence primary, Kokoro fallback, and RVC disabled. P9.1 architecture is
+approved and locked, while P9 implementation remains
 `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`; its architecture is
 documented under `p9/`. Later phases must not be collapsed into one execution
 turn.

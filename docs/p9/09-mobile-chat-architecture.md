@@ -1,12 +1,12 @@
 # Mobile Chat Architecture
 
-**Status:** `PROPOSED`
+**Status:** `P9.1 LOCKED FOUNDATION; P9.2–P9.6 PROPOSED`
 
 ## Screens and API mapping
 
 | Mobile surface | Proposed API group | Primary data |
 |---|---|---|
-| Sign-in/session | `/auth/*`, `/me` | Session, User |
+| Sign-in/session | `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/sessions/*`, `/me` | Invitation, PasswordCredential, Session, User |
 | Device setup | `/pairing/*`, `/devices` | Device, DevicePairing |
 | Chat list | `/chat/sessions` | ChatSession |
 | Chat detail | `/chat/sessions/:id/messages` | ChatMessage |
@@ -15,12 +15,14 @@
 | Memory review | `/memories`, `/memory-candidates` | MemoryRecord, MemoryCandidate |
 | Schedule list/editor | `/schedules`, `/schedule-runs` | Schedule, ScheduleRun |
 | Settings | `/settings`, `/devices/:id/settings` | UserSettings, DeviceSettings |
-| Voice settings/preview | `/settings/voice`, `/voice/preview` | UserSettings + catalog |
+| Voice settings/preview | `/settings/voice`, `/voice/preview` | DeviceSettings + catalog |
 | Spotify status | `/integrations/spotify/*` | SpotifyConnection, action result |
 | WhatsApp status/rules | `/integrations/whatsapp/*` | WhatsAppConnection, rules |
 
 Every proposed screen has a Backend API owner and a source-of-truth entity.
-Mobile does not read raw Hermes context or provider tokens.
+Mobile does not read raw Hermes context or provider tokens. Mobile displays all
+initial user-facing times in `Asia/Jakarta`; timezone is server-enforced and
+has no user-editable control.
 
 ## Chat request lifecycle
 

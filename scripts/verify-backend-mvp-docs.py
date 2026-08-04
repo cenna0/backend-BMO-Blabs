@@ -29,7 +29,7 @@ expected = [
 ]
 
 source_hashes = {
-    prd: "24b31e8268d516f6a7d22bfcdefd149fe56e0be08723ad1a32ce53d5287d5d52",
+    prd: "2928ac05023e76ae463dfaaefbc0141d42d97b796c276ef4c779c46b23ac78e3",
     archive: "d1554d8d2cdbd6e32cf7acca75ce17031adcc47463b8577f64cdc288fa076853",
     hw_copy: "633e398a7fa39a3ebc469af7f9ca46fd04890339bb132ec7de2c2286207c6a44",
 }
@@ -127,14 +127,15 @@ if archive.is_file():
 status = (bm / "IMPLEMENTATION-STATUS.md").read_text(encoding="utf-8")
 control_state = [
     "Documentation package: CURRENT / P8 PRODUCTION CLOSED",
-    "Current next implementation phase: P9 — PostgreSQL and persistent user/device data",
+    "Current next implementation phase: P9.1 — PostgreSQL, auth, pairing, settings foundation",
     "P6 state: VERIFIED",
     "P6 execution authorization: COMPLETED",
     "P7 state: VERIFIED — PRODUCTION",
     "P7 execution: COMPLETED",
     "P8 state: P8_PIPER_PRODUCTION_VERIFIED",
-    "P9 state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
-    "P10 state: NOT_STARTED / dependency-gated after P9",
+    "P9.1 architecture state: LOCKED / APPROVED",
+    "P9 implementation state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
+    "P10 state: NOT_STARTED / dependency-gated after P9.6",
 ]
 for value in control_state:
     if value not in status:
@@ -142,7 +143,7 @@ for value in control_state:
 
 phase_rows = {}
 for line in status.splitlines():
-    if not re.match(r"^\| P(?:[1-9]|10) \|", line):
+    if not re.match(r"^\| (?:P[1-8]|P9\.1|P9\.2–P9\.6|P10) \|", line):
         continue
     columns = [column.strip() for column in line.strip().strip("|").split("|")]
     if len(columns) != 6:
@@ -162,10 +163,11 @@ expected_phase_rows = {
     "P6": ("VERIFIED", "COMPLETED"),
     "P7": ("VERIFIED — PRODUCTION", "COMPLETED"),
     "P8": ("VERIFIED — PRODUCTION", "COMPLETED"),
-    "P9": ("NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"),
+    "P9.1": ("ARCHITECTURE LOCKED; NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"),
+    "P9.2–P9.6": ("PROPOSED; NOT_STARTED", "DEPENDS ON PREDECESSOR GATES"),
     "P10": (
         "NOT_STARTED",
-        "DEPENDS ON P9 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS",
+        "DEPENDS ON P9.6 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS",
     ),
 }
 if set(phase_rows) != set(expected_phase_rows):
@@ -287,8 +289,8 @@ current_doc_requirements = {
         next_action,
         [
             "Current next phase:",
-            "P9 — PostgreSQL and persistent user/device data",
-            "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9 NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
+            "P9.1 — PostgreSQL, auth, pairing, and settings foundation",
+            "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
             "P7 is `VERIFIED — PRODUCTION`",
             "P8 is `P8_PIPER_PRODUCTION_VERIFIED`",
             "P8 completion does **not** authorize P9",
@@ -325,7 +327,7 @@ current_doc_requirements = {
     "docs/roadmap/P6-P10-ROADMAP.md": (
         roadmap,
         [
-            "P6 → P7 → P8 → P9 → P10",
+            "P6 → P7 → P8 → P9.1 → P9.2 → P9.3 → P9.4 → P9.5 → P9.6 → P10",
             "P7 — Deploy Backend + Audio Service + Hermes Integration",
             "Phase status:** `VERIFIED — PRODUCTION`",
             "P8 — Fixed Piper Production TTS and RVC Boundary",
@@ -406,7 +408,7 @@ unique_state_declarations = [
         "docs/NEXT-ACTION.md phase state",
         next_action,
         r"^\*\*Phase state:\*\*\s*`([^`]+)`\s*$",
-        "P8_PIPER_PRODUCTION_VERIFIED; P9 NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
+        "P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
     ),
     (
         "docs/roadmap/P8-EXECUTION-SPEC.md status",
@@ -418,7 +420,7 @@ unique_state_declarations = [
         "docs/roadmap/P6-P10-ROADMAP.md current next phase",
         roadmap,
         r"^\*\*Current next phase:\*\*\s*(.+?)\s*$",
-        "P9 — `NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
+        "P9.1 — `ARCHITECTURE LOCKED; NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
     ),
     (
         "docs/backend-mvp/IMPLEMENTATION-STATUS.md P8 control state",
