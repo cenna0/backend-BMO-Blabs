@@ -3,6 +3,11 @@
 **Status:** `LOCKED + PROPOSED + OPEN`
 **Decision date:** 2026-08-04
 
+The production-readiness decisions for the merged P9.1 foundation are recorded
+in [`P9.1-PRODUCTION-DECISION-REGISTER.md`](P9.1-PRODUCTION-DECISION-REGISTER.md).
+This architecture register remains the source of locked P9 scope and future
+phase decisions; it does not authorize production deployment.
+
 | Decision | Status | Rationale | Alternatives | Consequence | Owner | Phase |
 |---|---|---|---|---|---|---|
 | PostgreSQL is application source of truth | LOCKED | durable relational ownership, audit, backup | Hermes store, document DB | DB is required for P9.1+ | SW/operations | P9.1 |

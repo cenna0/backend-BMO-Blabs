@@ -5,6 +5,12 @@
 These are the smallest decisions that must be closed before the affected
 implementation prompt is authorized. They are not hidden assumptions.
 
+P9.1 implementation-level readiness decisions are tracked separately in
+[`P9.1-PRODUCTION-DECISION-REGISTER.md`](P9.1-PRODUCTION-DECISION-REGISTER.md).
+That register does not close the operator-owned choices below; it records the
+recommended alternatives and the gates that remain before a production
+canary. P9.1 source is merged but not deployed.
+
 | Decision | Why it matters | Required owner | Due phase |
 |---|---|---|---|
 | Off-VPS backup destination | determines final disaster-recovery location and key boundary | operations | P9.6 |

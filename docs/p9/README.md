@@ -1,16 +1,19 @@
 # BMO P9 — Final Architecture and Product Lock
 
-**Status:** `P9.1 ARCHITECTURE LOCKED; ISOLATED P9.1 CANDIDATE READY FOR REVIEW; P9.2–P9.6 PROPOSED`
+**Status:** `P9.1 ARCHITECTURE LOCKED; IMPLEMENTATION MERGED; PRODUCTION READINESS IN PROGRESS; P9.2–P9.6 PROPOSED`
 **Architecture branch:** `docs/p9-final-architecture`
 **Base main:** `159ce6d9081928eca6d68921c3f64cdb36fce5bb`
 **Date:** 2026-08-04
 
 This directory is the P9 application-platform architecture set. P9.1 has been
-approved and its authentication, timezone, pairing, database, settings,
-migration, backup, and audit decisions are locked. P9.2–P9.6 remain proposed
-execution stages and are not implemented. The isolated P9.1 implementation
-evidence is recorded in [`P9.1-IMPLEMENTATION-EVIDENCE.md`](P9.1-IMPLEMENTATION-EVIDENCE.md);
-no P9.1 candidate is deployed to production.
+implemented, independently reviewed, and merged into main, but it is not
+deployed. Production PostgreSQL is not installed and no production migration
+has run. Its authentication, timezone, pairing, database, settings, migration,
+backup, and audit decisions are locked. P9.2–P9.6 remain proposed execution
+stages and are not implemented. The historical P9.1 implementation and review
+evidence are recorded in [`P9.1-IMPLEMENTATION-EVIDENCE.md`](P9.1-IMPLEMENTATION-EVIDENCE.md)
+and [`P9.1-FOUNDATION-REVIEW.md`](P9.1-FOUNDATION-REVIEW.md); the readiness
+package is [`P9.1-PRODUCTION-READINESS.md`](P9.1-PRODUCTION-READINESS.md).
 
 ## Status vocabulary
 

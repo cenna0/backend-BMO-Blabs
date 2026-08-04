@@ -2,22 +2,22 @@
 
 **Last updated:** 2026-08-04
 **Audience:** Codex / infrastructure-backend coding agent
-**Current next phase:** **P9.1 — PostgreSQL, auth, pairing, and settings foundation**
-**Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
+**Current next phase:** **P9.1 production readiness lock**
+**Phase state:** `P9.1 MERGED / NOT DEPLOYED; PRODUCTION READINESS IN PROGRESS`
 
-> P8 is `P8_PIPER_PRODUCTION_VERIFIED`. P8 completion does **not** authorize
-> P9. A future P9 run requires a new explicit instruction such as **“execute P9”**
-> or equivalent.
+> P8 is `P8_PIPER_PRODUCTION_VERIFIED`. P9.1 source is merged and independently
+> reviewed, but this gate does **not** authorize production deployment,
+> PostgreSQL installation, or migration. P9.2–P9.6 require separate gates.
 
 ## 1. Current checkpoint
 
 P6 VPS Foundation and Operations Baseline remains `VERIFIED`. P7 backend,
 Audio Service, and Hermes production integration is `VERIFIED — PRODUCTION`.
 P7 is `VERIFIED — PRODUCTION`. P8 is `P8_PIPER_PRODUCTION_VERIFIED` with Piper
-Prudence primary, Kokoro fallback, and RVC disabled. P8 completion does **not**
-authorize P9 implementation. The P9 architecture set is available for review
-under [`p9/README.md`](p9/README.md); do not install a database or execute
-P9.1 implementation from this documentation gate. Do not execute P10 from this gate.
+Prudence primary, Kokoro fallback, and RVC disabled. P8 completion does **not** authorize P9 implementation or deployment. P9.1 source is now merged but not deployed; its
+readiness package is available under [`p9/README.md`](p9/README.md). Do not
+install a production database or execute P10 from this documentation gate.
+Do not execute P10 from the P9.1 readiness package.
 P8 completion does **not** authorize P9.
 Sanitized proof is in
 [`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
@@ -49,14 +49,15 @@ Verified P7 outcomes include:
 Production uses Piper Prudence as the fixed primary and Kokoro `af_heart` at
 `0.80` as automatic fallback; real RVC inference is not verified and RVC
 remains disabled. Physical ESP32 acceptance
-is not run, and PostgreSQL/Prisma is not implemented or deployed.
+is not run. PostgreSQL/Prisma source is merged, but production PostgreSQL is
+not installed and no production migration has run.
 
 P9.1 architecture is now approved and locked for invite-only email/password
 authentication, Argon2id, short-lived access tokens, rotating opaque refresh
 tokens by hash, server-enforced `Asia/Jakarta`, six-digit ten-minute pairing,
 private PostgreSQL targets, persisted user/device settings, migration policy,
-backup/restore, and audit/redaction controls. P9.1 implementation remains
-unstarted and requires a separate explicit execution prompt.
+backup/restore, and audit/redaction controls. P9.1 implementation is merged;
+production readiness and deployment remain separately authorized tasks.
 
 ## 2. Locked execution order
 
@@ -67,13 +68,13 @@ P7 backend/audio production deployment   VERIFIED — PRODUCTION
   ↓ explicit new authorization required
 P8 fixed Piper primary + Kokoro fallback VERIFIED — PRODUCTION
   ↓ completed/verified status + explicit authorization
-P9 PostgreSQL + Prisma readiness         NOT_STARTED / dependency-gated
+P9.1 production readiness                IN PROGRESS / OPERATOR REVIEW REQUIRED
   ↓ VERIFIED + explicit authorization
 P10 physical ESP32 acceptance            NOT_STARTED / dependency-gated
 ```
 
-Do not collapse phases or infer execution authority from technical readiness.
-P8 completion does not automatically start P9.
+Do not collapse phases or infer deployment authority from technical readiness.
+P9.1 merge does not automatically start a production canary.
 
 ## 3. Read before a future P9 execution
 
@@ -120,11 +121,11 @@ P8 did not:
 
 ## 5. P9 authorization and first action
 
-This documentation does not authorize P9 implementation. After a new explicit
-user command such as **“execute P9.1”**, begin with a fresh read-only
-source/runtime audit, read the approved P9.1 gate, and create an isolated
-implementation branch/worktree. Do not start database work from this
-architecture branch. P9.2–P9.6 require their own completed predecessor gate.
+This documentation does not authorize production deployment. A future explicit
+command such as **“execute P9.1”** is required for a canary. After operator
+approval, the next canary task must begin with a fresh read-only audit from the
+exact final main SHA and a separate isolated worktree. Do not start database
+work from this readiness branch. P9.2–P9.6 require their own completed gate.
 
 Document and stop on any conflict with the locked hardware contract, P7
 production provenance, secret isolation, offline model policy, or Kokoro
@@ -133,6 +134,5 @@ fallback requirement.
 ## 6. P8 finish line
 
 P8 is closed as `P8_PIPER_PRODUCTION_VERIFIED`. Do not repeat P8 work from this
-gate. P9 implementation requires the explicit authorization described in §5;
-the architecture branch only supplies the reviewable design and execution
-gates.
+gate. Production deployment requires a separate explicit authorization; this
+branch only supplies the reviewable readiness design and execution gates.

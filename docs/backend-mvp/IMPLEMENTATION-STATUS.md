@@ -8,23 +8,23 @@
 ```text
 Documentation package: CURRENT / P8 PRODUCTION CLOSED
 P1–P5 backend history: implemented/verified according to phase evidence below
-Current next implementation phase: P9.1 — PostgreSQL, auth, pairing, settings foundation
+Current next implementation phase: P9.1 production readiness lock
 P6 state: VERIFIED
 P6 execution authorization: COMPLETED
 P7 state: VERIFIED — PRODUCTION
 P7 execution: COMPLETED
 P8 state: P8_PIPER_PRODUCTION_VERIFIED
 P9.1 architecture state: LOCKED / APPROVED
-P9.1 implementation state: ISOLATED CANDIDATE IMPLEMENTED / READY FOR REVIEW
+P9.1 implementation state: MERGED / NOT DEPLOYED; PRODUCTION READINESS PACKAGE IN PROGRESS
 P9.2–P9.6 implementation state: NOT IMPLEMENTED
 P10 state: NOT_STARTED / dependency-gated after P9.6
 ```
 
 P6, P7, and P8 are verified. P8 fixed Piper Prudence as the production primary,
-retains Kokoro as automatic fallback, and preserves the public contract. Read
-`P8-PRODUCTION-ROLLOUT-EVIDENCE.md` for source synchronization, deployment,
-acceptance, and soak evidence. P9 is the next dependency phase but is not
-started or authorized.
+retains Kokoro as automatic fallback, and preserves the public contract. P9.1
+source is merged on main and independently reviewed, but it is not deployed;
+production PostgreSQL is not installed and no production migration has run.
+Read `../p9/P9.1-PRODUCTION-READINESS.md` for the operator-review package.
 
 ## 2. Documentation status
 
@@ -60,7 +60,7 @@ started or authorized.
 | P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
 | P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | VERIFIED — PRODUCTION | COMPLETED | [`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md) |
 | P8 | Fixed Piper Prudence primary + Kokoro fallback + production acceptance; RVC remains disabled | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | VERIFIED — PRODUCTION | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
-| P9.1 | PostgreSQL + Prisma, invite auth, pairing, user/device settings, backup/restore baseline | PRD + `../p9/` + roadmap | IMPLEMENTED — ISOLATED / READY FOR REVIEW | AUTHORIZED | [`../p9/P9.1-IMPLEMENTATION-EVIDENCE.md`](../p9/P9.1-IMPLEMENTATION-EVIDENCE.md) |
+| P9.1 | PostgreSQL + Prisma, invite auth, pairing, user/device settings, backup/restore baseline | PRD + `../p9/` + readiness package | MERGED — NOT DEPLOYED / READINESS IN PROGRESS | AUTHORIZED | [`../p9/P9.1-PRODUCTION-READINESS.md`](../p9/P9.1-PRODUCTION-READINESS.md) |
 | P9.2–P9.6 | Chat/memory, scheduler, integrations, hardening, final acceptance | `../p9/` | PROPOSED; NOT_STARTED | DEPENDS ON PREDECESSOR GATES | — |
 | P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9.6 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
 

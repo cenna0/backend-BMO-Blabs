@@ -68,10 +68,9 @@ Never resolve a conflict by silently changing firmware behavior or adding a new 
 does not override the protocol/runtime source-of-truth hierarchy above. At this
 revision, **P6, P7, and P8 are verified**, with P8 production using Piper
 Prudence primary, Kokoro fallback, and RVC disabled. P9.1 architecture is
-approved and locked, while P9 implementation remains
-`NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`; its architecture is
-documented under `p9/`. Later phases must not be collapsed into one execution
-turn.
+approved and locked, and its source is merged and independently reviewed but
+not deployed. The production-readiness package is documented under `p9/`.
+Later phases must not be collapsed into one execution turn.
 
 P7 is `VERIFIED — PRODUCTION`; real RVC inference is not verified and is not a
 production dependency; its compact evidence and Git history are archived.
@@ -107,8 +106,9 @@ At this audit point:
   at speed `0.80` as fallback; `RVC_ENABLED=false` and no RVC runtime artifact
   is in production;
 - **physical ESP32 integration is not verified** and belongs to P10;
-- PostgreSQL/Prisma is not implemented or deployed; it belongs to P9.1 and
-  remains blocked until a separate implementation authorization.
+- PostgreSQL/Prisma source is present on main, but production PostgreSQL is not
+  installed, no production migration has run, and P9.1 APIs are not publicly
+  activated. Production deployment remains a separate authorized task.
 
 The hardware team may use
 [`hardware-handoff/DEPLOYMENT-CONFIG.md`](hardware-handoff/DEPLOYMENT-CONFIG.md)
