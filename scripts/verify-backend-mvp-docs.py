@@ -19,14 +19,16 @@ archive = root / "docs" / "archive" / "BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES
 
 PRE_P9_IMPLEMENTATION_STATE = "P9 implementation state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION"
 P9_1_ISOLATED_IMPLEMENTATION_STATE = "P9.1 implementation state: ISOLATED CANDIDATE IMPLEMENTED / READY FOR REVIEW"
+P9_1_MERGED_READINESS_STATE = "P9.1 implementation state: MERGED / NOT DEPLOYED; PRODUCTION READINESS PACKAGE IN PROGRESS"
 
 
 def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
-    """Validate the pre-P9 and isolated P9.1 implementation-control states."""
+    """Validate pre-P9, isolated-candidate, and merged-readiness states."""
     errors: list[str] = []
     candidate_expected_value = P9_1_ISOLATED_IMPLEMENTATION_STATE.split(": ", 1)[1]
+    merged_expected_value = P9_1_MERGED_READINESS_STATE.split(": ", 1)[1]
     pre_p9_expected_value = PRE_P9_IMPLEMENTATION_STATE.split(": ", 1)[1]
-    candidate_declarations = re.findall(
+    p9_1_declarations = re.findall(
         r"^P9\.1 implementation state:\s*(.+?)\s*$",
         status,
         re.MULTILINE,
@@ -37,13 +39,15 @@ def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
         re.MULTILINE,
     )
 
-    if candidate_declarations == [candidate_expected_value] and not pre_p9_declarations:
+    if p9_1_declarations == [candidate_expected_value] and not pre_p9_declarations:
         stage = "P9.1-isolated-candidate"
-    elif pre_p9_declarations == [pre_p9_expected_value] and not candidate_declarations:
+    elif p9_1_declarations == [merged_expected_value] and not pre_p9_declarations:
+        stage = "P9.1-merged-readiness"
+    elif pre_p9_declarations == [pre_p9_expected_value] and not p9_1_declarations:
         stage = "pre-P9"
     else:
         stage = "unknown"
-        declared = " ".join(candidate_declarations + pre_p9_declarations)
+        declared = " ".join(p9_1_declarations + pre_p9_declarations)
         if re.search(r"\b(?:PRODUCTION|DEPLOYED|ACTIVE)\b", declared, re.IGNORECASE):
             errors.append("P9.1 isolated candidate must not be marked production")
         else:
@@ -51,7 +55,11 @@ def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
 
     common_control_state = [
         "Documentation package: CURRENT / P8 PRODUCTION CLOSED",
-        "Current next implementation phase: P9.1 — PostgreSQL, auth, pairing, settings foundation",
+        (
+            "Current next implementation phase: P9.1 production readiness lock"
+            if stage == "P9.1-merged-readiness"
+            else "Current next implementation phase: P9.1 — PostgreSQL, auth, pairing, settings foundation"
+        ),
         "P6 state: VERIFIED",
         "P6 execution authorization: COMPLETED",
         "P7 state: VERIFIED — PRODUCTION",
@@ -64,7 +72,7 @@ def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
         if value not in status:
             errors.append(f"status missing current control state: {value}")
 
-    if stage == "P9.1-isolated-candidate" and "P9.2–P9.6 implementation state: NOT IMPLEMENTED" not in status:
+    if stage in {"P9.1-isolated-candidate", "P9.1-merged-readiness"} and "P9.2–P9.6 implementation state: NOT IMPLEMENTED" not in status:
         errors.append("P9.2–P9.6 must remain PROPOSED; NOT_STARTED")
 
     phase_rows: dict[str, tuple[str, str]] = {}
@@ -80,11 +88,11 @@ def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
             errors.append(f"duplicate implementation phase row: {phase}")
         phase_rows[phase] = (phase_status, authorization)
 
-    expected_p9_1 = (
-        ("IMPLEMENTED — ISOLATED / READY FOR REVIEW", "AUTHORIZED")
-        if stage == "P9.1-isolated-candidate"
-        else ("ARCHITECTURE LOCKED; NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION")
-    )
+    expected_p9_1 = {
+        "P9.1-isolated-candidate": ("IMPLEMENTED — ISOLATED / READY FOR REVIEW", "AUTHORIZED"),
+        "P9.1-merged-readiness": ("MERGED — NOT DEPLOYED / READINESS IN PROGRESS", "AUTHORIZED"),
+        "pre-P9": ("ARCHITECTURE LOCKED; NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"),
+    }.get(stage, ("ARCHITECTURE LOCKED; NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"))
     expected_phase_rows = {
         "P1": ("VERIFIED — BACKEND", "AUTHORIZED BY USER"),
         "P2": ("VERIFIED — LOCAL FUNCTIONAL", "AUTHORIZED BY USER"),
@@ -362,6 +370,33 @@ if p9_stage == "P9.1-isolated-candidate":
         for value in required_values:
             if value not in text:
                 errors.append(f"{label} missing isolated P9.1 safety assertion: {value}")
+elif p9_stage == "P9.1-merged-readiness":
+    readiness = read_utf8(docs / "p9" / "P9.1-PRODUCTION-READINESS.md")
+    for value in [
+        "P9_1_PRODUCTION_READINESS_",
+        "P9.1 is merged but not deployed",
+        "production PostgreSQL is not installed",
+        "P9.2–P9.6 remain unimplemented",
+        "Hardware Contract v1.0.5 remains unchanged",
+    ]:
+        if value not in readiness:
+            errors.append(
+                "docs/p9/P9.1-PRODUCTION-READINESS.md missing merged-readiness safety assertion: "
+                + value,
+            )
+    readiness_forbidden_claims = [
+        (r"(?<!not )P9\.1 (?:is|has been) (?:now )?deployed", "P9.1 is falsely marked deployed"),
+        (r"(?<!not )P9\.1 (?:is|has been) (?:now )?in production", "P9.1 is falsely marked in production"),
+        (r"(?<!not )production PostgreSQL (?:is|has been) (?:installed|active|running)", "production PostgreSQL is falsely marked active"),
+        (r"(?<!no )production migration (?:has|was|is) (?:run|executed|applied)", "production migration is falsely marked complete"),
+        (r"(?<!not )P9\.2[–-]P9\.6 (?:are|were|have been) implemented", "P9.2-P9.6 are falsely marked implemented"),
+        (r"\bRVC_ENABLED\s*=\s*true\b", "RVC is falsely marked active"),
+    ]
+    for pattern, description in readiness_forbidden_claims:
+        if re.search(pattern, readiness, re.IGNORECASE):
+            errors.append(
+                "docs/p9/P9.1-PRODUCTION-READINESS.md contains unsafe claim: " + description,
+            )
 
 current_doc_requirements = {
     "docs/README.md": (
@@ -380,8 +415,16 @@ current_doc_requirements = {
         next_action,
         [
             "Current next phase:",
-            "P9.1 — PostgreSQL, auth, pairing, and settings foundation",
-            "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
+            (
+                "P9.1 production readiness lock"
+                if p9_stage == "P9.1-merged-readiness"
+                else "P9.1 — PostgreSQL, auth, pairing, and settings foundation"
+            ),
+            (
+                "Phase state:** `P9.1 MERGED / NOT DEPLOYED; PRODUCTION READINESS IN PROGRESS`"
+                if p9_stage == "P9.1-merged-readiness"
+                else "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`"
+            ),
             "P7 is `VERIFIED — PRODUCTION`",
             "P8 is `P8_PIPER_PRODUCTION_VERIFIED`",
             "P8 completion does **not** authorize P9",
@@ -499,7 +542,11 @@ unique_state_declarations = [
         "docs/NEXT-ACTION.md phase state",
         next_action,
         r"^\*\*Phase state:\*\*\s*`([^`]+)`\s*$",
-        "P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
+        (
+            "P9.1 MERGED / NOT DEPLOYED; PRODUCTION READINESS IN PROGRESS"
+            if p9_stage == "P9.1-merged-readiness"
+            else "P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION"
+        ),
     ),
     (
         "docs/roadmap/P8-EXECUTION-SPEC.md status",
@@ -828,7 +875,7 @@ voice_runtime_text = "\n".join(
         (
             (root / "backend" / "src") in path.parents
             and not (
-                p9_stage == "P9.1-isolated-candidate"
+                p9_stage in {"P9.1-isolated-candidate", "P9.1-merged-readiness"}
                 and (
                     (root / "backend" / "src" / "p9") in path.parents
                     or (root / "backend" / "src" / "generated" / "prisma") in path.parents
