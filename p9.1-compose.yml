@@ -1,0 +1,81 @@
+name: bmo-p9-1
+
+services:
+  postgres:
+    image: postgres:16.10-alpine3.22@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+    environment:
+      POSTGRES_DB: ${P9_POSTGRES_DB:-bmo}
+      POSTGRES_USER: ${P9_POSTGRES_USER:-bmo}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    command:
+      - postgres
+      - -c
+      - max_connections=20
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
+    volumes:
+      - type: bind
+        source: ${P9_DATA_DIR:-/opt/bmo/p9.1-data/postgres}
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+    networks:
+      - p9_private
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: "1.0"
+    pids_limit: 128
+    read_only: false
+    restart: "no"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.p9.1
+    environment:
+      P9_ENABLED: "true"
+      P9_BIND_HOST: 0.0.0.0
+      P9_BIND_PORT: "3010"
+      P9_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      P9_POSTGRES_USER: ${P9_POSTGRES_USER:-bmo}
+      P9_POSTGRES_DB: ${P9_POSTGRES_DB:-bmo}
+      P9_JWT_SECRET: ${P9_JWT_SECRET:?Set P9_JWT_SECRET outside Git}
+      P9_PAIRING_PEPPER: ${P9_PAIRING_PEPPER:?Set P9_PAIRING_PEPPER outside Git}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - p9_private
+    secrets:
+      - postgres_password
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: "1.0"
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+networks:
+  p9_private:
+    internal: true
+
+secrets:
+  postgres_password:
+    file: ${P9_POSTGRES_PASSWORD_FILE:?Set P9_POSTGRES_PASSWORD_FILE outside Git}
