@@ -15,6 +15,36 @@ evidence are recorded in [`P9.1-IMPLEMENTATION-EVIDENCE.md`](P9.1-IMPLEMENTATION
 and [`P9.1-FOUNDATION-REVIEW.md`](P9.1-FOUNDATION-REVIEW.md); the readiness
 package is [`P9.1-PRODUCTION-READINESS.md`](P9.1-PRODUCTION-READINESS.md).
 
+## Start here for P9.1 production operations
+
+These documents are the operator handoff. They describe approved future
+procedures; they do not mean secrets are provisioned, PostgreSQL is active, or
+P9.1 is deployed.
+
+1. [`P9.1-PRODUCTION-READINESS.md`](P9.1-PRODUCTION-READINESS.md) — readiness
+   state and remaining gates.
+2. [`P9.1-PRODUCTION-SECRETS-OPERATOR-GUIDE.md`](P9.1-PRODUCTION-SECRETS-OPERATOR-GUIDE.md)
+   — plain-language provisioning, validation, rotation, recovery, and
+   emergency checklists.
+3. [`P9.1-PRODUCTION-SECRET-MATRIX.md`](P9.1-PRODUCTION-SECRET-MATRIX.md) —
+   ownership, file, mount, and service-isolation source of truth.
+4. [`P9.1-BACKUP-MONITORING-AND-RESTORE.md`](P9.1-BACKUP-MONITORING-AND-RESTORE.md)
+   — local backup, manual PC pull, monitoring, and restore policy.
+5. [`P9.1-PRODUCTION-MIGRATION-PLAN.md`](P9.1-PRODUCTION-MIGRATION-PLAN.md) —
+   private initialization and migration sequence.
+6. [`P9.1-PRODUCTION-CANARY-PLAN.md`](P9.1-PRODUCTION-CANARY-PLAN.md) — future
+   staged canary topology.
+7. [`P9.1-PRODUCTION-ROLLBACK-RUNBOOK.md`](P9.1-PRODUCTION-ROLLBACK-RUNBOOK.md)
+   — rollback and failure matrix.
+8. [`P9.1-PRODUCTION-OBSERVABILITY.md`](P9.1-PRODUCTION-OBSERVABILITY.md) —
+   private operational signals.
+9. [`P9.1-PRODUCTION-ACCEPTANCE-MATRIX.md`](P9.1-PRODUCTION-ACCEPTANCE-MATRIX.md)
+   — command-level future acceptance gates.
+
+The deep secret reference is [`P9.1-PRODUCTION-SECRET-AND-KEY-MANAGEMENT.md`](P9.1-PRODUCTION-SECRET-AND-KEY-MANAGEMENT.md),
+and individual compromise procedures are in
+[`P9.1-PRODUCTION-SECRET-INCIDENT-RUNBOOKS.md`](P9.1-PRODUCTION-SECRET-INCIDENT-RUNBOOKS.md).
+
 ## Status vocabulary
 
 - **LOCKED** — supplied by the product direction or a previous verified

@@ -56,8 +56,11 @@ P9.1 architecture is now approved and locked for invite-only email/password
 authentication, Argon2id, short-lived access tokens, rotating opaque refresh
 tokens by hash, server-enforced `Asia/Jakarta`, six-digit ten-minute pairing,
 private PostgreSQL targets, persisted user/device settings, migration policy,
-backup/restore, and audit/redaction controls. P9.1 implementation is merged;
-production readiness and deployment remain separately authorized tasks.
+backup/restore, audit/redaction controls, operator-owned production secret
+ownership, and file-based service-specific secret injection. P9.1 implementation
+is merged; production readiness and deployment remain separately authorized
+tasks. Secret ownership/injection is a locked design, not proof that any real
+production secret has been created or mounted.
 
 ## 2. Locked execution order
 
@@ -93,6 +96,10 @@ Read in this order:
    public protocol contract.
 10. `operations/MAINTENANCE-AND-RECOVERY.md` — live recovery procedures.
 11. `p9/README.md` — approved P9.1 architecture lock and later subphase gates.
+12. `p9/P9.1-PRODUCTION-SECRETS-OPERATOR-GUIDE.md` — approved secret
+    provisioning, validation, rotation, recovery, and incident handoff.
+13. `p9/P9.1-PRODUCTION-SECRET-MATRIX.md` — service isolation and mount
+    boundary.
 
 Historical P1–P7 plans/evidence remain evidence, not execution authority.
 
