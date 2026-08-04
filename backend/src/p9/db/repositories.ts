@@ -20,4 +20,48 @@ export class P9Repositories {
   get client(): PrismaClient | Prisma.TransactionClient {
     return this.db;
   }
+
+  get user() {
+    return this.db.user;
+  }
+
+  get passwordCredential() {
+    return this.db.passwordCredential;
+  }
+
+  get authIdentity() {
+    return this.db.authIdentity;
+  }
+
+  get invitation() {
+    return this.db.invitation;
+  }
+
+  get session() {
+    return this.db.session;
+  }
+
+  get refreshToken() {
+    return this.db.refreshToken;
+  }
+
+  get device() {
+    return this.db.device;
+  }
+
+  get devicePairing() {
+    return this.db.devicePairing;
+  }
+
+  get userSettings() {
+    return this.db.userSettings;
+  }
+
+  get deviceSettings() {
+    return this.db.deviceSettings;
+  }
+
+  get auditEvent() {
+    return this.db.auditEvent;
+  }
 }
