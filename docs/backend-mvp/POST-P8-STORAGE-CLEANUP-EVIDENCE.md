@@ -1,6 +1,6 @@
 # BMO Post-P8 Storage Cleanup — Phase 1 Evidence
 
-Status: `BMO_STORAGE_CLEANUP_PHASE1_PARTIAL`
+Status: `BMO_STORAGE_CLEANUP_PHASE1_VERIFIED`
 
 Date: 2026-08-03
 
@@ -249,3 +249,37 @@ repository change for the cleanup evidence commit. Production does not require
 rebuild or redeployment for this documentation-only change.
 
 The final commit SHA is recorded in the handoff after commit and push.
+
+## Final closure verification
+
+The operator subsequently removed the two previously inaccessible residual
+paths:
+
+- `/opt/bmo/temp/p8-rvc-foundation-candidate`
+- `/opt/bmo/temp/p8-rvc-canary`
+
+Final verification on 2026-08-04 confirmed:
+
+- both residual paths are absent;
+- no RVC runtime path, image, container, process, or mount remains;
+- both compact evidence archives and all checksums remain valid;
+- the active Piper image and exact P7 rollback image remain unchanged;
+- active Piper model hashes remain exact;
+- Backend, Audio, and Hermes remain healthy;
+- a safe production Piper request returned HTTP 200 and a valid mono 24 kHz
+  96 kbps MP3;
+- existing committed Kokoro fallback and Piper recovery evidence remains the
+  authoritative fallback proof; no unsafe production fault injection was used;
+- `RVC_ENABLED=false`, restart counts remain zero, `OOMKilled=false`, and the
+  kernel OOM count remains `6`;
+- public `/health=200`, `/livez=404`, `/readyz=404`;
+- listeners remain loopback-only;
+- no open-deleted files were reported.
+
+Additional measured reclaim after the operator cleanup was 64,094,208 bytes.
+Final filesystem state is 102,888,095,744 total, 31,083,532,288 used, and
+71,787,786,240 available (31%). Final Docker accounting is 13 images,
+6.522 GB image storage, 5 active containers, zero volumes, and 11.76 GB build
+cache. No additional Docker cleanup was performed.
+
+The separate closure commit is recorded after commit and push verification.
