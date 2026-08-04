@@ -48,7 +48,19 @@ export class AccessTokenService {
       issuer: this.config.issuer,
       audience: this.config.audience,
     });
-    if (typeof verified.payload.sub !== "string" || typeof verified.payload.sid !== "string") {
+    const issuedAt = verified.payload.iat;
+    const expiresAt = verified.payload.exp;
+    const nowSeconds = Math.floor(Date.now() / 1_000);
+    if (
+      typeof verified.payload.sub !== "string" ||
+      typeof verified.payload.sid !== "string" ||
+      typeof issuedAt !== "number" ||
+      typeof expiresAt !== "number" ||
+      !Number.isSafeInteger(issuedAt) ||
+      !Number.isSafeInteger(expiresAt) ||
+      issuedAt > nowSeconds + 60 ||
+      expiresAt <= issuedAt
+    ) {
       throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
     }
     return verified.payload as JWTPayload & { sub: string; sid: string };
@@ -112,7 +124,7 @@ export class SessionService {
 
   async refresh(refreshToken: string, requestId?: string, now = new Date()): Promise<SessionTokens> {
     const tokenHash = sha256Hex(refreshToken);
-    return withP9Transaction(this.options.client, async (transaction) => {
+    const result = await withP9Transaction(this.options.client, async (transaction) => {
       const repositories = new P9Repositories(transaction);
       const audit = new AuditService(repositories);
       const stored = await repositories.refreshToken.findUnique({
@@ -138,7 +150,7 @@ export class SessionService {
           userId: stored.session.userId,
           ...(requestId === undefined ? {} : { context: { requestId } }),
         });
-        throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
+        return { kind: "rejected" as const };
       }
 
       const marked = await repositories.refreshToken.updateMany({
@@ -156,7 +168,7 @@ export class SessionService {
           userId: stored.session.userId,
           ...(requestId === undefined ? {} : { context: { requestId } }),
         });
-        throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
+        return { kind: "rejected" as const };
       }
 
       const nextRefreshToken = createOpaqueToken();
@@ -183,13 +195,18 @@ export class SessionService {
         now,
       );
       return {
-        sessionId: stored.sessionId,
-        accessToken: access.token,
-        refreshToken: nextRefreshToken,
-        accessTokenExpiresAt: access.expiresAt,
-        refreshTokenExpiresAt: stored.session.expiresAt,
+        kind: "success" as const,
+        tokens: {
+          sessionId: stored.sessionId,
+          accessToken: access.token,
+          refreshToken: nextRefreshToken,
+          accessTokenExpiresAt: access.expiresAt,
+          refreshTokenExpiresAt: stored.session.expiresAt,
+        },
       };
     });
+    if (result.kind === "rejected") throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
+    return result.tokens;
   }
 
   async revokeCurrent(userId: string, sessionId: string, reason: string, requestId?: string): Promise<void> {

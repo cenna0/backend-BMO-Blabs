@@ -25,6 +25,7 @@ export interface P9RouterServices {
   accessTokens: AccessTokenService;
   repositories: P9Repositories;
   config: P9Config;
+  includeOps?: boolean;
 }
 
 export function createP9Router(services: P9RouterServices): Router {
@@ -34,7 +35,7 @@ export function createP9Router(services: P9RouterServices): Router {
   router.use(createPairingRouter(services.pairing, services.accessTokens, services.sessions, services.config));
   router.use(createDeviceRouter(services.devices, services.settings, services.accessTokens, services.sessions));
   router.use(createSettingsRouter(services.settings, services.accessTokens, services.sessions));
-  router.use(createOpsRouter(services.repositories));
+  if (services.includeOps === true) router.use(createOpsRouter(services.repositories));
   router.use(p9ErrorHandler);
   return router;
 }

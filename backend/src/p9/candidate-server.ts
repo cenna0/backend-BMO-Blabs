@@ -17,7 +17,7 @@ loadDatabaseUrlFromSecret();
 const config = parseP9Config(process.env);
 if (!config.enabled) throw new Error("P9 candidate requires P9_ENABLED=true");
 
-const runtime = createP9Runtime(config);
+const runtime = createP9Runtime(config, { includeOps: true });
 const app = express();
 app.disable("x-powered-by");
 app.use("/api/v1", runtime.router);

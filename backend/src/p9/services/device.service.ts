@@ -77,6 +77,7 @@ export class DeviceService {
       await repositories.refreshToken.updateMany({ where: { session: { clientDeviceId: deviceId }, revokedAt: null }, data: { revokedAt: now } });
       await repositories.devicePairing.updateMany({ where: { deviceId, status: "ISSUED" }, data: { status: "REVOKED", revokedAt: now } });
       if (device.settings?.defaultDevice) {
+        await repositories.deviceSettings.update({ where: { deviceId }, data: { defaultDevice: false } });
         const replacement = await repositories.device.findFirst({ where: { userId, status: "ACTIVE", id: { not: deviceId } }, orderBy: { createdAt: "asc" } });
         if (replacement) await repositories.deviceSettings.update({ where: { deviceId: replacement.id }, data: { defaultDevice: true } });
       }

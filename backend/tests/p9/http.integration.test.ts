@@ -7,6 +7,7 @@ const baseUrl = (process.env.P9_TEST_BASE_URL ?? "http://backend:3010/api/v1").r
 const invitationA = process.env.P9_TEST_INVITATION_A;
 const invitationB = process.env.P9_TEST_INVITATION_B;
 const invitationC = process.env.P9_TEST_INVITATION_C;
+const invitationExpired = process.env.P9_TEST_INVITATION_EXPIRED;
 const configuredEmailA = process.env.P9_TEST_EMAIL_A;
 const configuredEmailB = process.env.P9_TEST_EMAIL_B;
 const configuredEmailC = process.env.P9_TEST_EMAIL_C;
@@ -44,6 +45,7 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     expect(invitationA).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(invitationB).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(invitationC).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(invitationExpired).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(password).toBeTruthy();
 
     const suffix = `${Date.now()}`;
@@ -66,6 +68,7 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     expect(JSON.stringify(registration.body)).not.toMatch(/passwordHash|tokenHash|pairingCode/);
     expect((await json("POST", "/auth/register", { invitationToken: "invalid-invitation", email: emailA, password })).status).toBe(400);
     expect((await json("POST", "/auth/register", { invitationToken: invitationA, email: emailA, password })).status).toBe(400);
+    expect((await json("POST", "/auth/register", { invitationToken: invitationExpired, email: `p9-expired-${suffix}@example.com`, password })).status).toBe(400);
 
     const concurrentRegistrations = await Promise.all([
       json("POST", "/auth/register", { invitationToken: invitationC, email: emailC, password, displayName: "P9 User C" }),
@@ -82,6 +85,20 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     const badLogin = await json("POST", "/auth/login", { email: emailA, password: "wrong-password" });
     expect(badLogin.status).toBe(401);
     expect(badLogin.body).toEqual({ error: "AUTHENTICATION_FAILED", message: "Authentication failed" });
+
+    const canonicalLoginVariants = [
+      emailA,
+      emailA.toUpperCase(),
+      ` ${emailA}`,
+      `${emailA} `,
+      ` ${emailA.toUpperCase()} `,
+      `\t${emailA}\t`,
+    ];
+    const canonicalLoginResults: number[] = [];
+    for (const emailVariant of canonicalLoginVariants) {
+      canonicalLoginResults.push((await json("POST", "/auth/login", { email: emailVariant, password: "wrong-password" })).status);
+    }
+    expect(canonicalLoginResults).toEqual([401, 401, 401, 429, 429, 429]);
 
     const me = await get("/me", accessLogin);
     expect(me.status).toBe(200);
@@ -109,20 +126,25 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     const firstCode = String(firstChallengeBody.code);
     expect(firstCode).toMatch(/^\d{6}$/);
 
+    const wrongCode = firstCode === "000000" ? "000001" : "000000";
+    const failedAttempts = await Promise.all(
+      Array.from({ length: 5 }, (_, index) => json("POST", `/pairing/${firstPairingId}/claim`, {
+        code: wrongCode,
+        hardwareId: `hw-failed-${suffix}-${index}`,
+        deviceName: "Failed Device",
+        deviceCredential: `failed-device-credential-${index}-012345`,
+      }, accessLogin)),
+    );
+    expect(failedAttempts.map((result) => result.status)).toEqual([409, 409, 409, 409, 409]);
+    const failedPairingStatus = await get(`/pairing/${firstPairingId}`, accessLogin);
+    expect(failedPairingStatus.body?.pairing).toMatchObject({ status: "failed", attemptCount: 5 });
+
     const secondChallenge = await json("POST", "/pairing/challenges", {}, accessLogin);
     expect(secondChallenge.status).toBe(201);
     const secondChallengeBody = required(secondChallenge.body);
     const secondPairingId = String(secondChallengeBody.pairingId);
     const secondCode = String(secondChallengeBody.code);
-    expect((await get(`/pairing/${firstPairingId}`, accessLogin)).body?.pairing?.status).toBe("invalidated");
-
-    const staleClaim = await json("POST", `/pairing/${firstPairingId}/claim`, {
-      code: firstCode,
-      hardwareId: `hw-stale-${suffix}`,
-      deviceName: "Stale Device",
-      deviceCredential: "stale-device-credential-012345",
-    }, accessLogin);
-    expect(staleClaim.status).toBe(409);
+    expect((await get(`/pairing/${firstPairingId}`, accessLogin)).body?.pairing?.status).toBe("failed");
 
     const concurrentClaims = await Promise.all([
       json("POST", `/pairing/${secondPairingId}/claim`, {
@@ -182,9 +204,9 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     expect(rotated).toBeDefined();
     const rotatedSession = required(required(rotated.body).session);
     expect(rotatedSession.refreshToken).not.toBe(refreshA);
+    expect((await json("POST", "/auth/refresh", { refreshToken: rotatedSession.refreshToken })).status).toBe(401);
     expect((await json("POST", "/auth/refresh", { refreshToken: refreshA })).status).toBe(401);
-
-    expect((await json("POST", "/auth/logout", {}, String(rotatedSession.accessToken))).status).toBe(204);
+    expect((await json("POST", "/auth/logout", {}, String(rotatedSession.accessToken))).status).toBe(401);
     expect((await get("/me", String(rotatedSession.accessToken))).status).toBe(401);
 
     const registrationB = await json("POST", "/auth/register", {
@@ -198,8 +220,13 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     expect((await get(`/devices/${deviceId}`, accessB)).status).toBe(404);
     expect((await get(`/settings/devices/${deviceId}`, accessB)).status).toBe(404);
     expect((await get(`/pairing/${secondPairingId}`, accessB)).status).toBe(404);
-    expect((await json("POST", "/auth/logout-all", {}, accessB)).status).toBe(204);
+    expect((await json("POST", "/auth/logout", {}, accessB)).status).toBe(204);
     expect((await get("/me", accessB)).status).toBe(401);
+    const loginB = await json("POST", "/auth/login", { email: emailB, password });
+    expect(loginB.status).toBe(200);
+    const accessB2 = String(required(required(loginB.body).session).accessToken);
+    expect((await json("POST", "/auth/logout-all", {}, accessB2)).status).toBe(204);
+    expect((await get("/me", accessB2)).status).toBe(401);
 
     const rateLimitedEmail = `p9-rate-${suffix}@example.com`;
     const rateResults: number[] = [];

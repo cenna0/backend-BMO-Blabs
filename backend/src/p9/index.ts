@@ -16,7 +16,11 @@ export interface P9Runtime {
   close(): Promise<void>;
 }
 
-export function createP9Runtime(config: P9Config): P9Runtime {
+export interface P9RuntimeOptions {
+  includeOps?: boolean;
+}
+
+export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}): P9Runtime {
   if (!config.enabled || !config.databaseUrl || !config.jwtSecret || !config.pairingPepper) {
     throw new Error("P9 runtime requires enabled database and security configuration");
   }
@@ -36,7 +40,7 @@ export function createP9Runtime(config: P9Config): P9Runtime {
   const pairing = new PairingService({ client, repositories, pepper: config.pairingPepper, ttlSeconds: config.pairingTtlSeconds });
   const settings = new SettingsService(client, repositories);
   return {
-    router: createP9Router({ auth, sessions, users, devices, pairing, settings, accessTokens, repositories, config }),
+    router: createP9Router({ auth, sessions, users, devices, pairing, settings, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
     close: () => disconnectP9Client(client),
   };
 }

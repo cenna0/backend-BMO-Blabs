@@ -6,6 +6,7 @@ import type { P9Config } from "../config.js";
 import { AuthService } from "../services/auth.service.js";
 import { AccessTokenService, SessionService } from "../services/session.service.js";
 import { UserService } from "../services/user.service.js";
+import { normalizeEmail } from "../validation.js";
 import { asyncP9, currentAuth, requireAuth, requestContext } from "./middleware.js";
 
 interface AuthRouteOptions {
@@ -33,7 +34,16 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
     limit: options.config.loginLimit,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    keyGenerator: (request) => sha256Hex(`${ipKeyGenerator(request.ip ?? "0.0.0.0")}:${request.path}:${String(request.body?.email ?? "")}`),
+    keyGenerator: (request) => {
+      const rawEmail = typeof request.body?.email === "string" ? request.body.email : "";
+      let email = rawEmail;
+      try {
+        email = normalizeEmail(rawEmail);
+      } catch {
+        email = rawEmail.trim().normalize("NFKC").toLowerCase();
+      }
+      return sha256Hex(`${ipKeyGenerator(request.ip ?? "0.0.0.0")}:${request.path}:${email}`);
+    },
     handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
   });
   const refreshLimiter = rateLimit({ windowMs: options.config.loginWindowMs, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });

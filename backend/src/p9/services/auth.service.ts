@@ -52,6 +52,7 @@ export class AuthService {
     } catch {
       throw new P9Error("INVALID_INPUT", 400, "Invalid registration request");
     }
+    await this.options.invitations.expireIfNeeded(parsed.invitationToken, new Date(), requestId);
     const passwordHash = await hashPassword(parsed.password);
     try {
       return await withP9Transaction(this.options.client, async (transaction) => {
@@ -87,6 +88,7 @@ export class AuthService {
         return { user: publicUser(user), session };
       });
     } catch (error) {
+      await this.options.invitations.expireIfNeeded(parsed.invitationToken, new Date(), requestId).catch(() => undefined);
       await new AuditService(this.options.repositories).record({
         eventType: "REGISTRATION_FAILED",
         outcome: "failure",

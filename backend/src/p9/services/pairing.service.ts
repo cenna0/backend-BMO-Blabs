@@ -120,7 +120,7 @@ export class PairingService {
       throw new P9Error("PAIRING_INVALID", 400, "Pairing is not valid");
     }
     try {
-      return await withP9Transaction(this.options.client, async (transaction) => {
+      const result = await withP9Transaction(this.options.client, async (transaction) => {
         const repositories = new P9Repositories(transaction);
         await repositories.lockUser(userId);
         const pairing = await repositories.devicePairing.findFirst({ where: { id: input.pairingId, userId } });
@@ -129,22 +129,24 @@ export class PairingService {
         if (pairing.status !== "ISSUED") throw new P9Error("PAIRING_INVALID", 409, "Pairing is not valid");
         if (pairing.expiresAt <= now) {
           await repositories.devicePairing.updateMany({ where: { id: pairing.id, status: "ISSUED" }, data: { status: "EXPIRED" } });
-          await new AuditService(repositories).record({ eventType: "PAIRING_EXPIRED", outcome: "success", actorType: "system", resourceType: "pairing", resourceId: pairing.id, userId });
-          throw new P9Error("PAIRING_INVALID", 409, "Pairing is not valid");
+          await new AuditService(repositories).record({ eventType: "PAIRING_EXPIRED", outcome: "success", actorType: "system", resourceType: "pairing", resourceId: pairing.id, userId, ...(requestId === undefined ? {} : { context: { requestId } }) });
+          return { kind: "rejected" as const };
         }
         if (pairing.attemptCount >= pairing.maxAttempts) {
           await repositories.devicePairing.updateMany({ where: { id: pairing.id, status: "ISSUED" }, data: { status: "FAILED" } });
-          throw new P9Error("PAIRING_INVALID", 409, "Pairing is not valid");
+          await new AuditService(repositories).record({ eventType: "PAIRING_FAILED", outcome: "denied", actorType: "user", resourceType: "pairing", resourceId: pairing.id, userId, ...(requestId === undefined ? {} : { context: { requestId } }), metadata: { attempts: pairing.attemptCount } });
+          return { kind: "rejected" as const };
         }
 
         const digest = keyedDigest(input.code, this.options.pepper);
         if (!safeDigestEqual(digest, pairing.codeHash)) {
           const attempted = await repositories.devicePairing.updateMany({ where: { id: pairing.id, status: "ISSUED", attemptCount: { lt: pairing.maxAttempts } }, data: { attemptCount: { increment: 1 }, lastAttemptAt: now } });
-          if (attempted.count === 1 && pairing.attemptCount + 1 >= pairing.maxAttempts) {
+          const nextAttemptCount = pairing.attemptCount + 1;
+          if (attempted.count === 1 && nextAttemptCount >= pairing.maxAttempts) {
             await repositories.devicePairing.updateMany({ where: { id: pairing.id, status: "ISSUED" }, data: { status: "FAILED" } });
           }
-          await new AuditService(repositories).record({ eventType: "PAIRING_FAILED", outcome: "denied", actorType: "user", resourceType: "pairing", resourceId: pairing.id, userId, ...(requestId === undefined ? {} : { context: { requestId } }), metadata: { attempts: pairing.attemptCount + 1 } });
-          throw new P9Error("PAIRING_INVALID", 409, "Pairing is not valid");
+          await new AuditService(repositories).record({ eventType: "PAIRING_FAILED", outcome: "denied", actorType: "user", resourceType: "pairing", resourceId: pairing.id, userId, ...(requestId === undefined ? {} : { context: { requestId } }), metadata: { attempts: nextAttemptCount } });
+          return { kind: "rejected" as const };
         }
 
         const claimed = await repositories.devicePairing.updateMany({ where: { id: pairing.id, userId, status: "ISSUED", codeHash: digest, expiresAt: { gt: now }, attemptCount: { lt: pairing.maxAttempts } }, data: { status: "CLAIMED", claimedAt: now } });
@@ -152,8 +154,10 @@ export class PairingService {
         const device = await new DeviceService(this.options.client, repositories).createClaimed({ userId, hardwareId: input.hardwareId, name: input.deviceName, deviceCredential: input.deviceCredential }, repositories);
         await repositories.devicePairing.update({ where: { id: pairing.id }, data: { deviceId: device.id } });
         await new AuditService(repositories).record({ eventType: "PAIRING_CLAIMED", outcome: "success", actorType: "user", resourceType: "device", resourceId: device.id, userId, deviceId: device.id, ...(requestId === undefined ? {} : { context: { requestId } }) });
-        return publicDevice(device);
+        return { kind: "success" as const, device: publicDevice(device) };
       });
+      if (result.kind === "rejected") throw new P9Error("PAIRING_INVALID", 409, "Pairing is not valid");
+      return result.device;
     } catch (error) {
       if (error instanceof P9Error) throw error;
       await new AuditService(this.options.repositories).record({ eventType: "PAIRING_FAILED", outcome: "failure", actorType: "user", resourceType: "pairing", resourceId: input.pairingId, userId, ...(requestId === undefined ? {} : { context: { requestId } }) }).catch(() => undefined);

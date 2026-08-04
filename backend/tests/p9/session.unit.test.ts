@@ -43,4 +43,14 @@ describe("P9 access tokens", () => {
       .sign(secret);
     await expect(tokens.verify(expired)).rejects.toThrow();
   });
+
+  it("rejects signed tokens without a valid issued-at claim", async () => {
+    const missingIssuedAt = await new SignJWT({ sub: "user-1", sid: "session-1" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuer("bmo-p9")
+      .setAudience("bmo-mobile")
+      .setExpirationTime("15m")
+      .sign(secret);
+    await expect(tokens.verify(missingIssuedAt)).rejects.toThrow();
+  });
 });

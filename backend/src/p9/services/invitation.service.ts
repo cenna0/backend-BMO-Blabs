@@ -16,6 +16,24 @@ export interface InvitationCreateInput {
 export class InvitationService {
   constructor(private readonly repositories: P9Repositories) {}
 
+  async expireIfNeeded(secret: string, now = new Date(), requestId?: string): Promise<void> {
+    const invitation = await this.repositories.invitation.findUnique({ where: { tokenHash: sha256Hex(secret) } });
+    if (!invitation || invitation.status !== "ACTIVE" || invitation.expiresAt > now) return;
+    const updated = await this.repositories.invitation.updateMany({
+      where: { id: invitation.id, status: "ACTIVE" },
+      data: { status: "EXPIRED" },
+    });
+    if (updated.count !== 1) return;
+    await new AuditService(this.repositories).record({
+      eventType: "INVITATION_EXPIRED",
+      outcome: "success",
+      actorType: "system",
+      resourceType: "invitation",
+      resourceId: invitation.id,
+      ...(requestId === undefined ? {} : { context: { requestId } }),
+    });
+  }
+
   async create(input: InvitationCreateInput): Promise<{ id: string; email: string; secret: string; expiresAt: Date }> {
     const email = normalizeEmail(input.email);
     const secret = createOpaqueToken();
@@ -70,9 +88,6 @@ export class InvitationService {
     const tokenHash = sha256Hex(secret);
     const invitation = await repositories.invitation.findUnique({ where: { tokenHash } });
     if (!invitation || invitation.status !== "ACTIVE" || invitation.expiresAt <= now || invitation.email !== normalizedEmail) {
-      if (invitation?.status === "ACTIVE" && invitation.expiresAt <= now) {
-        await repositories.invitation.updateMany({ where: { id: invitation.id, status: "ACTIVE" }, data: { status: "EXPIRED" } });
-      }
       throw new P9Error("INVITATION_INVALID", 400, "Invitation is not valid");
     }
     const claimed = await repositories.invitation.updateMany({
