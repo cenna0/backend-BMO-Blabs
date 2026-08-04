@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import express from "express";
 
+import { configureTrustedProxy } from "../http/trusted-proxy.js";
 import { parseP9Config } from "./config.js";
 import { createP9Runtime } from "./index.js";
 
@@ -19,6 +20,7 @@ if (!config.enabled) throw new Error("P9 candidate requires P9_ENABLED=true");
 
 const runtime = createP9Runtime(config, { includeOps: true });
 const app = express();
+configureTrustedProxy(app);
 app.disable("x-powered-by");
 app.use("/api/v1", runtime.router);
 

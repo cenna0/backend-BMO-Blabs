@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { createP9Router } from "../../src/p9/http/router.js";
 
-function appWithOps(includeOps: boolean) {
+function appWithOps(includeOps?: boolean) {
   const app = express();
   app.use(createP9Router({
-    includeOps,
+    ...(includeOps === undefined ? {} : { includeOps }),
     auth: {} as never,
     sessions: {} as never,
     users: {} as never,
@@ -30,7 +30,8 @@ function appWithOps(includeOps: boolean) {
 }
 
 describe("P9 operational route exposure", () => {
-  it("does not mount database diagnostics in the normal Backend runtime", async () => {
+  it("does not mount database diagnostics by default", async () => {
+    await request(appWithOps()).get("/ops/db/livez").expect(404);
     await request(appWithOps(false)).get("/ops/db/livez").expect(404);
   });
 

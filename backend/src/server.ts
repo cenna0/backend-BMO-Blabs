@@ -10,6 +10,7 @@ import { RequestStore } from "./domain/request-store.js";
 import { createAudioRouter } from "./http/audio.route.js";
 import { createHealthRouter } from "./http/health.route.js";
 import { createVoiceErrorHandler, createVoiceRouter } from "./http/voice.route.js";
+import { configureTrustedProxy } from "./http/trusted-proxy.js";
 import { AudioServiceClient } from "./services/audio-service.client.js";
 import { ConversationQueue } from "./services/conversation-queue.js";
 import { HermesResponsesClient } from "./services/hermes.client.js";
@@ -35,6 +36,7 @@ export interface BackendRuntime {
 export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   const logger: Logger = pino({ level: config.NODE_ENV === "test" ? "silent" : "info" });
   const app = express();
+  configureTrustedProxy(app);
   app.disable("x-powered-by");
   const httpServer = createServer(app);
   const requestStore = new RequestStore({

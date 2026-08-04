@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { ipKeyGenerator, rateLimit } from "express-rate-limit";
+import { rateLimit } from "express-rate-limit";
 
+import { rateLimitClientIp } from "../../http/trusted-proxy.js";
 import { sha256Hex } from "../crypto.js";
 import type { P9Config } from "../config.js";
 import { AuthService } from "../services/auth.service.js";
@@ -42,11 +43,17 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
       } catch {
         email = rawEmail.trim().normalize("NFKC").toLowerCase();
       }
-      return sha256Hex(`${ipKeyGenerator(request.ip ?? "0.0.0.0")}:${request.path}:${email}`);
+      return sha256Hex(`${rateLimitClientIp(request)}:${request.path}:${email}`);
     },
     handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
   });
-  const refreshLimiter = rateLimit({ windowMs: options.config.loginWindowMs, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
+  const refreshLimiter = rateLimit({
+    windowMs: options.config.loginWindowMs,
+    limit: 20,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: rateLimitClientIp,
+  });
 
   router.post("/auth/register", authLimiter, asyncP9(async (request, response) => {
     const context = requestContext(request, response);

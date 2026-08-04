@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
 
+import { rateLimitClientIp } from "../../http/trusted-proxy.js";
 import { PairingService } from "../services/pairing.service.js";
 import { asyncP9, currentAuth, requireAuth, requestContext } from "./middleware.js";
 import type { AccessTokenService, SessionService } from "../services/session.service.js";
@@ -14,6 +15,7 @@ export function createPairingRouter(pairing: PairingService, accessTokens: Acces
     limit: config.pairingLimit,
     standardHeaders: "draft-8",
     legacyHeaders: false,
+    keyGenerator: rateLimitClientIp,
     handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
   });
 
