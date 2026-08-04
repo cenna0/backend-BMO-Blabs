@@ -40,9 +40,10 @@ services:
       retries: 12
 
   backend:
+    image: ${P9_CANDIDATE_IMAGE:-bmo-p9.1-candidate:test}
     build:
-      context: .
-      dockerfile: backend/Dockerfile.p9.1
+      context: ./backend
+      dockerfile: Dockerfile.p9.1
     environment:
       P9_ENABLED: "true"
       P9_BIND_HOST: 0.0.0.0
