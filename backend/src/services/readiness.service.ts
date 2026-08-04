@@ -68,7 +68,7 @@ export class BackendReadinessService implements BackendReadinessPort {
     if (!isObject(payload)) return { ready: false, rvcAvailable: false };
 
     const mandatoryReady =
-      (payload.status === "ok" || payload.status === "degraded") &&
+      payload.status === "ok" &&
       payload.stt_loaded === true &&
       payload.kokoro_loaded === true &&
       payload.ffmpeg_available === true;

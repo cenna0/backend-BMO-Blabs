@@ -11,7 +11,7 @@ describe("BackendReadinessService", () => {
       }
       if (target === "http://127.0.0.1:8001/readyz") {
         return Response.json({
-          status: "degraded",
+          status: "ok",
           stt_loaded: true,
           kokoro_loaded: true,
           rvc_available: false,
@@ -33,6 +33,30 @@ describe("BackendReadinessService", () => {
       rvcAvailable: false,
     });
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects audio readiness when explicitly enabled RVC is unavailable", async () => {
+    const readiness = new BackendReadinessService({
+      hermesBaseUrl: "http://127.0.0.1:8642",
+      audioServiceBaseUrl: "http://127.0.0.1:8001",
+      timeoutMs: 100,
+      fetcher: async (url) => {
+        if (String(url).endsWith("/health")) return Response.json({ status: "ok" });
+        return Response.json({
+          status: "degraded",
+          stt_loaded: true,
+          kokoro_loaded: true,
+          rvc_available: false,
+          ffmpeg_available: true,
+        });
+      },
+    });
+
+    await expect(readiness.check()).resolves.toEqual({
+      hermesReady: true,
+      audioReady: false,
+      rvcAvailable: false,
+    });
   });
 
   it("contains dependency errors as not-ready state", async () => {

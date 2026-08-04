@@ -19,7 +19,7 @@ const unavailable: BackendReadinessState = {
 function sendReadiness(response: Response, state: BackendReadinessState): void {
   const ready = state.hermesReady && state.audioReady;
   response.status(ready ? 200 : 503).json({
-    status: ready ? (state.rvcAvailable ? "ok" : "degraded") : "error",
+    status: ready ? "ok" : "error",
     backend: "ok",
     hermes: state.hermesReady ? "ok" : "error",
     audio_service: state.audioReady ? "ok" : "error",

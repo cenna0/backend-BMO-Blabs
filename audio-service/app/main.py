@@ -98,7 +98,8 @@ def create_app(
             and tts_state.kokoro_loaded
             and tts_state.ffmpeg_available
         ):
-            status_value = "ok" if tts_state.rvc_available else "degraded"
+            rvc_required = resolved_settings.rvc_enabled
+            status_value = "ok" if not rvc_required or tts_state.rvc_available else "degraded"
         elif stt_status == "loading" or tts_status == "loading":
             status_value = "loading"
         else:

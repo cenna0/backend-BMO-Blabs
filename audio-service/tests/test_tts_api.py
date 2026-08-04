@@ -37,9 +37,12 @@ class FakeSynthesizer:
         )
 
 
-def make_client(synthesizer=None):
+def make_client(synthesizer=None, *, rvc_enabled=False):
     app = create_app(
-        settings=Settings(internal_service_token="test-internal-token"),
+        settings=Settings(
+            internal_service_token="test-internal-token",
+            rvc_enabled=rvc_enabled,
+        ),
         transcriber=ReadyTranscriber(),
         synthesizer=synthesizer or FakeSynthesizer(),
     )
@@ -114,16 +117,41 @@ def test_health_reports_ok_when_stt_kokoro_ffmpeg_and_rvc_ready():
     }
 
 
-def test_health_reports_degraded_when_rvc_unavailable_only():
+def test_health_reports_ok_when_rvc_is_disabled_and_absent():
     client = make_client(
         FakeSynthesizer(TtsEngineState(True, True, False, "RVC unavailable")),
+        rvc_enabled=False,
+    )
+    response = client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["kokoro_loaded"] is True
+    assert response.json()["ffmpeg_available"] is True
+    assert response.json()["rvc_available"] is False
+
+
+def test_health_reports_ok_when_rvc_is_enabled_and_available():
+    client = make_client(
+        FakeSynthesizer(TtsEngineState(True, True, True, None)),
+        rvc_enabled=True,
+    )
+    response = client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["rvc_available"] is True
+
+
+def test_health_reports_degraded_when_rvc_is_enabled_but_unavailable():
+    client = make_client(
+        FakeSynthesizer(TtsEngineState(True, True, False, "RVC unavailable")),
+        rvc_enabled=True,
     )
     response = client.get("/readyz")
 
     assert response.status_code == 200
     assert response.json()["status"] == "degraded"
-    assert response.json()["kokoro_loaded"] is True
-    assert response.json()["ffmpeg_available"] is True
     assert response.json()["rvc_available"] is False
 
 

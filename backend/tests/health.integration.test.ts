@@ -54,7 +54,7 @@ describe("backend health endpoints", () => {
     await request(app).get("/health").expect(200, expected);
   });
 
-  it("keeps readiness successful and degraded when optional RVC is unavailable", async () => {
+  it("keeps readiness healthy when disabled RVC is unavailable", async () => {
     const app = express();
     app.use(
       createHealthRouter({
@@ -70,7 +70,7 @@ describe("backend health endpoints", () => {
     );
 
     const expected = {
-      status: "degraded",
+      status: "ok",
       backend: "ok",
       hermes: "ok",
       audio_service: "ok",
@@ -78,6 +78,30 @@ describe("backend health endpoints", () => {
     };
     await request(app).get("/readyz").expect(200, expected);
     await request(app).get("/health").expect(200, expected);
+  });
+
+  it("fails readiness when Audio marks enabled RVC failure as degraded", async () => {
+    const app = express();
+    app.use(
+      createHealthRouter({
+        hardwareTestMode: false,
+        readiness: {
+          check: async () => ({
+            hermesReady: true,
+            audioReady: false,
+            rvcAvailable: false,
+          }),
+        },
+      }),
+    );
+
+    await request(app).get("/readyz").expect(503, {
+      status: "error",
+      backend: "ok",
+      hermes: "ok",
+      audio_service: "error",
+      rvc: "unavailable",
+    });
   });
 
   it("returns sanitized not-ready responses while liveness remains healthy", async () => {

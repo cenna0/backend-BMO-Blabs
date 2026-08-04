@@ -161,7 +161,26 @@ def test_model_warmup_runs_in_background_without_blocking_liveness():
                 break
             time.sleep(0.01)
         assert response.status_code == 200
-        assert response.json()["status"] == "degraded"
+        assert response.json()["status"] == "ok"
+
+
+def test_health_fails_when_piper_is_unavailable():
+    class PiperUnavailableSynthesizer(ReadySynthesizer):
+        def health_state(self):
+            return TtsEngineState(
+                kokoro_loaded=True,
+                ffmpeg_available=True,
+                rvc_available=False,
+                rvc_error="RVC disabled",
+                piper_loaded=False,
+            )
+
+    client = make_client(ReadyTranscriber(), PiperUnavailableSynthesizer())
+    response = client.get("/readyz")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "error"
+    assert response.json()["rvc_available"] is False
 
 
 class FailedWarmupTranscriber:
