@@ -11,6 +11,12 @@ function loadDatabaseUrlFromSecret(): void {
 }
 
 loadDatabaseUrlFromSecret();
+const setgid = process.setgid;
+const setuid = process.setuid;
+if (typeof process.getuid === "function" && process.getuid() === 0 && setgid && setuid) {
+  setgid(Number(process.env.P9_RUNTIME_GID ?? "1000"));
+  setuid(Number(process.env.P9_RUNTIME_UID ?? "1000"));
+}
 const [command, ...args] = process.argv.slice(2);
 if (!command) throw new Error("P9 candidate entrypoint requires a command");
 const child = spawn(command, args, { stdio: "inherit", env: process.env });
