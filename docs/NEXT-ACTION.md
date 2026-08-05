@@ -5,6 +5,12 @@
 **Current next phase:** **P9.1 isolated Windows off-VPS backup rehearsal**
 **Phase state:** `P9.1 SOURCE MERGED TO MAIN / NOT DEPLOYED; READINESS BRANCH NOT MERGED; WINDOWS BACKUP REHEARSAL READY / NOT EXECUTED`
 
+Current rehearsal state: `SSH V3 VERIFIED / ENCRYPTED BACKUP ARTIFACT NOT YET
+CREATED / WINDOWS TRANSFER NOT YET EXECUTED`. The approved Windows incoming
+destination is `D:\codex\BMO-backups\incoming`; the Windows operator pulls
+the exact encrypted three-file set from the VPS over Tailscale with
+`scp.exe`.
+
 > P8 is `P8_PIPER_PRODUCTION_VERIFIED`. P9.1 source is merged and independently
 > reviewed, but this gate does **not** authorize production deployment,
 > PostgreSQL installation, or migration. P9.2–P9.6 require separate gates.

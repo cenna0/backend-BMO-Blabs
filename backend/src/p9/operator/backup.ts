@@ -1,10 +1,10 @@
-import { createHash, randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream, chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import { chmodSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
 import { composeArgs, waitForProcess } from "./compose.js";
-import { writeSanitizedBackupManifest } from "./backup-manifest.js";
+import { cleanupFinalizedBackupSet, finalizeBackupSet, type FinalizedBackupSet } from "./backup-set.js";
 
 type BackupKind = "daily" | "weekly";
 
@@ -44,6 +44,7 @@ async function main(): Promise<void> {
   const checksumPath = `${outputPath}.sha256`;
   const backupIdentifier = filename.slice(0, -".dump.gpg".length);
   const manifestPath = join(config.directory, `${backupIdentifier}.manifest.json`);
+  let finalized: FinalizedBackupSet | undefined;
 
   const gpg = spawn("gpg", [
     "--batch",
@@ -67,19 +68,8 @@ async function main(): Promise<void> {
 
   try {
     await Promise.all([waitForProcess(dump, "pg_dump"), waitForProcess(gpg, "backup encryption")]);
-    chmodSync(temporaryPath, 0o600);
-    renameSync(temporaryPath, outputPath);
-    const hash = await new Promise<string>((resolveHash, reject) => {
-      const digest = createHash("sha256");
-      const stream = createReadStream(outputPath);
-      stream.on("data", (chunk) => digest.update(chunk));
-      stream.once("error", reject);
-      stream.once("end", () => resolveHash(digest.digest("hex")));
-    });
-    const checksumTemporaryPath = `${checksumPath}.${randomUUID()}.tmp`;
-    writeFileSync(checksumTemporaryPath, `${hash}  ${basename(outputPath)}\n`, { mode: 0o600 });
-    renameSync(checksumTemporaryPath, checksumPath);
-    await writeSanitizedBackupManifest({
+    finalized = await finalizeBackupSet({
+      artifactTempPath: temporaryPath,
       artifactPath: outputPath,
       checksumPath,
       manifestPath,
@@ -100,8 +90,9 @@ async function main(): Promise<void> {
       const staleManifest = `${stale.slice(0, -".dump.gpg".length)}.manifest.json`;
       try { unlinkSync(join(config.directory, staleManifest)); } catch { /* already absent */ }
     }
-    process.stdout.write(`${outputPath}\n${hash}\n${manifestPath}\n`);
+    process.stdout.write(`${outputPath}\n${finalized.sha256}\n${manifestPath}\n`);
   } catch (error) {
+    if (finalized) cleanupFinalizedBackupSet(finalized.paths);
     try { unlinkSync(temporaryPath); } catch { /* best effort cleanup */ }
     throw error;
   }
