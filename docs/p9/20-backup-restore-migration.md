@@ -1,6 +1,14 @@
 # Backup, Restore, and Migration Plan
 
-**Status:** `P9.1 LOCKED BASELINE; DESTINATION OPEN`
+**Status:** `HISTORICAL P9.1 BASELINE; DESTINATION OPEN AT DOCUMENT DATE — SUPERSEDED`
+
+This document preserves the earlier decision state. Its `OPEN` off-VPS
+destination statements are superseded for the P9.1 first canary by the current
+operator decision in
+[`P9.1-PRODUCTION-DECISION-REGISTER.md`](P9.1-PRODUCTION-DECISION-REGISTER.md):
+Windows operator PC, PowerShell, Tailscale, Windows OpenSSH `scp.exe`, and
+weekly manual pull. The current executable procedure is
+[`P9.1-WINDOWS-OFF-VPS-BACKUP-GUIDE.md`](P9.1-WINDOWS-OFF-VPS-BACKUP-GUIDE.md).
 
 ## Backup policy
 
@@ -8,15 +16,15 @@
 |---|---|---|
 | Scheduled `pg_dump` | seven daily backups | encrypted, checksum, outside active DB volume |
 | PostgreSQL + config recovery bundle | four weekly backups | encrypted, access-restricted |
-| Off-VPS recovery copy | required before final production sign-off | destination remains OPEN; separate key boundary |
+| Off-VPS recovery copy | required before final production sign-off | historical destination was OPEN; superseded for the first canary by the locked Windows operator-PC decision |
 | Model/cache provenance | manifest/hash, not mandatory full copy | reproducible source and revision |
 | Pre-deploy snapshot | before every DB-affecting rollout | commit/image/schema/config record |
 
 The current single-VPS `/opt/bmo/backups` layout remains the target operational
 shape. Checksums and encryption are mandatory. No backup is complete until an
-isolated restore has been exercised and verified. An off-VPS destination is
-required before final production sign-off, but its provider/location remains
-OPEN.
+isolated restore has been exercised and verified. The historical provider/location
+was OPEN; the first-canary destination is now the locked Windows operator PC,
+with the real Windows transfer and restore still pending.
 
 ## Restore rehearsal
 

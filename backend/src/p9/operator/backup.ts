@@ -4,6 +4,7 @@ import { basename, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
 import { composeArgs, waitForProcess } from "./compose.js";
+import { writeSanitizedBackupManifest } from "./backup-manifest.js";
 
 type BackupKind = "daily" | "weekly";
 
@@ -11,6 +12,9 @@ const kind = process.env.P9_BACKUP_KIND === "weekly" ? "weekly" : "daily";
 const retention: Record<BackupKind, number> = { daily: 7, weekly: 4 };
 const backupDir = resolve(process.env.P9_BACKUP_DIR ?? "");
 const passphraseFile = process.env.P9_BACKUP_PASSPHRASE_FILE;
+const databaseIdentifier = process.env.P9_POSTGRES_DB ?? "bmo";
+const postgresMajorVersion = Number(process.env.P9_POSTGRES_MAJOR_VERSION ?? "16");
+const migrationState = process.env.P9_BACKUP_MIGRATION_STATE ?? "not-verified";
 
 function requireConfig(): { directory: string; passphrase: string } {
   if (!process.env.P9_BACKUP_DIR) throw new Error("P9_BACKUP_DIR is required");
@@ -38,6 +42,8 @@ async function main(): Promise<void> {
   const outputPath = join(config.directory, filename);
   const temporaryPath = join(config.directory, `.${filename}.${randomUUID()}.tmp`);
   const checksumPath = `${outputPath}.sha256`;
+  const backupIdentifier = filename.slice(0, -".dump.gpg".length);
+  const manifestPath = join(config.directory, `${backupIdentifier}.manifest.json`);
 
   const gpg = spawn("gpg", [
     "--batch",
@@ -73,6 +79,16 @@ async function main(): Promise<void> {
     const checksumTemporaryPath = `${checksumPath}.${randomUUID()}.tmp`;
     writeFileSync(checksumTemporaryPath, `${hash}  ${basename(outputPath)}\n`, { mode: 0o600 });
     renameSync(checksumTemporaryPath, checksumPath);
+    await writeSanitizedBackupManifest({
+      artifactPath: outputPath,
+      checksumPath,
+      manifestPath,
+      backupIdentifier,
+      timestamp: new Date().toISOString(),
+      databaseIdentifier,
+      postgresMajorVersion,
+      migrationState,
+    });
     const candidates = readdirSync(config.directory)
       .filter((entry) => entry.startsWith(`p9-${kind}-`) && entry.endsWith(".dump.gpg"))
       .sort()
@@ -81,8 +97,10 @@ async function main(): Promise<void> {
       unlinkSync(join(config.directory, stale));
       const staleChecksum = `${stale}.sha256`;
       try { unlinkSync(join(config.directory, staleChecksum)); } catch { /* already absent */ }
+      const staleManifest = `${stale.slice(0, -".dump.gpg".length)}.manifest.json`;
+      try { unlinkSync(join(config.directory, staleManifest)); } catch { /* already absent */ }
     }
-    process.stdout.write(`${outputPath}\n${hash}\n`);
+    process.stdout.write(`${outputPath}\n${hash}\n${manifestPath}\n`);
   } catch (error) {
     try { unlinkSync(temporaryPath); } catch { /* best effort cleanup */ }
     throw error;

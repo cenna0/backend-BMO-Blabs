@@ -1,6 +1,13 @@
 # P9 Unresolved Decisions
 
-**Status:** `OPEN`
+**Status:** `HISTORICAL/DEFERRED OPEN ITEMS`
+
+The off-VPS destination was OPEN when this unresolved-decision list was
+written. That historical item is superseded for the P9.1 first canary by the
+locked Windows operator-PC decision in
+[`P9.1-PRODUCTION-DECISION-REGISTER.md`](P9.1-PRODUCTION-DECISION-REGISTER.md).
+The real transfer and restore remain execution gates; this document does not
+mark them complete.
 
 These are the smallest decisions that must be closed before the affected
 implementation prompt is authorized. They are not hidden assumptions.
@@ -13,7 +20,7 @@ canary. P9.1 source is merged but not deployed.
 
 | Decision | Why it matters | Required owner | Due phase |
 |---|---|---|---|
-| Off-VPS backup destination | determines final disaster-recovery location and key boundary | operations | P9.6 |
+| Off-VPS backup destination | historical OPEN item; superseded for P9.1 first canary by Windows operator PC/Tailscale/SCP; execution evidence remains pending | operations | P9.6 |
 | Production email delivery and password-reset strategy | determines invite/recovery operations without adding an unapproved provider | product/security | P9.1/P9.6 |
 | Final mobile pairing copy and visual design | determines user-facing presentation of locked pairing mechanics | product/mobile | P9.1 |
 | Default chat retention and purge delay | determines user privacy and storage budget | product/privacy | P9.2 |

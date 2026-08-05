@@ -4,7 +4,7 @@ import { parseP9Config } from "../../src/p9/config.js";
 
 const enabled = {
   P9_ENABLED: "true",
-  DATABASE_URL: "postgresql://bmo:password@127.0.0.1:5432/bmo",
+  DATABASE_URL: "postgresql://bmo@127.0.0.1:5432/bmo",
   P9_JWT_SECRET: "a".repeat(32),
   P9_PAIRING_PEPPER: "b".repeat(32),
 };

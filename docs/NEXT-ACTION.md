@@ -1,9 +1,9 @@
 # BMO — Next Execution Action
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-05
 **Audience:** Codex / infrastructure-backend coding agent
-**Current next phase:** **P9.1 production readiness lock**
-**Phase state:** `P9.1 MERGED / NOT DEPLOYED; PRODUCTION READINESS IN PROGRESS`
+**Current next phase:** **P9.1 corrective readiness pass**
+**Phase state:** `P9.1 MERGED / NOT DEPLOYED; MANIFEST FIX IN REVIEW; WINDOWS REHEARSAL NOT EXECUTED`
 
 > P8 is `P8_PIPER_PRODUCTION_VERIFIED`. P9.1 source is merged and independently
 > reviewed, but this gate does **not** authorize production deployment,
@@ -128,13 +128,22 @@ P8 did not:
 - change the public hardware contract;
 - begin P9 implementation without a new explicit authorization.
 
-## 5. P9 authorization and first action
+## 5. P9.1 correction and canary order
 
-This documentation does not authorize production deployment. A future explicit
-command such as **“execute P9.1”** is required for a canary. After operator
-approval, the next canary task must begin with a fresh read-only audit from the
-exact final main SHA and a separate isolated worktree. Do not start database
-work from this readiness branch. P9.2–P9.6 require their own completed gate.
+This documentation does not authorize production deployment. The next actions
+must occur in this order:
+
+1. finish and review the corrective readiness pass, including sanitized
+   manifest generation and documentation/verifier consistency;
+2. perform the real isolated Windows backup rehearsal over Tailscale and
+   `scp.exe`, including checksum, GPG readability, and exact-copy restore;
+3. complete the remaining operator decisions and record their evidence;
+4. review and merge the readiness branch through the approved merge gate;
+5. only then prepare a separately authorized production canary.
+
+No step above creates production secrets, starts production PostgreSQL, runs a
+production migration, or deploys P9.1. P9.2–P9.6 require their own completed
+gates.
 
 Document and stop on any conflict with the locked hardware contract, P7
 production provenance, secret isolation, offline model policy, or Kokoro

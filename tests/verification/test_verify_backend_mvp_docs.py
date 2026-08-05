@@ -60,14 +60,14 @@ class P9PhaseVerifierRegressionTests(unittest.TestCase):
                 check=False,
             )
 
-    def test_approved_isolated_p9_1_fixture_is_accepted(self) -> None:
-        result = self.run_fixture("p9.1-isolated-approved.txt")
+    def test_merged_p9_1_readiness_fixture_is_accepted(self) -> None:
+        result = self.run_fixture("p9.1-merged-readiness-approved.txt")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_main_pre_p9_state_remains_accepted(self) -> None:
+    def test_current_readiness_state_is_accepted(self) -> None:
         result = subprocess.run(
-            [sys.executable, str(SCRIPT)],
-            cwd=Path("/opt/bmo/app"),
+            [sys.executable, str(SCRIPT), "--root", str(ROOT)],
+            cwd=ROOT,
             text=True,
             capture_output=True,
             check=False,

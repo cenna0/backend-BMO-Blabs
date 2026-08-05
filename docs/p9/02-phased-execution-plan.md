@@ -55,8 +55,11 @@ implementation claim.
   session, pair/revoke a device, read/write approved settings, and survive
   service restart; voice fake-device acceptance remains green; no public
   `5432`; encrypted local backup and isolated restore verification are
-  evidenced; the required off-VPS backup destination is recorded as an open
-  prerequisite for final production sign-off.
+  evidenced; the required off-VPS destination was recorded as open when this
+  plan was written. That historical statement is superseded for the P9.1
+  first canary by the current locked Windows operator-PC/PowerShell/
+  Tailscale/Windows-OpenSSH decision; real transfer and restore evidence remain
+  prerequisites for final production sign-off.
 
 ## P9.2 — Chat sessions, messages, curated memory, gateway, deletion/export
 

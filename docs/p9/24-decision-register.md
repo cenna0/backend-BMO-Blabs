@@ -1,7 +1,14 @@
 # P9 Decision Register
 
-**Status:** `LOCKED + PROPOSED + OPEN`
+**Status:** `HISTORICAL REGISTER — LOCKED + PROPOSED + OPEN AT DOCUMENT DATE`
 **Decision date:** 2026-08-04
+
+This is the historical P9 register. The P9.1 off-VPS row below records the
+state before the operator approved the first-canary destination; it is
+superseded for current execution by
+[`P9.1-PRODUCTION-DECISION-REGISTER.md`](P9.1-PRODUCTION-DECISION-REGISTER.md),
+which locks a Windows operator PC, PowerShell, Tailscale, Windows OpenSSH
+`scp.exe`, and weekly manual pull.
 
 The production-readiness decisions for the merged P9.1 foundation are recorded
 in [`P9.1-PRODUCTION-DECISION-REGISTER.md`](P9.1-PRODUCTION-DECISION-REGISTER.md).
@@ -46,7 +53,7 @@ phase decisions; it does not authorize production deployment.
 | P9.1 persisted settings | LOCKED | keeps user/device ownership explicit | Hermes/local-only settings | exact fields are defined in schema and settings boundary | SW/mobile | P9.1 |
 | Migration discipline | LOCKED | protects data and controlled rollout | startup migration, `db push`, reset | dev/deploy split, expand/contract, forward fix/restore | SW/operations | P9.1 |
 | P9.1 backup baseline | LOCKED | recoverability before activation | unverified local backup | scheduled `pg_dump`, checksum, encryption, seven daily, four weekly, isolated restore | operations | P9.1 |
-| Off-VPS backup destination | OPEN | final disaster-recovery boundary remains unselected | provider/location choices | required before final production sign-off | operations | P9.6 |
+| Off-VPS backup destination | OPEN AT DOCUMENT DATE — SUPERSEDED FOR P9.1 FIRST CANARY | final disaster-recovery boundary was unselected at this register's date | provider/location choices | current first-canary decision is the Windows operator PC; see the canonical register | operations | P9.6 |
 | Production email delivery/password reset | OPEN | delivery and recovery need operational policy | local-only, provider service | not silently included in P9.1 | product/security | P9.1/P9.6 |
 | Final mobile pairing copy/visual design | OPEN | implementation UX is not specified by protocol | ad hoc device UI | mechanics remain locked; presentation requires review | product/mobile | P9.1 |
 | Mobile API is versioned Backend-only | PROPOSED | stable clients and ownership enforcement | direct service calls | API mapping required per screen | SW/mobile | P9.1+ |

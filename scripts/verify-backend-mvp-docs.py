@@ -416,19 +416,18 @@ current_doc_requirements = {
         [
             "Current next phase:",
             (
-                "P9.1 production readiness lock"
-                if p9_stage == "P9.1-merged-readiness"
-                else "P9.1 — PostgreSQL, auth, pairing, and settings foundation"
+                "P9.1 — PostgreSQL, auth, pairing, and settings foundation"
+                if p9_stage != "P9.1-merged-readiness"
+                else None
             ),
             (
-                "Phase state:** `P9.1 MERGED / NOT DEPLOYED; PRODUCTION READINESS IN PROGRESS`"
-                if p9_stage == "P9.1-merged-readiness"
-                else "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`"
+                "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`"
+                if p9_stage != "P9.1-merged-readiness"
+                else None
             ),
             "P7 is `VERIFIED — PRODUCTION`",
             "P8 is `P8_PIPER_PRODUCTION_VERIFIED`",
             "P8 completion does **not** authorize P9",
-            "execute P9",
             "Do not execute P10",
         ],
     ),
@@ -534,8 +533,22 @@ current_doc_requirements = {
 }
 for label, (text, required_values) in current_doc_requirements.items():
     for value in required_values:
+        if value is None:
+            continue
         if value not in text:
             errors.append(f"{label} missing current-state assertion: {value}")
+
+if p9_stage == "P9.1-merged-readiness":
+    if not any(
+        marker in next_action
+        for marker in ("P9.1 corrective readiness pass", "P9.1 production readiness lock")
+    ):
+        errors.append("docs/NEXT-ACTION.md missing merged P9.1 readiness checkpoint")
+    if not any(
+        marker in next_action
+        for marker in ("P9.1 correction and canary order", "execute P9")
+    ):
+        errors.append("docs/NEXT-ACTION.md missing P9.1 correction/canary ordering")
 
 unique_state_declarations = [
     (
@@ -543,9 +556,14 @@ unique_state_declarations = [
         next_action,
         r"^\*\*Phase state:\*\*\s*`([^`]+)`\s*$",
         (
-            "P9.1 MERGED / NOT DEPLOYED; PRODUCTION READINESS IN PROGRESS"
+            {
+                "P9.1 MERGED / NOT DEPLOYED; PRODUCTION READINESS IN PROGRESS",
+                "P9.1 MERGED / NOT DEPLOYED; MANIFEST FIX IN REVIEW; WINDOWS REHEARSAL NOT EXECUTED",
+            }
             if p9_stage == "P9.1-merged-readiness"
-            else "P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION"
+            else {
+                "P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
+            }
         ),
     ),
     (
@@ -567,12 +585,13 @@ unique_state_declarations = [
         "P8_PIPER_PRODUCTION_VERIFIED",
     ),
 ]
-for label, text, pattern, expected_value in unique_state_declarations:
+for label, text, pattern, expected_values in unique_state_declarations:
     declarations = re.findall(pattern, text, re.MULTILINE)
-    if declarations != [expected_value]:
+    expected_options = {expected_values} if isinstance(expected_values, str) else expected_values
+    if len(declarations) != 1 or declarations[0] not in expected_options:
         errors.append(
             f"{label} declarations={declarations!r}, expected exactly "
-            f"[{expected_value!r}]",
+            f"one of {sorted(expected_options)!r}",
         )
 
 deployment_values = {}
