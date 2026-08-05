@@ -2,8 +2,8 @@
 
 **Last updated:** 2026-08-05
 **Audience:** Codex / infrastructure-backend coding agent
-**Current next phase:** **P9.1 corrective readiness pass**
-**Phase state:** `P9.1 MERGED / NOT DEPLOYED; MANIFEST FIX IN REVIEW; WINDOWS REHEARSAL NOT EXECUTED`
+**Current next phase:** **P9.1 isolated Windows off-VPS backup rehearsal**
+**Phase state:** `P9.1 SOURCE MERGED TO MAIN / NOT DEPLOYED; READINESS BRANCH NOT MERGED; WINDOWS BACKUP REHEARSAL READY / NOT EXECUTED`
 
 > P8 is `P8_PIPER_PRODUCTION_VERIFIED`. P9.1 source is merged and independently
 > reviewed, but this gate does **not** authorize production deployment,
@@ -19,6 +19,10 @@ readiness package is available under [`p9/README.md`](p9/README.md). Do not
 install a production database or execute P10 from this documentation gate.
 Do not execute P10 from the P9.1 readiness package.
 P8 completion does **not** authorize P9.
+The readiness branch is not merged and no production canary has occurred.
+Windows backup tooling and documentation are ready for rehearsal; no real
+Windows transfer, GPG readability check, exact-copy off-VPS restore,
+production PostgreSQL provisioning, or production migration has occurred.
 Sanitized proof is in
 [`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
 
@@ -128,18 +132,36 @@ P8 did not:
 - change the public hardware contract;
 - begin P9 implementation without a new explicit authorization.
 
-## 5. P9.1 correction and canary order
+## 5. P9.1 Windows rehearsal and canary order
 
 This documentation does not authorize production deployment. The next actions
 must occur in this order:
 
-1. finish and review the corrective readiness pass, including sanitized
-   manifest generation and documentation/verifier consistency;
-2. perform the real isolated Windows backup rehearsal over Tailscale and
+1. perform the real isolated Windows backup rehearsal over Tailscale and
    `scp.exe`, including checksum, GPG readability, and exact-copy restore;
-3. complete the remaining operator decisions and record their evidence;
-4. review and merge the readiness branch through the approved merge gate;
-5. only then prepare a separately authorized production canary.
+2. complete the remaining operator decisions and record their evidence;
+3. review and merge the readiness branch through the approved merge gate;
+4. only then prepare a separately authorized production canary.
+
+The Windows rehearsal is ready but not executed. It must include:
+
+- Windows PowerShell preflight;
+- Tailscale private connectivity;
+- dedicated Windows OpenSSH key and ACL verification;
+- the exact three-file set: `.dump.gpg`, `.dump.gpg.sha256`, and
+  `.manifest.json`;
+- transfer through `scp.exe`;
+- SHA-256 and manifest verification;
+- interactive GPG readability verification;
+- restore of that exact off-VPS artifact into a fresh isolated PostgreSQL
+  database;
+- Prisma migration-state verification;
+- row-count and ownership-relationship verification;
+- login and `/me` verification;
+- plaintext cleanup; and
+- sanitized evidence.
+
+None of these rehearsal steps is complete.
 
 No step above creates production secrets, starts production PostgreSQL, runs a
 production migration, or deploys P9.1. P9.2–P9.6 require their own completed

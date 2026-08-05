@@ -541,14 +541,14 @@ for label, (text, required_values) in current_doc_requirements.items():
 if p9_stage == "P9.1-merged-readiness":
     if not any(
         marker in next_action
-        for marker in ("P9.1 corrective readiness pass", "P9.1 production readiness lock")
+        for marker in ("P9.1 isolated Windows off-VPS backup rehearsal",)
     ):
         errors.append("docs/NEXT-ACTION.md missing merged P9.1 readiness checkpoint")
     if not any(
         marker in next_action
-        for marker in ("P9.1 correction and canary order", "execute P9")
+        for marker in ("P9.1 Windows rehearsal and canary order",)
     ):
-        errors.append("docs/NEXT-ACTION.md missing P9.1 correction/canary ordering")
+        errors.append("docs/NEXT-ACTION.md missing P9.1 rehearsal/canary ordering")
 
 unique_state_declarations = [
     (
@@ -557,8 +557,7 @@ unique_state_declarations = [
         r"^\*\*Phase state:\*\*\s*`([^`]+)`\s*$",
         (
             {
-                "P9.1 MERGED / NOT DEPLOYED; PRODUCTION READINESS IN PROGRESS",
-                "P9.1 MERGED / NOT DEPLOYED; MANIFEST FIX IN REVIEW; WINDOWS REHEARSAL NOT EXECUTED",
+                "P9.1 SOURCE MERGED TO MAIN / NOT DEPLOYED; READINESS BRANCH NOT MERGED; WINDOWS BACKUP REHEARSAL READY / NOT EXECUTED",
             }
             if p9_stage == "P9.1-merged-readiness"
             else {
