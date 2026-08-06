@@ -57,6 +57,26 @@ describe("P9 Compose backup boundary", () => {
     );
   });
 
+  it("uses the explicitly selected Compose file, project, and env file", async () => {
+    const spawnProcess = vi.fn(() => fakeChild(0));
+    await validateComposeConfiguration("/tmp/synthetic-postgres-password", {
+      spawn: spawnProcess,
+      composeFile: "/tmp/synthetic-p9.1-compose.yml",
+      projectName: "bmo-p9-1",
+      envFile: "/tmp/synthetic-compose.env",
+    });
+
+    expect(spawnProcess).toHaveBeenCalledWith(
+      "docker",
+      expect.arrayContaining([
+        "-f", "/tmp/synthetic-p9.1-compose.yml",
+        "--project-name", "bmo-p9-1",
+        "--env-file", "/tmp/synthetic-compose.env",
+      ]),
+      expect.anything(),
+    );
+  });
+
   it("categorizes Compose interpolation failure without calling it pg_dump failure", async () => {
     const child = fakeChild(
       1,
@@ -99,5 +119,24 @@ describe("P9 Compose backup boundary", () => {
   it("does not require stdout capture for streamed dump data", async () => {
     const child = fakeChild(0, "synthetic dump bytes");
     await expect(waitForProcess(child, "pg_dump", { failureKind: "pg_dump" })).resolves.toBeUndefined();
+  });
+
+  it("categorizes GPG authentication and pg_restore failures without exposing child stderr", async () => {
+    await expect(waitForProcess(
+      fakeChild(2, "", "gpg: decryption failed: Bad session key\npassword=synthetic-secret\n"),
+      "GPG authentication",
+      { failureKind: "gpg-authentication" },
+    )).rejects.toThrow(/GPG authentication failed/);
+
+    await expect(waitForProcess(
+      fakeChild(1, "", "pg_restore: error: could not execute query\nP9_PG_RESTORE_EXIT=1\n"),
+      "pg_restore",
+      { failureKind: "pg_restore" },
+    )).rejects.toThrow(/pg_restore failed/);
+    await expect(waitForProcess(
+      fakeChild(1, "", "password=synthetic-secret\n"),
+      "GPG authentication",
+      { failureKind: "gpg-authentication" },
+    )).rejects.not.toThrow("synthetic-secret");
   });
 });

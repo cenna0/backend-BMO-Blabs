@@ -6,6 +6,12 @@ export type ProcessFailureKind =
   | "compose-configuration"
   | "compose-execution"
   | "pg_dump"
+  | "gpg-authentication"
+  | "gpg-decryption"
+  | "pg_restore"
+  | "restore-target-check"
+  | "restore-target-creation"
+  | "restore-cleanup"
   | "generic";
 
 export interface WaitForProcessOptions {
@@ -17,9 +23,17 @@ export interface ComposeEnvironmentOptions {
   baseEnv?: NodeJS.ProcessEnv;
 }
 
+export interface ComposeSelection {
+  composeFile?: string;
+  projectName?: string | null;
+  envFile?: string | null;
+}
+
 export interface ComposeConfigurationDependencies extends ComposeEnvironmentOptions {
   spawn?: ComposeSpawn;
   composeFile?: string;
+  projectName?: string | null;
+  envFile?: string | null;
 }
 
 export type ComposeSpawn = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
@@ -34,10 +48,16 @@ export class BackupProcessError extends Error {
   }
 }
 
-export function composeArgs(command: string[], composeFile = process.env.P9_COMPOSE_FILE ?? "../p9.1-compose.yml"): string[] {
+export function composeArgs(
+  command: string[],
+  composeFile = process.env.P9_COMPOSE_FILE ?? "../p9.1-compose.yml",
+  selection: ComposeSelection = {},
+): string[] {
   const args = ["compose", "-f", resolve(composeFile)];
-  if (process.env.P9_COMPOSE_PROJECT) args.push("--project-name", process.env.P9_COMPOSE_PROJECT);
-  if (process.env.P9_COMPOSE_ENV_FILE) args.push("--env-file", resolve(process.env.P9_COMPOSE_ENV_FILE));
+  const projectName = selection.projectName !== undefined ? selection.projectName : process.env.P9_COMPOSE_PROJECT;
+  const envFile = selection.envFile !== undefined ? selection.envFile : process.env.P9_COMPOSE_ENV_FILE;
+  if (projectName) args.push("--project-name", projectName);
+  if (envFile) args.push("--env-file", resolve(envFile));
   args.push(...command);
   return args;
 }
@@ -93,6 +113,15 @@ function failureMessage(label: string, output: string, kind: ProcessFailureKind)
     const sanitized = sanitizeChildOutput(output.replace(/P9_PG_DUMP_EXIT=\d+/g, ""));
     return `pg_dump failed${sanitized ? `: ${sanitized}` : ""}`;
   }
+  if (kind === "gpg-authentication") return `GPG authentication failed: ${detail}`;
+  if (kind === "gpg-decryption") return `GPG decryption failed: ${detail}`;
+  if (kind === "pg_restore") {
+    const marker = /P9_PG_RESTORE_EXIT=\d+/.test(output);
+    return `pg_restore failed${marker ? `: ${sanitizeChildOutput(output.replace(/P9_PG_RESTORE_EXIT=\d+/g, ""))}` : `: ${detail}`}`;
+  }
+  if (kind === "restore-target-check") return `restore target check failed: ${detail}`;
+  if (kind === "restore-target-creation") return `restore target creation failed: ${detail}`;
+  if (kind === "restore-cleanup") return `restore target cleanup failed: ${detail}`;
   return `${label} failed: ${detail}`;
 }
 
@@ -112,11 +141,11 @@ function processCompletion(child: ChildProcess): Promise<number | null> {
   });
 }
 
-export async function waitForProcess(
+async function waitForProcessResult(
   child: ChildProcess,
   label: string,
   options: WaitForProcessOptions = {},
-): Promise<void> {
+): Promise<string> {
   const stderr: string[] = [];
   const stdout: string[] = [];
   captureStream(child.stderr, stderr);
@@ -137,17 +166,40 @@ export async function waitForProcess(
       failureKind,
     );
   }
+  return [...stdout].join("");
+}
+
+export async function waitForProcess(
+  child: ChildProcess,
+  label: string,
+  options: WaitForProcessOptions = {},
+): Promise<void> {
+  await waitForProcessResult(child, label, options);
 }
 
 export async function runCompose(
   args: string[],
-  options: { env?: NodeJS.ProcessEnv } = {},
+  options: { env?: NodeJS.ProcessEnv; failureKind?: ProcessFailureKind } = {},
 ): Promise<void> {
   const child = spawn("docker", args, {
     env: options.env ?? process.env,
     stdio: ["ignore", "ignore", "pipe"],
   });
-  await waitForProcess(child, "docker compose command", { failureKind: "compose-execution" });
+  await waitForProcess(child, "docker compose command", { failureKind: options.failureKind ?? "compose-execution" });
+}
+
+export async function runComposeOutput(
+  args: string[],
+  options: { env?: NodeJS.ProcessEnv; failureKind?: ProcessFailureKind } = {},
+): Promise<string> {
+  const child = spawn("docker", args, {
+    env: options.env ?? process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  return await waitForProcessResult(child, "docker compose command", {
+    failureKind: options.failureKind ?? "compose-execution",
+    captureStdout: true,
+  });
 }
 
 export async function validateComposeConfiguration(
@@ -161,7 +213,7 @@ export async function validateComposeConfiguration(
   };
   const child = spawnProcess(
     "docker",
-    composeArgs(["config", "--quiet"], options.composeFile),
+    composeArgs(["config", "--quiet"], options.composeFile, options),
     spawnOptions,
   );
   await waitForProcess(child, "Docker Compose configuration", {

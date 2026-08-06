@@ -15,6 +15,7 @@
     "p9:backup": "tsx src/p9/operator/backup.ts",
     "p9:backup:validate-config": "tsx src/p9/operator/validate-backup-config.ts",
     "p9:restore": "tsx src/p9/operator/restore.ts",
+    "p9:restore:validate-config": "tsx src/p9/operator/validate-restore-config.ts",
     "test:p9": "vitest run tests/p9",
     "fake-esp32": "tsx scripts/fake-esp32.ts",
     "hermes-fixture": "tsx scripts/hermes-fixture.ts",

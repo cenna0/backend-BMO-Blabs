@@ -5,8 +5,8 @@
 **Current next phase:** **P9.1 isolated Windows off-VPS backup rehearsal**
 **Phase state:** `P9.1 SOURCE MERGED TO MAIN / NOT DEPLOYED; READINESS BRANCH NOT MERGED; WINDOWS BACKUP REHEARSAL READY / NOT EXECUTED`
 
-Current rehearsal state: `SSH V3 VERIFIED / ENCRYPTION AND POSTGRES PASSWORD-FILE PREFLIGHT VALIDATED /
-BACKUP ARTIFACT NOT YET CREATED / WINDOWS TRANSFER NOT YET EXECUTED`. The canonical encryption-material file is
+Current rehearsal state: `SSH V3 VERIFIED / WINDOWS EXACT COPY VERIFIED / GPG READABILITY VERIFIED /
+RESTORE TOOLING PREFLIGHT READY / EXACT-PC-COPY RESTORE NOT YET EXECUTED`. The canonical encryption-material file is
 `/opt/bmo/secrets/p9.1/backup/backup-encryption-material-v1`. The approved Windows incoming destination is
 `D:\codex\BMO-backups\incoming`; the Windows operator pulls
 the exact encrypted three-file set from the VPS over Tailscale with
@@ -27,9 +27,9 @@ install a production database or execute P10 from this documentation gate.
 Do not execute P10 from the P9.1 readiness package.
 P8 completion does **not** authorize P9.
 The readiness branch is not merged and no production canary has occurred.
-Windows backup tooling and documentation are ready for rehearsal; no real
-Windows transfer, GPG readability check, exact-copy off-VPS restore,
-production PostgreSQL provisioning, or production migration has occurred.
+The exact Windows backup set has completed the approved transfer, checksum,
+manifest, promotion, and GPG-readability gates. The exact-copy off-VPS restore,
+production PostgreSQL provisioning, and production migration have not occurred.
 Sanitized proof is in
 [`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
 
@@ -150,16 +150,12 @@ must occur in this order:
 3. review and merge the readiness branch through the approved merge gate;
 4. only then prepare a separately authorized production canary.
 
-The Windows rehearsal is ready but not executed. It must include:
+The Windows exact-copy restore remains pending. Its evidence must include:
 
-- Windows PowerShell preflight;
-- Tailscale private connectivity;
-- dedicated Windows OpenSSH key and ACL verification;
-- the exact three-file set: `.dump.gpg`, `.dump.gpg.sha256`, and
-  `.manifest.json`;
-- transfer through `scp.exe`;
-- SHA-256 and manifest verification;
-- interactive GPG readability verification;
+- return of the already verified exact three-file set from Windows `verified`
+  to `/opt/bmo/p9.1-restore-tests/incoming/<backup-id>`;
+- server-side SHA-256 and manifest revalidation;
+- no-output GPG authentication before target creation;
 - restore of that exact off-VPS artifact into a fresh isolated PostgreSQL
   database;
 - Prisma migration-state verification;
