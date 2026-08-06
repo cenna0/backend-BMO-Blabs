@@ -6,10 +6,9 @@
 **Phase state:** `P9.1 SOURCE MERGED TO MAIN / NOT DEPLOYED; READINESS BRANCH NOT MERGED; WINDOWS BACKUP REHEARSAL READY / NOT EXECUTED`
 
 Current rehearsal state: `SSH V3 VERIFIED / ENCRYPTION MATERIAL PATH CONSISTENT /
-ENCRYPTION MATERIAL NOT YET PROVISIONED / BACKUP ARTIFACT NOT YET CREATED /
+ENCRYPTION MATERIAL PROVISIONED AND PREFLIGHT VALIDATED / BACKUP ARTIFACT NOT YET CREATED /
 WINDOWS TRANSFER NOT YET EXECUTED`. The canonical encryption-material file is
-`/opt/bmo/secrets/p9.1/backup/backup-encryption-material-v1`; it is not yet
-provisioned. The approved Windows incoming destination is
+`/opt/bmo/secrets/p9.1/backup/backup-encryption-material-v1`. The approved Windows incoming destination is
 `D:\codex\BMO-backups\incoming`; the Windows operator pulls
 the exact encrypted three-file set from the VPS over Tailscale with
 `scp.exe`.

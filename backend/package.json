@@ -13,6 +13,7 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "p9:invite": "tsx src/p9/operator/create-invitation.ts",
     "p9:backup": "tsx src/p9/operator/backup.ts",
+    "p9:backup:validate-config": "tsx src/p9/operator/validate-backup-config.ts",
     "p9:restore": "tsx src/p9/operator/restore.ts",
     "test:p9": "vitest run tests/p9",
     "fake-esp32": "tsx scripts/fake-esp32.ts",

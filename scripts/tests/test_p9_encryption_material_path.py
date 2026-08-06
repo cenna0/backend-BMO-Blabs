@@ -8,7 +8,8 @@ OBSOLETE = "/opt/bmo/config/p9.1/backup-passphrase"
 WINDOWS_INCOMING = r"D:\codex\BMO-backups\incoming"
 CURRENT_STATE = (
     "SSH V3 VERIFIED / ENCRYPTION MATERIAL PATH CONSISTENT / "
-    "ENCRYPTION MATERIAL NOT YET PROVISIONED / BACKUP ARTIFACT NOT YET CREATED / "
+    "ENCRYPTION MATERIAL PROVISIONED AND PREFLIGHT VALIDATED / "
+    "BACKUP ARTIFACT NOT YET CREATED / "
     "WINDOWS TRANSFER NOT YET EXECUTED"
 )
 
@@ -35,6 +36,9 @@ class P9EncryptionMaterialPathTests(unittest.TestCase):
         self.assertIn(WINDOWS_INCOMING, combined)
         self.assertIn(CURRENT_STATE, " ".join(combined.split()))
         self.assertNotIn(OBSOLETE, combined)
+        runbook = (ROOT / "docs/p9/P9.1-PRODUCTION-RUNBOOKS.md").read_text(encoding="utf-8")
+        self.assertIn("npm run p9:backup:validate-config", runbook)
+        self.assertIn("configuration-only preflight", runbook)
         readiness = " ".join(
             (ROOT / "docs/p9/P9.1-PRODUCTION-READINESS.md").read_text(encoding="utf-8").split()
         )
@@ -54,7 +58,7 @@ class P9EncryptionMaterialPathTests(unittest.TestCase):
         ]
         for path in status_documents:
             text = " ".join(path.read_text(encoding="utf-8").split())
-            self.assertIn("ENCRYPTION MATERIAL NOT YET PROVISIONED", text)
+            self.assertIn("ENCRYPTION MATERIAL PROVISIONED AND PREFLIGHT VALIDATED", text)
             self.assertIn("BACKUP ARTIFACT NOT YET CREATED", text)
             self.assertIn("WINDOWS TRANSFER NOT YET EXECUTED", text)
 

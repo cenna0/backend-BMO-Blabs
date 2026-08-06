@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const backupSourcePath = resolve(backendRoot, "src/p9/operator/backup.ts");
+const backupConfigSourcePath = resolve(backendRoot, "src/p9/operator/backup-config.ts");
 const canonicalMaterialPath = "/opt/bmo/secrets/p9.1/backup/backup-encryption-material-v1";
 const obsoleteMaterialPath = "/opt/bmo/config/p9.1/backup-passphrase";
 
@@ -25,12 +26,14 @@ function runBackupWithMaterial(materialPath: string, outputDirectory: string, in
 
 describe("P9 backup encryption-material path contract", () => {
   it("uses the protected path variable and rejects unsafe material before dumping", () => {
-    const source = readFileSync(backupSourcePath, "utf8");
-    expect(source).toContain("P9_BACKUP_PASSPHRASE_FILE");
-    expect(source).toContain("statSync(passphraseFile)");
-    expect(source).toContain("readFileSync(passphraseFile, \"utf8\")");
-    expect(source).toContain("passphrase.length < 16");
-    expect(source).not.toContain(obsoleteMaterialPath);
+    const backupSource = readFileSync(backupSourcePath, "utf8");
+    const configSource = readFileSync(backupConfigSourcePath, "utf8");
+    expect(configSource).toContain("P9_BACKUP_PASSPHRASE_FILE");
+    expect(configSource).toContain("lstatSync(passphraseFile)");
+    expect(configSource).toContain("readFileSync(passphraseFile, \"utf8\")");
+    expect(configSource).toContain("BACKUP_MATERIAL_MINIMUM_LENGTH");
+    expect(backupSource).toContain("loadBackupConfig");
+    expect(configSource).not.toContain(obsoleteMaterialPath);
     expect(canonicalMaterialPath).toBe("/opt/bmo/secrets/p9.1/backup/backup-encryption-material-v1");
   });
 

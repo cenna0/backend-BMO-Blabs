@@ -1,31 +1,22 @@
 import { randomUUID } from "node:crypto";
-import { chmodSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
+import {
+  loadBackupConfig,
+  type BackupConfig,
+  type LoadBackupConfigOptions,
+} from "./backup-config.js";
 import { composeArgs, waitForProcess } from "./compose.js";
 import { cleanupFinalizedBackupSet, finalizeBackupSet, type FinalizedBackupSet } from "./backup-set.js";
 
-type BackupKind = "daily" | "weekly";
-
-const kind = process.env.P9_BACKUP_KIND === "weekly" ? "weekly" : "daily";
-const retention: Record<BackupKind, number> = { daily: 7, weekly: 4 };
-const backupDir = resolve(process.env.P9_BACKUP_DIR ?? "");
-const passphraseFile = process.env.P9_BACKUP_PASSPHRASE_FILE;
-const databaseIdentifier = process.env.P9_POSTGRES_DB ?? "bmo";
-const postgresMajorVersion = Number(process.env.P9_POSTGRES_MAJOR_VERSION ?? "16");
-const migrationState = process.env.P9_BACKUP_MIGRATION_STATE ?? "not-verified";
-
-function requireConfig(): { directory: string; passphrase: string } {
-  if (!process.env.P9_BACKUP_DIR) throw new Error("P9_BACKUP_DIR is required");
-  if (!passphraseFile) throw new Error("P9_BACKUP_PASSPHRASE_FILE is required");
-  const mode = statSync(passphraseFile).mode & 0o077;
-  if (mode !== 0) throw new Error("backup passphrase file must not be group/world accessible");
-  const passphrase = readFileSync(passphraseFile, "utf8").trim();
-  if (passphrase.length < 16) throw new Error("backup passphrase must contain at least 16 characters");
-  mkdirSync(backupDir, { recursive: true, mode: 0o700 });
-  chmodSync(backupDir, 0o700);
-  return { directory: backupDir, passphrase };
+export function prepareBackupDirectory(directory: string | undefined): string {
+  if (!directory) throw new Error("P9_BACKUP_DIR is required");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  chmodSync(directory, 0o700);
+  return directory;
 }
 
 function dumpArgs(): string[] {
@@ -35,15 +26,17 @@ function dumpArgs(): string[] {
   ]);
 }
 
-async function main(): Promise<void> {
-  const config = requireConfig();
+async function executeBackup(config: BackupConfig): Promise<void> {
+  const directory = config.directory;
+  if (!directory) throw new Error("P9_BACKUP_DIR is required");
+
   const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  const filename = `p9-${kind}-${timestamp}.dump.gpg`;
-  const outputPath = join(config.directory, filename);
-  const temporaryPath = join(config.directory, `.${filename}.${randomUUID()}.tmp`);
+  const filename = `p9-${config.kind}-${timestamp}.dump.gpg`;
+  const outputPath = join(directory, filename);
+  const temporaryPath = join(directory, `.${filename}.${randomUUID()}.tmp`);
   const checksumPath = `${outputPath}.sha256`;
   const backupIdentifier = filename.slice(0, -".dump.gpg".length);
-  const manifestPath = join(config.directory, `${backupIdentifier}.manifest.json`);
+  const manifestPath = join(directory, `${backupIdentifier}.manifest.json`);
   let finalized: FinalizedBackupSet | undefined;
 
   const gpg = spawn("gpg", [
@@ -52,7 +45,7 @@ async function main(): Promise<void> {
     "--pinentry-mode",
     "loopback",
     "--passphrase-file",
-    passphraseFile!,
+    config.passphraseFile,
     "--symmetric",
     "--cipher-algo",
     "AES256",
@@ -75,20 +68,20 @@ async function main(): Promise<void> {
       manifestPath,
       backupIdentifier,
       timestamp: new Date().toISOString(),
-      databaseIdentifier,
-      postgresMajorVersion,
-      migrationState,
+      databaseIdentifier: config.databaseIdentifier,
+      postgresMajorVersion: config.postgresMajorVersion,
+      migrationState: config.migrationState,
     });
-    const candidates = readdirSync(config.directory)
-      .filter((entry) => entry.startsWith(`p9-${kind}-`) && entry.endsWith(".dump.gpg"))
+    const candidates = readdirSync(directory)
+      .filter((entry) => entry.startsWith(`p9-${config.kind}-`) && entry.endsWith(".dump.gpg"))
       .sort()
       .reverse();
-    for (const stale of candidates.slice(retention[kind])) {
-      unlinkSync(join(config.directory, stale));
+    for (const stale of candidates.slice(config.retention)) {
+      unlinkSync(join(directory, stale));
       const staleChecksum = `${stale}.sha256`;
-      try { unlinkSync(join(config.directory, staleChecksum)); } catch { /* already absent */ }
+      try { unlinkSync(join(directory, staleChecksum)); } catch { /* already absent */ }
       const staleManifest = `${stale.slice(0, -".dump.gpg".length)}.manifest.json`;
-      try { unlinkSync(join(config.directory, staleManifest)); } catch { /* already absent */ }
+      try { unlinkSync(join(directory, staleManifest)); } catch { /* already absent */ }
     }
     process.stdout.write(`${outputPath}\n${finalized.sha256}\n${manifestPath}\n`);
   } catch (error) {
@@ -98,7 +91,27 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.message : "backup failed"}\n`);
-  process.exitCode = 1;
-});
+export interface BackupDependencies {
+  loadConfig: (options?: LoadBackupConfigOptions) => BackupConfig;
+  prepareDirectory: typeof prepareBackupDirectory;
+  execute: (config: BackupConfig) => Promise<void>;
+}
+
+const runtimeDependencies: BackupDependencies = {
+  loadConfig: loadBackupConfig,
+  prepareDirectory: prepareBackupDirectory,
+  execute: executeBackup,
+};
+
+export async function runBackup(dependencies: BackupDependencies = runtimeDependencies): Promise<void> {
+  const config = dependencies.loadConfig({ requireOutputDirectory: true });
+  const directory = dependencies.prepareDirectory(config.directory);
+  await dependencies.execute({ ...config, directory });
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  runBackup().catch((error: unknown) => {
+    process.stderr.write(`${error instanceof Error ? error.message : "backup failed"}\n`);
+    process.exitCode = 1;
+  });
+}
