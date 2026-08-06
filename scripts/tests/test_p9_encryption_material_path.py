@@ -7,7 +7,7 @@ CANONICAL = "/opt/bmo/secrets/p9.1/backup/backup-encryption-material-v1"
 OBSOLETE = "/opt/bmo/config/p9.1/backup-passphrase"
 WINDOWS_INCOMING = r"D:\codex\BMO-backups\incoming"
 CURRENT_STATE = (
-    "SSH V3 VERIFIED / ENCRYPTION MATERIAL PROVISIONED AND PREFLIGHT VALIDATED / "
+    "SSH V3 VERIFIED / ENCRYPTION AND POSTGRES PASSWORD-FILE PREFLIGHT VALIDATED / "
     "BACKUP ARTIFACT NOT YET CREATED / "
     "WINDOWS TRANSFER NOT YET EXECUTED"
 )
@@ -57,7 +57,7 @@ class P9EncryptionMaterialPathTests(unittest.TestCase):
         ]
         for path in status_documents:
             text = " ".join(path.read_text(encoding="utf-8").split())
-            self.assertIn("ENCRYPTION MATERIAL PROVISIONED AND PREFLIGHT VALIDATED", text)
+            self.assertIn("ENCRYPTION AND POSTGRES PASSWORD-FILE PREFLIGHT VALIDATED", text)
             self.assertIn("BACKUP ARTIFACT NOT YET CREATED", text)
             self.assertIn("WINDOWS TRANSFER NOT YET EXECUTED", text)
 

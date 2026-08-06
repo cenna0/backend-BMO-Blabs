@@ -9,7 +9,12 @@ import {
   type BackupConfig,
   type LoadBackupConfigOptions,
 } from "./backup-config.js";
-import { composeArgs, waitForProcess } from "./compose.js";
+import {
+  composeArgs,
+  composeEnvironment,
+  validateComposeConfiguration,
+  waitForProcess,
+} from "./compose.js";
 import { cleanupFinalizedBackupSet, finalizeBackupSet, type FinalizedBackupSet } from "./backup-set.js";
 
 export function prepareBackupDirectory(directory: string | undefined): string {
@@ -19,10 +24,10 @@ export function prepareBackupDirectory(directory: string | undefined): string {
   return directory;
 }
 
-function dumpArgs(): string[] {
+export function backupDumpArgs(): string[] {
   return composeArgs([
     "exec", "-T", "postgres", "sh", "-c",
-    "set -eu; export PGPASSWORD=$(cat /run/secrets/postgres_password); exec pg_dump --format=custom --no-owner --no-privileges --username=\"$POSTGRES_USER\" --dbname=\"$POSTGRES_DB\"",
+    "set -eu; command -v pg_dump >/dev/null 2>&1 || { printf 'P9_PG_DUMP_EXECUTABLE_MISSING\\n' >&2; exit 127; }; export PGPASSWORD=$(cat /run/secrets/postgres_password); pg_dump --format=custom --no-owner --no-privileges --username=\"$POSTGRES_USER\" --dbname=\"$POSTGRES_DB\" || { status=$?; printf 'P9_PG_DUMP_EXIT=%s\\n' \"$status\" >&2; exit \"$status\"; }",
   ]);
 }
 
@@ -38,6 +43,8 @@ async function executeBackup(config: BackupConfig): Promise<void> {
   const backupIdentifier = filename.slice(0, -".dump.gpg".length);
   const manifestPath = join(directory, `${backupIdentifier}.manifest.json`);
   let finalized: FinalizedBackupSet | undefined;
+
+  await validateComposeConfiguration(config.postgresPasswordFile);
 
   const gpg = spawn("gpg", [
     "--batch",
@@ -55,12 +62,18 @@ async function executeBackup(config: BackupConfig): Promise<void> {
     "SHA512",
     "--output",
     temporaryPath,
-  ], { stdio: ["pipe", "ignore", "ignore"] });
-  const dump = spawn("docker", dumpArgs(), { stdio: ["ignore", "pipe", "ignore"] });
+  ], { stdio: ["pipe", "ignore", "pipe"] });
+  const dump = spawn("docker", backupDumpArgs(), {
+    env: composeEnvironment(config.postgresPasswordFile),
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   dump.stdout?.pipe(gpg.stdin);
 
   try {
-    await Promise.all([waitForProcess(dump, "pg_dump"), waitForProcess(gpg, "backup encryption")]);
+    await Promise.all([
+      waitForProcess(dump, "pg_dump", { failureKind: "pg_dump" }),
+      waitForProcess(gpg, "backup encryption"),
+    ]);
     finalized = await finalizeBackupSet({
       artifactTempPath: temporaryPath,
       artifactPath: outputPath,

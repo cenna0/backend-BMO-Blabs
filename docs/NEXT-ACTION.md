@@ -5,7 +5,7 @@
 **Current next phase:** **P9.1 isolated Windows off-VPS backup rehearsal**
 **Phase state:** `P9.1 SOURCE MERGED TO MAIN / NOT DEPLOYED; READINESS BRANCH NOT MERGED; WINDOWS BACKUP REHEARSAL READY / NOT EXECUTED`
 
-Current rehearsal state: `SSH V3 VERIFIED / ENCRYPTION MATERIAL PROVISIONED AND PREFLIGHT VALIDATED /
+Current rehearsal state: `SSH V3 VERIFIED / ENCRYPTION AND POSTGRES PASSWORD-FILE PREFLIGHT VALIDATED /
 BACKUP ARTIFACT NOT YET CREATED / WINDOWS TRANSFER NOT YET EXECUTED`. The canonical encryption-material file is
 `/opt/bmo/secrets/p9.1/backup/backup-encryption-material-v1`. The approved Windows incoming destination is
 `D:\codex\BMO-backups\incoming`; the Windows operator pulls
