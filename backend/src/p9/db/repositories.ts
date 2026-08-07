@@ -8,6 +8,13 @@ export class P9Repositories {
     await this.db.$queryRaw`SELECT 1`;
   }
 
+  async databaseIdentity(): Promise<string> {
+    const rows = await this.db.$queryRaw<Array<{ current_database: string }>>`SELECT current_database() AS current_database`;
+    const database = rows[0]?.current_database;
+    if (!database) throw new Error("database identity unavailable");
+    return database;
+  }
+
   async lockUser(userId: string): Promise<void> {
     await this.db.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
   }

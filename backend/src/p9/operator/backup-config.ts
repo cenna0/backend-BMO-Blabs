@@ -1,6 +1,8 @@
 import { accessSync, constants, lstatSync, readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 
+import { validateProtectedFile, type ProtectedFileFs } from "./protected-file.js";
+
 export const BACKUP_PASSPHRASE_FILE_ENV = "P9_BACKUP_PASSPHRASE_FILE";
 export const POSTGRES_PASSWORD_FILE_ENV = "P9_POSTGRES_PASSWORD_FILE";
 export const CANONICAL_BACKUP_MATERIAL_PATH =
@@ -69,7 +71,7 @@ function runtimeUserId(): number {
   return process.getuid();
 }
 
-function validatePostgresPasswordFile(
+export function validatePostgresPasswordFile(
   env: NodeJS.ProcessEnv,
   fs: BackupConfigFs,
   options: LoadBackupConfigOptions,
@@ -77,32 +79,17 @@ function validatePostgresPasswordFile(
   const passwordFile = env[POSTGRES_PASSWORD_FILE_ENV];
   if (!passwordFile) fail("P9_POSTGRES_PASSWORD_FILE is required");
   if (!isAbsolute(passwordFile)) fail("P9_POSTGRES_PASSWORD_FILE must be an absolute path");
-
-  let metadata: BackupMaterialStats;
   try {
-    metadata = fs.lstatSync(passwordFile);
-  } catch {
-    fail("postgres password file is unavailable");
+    validateProtectedFile(passwordFile, {
+      fs: fs as ProtectedFileFs,
+      expectedUid: options.runtimeUid ?? runtimeUserId(),
+      expectedGid: options.runtimeGid ?? runtimeGroupId(),
+      mode: POSTGRES_PASSWORD_FILE_MODE,
+      label: "postgres password file",
+    });
+  } catch (error) {
+    fail(error instanceof Error ? error.message : "postgres password file is unavailable");
   }
-
-  if (metadata.isSymbolicLink()) fail("postgres password file must not be a symlink");
-  if (!metadata.isFile()) fail("postgres password file must be a regular file");
-  if (
-    metadata.uid !== (options.runtimeUid ?? runtimeUserId()) ||
-    metadata.gid !== (options.runtimeGid ?? runtimeGroupId())
-  ) {
-    fail("postgres password file ownership is unsafe");
-  }
-  if ((metadata.mode & 0o7777) !== POSTGRES_PASSWORD_FILE_MODE) {
-    fail("postgres password file permissions are unsafe");
-  }
-
-  try {
-    fs.accessSync(passwordFile, constants.R_OK);
-  } catch {
-    fail("postgres password file is unreadable");
-  }
-
   return passwordFile;
 }
 

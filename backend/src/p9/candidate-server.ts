@@ -1,20 +1,11 @@
-import { readFileSync } from "node:fs";
 import express from "express";
 
 import { configureTrustedProxy } from "../http/trusted-proxy.js";
 import { parseP9Config } from "./config.js";
+import { loadP9DatabaseUrlFromSecret } from "./database-url.js";
 import { createP9Runtime } from "./index.js";
 
-function loadDatabaseUrlFromSecret(): void {
-  if (process.env.DATABASE_URL || !process.env.P9_DATABASE_PASSWORD_FILE) return;
-  const password = readFileSync(process.env.P9_DATABASE_PASSWORD_FILE, "utf8").trim();
-  if (!password) throw new Error("P9 database password secret is empty");
-  const user = process.env.P9_POSTGRES_USER ?? "bmo";
-  const database = process.env.P9_POSTGRES_DB ?? "bmo";
-  process.env.DATABASE_URL = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@postgres:5432/${encodeURIComponent(database)}`;
-}
-
-loadDatabaseUrlFromSecret();
+loadP9DatabaseUrlFromSecret(process.env);
 const config = parseP9Config(process.env);
 if (!config.enabled) throw new Error("P9 candidate requires P9_ENABLED=true");
 

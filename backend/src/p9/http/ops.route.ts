@@ -13,6 +13,13 @@ export function createOpsRouter(repositories: P9Repositories): Router {
       response.status(503).json({ status: "error", database: "unavailable" });
     }
   }));
+  router.get("/ops/db/identity", asyncP9(async (_request, response) => {
+    try {
+      response.json({ database: await repositories.databaseIdentity() });
+    } catch {
+      response.status(503).json({ error: "DATABASE_UNAVAILABLE" });
+    }
+  }));
   router.get("/ops/db/readyz", asyncP9(async (_request, response) => {
     try {
       await repositories.healthCheck();
