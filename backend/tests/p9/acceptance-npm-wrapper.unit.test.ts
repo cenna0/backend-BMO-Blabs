@@ -18,12 +18,26 @@ function setup(): { env: NodeJS.ProcessEnv; statePath: string; cleanup: () => vo
   const dockerPath = join(dockerDirectory, "docker");
   writeFileSync(dockerPath, `#!/usr/bin/env node
 const fs = require("node:fs");
+const { spawn } = require("node:child_process");
+const serverPidPath = process.env.P9_FAKE_SERVER_PID_FILE;
 const args = process.argv.slice(2);
 const last = args.at(-1) || "";
+function startFakeServer() {
+  const child = spawn(process.execPath, ["-e", \
+    "const http=require('node:http'); const server=http.createServer((req,res)=>{res.setHeader('content-type','application/json'); if(req.url==='/api/v1/ops/db/readyz') {res.statusCode=200; res.end(JSON.stringify({status:'ok',database:'ready'})); return;} if(req.url==='/api/v1/ops/db/identity') {res.statusCode=200; res.end(JSON.stringify({database:'bmo_restore_acceptance_test'})); return;} res.statusCode=404; res.end();}); server.listen(3025,'127.0.0.1');"], { detached: true, stdio: "ignore" });
+  child.unref();
+  fs.writeFileSync(serverPidPath, String(child.pid));
+}
+function stopFakeServer() {
+  if (!serverPidPath || !fs.existsSync(serverPidPath)) return;
+  try { process.kill(Number(fs.readFileSync(serverPidPath, "utf8"))); } catch {}
+  try { fs.unlinkSync(serverPidPath); } catch {}
+}
 if (args[0] === "network" && args[1] === "inspect") process.exit(0);
 if (args[0] === "inspect" && args[1] === "--format") {
   if (last === "bmo-p9-1-backend-1") process.stdout.write("bmo-p9.1-candidate:test\\n");
-  else process.stdout.write("running|bmo-p9.1-candidate:test\\n");
+  else if ((args[2] || "").includes(".Config.Image")) process.stdout.write("running|bmo-p9.1-candidate:test\\n");
+  else process.stdout.write("running|0\\n");
   process.exit(0);
 }
 if (args[0] === "inspect") process.exit(1);
@@ -32,8 +46,9 @@ if (args[0] === "exec") {
   else process.stdout.write("1\\n");
   process.exit(0);
 }
-if (args[0] === "rm") process.exit(0);
+if (args[0] === "rm") { stopFakeServer(); process.exit(0); }
 if (args[0] === "run") {
+  if (args.some((arg) => arg.endsWith("candidate-server.js"))) startFakeServer();
   if (args.includes("fixture-create")) {
     const pending = JSON.parse(fs.readFileSync(process.env.P9_ACCEPTANCE_STATE_FILE, "utf8"));
     process.stdout.write(JSON.stringify({ state: { ...pending, userId: "11111111-1111-1111-1111-111111111111" } }) + "\\n");
@@ -65,7 +80,18 @@ process.exit(0);
     P9_ACCEPTANCE_RUNTIME_ENV_FILE: join(directory, "runtime.env"),
     P9_ACCEPTANCE_STATE_FILE: statePath,
   };
-  return { env, statePath, cleanup: () => rmSync(directory, { recursive: true, force: true }) };
+  const serverPidPath = join(directory, "fake-server.pid");
+  env.P9_FAKE_SERVER_PID_FILE = serverPidPath;
+  return {
+    env,
+    statePath,
+    cleanup: () => {
+      if (existsSync(serverPidPath)) {
+        try { process.kill(Number(readFileSync(serverPidPath, "utf8"))); } catch {}
+      }
+      rmSync(directory, { recursive: true, force: true });
+    },
+  };
 }
 
 function runScript(script: string, env: NodeJS.ProcessEnv) {
@@ -79,8 +105,10 @@ describe("documented P9 acceptance npm wrappers", () => {
       expect(runScript("p9:acceptance:runtime:validate-config", fixture.env)).toMatchObject({ status: 0 });
       expect(runScript("p9:acceptance:fixture:validate-config", fixture.env)).toMatchObject({ status: 0 });
       expect(runScript("p9:acceptance:fixture:status", fixture.env)).toMatchObject({ status: 0 });
-      expect(runScript("p9:acceptance:runtime:start", fixture.env)).toMatchObject({ status: 0 });
-      expect(runScript("p9:acceptance:runtime:status", fixture.env)).toMatchObject({ status: 0 });
+      const runtimeStart = runScript("p9:acceptance:runtime:start", fixture.env);
+      expect(runtimeStart, runtimeStart.stdout + runtimeStart.stderr).toMatchObject({ status: 0 });
+      const runtimeStatus = runScript("p9:acceptance:runtime:status", fixture.env);
+      expect(runtimeStatus, runtimeStatus.stdout + runtimeStatus.stderr).toMatchObject({ status: 0 });
       expect(runScript("p9:acceptance:fixture:create", fixture.env)).toMatchObject({ status: 0 });
       expect(existsSync(fixture.statePath)).toBe(true);
       expect(runScript("p9:acceptance:fixture:status", fixture.env)).toMatchObject({ status: 0 });

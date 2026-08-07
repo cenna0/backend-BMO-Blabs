@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ACCEPTANCE_IDENTITY_PATH,
+  ACCEPTANCE_READINESS_PROBE_TIMEOUT_MS,
+  ACCEPTANCE_READINESS_PATH,
+  ACCEPTANCE_STARTUP_POLL_INTERVAL_MS,
+  ACCEPTANCE_STARTUP_TIMEOUT_MS,
   buildAcceptanceRuntimeArgs,
   startAcceptanceRuntime,
   statusAcceptanceRuntime,
   stopAcceptanceRuntime,
   type AcceptanceDocker,
+  type AcceptanceRuntimeHttpClient,
+  type AcceptanceRuntimeWaitOptions,
 } from "../../src/p9/operator/acceptance-runtime.js";
 import { buildAcceptanceWorkerArgs } from "../../src/p9/operator/acceptance-cli.js";
 import type { AcceptanceConfig } from "../../src/p9/operator/acceptance-config.js";
@@ -41,6 +48,40 @@ function fakeDocker(responses: Array<Partial<Awaited<ReturnType<AcceptanceDocker
   return { docker, calls };
 }
 
+function startupDocker(responses: Array<Partial<Awaited<ReturnType<AcceptanceDocker["run"]>>> & { exitCode: number; stdout?: string; stderr?: string }> = []) {
+  return fakeDocker([
+    { exitCode: 0 },
+    { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
+    { exitCode: 1, stderr: "No such container" },
+    { exitCode: 0, stdout: "1\n" },
+    { exitCode: 0, stdout: "container-id\n" },
+    ...responses,
+  ]);
+}
+
+function readinessHttp(responses: Array<{ status: number; body?: unknown } | Error>) {
+  const calls: string[] = [];
+  const http: AcceptanceRuntimeHttpClient = {
+    request: async (path) => {
+      calls.push(path);
+      const response = responses[calls.length - 1];
+      if (response instanceof Error) throw response;
+      return response ?? { status: 500 };
+    },
+  };
+  return { http, calls };
+}
+
+function deterministicWait(): AcceptanceRuntimeWaitOptions {
+  let time = 0;
+  return {
+    timeoutMs: 20,
+    pollIntervalMs: 5,
+    now: () => time,
+    sleep: async (milliseconds) => { time += milliseconds; },
+  };
+}
+
 describe("P9 restored-target acceptance runtime", () => {
   it("builds a Docker run that only publishes loopback and targets the restore database", () => {
     const args = buildAcceptanceRuntimeArgs(config);
@@ -69,14 +110,115 @@ describe("P9 restored-target acceptance runtime", () => {
       { exitCode: 1, stderr: "No such container" },
       { exitCode: 0, stdout: "1\n" },
       { exitCode: 0, stdout: "container-id\n" },
+      { exitCode: 0, stdout: "running|0\n" },
     ]);
+    const { http } = readinessHttp([{ status: 200, body: { status: "ok", database: "ready" } }]);
 
-    await expect(startAcceptanceRuntime(config, docker)).resolves.toMatchObject({ container: config.container, database: config.database });
+    await expect(startAcceptanceRuntime(config, docker, { http })).resolves.toMatchObject({ container: config.container, database: config.database });
     expect(calls[0]).toEqual(["network", "inspect", config.network]);
     expect(calls[1]).toEqual(["inspect", "--format", "{{.Config.Image}}", "bmo-p9-1-backend-1"]);
     expect(calls[2]).toEqual(["inspect", config.container]);
     expect(calls[3]?.slice(0, 5)).toEqual(["exec", config.postgresContainer, "psql", "-U", "bmo"]);
     expect(calls[4]?.[0]).toBe("run");
+    expect(calls.filter((args) => args[0] === "run")).toHaveLength(1);
+  });
+
+  it("keeps the single runtime after a connection-refused first probe and passes on the next probe", async () => {
+    const { docker, calls } = startupDocker([{ exitCode: 0, stdout: "running|0\n" }, { exitCode: 0, stdout: "running|0\n" }]);
+    const { http, calls: httpCalls } = readinessHttp([
+      new Error("connect ECONNREFUSED 127.0.0.1:3025"),
+      { status: 200, body: { status: "ok", database: "ready" } },
+    ]);
+
+    await expect(startAcceptanceRuntime(config, docker, { http, ...deterministicWait() })).resolves.toMatchObject({ container: config.container });
+
+    expect(httpCalls).toEqual([ACCEPTANCE_READINESS_PATH, ACCEPTANCE_READINESS_PATH]);
+    expect(calls.filter((args) => args[0] === "run")).toHaveLength(1);
+    expect(calls.some((args) => args[0] === "rm")).toBe(false);
+  });
+
+  it("retries several transient connection failures within the startup deadline", async () => {
+    const { docker } = startupDocker([
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+    ]);
+    const { http, calls } = readinessHttp([
+      new Error("connection refused"),
+      new Error("connection refused"),
+      new Error("connection refused"),
+      { status: 200, body: { status: "ok", database: "ready" } },
+    ]);
+
+    await expect(startAcceptanceRuntime(config, docker, { http, ...deterministicWait() })).resolves.toBeDefined();
+    expect(calls).toHaveLength(4);
+  });
+
+  it("fails finitely and cleans the runtime when readiness never succeeds", async () => {
+    const { docker, calls } = startupDocker([
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "state P9_ACCEPTANCE_PASSWORD=not-real\n" },
+      { exitCode: 0, stdout: "log P9_ACCEPTANCE_PASSWORD=not-real\n" },
+      { exitCode: 0 },
+    ]);
+    const { http } = readinessHttp([
+      { status: 503, body: { status: "error", database: "unavailable" } },
+      { status: 503, body: { status: "error", database: "unavailable" } },
+      { status: 503, body: { status: "error", database: "unavailable" } },
+      { status: 503, body: { status: "error", database: "unavailable" } },
+      { status: 503, body: { status: "error", database: "unavailable" } },
+    ]);
+
+    const failure = await startAcceptanceRuntime(config, docker, { http, ...deterministicWait() }).catch((error) => error);
+    expect(String(failure)).toMatch(/timed out|not ready/);
+    expect(calls.filter((args) => args[0] === "run")).toHaveLength(1);
+    expect(calls.at(-1)).toEqual(["rm", "--force", config.container]);
+    expect(String(failure)).not.toContain("not-real");
+  });
+
+  it("fails immediately when the container exits before readiness", async () => {
+    const { docker, calls } = startupDocker([
+      { exitCode: 0, stdout: "exited|1\n" },
+      { exitCode: 0, stdout: "exited|1\n" },
+      { exitCode: 0, stdout: "crash P9_ACCEPTANCE_PASSWORD=not-real\n" },
+      { exitCode: 0 },
+    ]);
+    const { http, calls: httpCalls } = readinessHttp([]);
+
+    await expect(startAcceptanceRuntime(config, docker, { http, ...deterministicWait() })).rejects.toThrow(/exited/);
+    expect(httpCalls).toHaveLength(0);
+    expect(calls.filter((args) => args[0] === "run")).toHaveLength(1);
+    expect(calls.at(-1)).toEqual(["rm", "--force", config.container]);
+  });
+
+  it("keeps unexpected readiness statuses not-ready until a valid response", async () => {
+    const { docker } = startupDocker([
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+      { exitCode: 0, stdout: "running|0\n" },
+    ]);
+    const { http, calls } = readinessHttp([
+      { status: 200, body: { status: "ok", database: "unavailable" } },
+      { status: 503, body: { status: "ok", database: "ready" } },
+      { status: 200, body: { status: "ok", database: "ready" } },
+    ]);
+
+    await expect(startAcceptanceRuntime(config, docker, { http, ...deterministicWait() })).resolves.toBeDefined();
+    expect(calls).toHaveLength(3);
+  });
+
+  it("defines explicit bounded startup defaults", () => {
+    expect(ACCEPTANCE_STARTUP_TIMEOUT_MS).toBe(30_000);
+    expect(ACCEPTANCE_STARTUP_POLL_INTERVAL_MS).toBe(250);
+    expect(ACCEPTANCE_READINESS_PROBE_TIMEOUT_MS).toBe(3_000);
+    expect(ACCEPTANCE_READINESS_PATH).toBe("/api/v1/ops/db/readyz");
+    expect(ACCEPTANCE_IDENTITY_PATH).toBe("/api/v1/ops/db/identity");
   });
 
   it("fails before Docker run when the target database does not exist", async () => {

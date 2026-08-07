@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { main } from "../../src/p9/operator/acceptance-cli.js";
-import type { AcceptanceDocker } from "../../src/p9/operator/acceptance-runtime.js";
+import type {
+  AcceptanceDocker,
+  AcceptanceRuntimeHttpClient,
+  AcceptanceRuntimeWaitOptions,
+} from "../../src/p9/operator/acceptance-runtime.js";
 
 const syntheticDirectories: string[] = [];
 
@@ -72,9 +76,12 @@ describe("P9 acceptance CLI entrypoint", () => {
     const directory = configureSyntheticEnvironment();
     const statePath = join(directory, "fixture-state.json");
     const calls: string[][] = [];
+    const events: string[] = [];
     const docker: AcceptanceDocker = {
       run: async (args) => {
         calls.push(args);
+        events.push(`docker:${args[0]}`);
+        if (args[0] === "inspect") return { exitCode: 0, stdout: "running|0\n", stderr: "" };
         const pending = JSON.parse(readFileSync(statePath, "utf8")) as Record<string, unknown>;
         return {
           exitCode: 0,
@@ -83,14 +90,27 @@ describe("P9 acceptance CLI entrypoint", () => {
         };
       },
     };
+    const http: AcceptanceRuntimeHttpClient = {
+      request: async (path) => {
+        events.push(`http:${path}`);
+        if (path === "/api/v1/ops/db/readyz") return { status: 200, body: { status: "ok", database: "ready" } };
+        return { status: 200, body: { database: "bmo_restore_acceptance_test" } };
+      },
+    };
+    const runtimeWait: AcceptanceRuntimeWaitOptions = { http };
 
-    const result = await main(["fixture:create"], docker);
+    const result = await main(["fixture:create"], docker, runtimeWait);
     const output = JSON.stringify(readFileSync(statePath, "utf8"));
 
     expect(result).toBe(0);
     expect(output).toContain("11111111-1111-1111-1111-111111111111");
-    expect(calls[0]?.join(" ")).toContain("destination=/run/secrets/acceptance_state_source,readonly");
-    expect(calls[0]?.join(" ")).toContain("/run/p9-acceptance:rw");
+    const workerArgs = calls.at(-1) ?? [];
+    expect(workerArgs.join(" ")).toContain("destination=/run/secrets/acceptance_state_source,readonly");
+    expect(workerArgs.join(" ")).toContain("/run/p9-acceptance:rw");
+    const identityEvent = events.indexOf("http:/api/v1/ops/db/identity");
+    expect(identityEvent).toBeGreaterThanOrEqual(0);
+    expect(identityEvent).toBeLessThan(events.lastIndexOf("docker:run"));
+    expect(events.filter((event) => event.includes("/auth/login"))).toHaveLength(0);
     unlinkSync(statePath);
   });
 
@@ -112,5 +132,33 @@ describe("P9 acceptance CLI entrypoint", () => {
     expect(existsSync(statePath)).toBe(false);
     expect(calls[0]?.join(" ")).not.toContain("acceptance_state_source");
     expect(calls[0]?.join(" ")).not.toContain("/run/p9-acceptance");
+  });
+
+  it("proves the restored-target identity before invoking the fixture worker", async () => {
+    const directory = configureSyntheticEnvironment();
+    const statePath = process.env.P9_ACCEPTANCE_STATE_FILE as string;
+    const calls: string[][] = [];
+    const docker: AcceptanceDocker = {
+      run: async (args) => {
+        calls.push(args);
+        if (args[0] === "inspect") return { exitCode: 0, stdout: "running|0\n", stderr: "" };
+        throw new Error("fixture worker must not run");
+      },
+    };
+    const http: AcceptanceRuntimeHttpClient = {
+      request: async (path) => path === "/api/v1/ops/db/readyz"
+        ? { status: 200, body: { status: "ok", database: "ready" } }
+        : { status: 200, body: { database: "bmo" } },
+    };
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = await main(["fixture:create"], docker, { http });
+
+    expect(result).toBe(1);
+    expect(calls.every((args) => args[0] !== "run")).toBe(true);
+    expect(existsSync(statePath)).toBe(false);
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain("database identity");
+    stderr.mockRestore();
+    void directory;
   });
 });

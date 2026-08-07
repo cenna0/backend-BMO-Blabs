@@ -15,7 +15,10 @@ import {
   startAcceptanceRuntime,
   statusAcceptanceRuntime,
   stopAcceptanceRuntime,
+  verifyAcceptanceTargetIdentity,
+  waitForAcceptanceReadiness,
   type AcceptanceDocker,
+  type AcceptanceRuntimeWaitOptions,
 } from "./acceptance-runtime.js";
 import {
   ACCEPTANCE_RUNTIME_STATE_FILE,
@@ -141,7 +144,13 @@ async function runWorker(
   return result.stdout.trim();
 }
 
-async function createFixture(config: AcceptanceConfig, docker: AcceptanceDocker): Promise<void> {
+async function createFixture(
+  config: AcceptanceConfig,
+  docker: AcceptanceDocker,
+  runtimeWait: AcceptanceRuntimeWaitOptions,
+): Promise<void> {
+  await waitForAcceptanceReadiness(config, docker, runtimeWait);
+  await verifyAcceptanceTargetIdentity(config, runtimeWait.http);
   const statePath = stateFilePath();
   assertStateDirectory(statePath);
   if (existsSync(statePath)) {
@@ -160,14 +169,18 @@ async function createFixture(config: AcceptanceConfig, docker: AcceptanceDocker)
   assertHostState(statePath);
 }
 
-export async function runAcceptanceCommand(command: string, docker = createDockerExecutor()): Promise<void> {
+export async function runAcceptanceCommand(
+  command: string,
+  docker = createDockerExecutor(),
+  runtimeWait: AcceptanceRuntimeWaitOptions = {},
+): Promise<void> {
   const config = loadAcceptanceConfig();
   if (command === "runtime:validate-config") {
     process.stdout.write("acceptance runtime configuration valid\n");
     return;
   }
   if (command === "runtime:start") {
-    await startAcceptanceRuntime(config, docker);
+    await startAcceptanceRuntime(config, docker, runtimeWait);
     process.stdout.write("acceptance runtime started\n");
     return;
   }
@@ -187,7 +200,7 @@ export async function runAcceptanceCommand(command: string, docker = createDocke
     return;
   }
   if (command === "fixture:create") {
-    await createFixture(config, docker);
+    await createFixture(config, docker, runtimeWait);
     process.stdout.write("acceptance fixture created\n");
     return;
   }
@@ -231,9 +244,10 @@ export async function runAcceptanceCommand(command: string, docker = createDocke
 export async function main(
   argv: string[] = process.argv.slice(2),
   docker = createDockerExecutor(),
+  runtimeWait: AcceptanceRuntimeWaitOptions = {},
 ): Promise<number> {
   try {
-    await runAcceptanceCommand(argv[0] ?? "", docker);
+    await runAcceptanceCommand(argv[0] ?? "", docker, runtimeWait);
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : "acceptance command failed";
