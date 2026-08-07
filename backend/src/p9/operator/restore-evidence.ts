@@ -61,7 +61,7 @@ export function buildRestoreEvidenceQueries(): RestoreEvidenceQuery[] {
     { name: "entity-counts", sql: entityCountSql },
     {
       name: "orphan-checks",
-      sql: "SELECT (SELECT COUNT(*)::int FROM \"Device\" d LEFT JOIN \"User\" u ON u.id = d.\"userId\" WHERE u.id IS NULL) AS \"orphanDevices\", (SELECT COUNT(*)::int FROM \"DevicePairing\" p LEFT JOIN \"Device\" d ON d.id = p.\"deviceId\" WHERE d.id IS NULL) AS \"orphanPairings\", (SELECT COUNT(*)::int FROM \"Device\" d LEFT JOIN \"User\" u ON u.id = d.\"userId\" WHERE u.id IS NULL) AS \"orphanOwnership\"",
+      sql: "SELECT (SELECT COUNT(*)::int FROM \"Device\" d LEFT JOIN \"User\" u ON u.id = d.\"userId\" WHERE u.id IS NULL) AS \"orphanDevices\", (SELECT COUNT(*)::int FROM \"DevicePairing\" p LEFT JOIN \"Device\" d ON d.id = p.\"deviceId\" AND d.\"userId\" = p.\"userId\" WHERE p.\"deviceId\" IS NOT NULL AND d.id IS NULL) AS \"orphanPairings\", (SELECT COUNT(*)::int FROM \"Device\" d LEFT JOIN \"User\" u ON u.id = d.\"userId\" WHERE u.id IS NULL) AS \"orphanOwnership\"",
     },
     {
       name: "argon2id-password-format",
