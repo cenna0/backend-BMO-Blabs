@@ -1,9 +1,16 @@
+import { mkdtempSync, readdirSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
   cleanupAcceptanceFixture,
+  createPendingAcceptanceFixtureState,
   createAcceptanceFixture,
   displayNameForRun,
+  fileFixtureStateStore,
+  validateFixtureState,
   type AcceptanceFixtureDatabase,
   type FixtureState,
   type FixtureStateStore,
@@ -158,5 +165,55 @@ describe("P9 restored-target acceptance fixture", () => {
     })).rejects.toThrow(/creation failed/);
     expect(stateStore.current).toBeUndefined();
     expect(db.calls).toEqual(["user.findUnique"]);
+  });
+
+  it("recovers a partially-created fixture from the exact pending synthetic identity", async () => {
+    const fixture = state();
+    const pending = { ...fixture, userId: null };
+    const db = database({
+      id: fixture.userId,
+      email: fixture.email,
+      displayName: fixture.displayName,
+      passwordCredential: { algorithm: "argon2id" },
+      identities: [{ provider: "password", providerSubject: fixture.providerSubject }],
+      userSettings: { timezone: "Asia/Jakarta" },
+      devices: [],
+      pairings: [],
+      invitations: [],
+    });
+
+    await expect(cleanupAcceptanceFixture({ database: fixture.database, db, state: pending })).resolves.toEqual({
+      deleted: true,
+      userId: fixture.userId,
+    });
+    expect(db.calls).toEqual(["user.findUnique", "auditEvent.deleteMany", "user.delete"]);
+  });
+
+  it("accepts exact absence for a pending state without deleting unrelated rows", async () => {
+    const fixture = state();
+    const db = database();
+
+    await expect(cleanupAcceptanceFixture({ database: fixture.database, db, state: { ...fixture, userId: null } })).resolves.toEqual({
+      deleted: true,
+      userId: null,
+    });
+    expect(db.calls).toEqual(["user.findUnique"]);
+  });
+
+  it("writes the host/runtime manifest atomically with protected mode and no temporary residue", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "p9-state-store-test-"));
+    const path = join(directory, "fixture-state.json");
+    const state = createPendingAcceptanceFixtureState("bmo_restore_acceptance_test", "run-1234");
+    const stateStore = fileFixtureStateStore(path);
+
+    await stateStore.write(state);
+
+    expect(statSync(path).mode & 0o7777).toBe(0o600);
+    expect(await stateStore.read()).toEqual(state);
+    expect(readdirSync(directory)).toEqual(["fixture-state.json"]);
+  });
+
+  it("rejects malformed state before any cleanup operation", () => {
+    expect(() => validateFixtureState({ ...state(), runId: "bad state" })).toThrow(/invalid/);
   });
 });

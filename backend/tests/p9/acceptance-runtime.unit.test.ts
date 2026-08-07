@@ -132,9 +132,25 @@ describe("P9 restored-target acceptance runtime", () => {
   it("runs fixture/evidence commands in the backend image without creating PostgreSQL", () => {
     const args = buildAcceptanceWorkerArgs(config, "/tmp/p9-acceptance-state.json", "fixture-status", false);
 
-    expect(args).toEqual(expect.arrayContaining(["run", "--rm", "--network", config.network, "node", "dist/src/p9/operator/acceptance-worker.js", "fixture-status"]));
+    expect(args).toEqual(expect.arrayContaining(["run", "--rm", "--network", config.network, "node", "dist/src/p9/operator/acceptance-worker-entrypoint.js", "fixture-status"]));
+    expect(args).toEqual(expect.arrayContaining([
+      "--tmpfs", "/run/p9-acceptance:rw,noexec,nosuid,nodev,uid=1000,gid=1000,mode=0700",
+      "--env", "P9_ACCEPTANCE_STATE_FILE=/run/p9-acceptance/fixture-state.json",
+      "--env", "P9_ACCEPTANCE_STATE_SOURCE_FILE=/run/secrets/acceptance_state_source",
+      "--mount", "type=bind,source=/tmp/p9-acceptance-state.json,destination=/run/secrets/acceptance_state_source,readonly",
+    ]));
     expect(args).not.toContain("postgres");
     expect(args).not.toContain("postgres:16.10-alpine3.22");
+  });
+
+  it("runs pre-fixture aggregate evidence without creating or mounting state", () => {
+    const args = buildAcceptanceWorkerArgs(config, "/tmp/p9-acceptance-state.json", "evidence-snapshot", false, false);
+    const joined = args.join(" ");
+
+    expect(joined).toContain("dist/src/p9/operator/acceptance-worker-entrypoint.js evidence-snapshot");
+    expect(joined).not.toContain("acceptance_state_source");
+    expect(joined).not.toContain("P9_ACCEPTANCE_STATE_FILE=");
+    expect(joined).not.toContain("/run/p9-acceptance");
   });
 
   it("hands the canonical password to a private tmpfs bootstrap, never directly to UID 1000", () => {

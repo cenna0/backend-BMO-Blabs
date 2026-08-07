@@ -1,5 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { chmodSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  constants as fsConstants,
+  fchmodSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeSync,
+} from "node:fs";
 
 import { hashPassword as realHashPassword } from "../crypto.js";
 import { validateRestoreDatabaseName } from "./restore-config.js";
@@ -49,7 +58,7 @@ export interface CleanupAcceptanceFixtureOptions {
 
 export interface CleanupAcceptanceFixtureResult {
   deleted: true;
-  userId: string;
+  userId: string | null;
 }
 
 export interface AcceptanceFixtureStatus {
@@ -82,37 +91,55 @@ function runIdValue(value: string | undefined): string {
   return runId;
 }
 
-function validateState(state: FixtureState): void {
+export function validateFixtureState(state: FixtureState): void {
   if (state.version !== 1 || !state.database || !state.runId || !state.email || !state.providerSubject || !state.displayName) {
     throw new AcceptanceFixtureError("acceptance fixture state is invalid");
+  }
+  if (
+    !/^[A-Za-z0-9-]{8,80}$/.test(state.runId) ||
+    state.email !== `p9-acceptance-${state.runId}@example.invalid` ||
+    state.providerSubject !== `p9-acceptance:${state.runId}` ||
+    state.displayName !== displayNameForRun(state.runId)
+  ) {
+    throw new AcceptanceFixtureError("acceptance fixture state identity is invalid");
   }
   if (state.userId !== null && !/^[0-9a-f-]{20,80}$/i.test(state.userId)) {
     throw new AcceptanceFixtureError("acceptance fixture state identity is invalid");
   }
 }
 
+export function createPendingAcceptanceFixtureState(database: string, runId?: string): FixtureState {
+  assertRestoreTarget(database);
+  const normalizedRunId = runIdValue(runId);
+  return {
+    version: 1,
+    database,
+    runId: normalizedRunId,
+    userId: null,
+    email: `p9-acceptance-${normalizedRunId}@example.invalid`,
+    providerSubject: `p9-acceptance:${normalizedRunId}`,
+    displayName: displayNameForRun(normalizedRunId),
+  };
+}
+
 export async function createAcceptanceFixture(options: CreateAcceptanceFixtureOptions): Promise<FixtureState & { userId: string }> {
   assertRestoreTarget(options.database);
-  const runId = runIdValue(options.runId);
-  const email = `p9-acceptance-${runId}@example.invalid`;
-  const providerSubject = `p9-acceptance:${runId}`;
-  const displayName = displayNameForRun(runId);
-  const pending: FixtureState = { version: 1, database: options.database, runId, userId: null, email, providerSubject, displayName };
+  const pending = createPendingAcceptanceFixtureState(options.database, options.runId);
   await options.stateStore.write(pending);
 
   let created: (FixtureState & { userId: string }) | undefined;
   try {
-    const existing = await options.db.user.findUnique({ where: { email } });
+    const existing = await options.db.user.findUnique({ where: { email: pending.email } });
     if (existing) throw new AcceptanceFixtureError("acceptance fixture identity collision");
     const password = await options.readPassword();
     if (typeof password !== "string" || password.length < 12) throw new AcceptanceFixtureError("acceptance password is invalid");
     const passwordHash = await (options.hashPassword ?? realHashPassword)(password);
     const user = await options.db.$transaction(async (database) => database.user.create({
       data: {
-        email,
-        displayName,
+        email: pending.email,
+        displayName: pending.displayName,
         passwordCredential: { create: { passwordHash, algorithm: "argon2id" } },
-        identities: { create: { provider: "password", providerSubject } },
+        identities: { create: { provider: "password", providerSubject: pending.providerSubject } },
         userSettings: { create: { timezone: "Asia/Jakarta" } },
       },
     }));
@@ -133,17 +160,21 @@ export async function cleanupAcceptanceFixture(
   options: CleanupAcceptanceFixtureOptions,
 ): Promise<CleanupAcceptanceFixtureResult> {
   assertRestoreTarget(options.database);
-  validateState(options.state);
-  if (options.state.database !== options.database || options.state.userId === null) {
+  validateFixtureState(options.state);
+  if (options.state.database !== options.database) {
     throw new AcceptanceFixtureError("acceptance fixture state target mismatch");
   }
-  const userId = options.state.userId;
+  let userId = options.state.userId;
   await options.db.$transaction(async (database) => {
     const user = await database.user.findUnique({
-      where: { id: userId },
+      where: userId === null ? { email: options.state.email } : { id: userId },
       include: { passwordCredential: true, identities: true, userSettings: true, devices: true, pairings: true, invitations: true },
     });
-    if (!user) throw new AcceptanceFixtureError("acceptance fixture user is missing");
+    if (!user) {
+      if (options.state.userId === null) return;
+      throw new AcceptanceFixtureError("acceptance fixture user is missing");
+    }
+    userId = user.id;
     const identity = user.identities?.length === 1 ? user.identities[0] : undefined;
     if (
       user.email !== options.state.email ||
@@ -171,9 +202,9 @@ export async function statusAcceptanceFixture(
   state: FixtureState,
 ): Promise<AcceptanceFixtureStatus> {
   assertRestoreTarget(database);
-  validateState(state);
-  if (state.database !== database || state.userId === null) throw new AcceptanceFixtureError("acceptance fixture state target mismatch");
-  const user = await db.user.findUnique({ where: { id: state.userId }, include: { identities: true } });
+  validateFixtureState(state);
+  if (state.database !== database) throw new AcceptanceFixtureError("acceptance fixture state target mismatch");
+  const user = await db.user.findUnique({ where: state.userId === null ? { email: state.email } : { id: state.userId }, include: { identities: true } });
   const identity = user?.identities?.length === 1 ? user.identities[0] : undefined;
   const present = Boolean(
     user &&
@@ -188,18 +219,29 @@ export async function statusAcceptanceFixture(
 export function fileFixtureStateStore(path: string): FixtureStateStore {
   return {
     async write(state) {
-      validateState(state);
+      validateFixtureState(state);
+      const temporaryPath = `${path}.${randomUUID()}.tmp`;
+      let descriptor: number | undefined;
       try {
-        writeFileSync(path, `${JSON.stringify(state)}\n`, { mode: 0o600 });
-        chmodSync(path, 0o600);
+        descriptor = openSync(temporaryPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW, 0o600);
+        const serialized = `${JSON.stringify(state)}\n`;
+        writeSync(descriptor, serialized);
+        fchmodSync(descriptor, 0o600);
+        closeSync(descriptor);
+        descriptor = undefined;
+        renameSync(temporaryPath, path);
       } catch {
+        if (descriptor !== undefined) {
+          try { closeSync(descriptor); } catch { /* best-effort descriptor cleanup */ }
+        }
+        try { unlinkSync(temporaryPath); } catch { /* best-effort temporary cleanup */ }
         throw new AcceptanceFixtureError("acceptance fixture state is not writable");
       }
     },
     async read() {
       try {
         const state = JSON.parse(readFileSync(path, "utf8")) as FixtureState;
-        validateState(state);
+        validateFixtureState(state);
         return state;
       } catch (error) {
         if (error instanceof AcceptanceFixtureError) throw error;
