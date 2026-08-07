@@ -61,6 +61,7 @@ describe("P9 restore evidence helpers", () => {
     expect(text).not.toMatch(/postgres(?:ql)?:\/\/[^\s]+/i);
     expect(text).toContain("passwordHash");
     expect(text).toContain("metadata::text");
+    expect(text).toContain('DISTINCT "eventType"');
     expect(text).not.toContain("synthetic");
     for (const entity of [
       "User", "PasswordCredential", "AuthIdentity", "Invitation", "Session", "RefreshToken",

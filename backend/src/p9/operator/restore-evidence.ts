@@ -77,7 +77,7 @@ export function buildRestoreEvidenceQueries(): RestoreEvidenceQuery[] {
     },
     {
       name: "audit-summary",
-      sql: "SELECT (SELECT COUNT(*)::int FROM \"AuditEvent\") AS count, (SELECT COALESCE(array_agg(event_type::text ORDER BY event_type), ARRAY[]::text[]) FROM (SELECT DISTINCT event_type FROM \"AuditEvent\") types) AS \"eventTypes\", (SELECT COUNT(*)::int FROM \"AuditEvent\" WHERE metadata::text ~* '(password|passphrase|token|secret|private.?key|authorization|credential|jwt)') AS \"secretBearingMetadataCount\"",
+      sql: "SELECT (SELECT COUNT(*)::int FROM \"AuditEvent\") AS count, (SELECT COALESCE(array_agg(\"eventType\"::text ORDER BY \"eventType\"), ARRAY[]::text[]) FROM (SELECT DISTINCT \"eventType\" FROM \"AuditEvent\") types) AS \"eventTypes\", (SELECT COUNT(*)::int FROM \"AuditEvent\" WHERE metadata::text ~* '(password|passphrase|token|secret|private.?key|authorization|credential|jwt)') AS \"secretBearingMetadataCount\"",
     },
   ];
 }
