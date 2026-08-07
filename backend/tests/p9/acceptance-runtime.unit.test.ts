@@ -25,7 +25,7 @@ const config: AcceptanceConfig = {
   migrationsDisabled: true,
   postgresUser: "bmo",
   postgresPasswordFile: "/tmp/postgres-password",
-  acceptancePasswordFile: "/tmp/acceptance-password",
+  canonicalAcceptancePasswordFile: "/tmp/acceptance-password",
   runtimeEnvFile: "/tmp/acceptance-runtime.env",
 };
 
@@ -135,5 +135,19 @@ describe("P9 restored-target acceptance runtime", () => {
     expect(args).toEqual(expect.arrayContaining(["run", "--rm", "--network", config.network, "node", "dist/src/p9/operator/acceptance-worker.js", "fixture-status"]));
     expect(args).not.toContain("postgres");
     expect(args).not.toContain("postgres:16.10-alpine3.22");
+  });
+
+  it("hands the canonical password to a private tmpfs bootstrap, never directly to UID 1000", () => {
+    const args = buildAcceptanceWorkerArgs(config, "/tmp/p9-acceptance-state.json", "fixture-create", true);
+    const joined = args.join(" ");
+
+    expect(args).toEqual(expect.arrayContaining([
+      "--tmpfs", "/run/bmo-p9.1:rw,noexec,nosuid,nodev,mode=0755",
+      "--env", "P9_ACCEPTANCE_PASSWORD_FILE=/run/bmo-p9.1/acceptance-password",
+      "--env", "P9_ACCEPTANCE_PASSWORD_SOURCE_FILE=/run/secrets/acceptance_password_source",
+      "--mount", "type=bind,source=/tmp/acceptance-password,destination=/run/secrets/acceptance_password_source,readonly",
+    ]));
+    expect(joined).not.toContain("P9_ACCEPTANCE_PASSWORD_FILE=/tmp/acceptance-password");
+    expect(joined).not.toContain("synthetic-password");
   });
 });

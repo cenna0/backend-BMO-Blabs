@@ -13,6 +13,7 @@ import {
 } from "./acceptance-fixture.js";
 import { readAcceptanceCounts } from "./acceptance-evidence.js";
 import { validateProtectedFile } from "./protected-file.js";
+import { validateRuntimeAcceptancePasswordFile } from "./acceptance-secret.js";
 import { validateRestoreDatabaseName } from "./restore-config.js";
 
 function required(name: string): string {
@@ -34,7 +35,7 @@ function validateWorkerConfiguration(database: string, command: string): void {
   if (!isAbsolute(stateFile)) throw new Error("acceptance worker state path is unsafe");
   validateProtectedFile(stateFile, { label: "acceptance fixture state file" });
   if (command === "fixture-create") {
-    validateProtectedFile(required("P9_ACCEPTANCE_PASSWORD_FILE"), { label: "acceptance password file" });
+    validateRuntimeAcceptancePasswordFile(required("P9_ACCEPTANCE_PASSWORD_FILE"));
   }
   validateProtectedFile(required("P9_DATABASE_PASSWORD_FILE"), { label: "postgres password file" });
 }

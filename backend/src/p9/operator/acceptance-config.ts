@@ -29,7 +29,7 @@ export interface AcceptanceConfig {
   migrationsDisabled: true;
   postgresUser: "bmo";
   postgresPasswordFile: string;
-  acceptancePasswordFile: string;
+  canonicalAcceptancePasswordFile: string;
   runtimeEnvFile: string;
 }
 
@@ -113,11 +113,11 @@ export function loadAcceptanceConfig(options: AcceptanceConfigOptions = {}): Acc
   if (required(env, "P9_POSTGRES_USER") !== "bmo") fail("P9_POSTGRES_USER must be bmo");
 
   const postgresPasswordFile = requiredAbsolute(env, "P9_POSTGRES_PASSWORD_FILE");
-  const acceptancePasswordFile = requiredAbsolute(env, "P9_ACCEPTANCE_PASSWORD_FILE");
+  const canonicalAcceptancePasswordFile = requiredAbsolute(env, "P9_ACCEPTANCE_PASSWORD_FILE");
   const runtimeEnvFile = requiredAbsolute(env, "P9_ACCEPTANCE_RUNTIME_ENV_FILE");
   for (const [path, label] of [
     [postgresPasswordFile, "PostgreSQL password file"],
-    [acceptancePasswordFile, "acceptance password file"],
+    [canonicalAcceptancePasswordFile, "canonical acceptance password file"],
     [runtimeEnvFile, "acceptance runtime environment file"],
   ] as const) {
     try {
@@ -149,7 +149,7 @@ export function loadAcceptanceConfig(options: AcceptanceConfigOptions = {}): Acc
     migrationsDisabled: true,
     postgresUser: "bmo",
     postgresPasswordFile,
-    acceptancePasswordFile,
+    canonicalAcceptancePasswordFile,
     runtimeEnvFile,
   };
 }

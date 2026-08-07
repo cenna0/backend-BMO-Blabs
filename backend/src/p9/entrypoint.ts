@@ -1,6 +1,40 @@
 import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 
+import {
+  ACCEPTANCE_RUNTIME_PASSWORD_FILE,
+  ACCEPTANCE_RUNTIME_PASSWORD_SOURCE_FILE,
+  cleanupRuntimeAcceptancePassword,
+  materializeRuntimeAcceptancePassword,
+} from "./operator/acceptance-secret.js";
+
+let runtimeAcceptancePasswordMaterialized = false;
+let runtimeAcceptancePasswordCleanupFailed = false;
+
+function cleanupRuntimeAcceptancePasswordIfNeeded(): void {
+  if (!runtimeAcceptancePasswordMaterialized) return;
+  try {
+    cleanupRuntimeAcceptancePassword();
+  } catch {
+    runtimeAcceptancePasswordCleanupFailed = true;
+    process.stderr.write("acceptance password runtime cleanup failed\n");
+  } finally {
+    runtimeAcceptancePasswordMaterialized = false;
+  }
+}
+
+function materializeRuntimeAcceptancePasswordIfConfigured(): void {
+  const sourcePath = process.env.P9_ACCEPTANCE_PASSWORD_SOURCE_FILE;
+  if (sourcePath === undefined) return;
+  if (sourcePath !== ACCEPTANCE_RUNTIME_PASSWORD_SOURCE_FILE || process.env.P9_ACCEPTANCE_PASSWORD_FILE !== ACCEPTANCE_RUNTIME_PASSWORD_FILE) {
+    throw new Error("acceptance password runtime handoff configuration is unsafe");
+  }
+  materializeRuntimeAcceptancePassword({ sourcePath, runtimePath: ACCEPTANCE_RUNTIME_PASSWORD_FILE });
+  runtimeAcceptancePasswordMaterialized = true;
+}
+
+process.once("exit", cleanupRuntimeAcceptancePasswordIfNeeded);
+
 function loadDatabaseUrlFromSecret(): void {
   if (process.env.DATABASE_URL || !process.env.P9_DATABASE_PASSWORD_FILE) return;
   const password = readFileSync(process.env.P9_DATABASE_PASSWORD_FILE, "utf8").trim();
@@ -11,6 +45,7 @@ function loadDatabaseUrlFromSecret(): void {
 }
 
 loadDatabaseUrlFromSecret();
+materializeRuntimeAcceptancePasswordIfConfigured();
 const setgid = process.setgid;
 const setuid = process.setuid;
 if (typeof process.getuid === "function" && process.getuid() === 0 && setgid && setuid) {
@@ -21,10 +56,16 @@ const [command, ...args] = process.argv.slice(2);
 if (!command) throw new Error("P9 candidate entrypoint requires a command");
 const child = spawn(command, args, { stdio: "inherit", env: process.env });
 child.once("error", (error) => {
+  cleanupRuntimeAcceptancePasswordIfNeeded();
   process.stderr.write(`${error.message}\n`);
   process.exitCode = 1;
 });
 child.once("exit", (code, signal) => {
+  cleanupRuntimeAcceptancePasswordIfNeeded();
+  if (runtimeAcceptancePasswordCleanupFailed) {
+    process.exitCode = 1;
+    return;
+  }
   if (signal) process.kill(process.pid, signal);
   else process.exitCode = code ?? 1;
 });

@@ -12,6 +12,11 @@ import {
   type AcceptanceDocker,
 } from "./acceptance-runtime.js";
 import { sanitizeChildOutput } from "./compose.js";
+import {
+  ACCEPTANCE_RUNTIME_PASSWORD_FILE,
+  ACCEPTANCE_RUNTIME_PASSWORD_SOURCE_FILE,
+  ACCEPTANCE_RUNTIME_PASSWORD_TMPFS_SPEC,
+} from "./acceptance-secret.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -66,8 +71,10 @@ export function buildAcceptanceWorkerArgs(config: AcceptanceConfig, stateFile: s
   ];
   if (includePassword) {
     args.push(
-      "--env", "P9_ACCEPTANCE_PASSWORD_FILE=/run/secrets/acceptance_password",
-      "--mount", `type=bind,source=${config.acceptancePasswordFile},destination=/run/secrets/acceptance_password,readonly`,
+      "--tmpfs", ACCEPTANCE_RUNTIME_PASSWORD_TMPFS_SPEC,
+      "--env", `P9_ACCEPTANCE_PASSWORD_FILE=${ACCEPTANCE_RUNTIME_PASSWORD_FILE}`,
+      "--env", `P9_ACCEPTANCE_PASSWORD_SOURCE_FILE=${ACCEPTANCE_RUNTIME_PASSWORD_SOURCE_FILE}`,
+      "--mount", `type=bind,source=${config.canonicalAcceptancePasswordFile},destination=${ACCEPTANCE_RUNTIME_PASSWORD_SOURCE_FILE},readonly`,
     );
   }
   args.push(config.image, "node", "dist/src/p9/operator/acceptance-worker.js", command);
@@ -140,7 +147,7 @@ export async function runAcceptanceCommand(command: string, docker = createDocke
     const evidence = await runAcceptance({
       targetDatabase: config.database,
       fixture: { email: state.email, userId: state.userId ?? "" },
-      readPassword: async () => readAcceptancePasswordFile(config.acceptancePasswordFile),
+      readPassword: async () => readAcceptancePasswordFile(config.canonicalAcceptancePasswordFile),
       http: createFetchAcceptanceHttpClient(`http://${config.bindHost}:${config.port}/api/v1`),
     });
     process.stdout.write(`application acceptance prepared evidence: ${JSON.stringify(evidence)}\n`);

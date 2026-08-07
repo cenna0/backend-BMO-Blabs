@@ -11,8 +11,8 @@ function metadata(overrides: Partial<{ file: boolean; symlink: boolean; director
     symlink: false,
     directory: true,
     mode: 0o600,
-    uid: 1000,
-    gid: 1000,
+    uid: 1002,
+    gid: 1002,
     ...overrides,
   };
   return {
@@ -53,7 +53,7 @@ function environment(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 }
 
 function load(env = environment(), fs = fileSystem()) {
-  return loadAcceptanceConfig({ env, fs, runtimeUid: 1000, runtimeGid: 1000 });
+  return loadAcceptanceConfig({ env, fs, runtimeUid: 1002, runtimeGid: 1002 });
 }
 
 describe("P9 restored-target acceptance configuration", () => {
@@ -65,6 +65,7 @@ describe("P9 restored-target acceptance configuration", () => {
       network: "bmo-p9-1_p9_private",
       migrationsDisabled: true,
       codeDirectory: "/opt/bmo/app/backend/dist/src",
+      canonicalAcceptancePasswordFile: "/tmp/acceptance-password",
     });
   });
 
@@ -93,10 +94,15 @@ describe("P9 restored-target acceptance configuration", () => {
     ["symlink", { symlink: true }],
     ["code directory is not a directory", { directory: false }],
     ["wrong mode", { mode: 0o644 }],
+    ["group-readable mode", { mode: 0o640 }],
     ["wrong owner", { uid: 0 }],
     ["wrong group", { gid: 0 }],
   ])("rejects unsafe protected files: %s", (_label, fileOverrides) => {
     expect(() => load(environment(), fileSystem(fileOverrides))).toThrow();
+  });
+
+  it("rejects a container-owned canonical password file at the host boundary", () => {
+    expect(() => load(environment(), fileSystem({ uid: 1000, gid: 1000 }))).toThrow(/ownership/);
   });
 
   it("requires all explicit runtime identity and secret-file values", () => {
