@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { isAbsolute } from "node:path";
 
 import { loadAcceptanceConfig, type AcceptanceConfig } from "./acceptance-config.js";
@@ -85,17 +86,51 @@ function parseWorkerFixtureState(output: string): FixtureState {
   }
 }
 
+export type AcceptanceWorkerCommand =
+  | "fixture-create"
+  | "fixture-status"
+  | "fixture-cleanup"
+  | "evidence-snapshot";
+
+const ACCEPTANCE_WORKER_NAME_PREFIX = "p9aw" as const;
+const ACCEPTANCE_WORKER_NAME_MAX_LENGTH = 63 as const;
+const ACCEPTANCE_WORKER_COMMANDS: ReadonlySet<string> = new Set([
+  "fixture-create",
+  "fixture-status",
+  "fixture-cleanup",
+  "evidence-snapshot",
+]);
+
+function normalizeWorkerInvocationId(invocationId: string): string {
+  const normalized = invocationId.replaceAll("-", "").toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(normalized)) throw new Error("acceptance worker invocation identity is invalid");
+  return normalized;
+}
+
+export function createAcceptanceWorkerName(
+  command: string,
+  invocationId: string = randomUUID(),
+): string {
+  if (!ACCEPTANCE_WORKER_COMMANDS.has(command)) throw new Error("acceptance worker command identity is invalid");
+  const normalizedInvocationId = normalizeWorkerInvocationId(invocationId);
+  const name = `${ACCEPTANCE_WORKER_NAME_PREFIX}-${command}-${normalizedInvocationId}`;
+  if (name.length > ACCEPTANCE_WORKER_NAME_MAX_LENGTH) throw new Error("acceptance worker name is too long");
+  return name;
+}
+
 export function buildAcceptanceWorkerArgs(
   config: AcceptanceConfig,
   stateFile: string,
   command: string,
   includePassword: boolean,
   includeState = true,
+  invocationId: string = randomUUID(),
 ): string[] {
+  const workerName = createAcceptanceWorkerName(command, invocationId);
   const args = [
     "run",
     "--rm",
-    "--name", `${config.container}-worker`,
+    "--name", workerName,
     "--network", config.network,
     "--env-file", config.runtimeEnvFile,
     "--env", "P9_ENABLED=true",
