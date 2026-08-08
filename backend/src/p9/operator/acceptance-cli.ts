@@ -162,11 +162,33 @@ async function createFixture(
   const stateStore = fileFixtureStateStore(statePath);
   await stateStore.write(pending);
   assertHostState(statePath);
-  const output = await runWorker(config, "fixture-create", true, true, docker);
-  const created = parseWorkerFixtureState(output);
-  assertStateMatchesPending(pending, created);
-  await stateStore.write(created);
-  assertHostState(statePath);
+  try {
+    const output = await runWorker(config, "fixture-create", true, true, docker);
+    const created = parseWorkerFixtureState(output);
+    assertStateMatchesPending(pending, created);
+    await stateStore.write(created);
+    assertHostState(statePath);
+  } catch (error) {
+    try {
+      await stateStore.remove();
+    } catch {
+      throw new Error("acceptance fixture state cleanup failed");
+    }
+    throw error;
+  }
+}
+
+async function rethrowAfterRuntimeCleanup(
+  config: AcceptanceConfig,
+  docker: AcceptanceDocker,
+  error: unknown,
+): Promise<never> {
+  try {
+    await stopAcceptanceRuntime(config, docker);
+  } catch {
+    throw new Error("acceptance failure cleanup failed");
+  }
+  throw error;
 }
 
 export async function runAcceptanceCommand(
@@ -200,7 +222,11 @@ export async function runAcceptanceCommand(
     return;
   }
   if (command === "fixture:create") {
-    await createFixture(config, docker, runtimeWait);
+    try {
+      await createFixture(config, docker, runtimeWait);
+    } catch (error) {
+      await rethrowAfterRuntimeCleanup(config, docker, error);
+    }
     process.stdout.write("acceptance fixture created\n");
     return;
   }
@@ -229,12 +255,17 @@ export async function runAcceptanceCommand(
   if (command === "run") {
     const state = await readHostState(stateFilePath());
     if (state.userId === null) throw new Error("acceptance fixture state is pending");
-    const evidence = await runAcceptance({
-      targetDatabase: config.database,
-      fixture: { email: state.email, userId: state.userId },
-      readPassword: async () => readAcceptancePasswordFile(config.canonicalAcceptancePasswordFile),
-      http: createFetchAcceptanceHttpClient(`http://${config.bindHost}:${config.port}/api/v1`),
-    });
+    let evidence;
+    try {
+      evidence = await runAcceptance({
+        targetDatabase: config.database,
+        fixture: { email: state.email, userId: state.userId },
+        readPassword: async () => readAcceptancePasswordFile(config.canonicalAcceptancePasswordFile),
+        http: createFetchAcceptanceHttpClient(`http://${config.bindHost}:${config.port}/api/v1`),
+      });
+    } catch (error) {
+      await rethrowAfterRuntimeCleanup(config, docker, error);
+    }
     process.stdout.write(`application acceptance prepared evidence: ${JSON.stringify(evidence)}\n`);
     return;
   }

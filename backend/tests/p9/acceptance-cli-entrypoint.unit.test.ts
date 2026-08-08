@@ -142,6 +142,7 @@ describe("P9 acceptance CLI entrypoint", () => {
       run: async (args) => {
         calls.push(args);
         if (args[0] === "inspect") return { exitCode: 0, stdout: "running|0\n", stderr: "" };
+        if (args[0] === "rm" || args[0] === "network") return { exitCode: 0, stdout: "", stderr: "" };
         throw new Error("fixture worker must not run");
       },
     };
@@ -159,6 +160,70 @@ describe("P9 acceptance CLI entrypoint", () => {
     expect(existsSync(statePath)).toBe(false);
     expect(String(stderr.mock.calls.at(-1)?.[0])).toContain("database identity");
     stderr.mockRestore();
+    void directory;
+  });
+
+  it("cleans the acceptance transport and pending host state when fixture creation fails", async () => {
+    const directory = configureSyntheticEnvironment();
+    const statePath = process.env.P9_ACCEPTANCE_STATE_FILE as string;
+    const calls: string[][] = [];
+    const docker: AcceptanceDocker = {
+      run: async (args) => {
+        calls.push(args);
+        if (args[0] === "inspect") return { exitCode: 0, stdout: "running|0\n", stderr: "" };
+        if (args[0] === "run") return { exitCode: 1, stdout: "", stderr: "fixture worker failed" };
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+    };
+    const http: AcceptanceRuntimeHttpClient = {
+      request: async (path) => path === "/api/v1/ops/db/readyz"
+        ? { status: 200, body: { status: "ok", database: "ready" } }
+        : { status: 200, body: { database: "bmo_restore_acceptance_test" } },
+    };
+
+    const result = await main(["fixture:create"], docker, { http });
+
+    expect(result).toBe(1);
+    expect(existsSync(statePath)).toBe(false);
+    expect(calls.slice(-3)).toEqual([
+      ["rm", "--force", "bmo-p9-1-restore-acceptance-proxy"],
+      ["rm", "--force", "bmo-p9-1-restore-acceptance-runtime"],
+      ["network", "rm", "bmo-p9-1-restore-acceptance-transport"],
+    ]);
+    void directory;
+  });
+
+  it("cleans the acceptance transport when the application runner fails before login", async () => {
+    const directory = configureSyntheticEnvironment();
+    const statePath = process.env.P9_ACCEPTANCE_STATE_FILE as string;
+    writeFileSync(statePath, JSON.stringify({
+      version: 1,
+      database: "bmo_restore_acceptance_test",
+      runId: "run-1234",
+      userId: "11111111-1111-1111-1111-111111111111",
+      email: "p9-acceptance-run-1234@example.invalid",
+      providerSubject: "p9-acceptance:run-1234",
+      displayName: "P9 restore acceptance fixture run-1234",
+    }) + "\n", { mode: 0o600 });
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("synthetic transport unavailable"); }));
+    const calls: string[][] = [];
+    const docker: AcceptanceDocker = {
+      run: async (args) => {
+        calls.push(args);
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+    };
+
+    const result = await main(["run"], docker);
+
+    expect(result).toBe(1);
+    expect(calls).toEqual([
+      ["rm", "--force", "bmo-p9-1-restore-acceptance-proxy"],
+      ["rm", "--force", "bmo-p9-1-restore-acceptance-runtime"],
+      ["network", "rm", "bmo-p9-1-restore-acceptance-transport"],
+    ]);
+    expect(String(vi.mocked(fetch).mock.calls)).not.toContain("/auth/login");
+    vi.unstubAllGlobals();
     void directory;
   });
 });

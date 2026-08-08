@@ -80,6 +80,7 @@ describe("P9 restored-target acceptance configuration", () => {
 
   it.each([
     ["public bind host", { P9_ACCEPTANCE_BIND_HOST: "0.0.0.0" }],
+    ["wrong host port", { P9_ACCEPTANCE_PORT: "3000" }],
     ["wrong network", { P9_ACCEPTANCE_NETWORK: "bridge" }],
     ["production project", { P9_ACCEPTANCE_PROJECT: "bmo-production" }],
     ["candidate container", { P9_ACCEPTANCE_CONTAINER: "bmo-p9-1-backend-1" }],

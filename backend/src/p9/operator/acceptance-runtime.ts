@@ -58,10 +58,9 @@ export function buildAcceptanceRuntimeArgs(config: AcceptanceConfig): string[] {
     "--detach",
     "--name", config.container,
     "--network", config.network,
-    "--publish", `${config.bindHost}:${config.port}:${config.internalPort}`,
     "--env-file", config.runtimeEnvFile,
     "--env", "P9_ENABLED=true",
-    // The container is private to the candidate network; host publication is loopback-only.
+    // Host publication belongs to the disposable proxy; this backend remains private-network-only.
     "--env", "P9_BIND_HOST=0.0.0.0",
     "--env", `P9_BIND_PORT=${config.internalPort}`,
     "--env", `P9_POSTGRES_USER=${config.postgresUser}`,
@@ -77,6 +76,66 @@ export function buildAcceptanceRuntimeArgs(config: AcceptanceConfig): string[] {
   ];
 }
 
+const ACCEPTANCE_PROXY_SCRIPT = [
+  'const http = require("node:http");',
+  'const target = process.env.BMO_ACCEPTANCE_PROXY_TARGET;',
+  'const [hostname, rawPort] = String(target || "").split(":");',
+  'const port = Number(rawPort);',
+  'if (!hostname || !Number.isInteger(port) || port !== 3010) process.exit(64);',
+  'const server = http.createServer((request, response) => {',
+  '  if (!request.url || request.url.startsWith("http://") || request.url.startsWith("https://")) { response.statusCode = 400; response.end("invalid proxy path"); return; }',
+  '  const upstream = http.request({ hostname, port, path: request.url, method: request.method, headers: { ...request.headers, host: `${hostname}:${port}`, connection: "close" } }, (upstreamResponse) => {',
+  '    response.writeHead(upstreamResponse.statusCode || 502, upstreamResponse.headers);',
+  '    upstreamResponse.pipe(response);',
+  '  });',
+  '  upstream.on("error", () => { if (!response.headersSent) { response.statusCode = 502; response.end("acceptance transport unavailable"); } else response.destroy(); });',
+  '  request.on("aborted", () => upstream.destroy());',
+  '  request.pipe(upstream);',
+  '});',
+  'server.listen(Number(process.env.BMO_ACCEPTANCE_PROXY_PORT || "3010"), process.env.BMO_ACCEPTANCE_PROXY_BIND || "0.0.0.0");',
+].join(" ");
+
+export function buildAcceptanceTransportNetworkArgs(config: AcceptanceConfig): string[] {
+  return [
+    "network",
+    "create",
+    "--driver", "bridge",
+    "--label", `com.bmo.p9.acceptance.project=${config.project}`,
+    "--label", "com.bmo.p9.acceptance.transport=true",
+    "--opt", "com.docker.network.bridge.enable_ip_masquerade=false",
+    "--opt", "com.docker.network.bridge.host_binding_ipv4=127.0.0.1",
+    config.transportNetwork,
+  ];
+}
+
+export function buildAcceptanceTransportProxyArgs(config: AcceptanceConfig): string[] {
+  return [
+    "run",
+    "--detach",
+    "--name", config.transportContainer,
+    "--network", config.transportNetwork,
+    "--publish", `${config.bindHost}:${config.port}:${config.internalPort}`,
+    "--user", "1000:1000",
+    "--read-only",
+    "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m",
+    "--cap-drop", "ALL",
+    "--security-opt", "no-new-privileges:true",
+    "--pids-limit", "64",
+    "--memory", "64m",
+    "--cpus", "0.25",
+    "--restart", "no",
+    "--env", `BMO_ACCEPTANCE_PROXY_TARGET=${config.container}:${config.internalPort}`,
+    "--env", `BMO_ACCEPTANCE_PROXY_PORT=${config.internalPort}`,
+    "--env", "BMO_ACCEPTANCE_PROXY_BIND=0.0.0.0",
+    "--label", `com.bmo.p9.acceptance.project=${config.project}`,
+    "--label", "com.bmo.p9.acceptance.transport=true",
+    config.image,
+    "node",
+    "-e",
+    ACCEPTANCE_PROXY_SCRIPT,
+  ];
+}
+
 function detail(result: DockerResult): string {
   return sanitizeChildOutput(result.stderr || result.stdout) || "no diagnostic output";
 }
@@ -87,8 +146,65 @@ async function requiredDocker(docker: AcceptanceDocker, args: string[], label: s
   return result;
 }
 
+interface DockerPortBinding {
+  HostIp?: unknown;
+  HostPort?: unknown;
+}
+
+export async function verifyAcceptanceTransport(
+  config: AcceptanceConfig,
+  docker: AcceptanceDocker,
+): Promise<void> {
+  const inspected = await requiredDocker(
+    docker,
+    ["inspect", "--format", "{{.State.Status}}|{{json .NetworkSettings.Ports}}", config.transportContainer],
+    "acceptance transport inspection",
+  );
+  const separator = inspected.stdout.indexOf("|");
+  if (separator < 0) throw new AcceptanceRuntimeError("acceptance transport inspection is malformed");
+  const status = inspected.stdout.slice(0, separator).trim();
+  if (status !== "running") throw new AcceptanceRuntimeError("acceptance transport is not running");
+
+  let ports: unknown;
+  try {
+    ports = JSON.parse(inspected.stdout.slice(separator + 1).trim());
+  } catch {
+    throw new AcceptanceRuntimeError("effective acceptance transport publication is unavailable");
+  }
+
+  if (!ports || typeof ports !== "object" || Array.isArray(ports)) {
+    throw new AcceptanceRuntimeError("effective acceptance transport publication is unavailable");
+  }
+  const portMap = ports as Record<string, DockerPortBinding[] | null>;
+  const expectedContainerPort = `${config.internalPort}/tcp`;
+  const keys = Object.keys(portMap);
+  const binding = portMap[expectedContainerPort];
+  if (keys.length !== 1 || !Array.isArray(binding) || binding.length !== 1) {
+    throw new AcceptanceRuntimeError("effective acceptance transport publication is unavailable");
+  }
+  const [published] = binding;
+  if (
+    published?.HostIp !== config.bindHost ||
+    published.HostPort !== String(config.port)
+  ) {
+    throw new AcceptanceRuntimeError("effective acceptance transport is not loopback-only on the required port");
+  }
+}
+
 async function ensureCandidateNetwork(docker: AcceptanceDocker, config: AcceptanceConfig): Promise<void> {
   await requiredDocker(docker, ["network", "inspect", config.network], "candidate network validation");
+}
+
+async function verifyCandidateNetworkPrivacy(docker: AcceptanceDocker, config: AcceptanceConfig): Promise<void> {
+  const result = await requiredDocker(
+    docker,
+    ["network", "inspect", "--format", "{{json .}}", config.network],
+    "candidate network privacy inspection",
+  );
+  const network = parseJsonOutput<DockerNetworkInspection>(result, "candidate network privacy inspection");
+  if (network.Name !== config.network || network.Driver !== "bridge" || network.Internal !== true) {
+    throw new AcceptanceRuntimeError("candidate network must remain an internal bridge");
+  }
 }
 
 async function ensureCandidateImage(docker: AcceptanceDocker, config: AcceptanceConfig): Promise<void> {
@@ -102,9 +218,24 @@ async function ensureCandidateImage(docker: AcceptanceDocker, config: Acceptance
   }
 }
 
-async function ensureContainerAbsent(docker: AcceptanceDocker, config: AcceptanceConfig): Promise<void> {
-  const result = await docker.run(["inspect", config.container]);
-  if (result.exitCode === 0) throw new AcceptanceRuntimeError("acceptance runtime container already exists");
+async function ensureContainerAbsent(
+  docker: AcceptanceDocker,
+  container: string,
+  label: string,
+): Promise<void> {
+  const result = await docker.run(["inspect", container]);
+  if (result.exitCode === 0) throw new AcceptanceRuntimeError(`${label} already exists`);
+  if (!/no such container/i.test(`${result.stderr}\n${result.stdout}`)) {
+    throw new AcceptanceRuntimeError(`${label} validation failed: ${detail(result)}`);
+  }
+}
+
+async function ensureTransportNetworkAbsent(docker: AcceptanceDocker, config: AcceptanceConfig): Promise<void> {
+  const result = await docker.run(["network", "inspect", config.transportNetwork]);
+  if (result.exitCode === 0) throw new AcceptanceRuntimeError("acceptance transport network already exists");
+  if (!/no such network/i.test(`${result.stderr}\n${result.stdout}`)) {
+    throw new AcceptanceRuntimeError(`acceptance transport network validation failed: ${detail(result)}`);
+  }
 }
 
 async function ensureTargetDatabase(docker: AcceptanceDocker, config: AcceptanceConfig): Promise<void> {
@@ -115,6 +246,53 @@ async function ensureTargetDatabase(docker: AcceptanceDocker, config: Acceptance
     "restore target database check",
   );
   if (result.stdout.trim() !== "1") throw new AcceptanceRuntimeError("restore target database does not exist");
+}
+
+function parseJsonOutput<T>(result: DockerResult, label: string): T {
+  try {
+    return JSON.parse(result.stdout.trim()) as T;
+  } catch {
+    throw new AcceptanceRuntimeError(`${label} is malformed`);
+  }
+}
+
+interface DockerNetworkInspection {
+  Name?: unknown;
+  Driver?: unknown;
+  Internal?: unknown;
+  Containers?: Record<string, { Name?: unknown }>;
+}
+
+export async function verifyAcceptanceTransportNetwork(docker: AcceptanceDocker, config: AcceptanceConfig): Promise<void> {
+  const result = await requiredDocker(
+    docker,
+    ["network", "inspect", "--format", "{{json .}}", config.transportNetwork],
+    "acceptance transport network inspection",
+  );
+  const network = parseJsonOutput<DockerNetworkInspection>(result, "acceptance transport network inspection");
+  const members = Object.values(network.Containers ?? {}).map((container) => container.Name);
+  if (
+    network.Name !== config.transportNetwork ||
+    network.Driver !== "bridge" ||
+    network.Internal !== false ||
+    members.length !== 1 ||
+    members[0] !== config.transportContainer
+  ) {
+    throw new AcceptanceRuntimeError("acceptance transport network is not dedicated and publish-capable");
+  }
+}
+
+export async function verifyAcceptanceRuntimePrivateNetwork(docker: AcceptanceDocker, config: AcceptanceConfig): Promise<void> {
+  const result = await requiredDocker(
+    docker,
+    ["inspect", "--format", "{{json .NetworkSettings.Networks}}", config.container],
+    "acceptance runtime network inspection",
+  );
+  const networks = parseJsonOutput<Record<string, unknown>>(result, "acceptance runtime network inspection");
+  const names = Object.keys(networks);
+  if (names.length !== 1 || names[0] !== config.network) {
+    throw new AcceptanceRuntimeError("acceptance backend must remain attached only to the private candidate network");
+  }
 }
 
 interface AcceptanceRuntimeContainerState {
@@ -285,23 +463,78 @@ export async function verifyAcceptanceTargetIdentity(
   }
 }
 
+function isMissingDockerResource(result: DockerResult): boolean {
+  return /no such (container|network)/i.test(`${result.stderr}\n${result.stdout}`);
+}
+
+async function removeDockerResource(
+  docker: AcceptanceDocker,
+  args: string[],
+  label: string,
+): Promise<void> {
+  const result = await docker.run(args);
+  if (result.exitCode !== 0 && !isMissingDockerResource(result)) {
+    throw new AcceptanceRuntimeError(`${label} cleanup failed: ${detail(result)}`);
+  }
+}
+
+async function cleanupAcceptanceResources(
+  config: AcceptanceConfig,
+  docker: AcceptanceDocker,
+  options: { runtime: boolean; transport: boolean; network: boolean },
+): Promise<void> {
+  let firstError: unknown;
+  const cleanup = async (args: string[], label: string): Promise<void> => {
+    try {
+      await removeDockerResource(docker, args, label);
+    } catch (error) {
+      firstError ??= error;
+    }
+  };
+
+  if (options.transport) await cleanup(["rm", "--force", config.transportContainer], "acceptance transport");
+  if (options.runtime) await cleanup(["rm", "--force", config.container], "acceptance runtime");
+  if (options.network) await cleanup(["network", "rm", config.transportNetwork], "acceptance transport network");
+  if (firstError) throw firstError;
+}
+
 export async function startAcceptanceRuntime(
   config: AcceptanceConfig,
   docker: AcceptanceDocker,
   options: AcceptanceRuntimeWaitOptions = {},
 ): Promise<{ container: string; database: string }> {
   await ensureCandidateNetwork(docker, config);
+  await verifyCandidateNetworkPrivacy(docker, config);
   await ensureCandidateImage(docker, config);
-  await ensureContainerAbsent(docker, config);
+  await ensureContainerAbsent(docker, config.container, "acceptance runtime container");
+  await ensureContainerAbsent(docker, config.transportContainer, "acceptance transport container");
+  await ensureTransportNetworkAbsent(docker, config);
   await ensureTargetDatabase(docker, config);
+  let runtimeCreated = false;
+  let transportCreated = false;
+  let transportNetworkCreated = false;
   try {
+    runtimeCreated = true;
     await requiredDocker(docker, buildAcceptanceRuntimeArgs(config), "acceptance runtime start");
+    transportNetworkCreated = true;
+    await requiredDocker(docker, buildAcceptanceTransportNetworkArgs(config), "acceptance transport network creation");
+    transportCreated = true;
+    await requiredDocker(docker, buildAcceptanceTransportProxyArgs(config), "acceptance transport start");
+    await requiredDocker(
+      docker,
+      ["network", "connect", config.network, config.transportContainer],
+      "acceptance transport private-network attachment",
+    );
+    await verifyAcceptanceTransport(config, docker);
+    await verifyAcceptanceTransportNetwork(docker, config);
+    await verifyAcceptanceRuntimePrivateNetwork(docker, config);
     await waitForAcceptanceReadiness(config, docker, options);
   } catch (error) {
-    const cleanup = await docker.run(["rm", "--force", config.container]);
-    if (cleanup.exitCode !== 0 && !/no such container/i.test(`${cleanup.stderr}\n${cleanup.stdout}`)) {
-      throw new AcceptanceRuntimeError("acceptance runtime start cleanup failed");
-    }
+    await cleanupAcceptanceResources(config, docker, {
+      runtime: runtimeCreated,
+      transport: transportCreated,
+      network: transportNetworkCreated,
+    });
     throw error;
   }
   return { container: config.container, database: config.database };
@@ -332,14 +565,14 @@ export async function statusAcceptanceRuntime(
     "acceptance runtime migration mode",
   )).stdout.trim();
   if (migrationMode !== "true") throw new AcceptanceRuntimeError("acceptance runtime migration mode is unsafe");
+  await verifyAcceptanceTransport(config, docker);
+  await verifyAcceptanceTransportNetwork(docker, config);
+  await verifyAcceptanceRuntimePrivateNetwork(docker, config);
   return { container: config.container, database, image, status, migrationsDisabled: true };
 }
 
 export async function stopAcceptanceRuntime(config: AcceptanceConfig, docker: AcceptanceDocker): Promise<void> {
-  const result = await docker.run(["rm", "--force", config.container]);
-  if (result.exitCode !== 0 && !/no such container/i.test(`${result.stderr}\n${result.stdout}`)) {
-    throw new AcceptanceRuntimeError(`acceptance runtime stop failed: ${detail(result)}`);
-  }
+  await cleanupAcceptanceResources(config, docker, { runtime: true, transport: true, network: true });
 }
 
 export function createDockerExecutor(): AcceptanceDocker {

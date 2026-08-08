@@ -6,10 +6,15 @@ import {
   ACCEPTANCE_READINESS_PATH,
   ACCEPTANCE_STARTUP_POLL_INTERVAL_MS,
   ACCEPTANCE_STARTUP_TIMEOUT_MS,
+  buildAcceptanceTransportNetworkArgs,
+  buildAcceptanceTransportProxyArgs,
   buildAcceptanceRuntimeArgs,
   startAcceptanceRuntime,
   statusAcceptanceRuntime,
   stopAcceptanceRuntime,
+  verifyAcceptanceTransport,
+  verifyAcceptanceTransportNetwork,
+  verifyAcceptanceRuntimePrivateNetwork,
   type AcceptanceDocker,
   type AcceptanceRuntimeHttpClient,
   type AcceptanceRuntimeWaitOptions,
@@ -23,6 +28,8 @@ const config: AcceptanceConfig = {
   port: 3025,
   bindHost: "127.0.0.1",
   network: "bmo-p9-1_p9_private",
+  transportNetwork: "bmo-p9-1-restore-acceptance-transport",
+  transportContainer: "bmo-p9-1-restore-acceptance-proxy",
   project: "bmo-p9-1-restore-acceptance",
   container: "bmo-p9-1-restore-acceptance-runtime",
   postgresContainer: "bmo-p9-1-postgres-1",
@@ -51,10 +58,19 @@ function fakeDocker(responses: Array<Partial<Awaited<ReturnType<AcceptanceDocker
 function startupDocker(responses: Array<Partial<Awaited<ReturnType<AcceptanceDocker["run"]>>> & { exitCode: number; stdout?: string; stderr?: string }> = []) {
   return fakeDocker([
     { exitCode: 0 },
+    { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
     { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
     { exitCode: 1, stderr: "No such container" },
+    { exitCode: 1, stderr: "No such container" },
+    { exitCode: 1, stderr: "No such network" },
     { exitCode: 0, stdout: "1\n" },
     { exitCode: 0, stdout: "container-id\n" },
+    { exitCode: 0, stdout: "network-id\n" },
+    { exitCode: 0, stdout: "proxy-id\n" },
+    { exitCode: 0 },
+    { exitCode: 0, stdout: `running|${JSON.stringify({ "3010/tcp": [{ HostIp: "127.0.0.1", HostPort: "3025" }] })}\n` },
+    { exitCode: 0, stdout: JSON.stringify({ Name: config.transportNetwork, Driver: "bridge", Internal: false, Containers: { proxy: { Name: config.transportContainer } } }) },
+    { exitCode: 0, stdout: JSON.stringify({ [config.network]: {} }) },
     ...responses,
   ]);
 }
@@ -83,6 +99,169 @@ function deterministicWait(): AcceptanceRuntimeWaitOptions {
 }
 
 describe("P9 restored-target acceptance runtime", () => {
+  it("builds a dedicated credential-free proxy transport with loopback-only publication", () => {
+    const networkArgs = buildAcceptanceTransportNetworkArgs(config);
+    const proxyArgs = buildAcceptanceTransportProxyArgs(config);
+
+    expect(networkArgs).toEqual(expect.arrayContaining([
+      "network", "create", "--driver", "bridge",
+      "--opt", "com.docker.network.bridge.host_binding_ipv4=127.0.0.1",
+      "--opt", "com.docker.network.bridge.enable_ip_masquerade=false",
+      config.transportNetwork,
+    ]));
+    expect(proxyArgs).toEqual(expect.arrayContaining([
+      "run", "--detach",
+      "--name", config.transportContainer,
+      "--network", config.transportNetwork,
+      "--publish", "127.0.0.1:3025:3010",
+      config.image,
+      "node", "-e",
+    ]));
+    const joined = proxyArgs.join(" ");
+    expect(joined).not.toContain("--env-file");
+    expect(joined).not.toContain("P9_DATABASE_PASSWORD");
+    expect(joined).not.toContain("P9_POSTGRES_PASSWORD");
+    expect(joined).not.toContain("5432");
+    expect(joined).toContain("bmo-p9-1-restore-acceptance-runtime:3010");
+  });
+
+  it("fails closed when effective Docker publication is absent before any readiness probe", async () => {
+    const { docker, calls } = fakeDocker([
+      { exitCode: 0, stdout: `running|${JSON.stringify({ "3010/tcp": null })}\n` },
+    ]);
+
+    await expect(verifyAcceptanceTransport(config, docker)).rejects.toThrow(/effective.*transport|publication/i);
+    expect(calls).toEqual([[
+      "inspect",
+      "--format",
+      "{{.State.Status}}|{{json .NetworkSettings.Ports}}",
+      config.transportContainer,
+    ]]);
+  });
+
+  it("accepts exactly the required loopback mapping", async () => {
+    const { docker } = fakeDocker([
+      { exitCode: 0, stdout: `running|${JSON.stringify({ "3010/tcp": [{ HostIp: "127.0.0.1", HostPort: "3025" }] })}\n` },
+    ]);
+
+    await expect(verifyAcceptanceTransport(config, docker)).resolves.toBeUndefined();
+  });
+
+  it.each([
+    ["wildcard host", { "3010/tcp": [{ HostIp: "0.0.0.0", HostPort: "3025" }] }],
+    ["non-loopback host", { "3010/tcp": [{ HostIp: "192.0.2.10", HostPort: "3025" }] }],
+    ["wrong host port", { "3010/tcp": [{ HostIp: "127.0.0.1", HostPort: "3026" }] }],
+    ["wrong container port", { "3011/tcp": [{ HostIp: "127.0.0.1", HostPort: "3025" }] }],
+  ])("rejects %s effective publication", async (_label, ports) => {
+    const { docker } = fakeDocker([
+      { exitCode: 0, stdout: `running|${JSON.stringify(ports)}\n` },
+    ]);
+
+    await expect(verifyAcceptanceTransport(config, docker)).rejects.toThrow(/effective acceptance transport/);
+  });
+
+  it("creates the backend once and starts readiness only after proxy metadata passes", async () => {
+    const { docker, calls } = fakeDocker([
+      { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
+      { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
+      { exitCode: 1, stderr: "No such container" },
+      { exitCode: 1, stderr: "No such container" },
+      { exitCode: 1, stderr: "No such network" },
+      { exitCode: 0, stdout: "1\n" },
+      { exitCode: 0, stdout: "backend-id\n" },
+      { exitCode: 0, stdout: "network-id\n" },
+      { exitCode: 0, stdout: "proxy-id\n" },
+      { exitCode: 0 },
+      { exitCode: 0, stdout: `running|${JSON.stringify({ "3010/tcp": [{ HostIp: "127.0.0.1", HostPort: "3025" }] })}\n` },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.transportNetwork, Driver: "bridge", Internal: false, Containers: { proxy: { Name: config.transportContainer } } }) },
+      { exitCode: 0, stdout: JSON.stringify({ [config.network]: {} }) },
+      { exitCode: 0, stdout: "running|0\n" },
+    ]);
+    const { http, calls: httpCalls } = readinessHttp([
+      { status: 200, body: { status: "ok", database: "ready" } },
+    ]);
+
+    await expect(startAcceptanceRuntime(config, docker, { http })).resolves.toMatchObject({ container: config.container });
+    expect(calls.filter((args) => args[0] === "run" && args.includes(config.container))).toHaveLength(1);
+    expect(calls.some((args) => args[0] === "run" && args.includes(config.transportContainer))).toBe(true);
+    expect(calls.find((args) => args[0] === "network" && args[1] === "connect")).toEqual([
+      "network", "connect", config.network, config.transportContainer,
+    ]);
+    const mappingIndex = calls.findIndex((args) => args[0] === "inspect" && args.some((arg) => arg.includes(".NetworkSettings.Ports")));
+    const readinessStateIndex = calls.findIndex((args) => args[0] === "inspect" && args.some((arg) => arg.includes(".State.Status")) && args.includes(config.container));
+    expect(mappingIndex).toBeGreaterThanOrEqual(0);
+    expect(mappingIndex).toBeLessThan(readinessStateIndex);
+    expect(httpCalls).toEqual([ACCEPTANCE_READINESS_PATH]);
+  });
+
+  it("cleans the backend, proxy, and dedicated network immediately when effective mapping is absent", async () => {
+    const { docker, calls } = fakeDocker([
+      { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
+      { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
+      { exitCode: 1, stderr: "No such container" },
+      { exitCode: 1, stderr: "No such container" },
+      { exitCode: 1, stderr: "No such network" },
+      { exitCode: 0, stdout: "1\n" },
+      { exitCode: 0, stdout: "backend-id\n" },
+      { exitCode: 0, stdout: "network-id\n" },
+      { exitCode: 0, stdout: "proxy-id\n" },
+      { exitCode: 0 },
+      { exitCode: 0, stdout: `running|${JSON.stringify({ "3010/tcp": null })}\n` },
+      { exitCode: 0 },
+      { exitCode: 0 },
+      { exitCode: 0 },
+    ]);
+    const { http, calls: httpCalls } = readinessHttp([]);
+
+    await expect(startAcceptanceRuntime(config, docker, { http })).rejects.toThrow(/effective.*publication/);
+    expect(httpCalls).toHaveLength(0);
+    expect(calls.slice(-3)).toEqual([
+      ["rm", "--force", config.transportContainer],
+      ["rm", "--force", config.container],
+      ["network", "rm", config.transportNetwork],
+    ]);
+    expect(calls).not.toContain(["network", "rm", config.network]);
+  });
+
+  it("requires the transport network to be a dedicated non-internal bridge with only the proxy", async () => {
+    const { docker } = fakeDocker([
+      { exitCode: 0, stdout: JSON.stringify({
+        Name: config.transportNetwork,
+        Driver: "bridge",
+        Internal: false,
+        Containers: {
+          proxy: { Name: config.transportContainer },
+          candidate: { Name: "bmo-p9-1-backend-1" },
+        },
+      }) },
+    ]);
+
+    await expect(verifyAcceptanceTransportNetwork(docker, config)).rejects.toThrow(/dedicated/);
+  });
+
+  it("requires the acceptance backend to remain on the private candidate network only", async () => {
+    const { docker } = fakeDocker([
+      { exitCode: 0, stdout: JSON.stringify({
+        [config.network]: {},
+        [config.transportNetwork]: {},
+      }) },
+    ]);
+
+    await expect(verifyAcceptanceRuntimePrivateNetwork(docker, config)).rejects.toThrow(/private candidate network/);
+  });
+
+  it("rejects a candidate network that is not internal before creating any acceptance container", async () => {
+    const { docker, calls } = fakeDocker([
+      { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: false, Containers: {} }) },
+    ]);
+
+    await expect(startAcceptanceRuntime(config, docker)).rejects.toThrow(/internal bridge/);
+    expect(calls.some((args) => args[0] === "run")).toBe(false);
+  });
+
   it("builds a Docker run that only publishes loopback and targets the restore database", () => {
     const args = buildAcceptanceRuntimeArgs(config);
 
@@ -91,7 +270,6 @@ describe("P9 restored-target acceptance runtime", () => {
       "--detach",
       "--name", config.container,
       "--network", config.network,
-      "--publish", "127.0.0.1:3025:3010",
       "--env-file", config.runtimeEnvFile,
       "--env", "P9_POSTGRES_DB=bmo_restore_acceptance_test",
       "--env", "P9_ACCEPTANCE_MIGRATIONS_DISABLED=true",
@@ -99,28 +277,24 @@ describe("P9 restored-target acceptance runtime", () => {
       config.image,
       "node", "dist/src/p9/candidate-server.js",
     ]));
+    expect(args).not.toEqual(expect.arrayContaining(["--publish", "127.0.0.1:3025:3010"]));
     expect(args.join(" ")).not.toContain("postgres:5432");
     expect(args.join(" ")).not.toContain("P9_ACCEPTANCE_PASSWORD_FILE=");
   });
 
   it("checks the private network, candidate image, existing target, and empty acceptance identity before starting", async () => {
-    const { docker, calls } = fakeDocker([
-      { exitCode: 0 },
-      { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
-      { exitCode: 1, stderr: "No such container" },
-      { exitCode: 0, stdout: "1\n" },
-      { exitCode: 0, stdout: "container-id\n" },
-      { exitCode: 0, stdout: "running|0\n" },
-    ]);
+    const { docker, calls } = startupDocker([{ exitCode: 0, stdout: "running|0\n" }]);
     const { http } = readinessHttp([{ status: 200, body: { status: "ok", database: "ready" } }]);
 
     await expect(startAcceptanceRuntime(config, docker, { http })).resolves.toMatchObject({ container: config.container, database: config.database });
     expect(calls[0]).toEqual(["network", "inspect", config.network]);
-    expect(calls[1]).toEqual(["inspect", "--format", "{{.Config.Image}}", "bmo-p9-1-backend-1"]);
-    expect(calls[2]).toEqual(["inspect", config.container]);
-    expect(calls[3]?.slice(0, 5)).toEqual(["exec", config.postgresContainer, "psql", "-U", "bmo"]);
-    expect(calls[4]?.[0]).toBe("run");
-    expect(calls.filter((args) => args[0] === "run")).toHaveLength(1);
+    expect(calls[1]).toEqual(["network", "inspect", "--format", "{{json .}}", config.network]);
+    expect(calls[2]).toEqual(["inspect", "--format", "{{.Config.Image}}", "bmo-p9-1-backend-1"]);
+    expect(calls[3]).toEqual(["inspect", config.container]);
+    expect(calls[4]).toEqual(["inspect", config.transportContainer]);
+    expect(calls[6]?.slice(0, 5)).toEqual(["exec", config.postgresContainer, "psql", "-U", "bmo"]);
+    expect(calls[7]?.[0]).toBe("run");
+    expect(calls.filter((args) => args[0] === "run")).toHaveLength(2);
   });
 
   it("keeps the single runtime after a connection-refused first probe and passes on the next probe", async () => {
@@ -133,7 +307,7 @@ describe("P9 restored-target acceptance runtime", () => {
     await expect(startAcceptanceRuntime(config, docker, { http, ...deterministicWait() })).resolves.toMatchObject({ container: config.container });
 
     expect(httpCalls).toEqual([ACCEPTANCE_READINESS_PATH, ACCEPTANCE_READINESS_PATH]);
-    expect(calls.filter((args) => args[0] === "run")).toHaveLength(1);
+    expect(calls.filter((args) => args[0] === "run")).toHaveLength(2);
     expect(calls.some((args) => args[0] === "rm")).toBe(false);
   });
 
@@ -177,8 +351,12 @@ describe("P9 restored-target acceptance runtime", () => {
 
     const failure = await startAcceptanceRuntime(config, docker, { http, ...deterministicWait() }).catch((error) => error);
     expect(String(failure)).toMatch(/timed out|not ready/);
-    expect(calls.filter((args) => args[0] === "run")).toHaveLength(1);
-    expect(calls.at(-1)).toEqual(["rm", "--force", config.container]);
+    expect(calls.filter((args) => args[0] === "run")).toHaveLength(2);
+    expect(calls.slice(-3)).toEqual([
+      ["rm", "--force", config.transportContainer],
+      ["rm", "--force", config.container],
+      ["network", "rm", config.transportNetwork],
+    ]);
     expect(String(failure)).not.toContain("not-real");
   });
 
@@ -193,8 +371,12 @@ describe("P9 restored-target acceptance runtime", () => {
 
     await expect(startAcceptanceRuntime(config, docker, { http, ...deterministicWait() })).rejects.toThrow(/exited/);
     expect(httpCalls).toHaveLength(0);
-    expect(calls.filter((args) => args[0] === "run")).toHaveLength(1);
-    expect(calls.at(-1)).toEqual(["rm", "--force", config.container]);
+    expect(calls.filter((args) => args[0] === "run")).toHaveLength(2);
+    expect(calls.slice(-3)).toEqual([
+      ["rm", "--force", config.transportContainer],
+      ["rm", "--force", config.container],
+      ["network", "rm", config.transportNetwork],
+    ]);
   });
 
   it("keeps unexpected readiness statuses not-ready until a valid response", async () => {
@@ -224,8 +406,11 @@ describe("P9 restored-target acceptance runtime", () => {
   it("fails before Docker run when the target database does not exist", async () => {
     const { docker, calls } = fakeDocker([
       { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
       { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
-      { exitCode: 1 },
+      { exitCode: 1, stderr: "No such container" },
+      { exitCode: 1, stderr: "No such container" },
+      { exitCode: 1, stderr: "No such network" },
       { exitCode: 0, stdout: "\n" },
     ]);
 
@@ -236,15 +421,22 @@ describe("P9 restored-target acceptance runtime", () => {
   it("removes only the acceptance container when its Docker start fails", async () => {
     const { docker, calls } = fakeDocker([
       { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
       { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
       { exitCode: 1, stderr: "No such container" },
+      { exitCode: 1, stderr: "No such container" },
+      { exitCode: 1, stderr: "No such network" },
       { exitCode: 0, stdout: "1\n" },
-      { exitCode: 1, stderr: "start failed" },
+      { exitCode: 0, stdout: "container-id\n" },
+      { exitCode: 1, stderr: "network create failed" },
       { exitCode: 0 },
     ]);
 
-    await expect(startAcceptanceRuntime(config, docker)).rejects.toThrow(/start failed/);
-    expect(calls.at(-1)).toEqual(["rm", "--force", config.container]);
+    await expect(startAcceptanceRuntime(config, docker)).rejects.toThrow(/network create failed/);
+    expect(calls.slice(-2)).toEqual([
+      ["rm", "--force", config.container],
+      ["network", "rm", config.transportNetwork],
+    ]);
   });
 
   it("reports only the named acceptance runtime and proves its configured target", async () => {
@@ -252,6 +444,9 @@ describe("P9 restored-target acceptance runtime", () => {
       { exitCode: 0, stdout: "running|bmo-p9.1-candidate:test\n" },
       { exitCode: 0, stdout: "bmo_restore_acceptance_test\n" },
       { exitCode: 0, stdout: "true\n" },
+      { exitCode: 0, stdout: `running|${JSON.stringify({ "3010/tcp": [{ HostIp: "127.0.0.1", HostPort: "3025" }] })}\n` },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.transportNetwork, Driver: "bridge", Internal: false, Containers: { proxy: { Name: config.transportContainer } } }) },
+      { exitCode: 0, stdout: JSON.stringify({ [config.network]: {} }) },
     ]);
 
     await expect(statusAcceptanceRuntime(config, docker)).resolves.toEqual({
@@ -261,14 +456,18 @@ describe("P9 restored-target acceptance runtime", () => {
       status: "running",
       migrationsDisabled: true,
     });
-    expect(calls.map((args) => args[0])).toEqual(["inspect", "exec", "exec"]);
+    expect(calls.map((args) => args[0])).toEqual(["inspect", "exec", "exec", "inspect", "network", "inspect"]);
   });
 
   it("stops only the exact acceptance container", async () => {
     const { docker, calls } = fakeDocker([{ exitCode: 0 }]);
 
     await expect(stopAcceptanceRuntime(config, docker)).resolves.toBeUndefined();
-    expect(calls).toEqual([["rm", "--force", config.container]]);
+    expect(calls).toEqual([
+      ["rm", "--force", config.transportContainer],
+      ["rm", "--force", config.container],
+      ["network", "rm", config.transportNetwork],
+    ]);
   });
 
   it("runs fixture/evidence commands in the backend image without creating PostgreSQL", () => {

@@ -7,8 +7,11 @@ import { validateProtectedFile, type ProtectedFileFs, type ProtectedFileStats } 
 export const ACCEPTANCE_NETWORK = "bmo-p9-1_p9_private" as const;
 export const ACCEPTANCE_PROJECT = "bmo-p9-1-restore-acceptance" as const;
 export const ACCEPTANCE_CONTAINER = "bmo-p9-1-restore-acceptance-runtime" as const;
+export const ACCEPTANCE_TRANSPORT_NETWORK = "bmo-p9-1-restore-acceptance-transport" as const;
+export const ACCEPTANCE_TRANSPORT_CONTAINER = "bmo-p9-1-restore-acceptance-proxy" as const;
 export const ACCEPTANCE_POSTGRES_CONTAINER = "bmo-p9-1-postgres-1" as const;
 export const ACCEPTANCE_BIND_HOST = "127.0.0.1" as const;
+export const ACCEPTANCE_PORT = 3025 as const;
 export const ACCEPTANCE_INTERNAL_PORT = 3010 as const;
 export const ACCEPTANCE_PASSWORD_FILE_MODE = 0o600 as const;
 
@@ -20,6 +23,8 @@ export interface AcceptanceConfig {
   port: number;
   bindHost: typeof ACCEPTANCE_BIND_HOST;
   network: typeof ACCEPTANCE_NETWORK;
+  transportNetwork: typeof ACCEPTANCE_TRANSPORT_NETWORK;
+  transportContainer: typeof ACCEPTANCE_TRANSPORT_CONTAINER;
   project: typeof ACCEPTANCE_PROJECT;
   container: typeof ACCEPTANCE_CONTAINER;
   postgresContainer: typeof ACCEPTANCE_POSTGRES_CONTAINER;
@@ -91,7 +96,7 @@ export function loadAcceptanceConfig(options: AcceptanceConfigOptions = {}): Acc
 
   const rawPort = required(env, "P9_ACCEPTANCE_PORT");
   const port = Number(rawPort);
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) fail("P9_ACCEPTANCE_PORT is invalid");
+  if (port !== ACCEPTANCE_PORT) fail("P9_ACCEPTANCE_PORT must be 3025");
 
   if (required(env, "P9_ACCEPTANCE_BIND_HOST") !== ACCEPTANCE_BIND_HOST) {
     fail("P9_ACCEPTANCE_BIND_HOST must be 127.0.0.1");
@@ -140,6 +145,8 @@ export function loadAcceptanceConfig(options: AcceptanceConfigOptions = {}): Acc
     port,
     bindHost: ACCEPTANCE_BIND_HOST,
     network: ACCEPTANCE_NETWORK,
+    transportNetwork: ACCEPTANCE_TRANSPORT_NETWORK,
+    transportContainer: ACCEPTANCE_TRANSPORT_CONTAINER,
     project: ACCEPTANCE_PROJECT,
     container: ACCEPTANCE_CONTAINER,
     postgresContainer: ACCEPTANCE_POSTGRES_CONTAINER,

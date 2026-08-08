@@ -33,22 +33,36 @@ function stopFakeServer() {
   try { process.kill(Number(fs.readFileSync(serverPidPath, "utf8"))); } catch {}
   try { fs.unlinkSync(serverPidPath); } catch {}
 }
-if (args[0] === "network" && args[1] === "inspect") process.exit(0);
+if (args[0] === "network" && args[1] === "inspect") {
+  const format = args[2] === "--format" ? args[3] || "" : "";
+  if (last === "bmo-p9-1-restore-acceptance-transport" && !format) { process.stderr.write("No such network\\n"); process.exit(1); }
+  if (format.includes("{{json .}}")) {
+    if (last === "bmo-p9-1_p9_private") process.stdout.write(JSON.stringify({Name:last, Driver:"bridge", Internal:true, Containers:{}}));
+    else process.stdout.write(JSON.stringify({Name:last, Driver:"bridge", Internal:false, Containers:{proxy:{Name:"bmo-p9-1-restore-acceptance-proxy"}}}));
+  }
+  process.exit(0);
+}
 if (args[0] === "inspect" && args[1] === "--format") {
+  const format = args[2] || "";
   if (last === "bmo-p9-1-backend-1") process.stdout.write("bmo-p9.1-candidate:test\\n");
-  else if ((args[2] || "").includes(".Config.Image")) process.stdout.write("running|bmo-p9.1-candidate:test\\n");
+  else if (format.includes(".NetworkSettings.Ports")) process.stdout.write("running|" + JSON.stringify({"3010/tcp":[{HostIp:"127.0.0.1",HostPort:"3025"}]}) + "\\n");
+  else if (format.includes(".NetworkSettings.Networks")) process.stdout.write(JSON.stringify({"bmo-p9-1_p9_private":{}}));
+  else if (format.includes(".Config.Image")) process.stdout.write("running|bmo-p9.1-candidate:test\\n");
   else process.stdout.write("running|0\\n");
   process.exit(0);
 }
-if (args[0] === "inspect") process.exit(1);
+if (args[0] === "inspect") { process.stderr.write("No such container\\n"); process.exit(1); }
 if (args[0] === "exec") {
   if (args.includes("printenv")) process.stdout.write(args.includes("P9_POSTGRES_DB") ? "bmo_restore_acceptance_test\\n" : "true\\n");
   else process.stdout.write("1\\n");
   process.exit(0);
 }
 if (args[0] === "rm") { stopFakeServer(); process.exit(0); }
+if (args[0] === "network" && args[1] === "connect") process.exit(0);
+if (args[0] === "network" && args[1] === "create") { process.stdout.write("network-id\\n"); process.exit(0); }
+if (args[0] === "network" && args[1] === "rm") { stopFakeServer(); process.exit(0); }
 if (args[0] === "run") {
-  if (args.some((arg) => arg.endsWith("candidate-server.js"))) startFakeServer();
+  if (args.includes("-e")) startFakeServer();
   if (args.includes("fixture-create")) {
     const pending = JSON.parse(fs.readFileSync(process.env.P9_ACCEPTANCE_STATE_FILE, "utf8"));
     process.stdout.write(JSON.stringify({ state: { ...pending, userId: "11111111-1111-1111-1111-111111111111" } }) + "\\n");
