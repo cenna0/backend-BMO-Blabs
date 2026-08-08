@@ -8,7 +8,8 @@ OBSOLETE = "/opt/bmo/config/p9.1/backup-passphrase"
 WINDOWS_INCOMING = r"D:\codex\BMO-backups\incoming"
 CURRENT_STATE = (
     "SSH V3 VERIFIED / WINDOWS EXACT COPY VERIFIED / GPG READABILITY VERIFIED / "
-    "RESTORE TOOLING PREFLIGHT READY / EXACT-PC-COPY RESTORE NOT YET EXECUTED"
+    "EXACT-PC-COPY RESTORE VERIFIED / RESTORED-TARGET APPLICATION ACCEPTANCE VERIFIED / "
+    "CLEANUP PENDING EXPLICIT APPROVAL"
 )
 
 
@@ -48,7 +49,7 @@ class P9EncryptionMaterialPathTests(unittest.TestCase):
         self.assertNotIn(OBSOLETE, example)
         self.assertNotIn(OBSOLETE, runbook)
 
-    def test_status_does_not_claim_provisioning_or_artifact_execution(self):
+    def test_status_records_verified_artifact_execution_without_production_claim(self):
         status_documents = [
             ROOT / "docs/NEXT-ACTION.md",
             ROOT / "docs/p9/P9.1-PRODUCTION-READINESS.md",
@@ -58,7 +59,9 @@ class P9EncryptionMaterialPathTests(unittest.TestCase):
             text = " ".join(path.read_text(encoding="utf-8").split())
             self.assertIn("WINDOWS EXACT COPY VERIFIED", text)
             self.assertIn("GPG READABILITY VERIFIED", text)
-            self.assertIn("EXACT-PC-COPY RESTORE NOT YET EXECUTED", text)
+            self.assertIn("EXACT-PC-COPY RESTORE VERIFIED", text)
+            self.assertIn("RESTORED-TARGET APPLICATION ACCEPTANCE VERIFIED", text)
+            self.assertIn("CLEANUP PENDING EXPLICIT APPROVAL", text)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # BMO Backend MVP — Implementation Status
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-08
 **Backend reference lineage:** 1.0.1; current active documentation is date-audited and governed by this status file
 
 ## 1. Control state
@@ -15,7 +15,7 @@ P7 state: VERIFIED — PRODUCTION
 P7 execution: COMPLETED
 P8 state: P8_PIPER_PRODUCTION_VERIFIED
 P9.1 architecture state: LOCKED / APPROVED
-P9.1 implementation state: MERGED / NOT DEPLOYED; PRODUCTION READINESS PACKAGE IN PROGRESS
+P9.1 implementation state: MERGED / NOT DEPLOYED; DATABASE RESTORE VERIFIED; REAL RESTORED-TARGET APPLICATION ACCEPTANCE VERIFIED; CLEANUP PENDING EXPLICIT APPROVAL
 P9.2–P9.6 implementation state: NOT IMPLEMENTED
 P10 state: NOT_STARTED / dependency-gated after P9.6
 ```
@@ -60,7 +60,7 @@ Read `../p9/P9.1-PRODUCTION-READINESS.md` for the operator-review package.
 | P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
 | P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | VERIFIED — PRODUCTION | COMPLETED | [`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md) |
 | P8 | Fixed Piper Prudence primary + Kokoro fallback + production acceptance; RVC remains disabled | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | VERIFIED — PRODUCTION | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
-| P9.1 | PostgreSQL + Prisma, invite auth, pairing, user/device settings, backup/restore baseline | PRD + `../p9/` + readiness package | MERGED — NOT DEPLOYED / READINESS IN PROGRESS | AUTHORIZED | [`../p9/P9.1-PRODUCTION-READINESS.md`](../p9/P9.1-PRODUCTION-READINESS.md) |
+| P9.1 | PostgreSQL + Prisma, invite auth, pairing, user/device settings, backup/restore baseline | PRD + `../p9/` + readiness package | MERGED — NOT DEPLOYED / RESTORED-TARGET ACCEPTANCE VERIFIED / CLEANUP PENDING EXPLICIT APPROVAL | AUTHORIZED | [`../p9/P9.1-PRODUCTION-READINESS.md`](../p9/P9.1-PRODUCTION-READINESS.md) |
 | P9.2–P9.6 | Chat/memory, scheduler, integrations, hardening, final acceptance | `../p9/` | PROPOSED; NOT_STARTED | DEPENDS ON PREDECESSOR GATES | — |
 | P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9.6 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
 

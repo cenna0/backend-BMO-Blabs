@@ -11,9 +11,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 VERIFIER = "scripts/verify-backend-mvp-docs.py"
-MERGED_STATE = (
-    "P9.1 implementation state: MERGED / NOT DEPLOYED; "
-    "PRODUCTION READINESS PACKAGE IN PROGRESS"
+FINAL_EVIDENCE_STATE = (
+    "P9.1 implementation state: MERGED / NOT DEPLOYED; DATABASE RESTORE VERIFIED; "
+    "REAL RESTORED-TARGET APPLICATION ACCEPTANCE VERIFIED; CLEANUP PENDING EXPLICIT APPROVAL"
 )
 
 
@@ -39,7 +39,7 @@ def run_verifier(root: Path) -> subprocess.CompletedProcess[str]:
 
 
 class StageAwareVerifierFixtures(unittest.TestCase):
-    def test_merged_readiness_state_is_accepted(self) -> None:
+    def test_final_evidence_state_is_accepted(self) -> None:
         result = run_verifier(REPO)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("PASS", result.stdout)
@@ -50,7 +50,7 @@ class StageAwareVerifierFixtures(unittest.TestCase):
             status_path = fixture / "docs/backend-mvp/IMPLEMENTATION-STATUS.md"
             status = status_path.read_text(encoding="utf-8")
             status_path.write_text(
-                status.replace(MERGED_STATE, "P9.1 implementation state: PRODUCTION DEPLOYED", 1),
+                status.replace(FINAL_EVIDENCE_STATE, "P9.1 implementation state: PRODUCTION DEPLOYED", 1),
                 encoding="utf-8",
             )
             result = run_verifier(fixture)

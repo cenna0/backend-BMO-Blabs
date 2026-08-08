@@ -60,8 +60,8 @@ class P9PhaseVerifierRegressionTests(unittest.TestCase):
                 check=False,
             )
 
-    def test_merged_p9_1_readiness_fixture_is_accepted(self) -> None:
-        result = self.run_fixture("p9.1-merged-readiness-approved.txt")
+    def test_final_p9_1_evidence_fixture_is_accepted(self) -> None:
+        result = self.run_fixture("p9.1-final-evidence-approved.txt")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_current_readiness_state_is_accepted(self) -> None:

@@ -20,13 +20,15 @@ archive = root / "docs" / "archive" / "BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES
 PRE_P9_IMPLEMENTATION_STATE = "P9 implementation state: NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION"
 P9_1_ISOLATED_IMPLEMENTATION_STATE = "P9.1 implementation state: ISOLATED CANDIDATE IMPLEMENTED / READY FOR REVIEW"
 P9_1_MERGED_READINESS_STATE = "P9.1 implementation state: MERGED / NOT DEPLOYED; PRODUCTION READINESS PACKAGE IN PROGRESS"
+P9_1_FINAL_EVIDENCE_STATE = "P9.1 implementation state: MERGED / NOT DEPLOYED; DATABASE RESTORE VERIFIED; REAL RESTORED-TARGET APPLICATION ACCEPTANCE VERIFIED; CLEANUP PENDING EXPLICIT APPROVAL"
 
 
 def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
-    """Validate pre-P9, isolated-candidate, and merged-readiness states."""
+    """Validate pre-P9, isolated-candidate, merged-readiness, and final-evidence states."""
     errors: list[str] = []
     candidate_expected_value = P9_1_ISOLATED_IMPLEMENTATION_STATE.split(": ", 1)[1]
     merged_expected_value = P9_1_MERGED_READINESS_STATE.split(": ", 1)[1]
+    final_expected_value = P9_1_FINAL_EVIDENCE_STATE.split(": ", 1)[1]
     pre_p9_expected_value = PRE_P9_IMPLEMENTATION_STATE.split(": ", 1)[1]
     p9_1_declarations = re.findall(
         r"^P9\.1 implementation state:\s*(.+?)\s*$",
@@ -43,6 +45,8 @@ def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
         stage = "P9.1-isolated-candidate"
     elif p9_1_declarations == [merged_expected_value] and not pre_p9_declarations:
         stage = "P9.1-merged-readiness"
+    elif p9_1_declarations == [final_expected_value] and not pre_p9_declarations:
+        stage = "P9.1-final-evidence"
     elif pre_p9_declarations == [pre_p9_expected_value] and not p9_1_declarations:
         stage = "pre-P9"
     else:
@@ -57,7 +61,7 @@ def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
         "Documentation package: CURRENT / P8 PRODUCTION CLOSED",
         (
             "Current next implementation phase: P9.1 production readiness lock"
-            if stage == "P9.1-merged-readiness"
+            if stage in {"P9.1-merged-readiness", "P9.1-final-evidence"}
             else "Current next implementation phase: P9.1 — PostgreSQL, auth, pairing, settings foundation"
         ),
         "P6 state: VERIFIED",
@@ -72,7 +76,7 @@ def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
         if value not in status:
             errors.append(f"status missing current control state: {value}")
 
-    if stage in {"P9.1-isolated-candidate", "P9.1-merged-readiness"} and "P9.2–P9.6 implementation state: NOT IMPLEMENTED" not in status:
+    if stage in {"P9.1-isolated-candidate", "P9.1-merged-readiness", "P9.1-final-evidence"} and "P9.2–P9.6 implementation state: NOT IMPLEMENTED" not in status:
         errors.append("P9.2–P9.6 must remain PROPOSED; NOT_STARTED")
 
     phase_rows: dict[str, tuple[str, str]] = {}
@@ -91,6 +95,7 @@ def validate_p9_phase_status(status: str) -> tuple[str, list[str]]:
     expected_p9_1 = {
         "P9.1-isolated-candidate": ("IMPLEMENTED — ISOLATED / READY FOR REVIEW", "AUTHORIZED"),
         "P9.1-merged-readiness": ("MERGED — NOT DEPLOYED / READINESS IN PROGRESS", "AUTHORIZED"),
+        "P9.1-final-evidence": ("MERGED — NOT DEPLOYED / RESTORED-TARGET ACCEPTANCE VERIFIED / CLEANUP PENDING EXPLICIT APPROVAL", "AUTHORIZED"),
         "pre-P9": ("ARCHITECTURE LOCKED; NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"),
     }.get(stage, ("ARCHITECTURE LOCKED; NOT_STARTED", "AWAITING EXPLICIT USER AUTHORIZATION"))
     expected_phase_rows = {
@@ -375,13 +380,45 @@ elif p9_stage == "P9.1-merged-readiness":
     for value in [
         "P9_1_PRODUCTION_READINESS_",
         "P9.1 is merged but not deployed",
-        "production PostgreSQL is not installed",
+        "Production PostgreSQL is not installed",
         "P9.2–P9.6 remain unimplemented",
         "Hardware Contract v1.0.5 remains unchanged",
     ]:
         if value not in readiness:
             errors.append(
                 "docs/p9/P9.1-PRODUCTION-READINESS.md missing merged-readiness safety assertion: "
+                + value,
+            )
+    readiness_forbidden_claims = [
+        (r"(?<!not )P9\.1 (?:is|has been) (?:now )?deployed", "P9.1 is falsely marked deployed"),
+        (r"(?<!not )P9\.1 (?:is|has been) (?:now )?in production", "P9.1 is falsely marked in production"),
+        (r"(?<!not )production PostgreSQL (?:is|has been) (?:installed|active|running)", "production PostgreSQL is falsely marked active"),
+        (r"(?<!no )production migration (?:has|was|is) (?:run|executed|applied)", "production migration is falsely marked complete"),
+        (r"(?<!not )P9\.2[–-]P9\.6 (?:are|were|have been) implemented", "P9.2-P9.6 are falsely marked implemented"),
+        (r"\bRVC_ENABLED\s*=\s*true\b", "RVC is falsely marked active"),
+    ]
+    for pattern, description in readiness_forbidden_claims:
+        if re.search(pattern, readiness, re.IGNORECASE):
+            errors.append(
+                "docs/p9/P9.1-PRODUCTION-READINESS.md contains unsafe claim: " + description,
+            )
+elif p9_stage == "P9.1-final-evidence":
+    readiness = read_utf8(docs / "p9" / "P9.1-PRODUCTION-READINESS.md")
+    for value in [
+        "P9_1_FINAL_EVIDENCE_READY_FOR_CLEANUP_APPROVAL",
+        "P9.1 database restore and real restored-target application",
+        "Production remained unaffected and undeployed",
+        "Production PostgreSQL is not installed",
+        "P9.2–P9.6 remain unimplemented",
+        "Hardware Contract v1.0.5 remains unchanged",
+        "4bde6aa261d7c025586f7f2857ee6ccc3b57b2494ebc0c476232e4148cd62a48",
+        "exactly one real login",
+        "Session `+1`, RefreshToken `+1`, AuditEvent `+1`",
+        "Destructive cleanup requires a separate explicit approval",
+    ]:
+        if value not in readiness:
+            errors.append(
+                "docs/p9/P9.1-PRODUCTION-READINESS.md missing final-evidence assertion: "
                 + value,
             )
     readiness_forbidden_claims = [
@@ -417,12 +454,12 @@ current_doc_requirements = {
             "Current next phase:",
             (
                 "P9.1 — PostgreSQL, auth, pairing, and settings foundation"
-                if p9_stage != "P9.1-merged-readiness"
+                if p9_stage not in {"P9.1-merged-readiness", "P9.1-final-evidence"}
                 else None
             ),
             (
                 "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`"
-                if p9_stage != "P9.1-merged-readiness"
+                if p9_stage not in {"P9.1-merged-readiness", "P9.1-final-evidence"}
                 else None
             ),
             "P7 is `VERIFIED — PRODUCTION`",
@@ -538,15 +575,23 @@ for label, (text, required_values) in current_doc_requirements.items():
         if value not in text:
             errors.append(f"{label} missing current-state assertion: {value}")
 
-if p9_stage == "P9.1-merged-readiness":
+if p9_stage in {"P9.1-merged-readiness", "P9.1-final-evidence"}:
     if not any(
         marker in next_action
-        for marker in ("P9.1 isolated Windows off-VPS backup rehearsal",)
+        for marker in (
+            "P9.1 isolated Windows off-VPS backup rehearsal"
+            if p9_stage == "P9.1-merged-readiness"
+            else "P9.1 final evidence / explicit cleanup approval gate",
+        )
     ):
         errors.append("docs/NEXT-ACTION.md missing merged P9.1 readiness checkpoint")
     if not any(
         marker in next_action
-        for marker in ("P9.1 Windows rehearsal and canary order",)
+        for marker in (
+            "P9.1 Windows rehearsal and canary order"
+            if p9_stage == "P9.1-merged-readiness"
+            else "P9.1 final evidence and canary order",
+        )
     ):
         errors.append("docs/NEXT-ACTION.md missing P9.1 rehearsal/canary ordering")
 
@@ -557,9 +602,13 @@ unique_state_declarations = [
         r"^\*\*Phase state:\*\*\s*`([^`]+)`\s*$",
         (
             {
-                "P9.1 SOURCE MERGED TO MAIN / NOT DEPLOYED; READINESS BRANCH NOT MERGED; WINDOWS BACKUP REHEARSAL READY / NOT EXECUTED",
+                (
+                    "P9.1 SOURCE MERGED TO MAIN / NOT DEPLOYED; READINESS BRANCH NOT MERGED; WINDOWS BACKUP REHEARSAL READY / NOT EXECUTED"
+                    if p9_stage == "P9.1-merged-readiness"
+                    else "P9.1 DATABASE RESTORE VERIFIED / REAL RESTORED-TARGET APPLICATION ACCEPTANCE VERIFIED / PRODUCTION UNAFFECTED AND NOT DEPLOYED / CLEANUP PENDING EXPLICIT APPROVAL"
+                ),
             }
-            if p9_stage == "P9.1-merged-readiness"
+            if p9_stage in {"P9.1-merged-readiness", "P9.1-final-evidence"}
             else {
                 "P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
             }
@@ -893,7 +942,7 @@ voice_runtime_text = "\n".join(
         (
             (root / "backend" / "src") in path.parents
             and not (
-                p9_stage in {"P9.1-isolated-candidate", "P9.1-merged-readiness"}
+                p9_stage in {"P9.1-isolated-candidate", "P9.1-merged-readiness", "P9.1-final-evidence"}
                 and (
                     (root / "backend" / "src" / "p9") in path.parents
                     or (root / "backend" / "src" / "generated" / "prisma") in path.parents

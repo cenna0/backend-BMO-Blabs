@@ -1,12 +1,13 @@
 # BMO — Next Execution Action
 
-**Last updated:** 2026-08-05
+**Last updated:** 2026-08-08
 **Audience:** Codex / infrastructure-backend coding agent
-**Current next phase:** **P9.1 isolated Windows off-VPS backup rehearsal**
-**Phase state:** `P9.1 SOURCE MERGED TO MAIN / NOT DEPLOYED; READINESS BRANCH NOT MERGED; WINDOWS BACKUP REHEARSAL READY / NOT EXECUTED`
+**Current next phase:** **P9.1 final evidence / explicit cleanup approval gate**
+**Phase state:** `P9.1 DATABASE RESTORE VERIFIED / REAL RESTORED-TARGET APPLICATION ACCEPTANCE VERIFIED / PRODUCTION UNAFFECTED AND NOT DEPLOYED / CLEANUP PENDING EXPLICIT APPROVAL`
 
 Current rehearsal state: `SSH V3 VERIFIED / WINDOWS EXACT COPY VERIFIED / GPG READABILITY VERIFIED /
-RESTORE TOOLING PREFLIGHT READY / EXACT-PC-COPY RESTORE NOT YET EXECUTED`. The canonical encryption-material file is
+EXACT-PC-COPY RESTORE VERIFIED / RESTORED-TARGET APPLICATION ACCEPTANCE VERIFIED /
+CLEANUP PENDING EXPLICIT APPROVAL`. The canonical encryption-material file is
 `/opt/bmo/secrets/p9.1/backup/backup-encryption-material-v1`. The approved Windows incoming destination is
 `D:\codex\BMO-backups\incoming`; the Windows operator pulls
 the exact encrypted three-file set from the VPS over Tailscale with
@@ -26,10 +27,11 @@ readiness package is available under [`p9/README.md`](p9/README.md). Do not
 install a production database or execute P10 from this documentation gate.
 Do not execute P10 from the P9.1 readiness package.
 P8 completion does **not** authorize P9.
-The readiness branch is not merged and no production canary has occurred.
-The exact Windows backup set has completed the approved transfer, checksum,
-manifest, promotion, and GPG-readability gates. The exact-copy off-VPS restore,
-production PostgreSQL provisioning, and production migration have not occurred.
+The readiness branch remains documentation-only and no production canary has
+occurred. The exact Windows backup set has completed the approved transfer,
+checksum, manifest, promotion, GPG-readability, exact-copy restore, and
+restored-target application-acceptance gates. Production PostgreSQL
+provisioning, production migration, and deployment have not occurred.
 Sanitized proof is in
 [`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
 
@@ -139,32 +141,30 @@ P8 did not:
 - change the public hardware contract;
 - begin P9 implementation without a new explicit authorization.
 
-## 5. P9.1 Windows rehearsal and canary order
+## 5. P9.1 final evidence and canary order
 
-This documentation does not authorize production deployment. The next actions
-must occur in this order:
+This documentation does not authorize production deployment. The final
+evidence chain is complete. The next actions must occur in this order:
 
-1. perform the real isolated Windows backup rehearsal over Tailscale and
-   `scp.exe`, including checksum, GPG readability, and exact-copy restore;
-2. complete the remaining operator decisions and record their evidence;
-3. review and merge the readiness branch through the approved merge gate;
+1. lock and review this sanitized evidence;
+2. obtain explicit approval for each cleanup action, if desired;
+3. complete the remaining operator decisions and record their evidence;
 4. only then prepare a separately authorized production canary.
 
-The Windows exact-copy restore remains pending. Its evidence must include:
+The exact-copy restore and restored-target application acceptance must not be
+rerun from this checkpoint. The recorded evidence includes:
 
 - return of the already verified exact three-file set from Windows `verified`
   to `/opt/bmo/p9.1-restore-tests/incoming/<backup-id>`;
 - server-side SHA-256 and manifest revalidation;
 - no-output GPG authentication before target creation;
-- restore of that exact off-VPS artifact into a fresh isolated PostgreSQL
+- restore of that exact off-VPS artifact into the retained isolated PostgreSQL
   database;
 - Prisma migration-state verification;
 - row-count and ownership-relationship verification;
 - login and `/me` verification;
-- plaintext cleanup; and
+- exact fixture cleanup, final target-baseline restoration, and runtime cleanup; and
 - sanitized evidence.
-
-None of these rehearsal steps is complete.
 
 No step above creates production secrets, starts production PostgreSQL, runs a
 production migration, or deploys P9.1. P9.2–P9.6 require their own completed
