@@ -18,7 +18,7 @@ export const ACCEPTANCE_RUNTIME_GID = 1000 as const;
 export const ACCEPTANCE_RUNTIME_PASSWORD_SOURCE_FILE = "/run/secrets/acceptance_password_source" as const;
 export const ACCEPTANCE_RUNTIME_PASSWORD_TMPFS = "/run/bmo-p9.1" as const;
 export const ACCEPTANCE_RUNTIME_PASSWORD_FILE = `${ACCEPTANCE_RUNTIME_PASSWORD_TMPFS}/acceptance-password` as const;
-export const ACCEPTANCE_RUNTIME_PASSWORD_TMPFS_SPEC = `${ACCEPTANCE_RUNTIME_PASSWORD_TMPFS}:rw,noexec,nosuid,nodev,mode=0755` as const;
+export const ACCEPTANCE_RUNTIME_PASSWORD_TMPFS_SPEC = `${ACCEPTANCE_RUNTIME_PASSWORD_TMPFS}:rw,noexec,nosuid,nodev,mode=0700,uid=${ACCEPTANCE_RUNTIME_UID},gid=${ACCEPTANCE_RUNTIME_GID}` as const;
 
 export interface RuntimeAcceptancePasswordFs {
   readFileSync(path: string, encoding: "utf8"): string;
@@ -98,7 +98,11 @@ export function materializeRuntimeAcceptancePassword(
 
 export interface CleanupRuntimeAcceptancePasswordOptions {
   runtimePath?: string;
-  fs?: Pick<RuntimeAcceptancePasswordFs, "unlinkSync">;
+  fs?: ProtectedFileFs & Pick<RuntimeAcceptancePasswordFs, "unlinkSync">;
+}
+
+function hasErrorCode(error: unknown, code: string): boolean {
+  return error instanceof Error && "code" in error && error.code === code;
 }
 
 export function cleanupRuntimeAcceptancePassword(
@@ -108,10 +112,21 @@ export function cleanupRuntimeAcceptancePassword(
   const fs = options.fs ?? runtimeFs;
   if (runtimePath !== ACCEPTANCE_RUNTIME_PASSWORD_FILE) throw new Error("runtime acceptance password path is unsafe");
   try {
+    fs.lstatSync(runtimePath);
+  } catch (error) {
+    if (hasErrorCode(error, "ENOENT")) return;
+    throw new Error("acceptance password runtime cleanup failed");
+  }
+  try {
+    validateRuntimeAcceptancePasswordFile(runtimePath, fs);
+  } catch {
+    throw new Error("acceptance password runtime cleanup failed");
+  }
+  try {
     fs.unlinkSync(runtimePath);
   } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) {
-      throw new Error("runtime acceptance password cleanup failed");
+    if (!hasErrorCode(error, "ENOENT")) {
+      throw new Error("acceptance password runtime cleanup failed");
     }
   }
 }

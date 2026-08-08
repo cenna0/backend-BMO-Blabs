@@ -673,7 +673,7 @@ describe("P9 restored-target acceptance runtime", () => {
     const joined = args.join(" ");
 
     expect(args).toEqual(expect.arrayContaining([
-      "--tmpfs", "/run/bmo-p9.1:rw,noexec,nosuid,nodev,mode=0755",
+      "--tmpfs", "/run/bmo-p9.1:rw,noexec,nosuid,nodev,mode=0700,uid=1000,gid=1000",
       "--env", "P9_ACCEPTANCE_PASSWORD_FILE=/run/bmo-p9.1/acceptance-password",
       "--env", "P9_ACCEPTANCE_PASSWORD_SOURCE_FILE=/run/secrets/acceptance_password_source",
       "--mount", "type=bind,source=/tmp/acceptance-password,destination=/run/secrets/acceptance_password_source,readonly",

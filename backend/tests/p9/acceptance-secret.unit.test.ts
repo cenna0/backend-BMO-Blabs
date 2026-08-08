@@ -4,6 +4,7 @@ import {
   ACCEPTANCE_RUNTIME_PASSWORD_FILE,
   ACCEPTANCE_RUNTIME_PASSWORD_SOURCE_FILE,
   ACCEPTANCE_RUNTIME_PASSWORD_TMPFS,
+  ACCEPTANCE_RUNTIME_PASSWORD_TMPFS_SPEC,
   ACCEPTANCE_RUNTIME_GID,
   ACCEPTANCE_RUNTIME_UID,
   cleanupRuntimeAcceptancePassword,
@@ -29,6 +30,12 @@ describe("P9 acceptance runtime secret handoff", () => {
     expect(ACCEPTANCE_RUNTIME_PASSWORD_FILE).toBe("/run/bmo-p9.1/acceptance-password");
     expect(ACCEPTANCE_RUNTIME_UID).toBe(1000);
     expect(ACCEPTANCE_RUNTIME_GID).toBe(1000);
+  });
+
+  it("gives the final worker ownership of the password tmpfs so dropped-UID cleanup can succeed", () => {
+    expect(ACCEPTANCE_RUNTIME_PASSWORD_TMPFS_SPEC).toBe(
+      "/run/bmo-p9.1:rw,noexec,nosuid,nodev,mode=0700,uid=1000,gid=1000",
+    );
   });
 
   it("accepts only the ephemeral runtime file owned by 1000:1000 with mode 0600", () => {
@@ -121,8 +128,41 @@ describe("P9 acceptance runtime secret handoff", () => {
   it("cleans only the fixed runtime file and ignores an already-removed file", () => {
     const calls: string[] = [];
     cleanupRuntimeAcceptancePassword({
-      fs: { unlinkSync: (path: string) => calls.push(path) },
+      fs: {
+        lstatSync: () => metadata(),
+        accessSync: () => undefined,
+        unlinkSync: (path: string) => calls.push(path),
+      },
     });
     expect(calls).toEqual([ACCEPTANCE_RUNTIME_PASSWORD_FILE]);
+  });
+
+  it("treats an already-destroyed runtime tmpfs file as an idempotent cleanup success", () => {
+    const calls: string[] = [];
+    const missing = Object.assign(new Error("missing"), { code: "ENOENT" });
+    const fs = {
+      lstatSync: () => { throw missing; },
+      accessSync: () => undefined,
+      unlinkSync: (path: string) => calls.push(path),
+    } as never;
+
+    expect(() => cleanupRuntimeAcceptancePassword({ fs })).not.toThrow();
+    expect(calls).toEqual([]);
+  });
+
+  it.each([
+    ["symlink", { symlink: true }],
+    ["wrong owner", { uid: 1002 }],
+    ["wrong mode", { mode: 0o640 }],
+  ])("fails closed without unlinking an unexpected runtime password %s", (_label, overrides) => {
+    const calls: string[] = [];
+    const fs = {
+      lstatSync: () => metadata(overrides),
+      accessSync: () => undefined,
+      unlinkSync: (path: string) => calls.push(path),
+    } as never;
+
+    expect(() => cleanupRuntimeAcceptancePassword({ fs })).toThrow(/cleanup failed|unsafe/);
+    expect(calls).toEqual([]);
   });
 });
