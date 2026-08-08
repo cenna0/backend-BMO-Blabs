@@ -9,6 +9,7 @@ import {
   buildAcceptanceTransportNetworkArgs,
   buildAcceptanceTransportProxyArgs,
   buildAcceptanceRuntimeArgs,
+  inspectDockerResource,
   startAcceptanceRuntime,
   statusAcceptanceRuntime,
   stopAcceptanceRuntime,
@@ -55,14 +56,18 @@ function fakeDocker(responses: Array<Partial<Awaited<ReturnType<AcceptanceDocker
   return { docker, calls };
 }
 
+function dockerAbsent(name: string) {
+  return { exitCode: 1, stdout: "[]\n", stderr: `error: no such object: ${name}\n` };
+}
+
 function startupDocker(responses: Array<Partial<Awaited<ReturnType<AcceptanceDocker["run"]>>> & { exitCode: number; stdout?: string; stderr?: string }> = []) {
   return fakeDocker([
     { exitCode: 0 },
     { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
     { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
-    { exitCode: 1, stderr: "No such container" },
-    { exitCode: 1, stderr: "No such container" },
-    { exitCode: 1, stderr: "No such network" },
+    dockerAbsent(config.container),
+    dockerAbsent(config.transportContainer),
+    dockerAbsent(config.transportNetwork),
     { exitCode: 0, stdout: "1\n" },
     { exitCode: 0, stdout: "container-id\n" },
     { exitCode: 0, stdout: "network-id\n" },
@@ -99,6 +104,161 @@ function deterministicWait(): AcceptanceRuntimeWaitOptions {
 }
 
 describe("P9 restored-target acceptance runtime", () => {
+  it.each([
+    ["container", config.container],
+    ["network", config.transportNetwork],
+  ] as const)("classifies the exact Docker no-such-object response as ABSENT for a %s", async (kind, name) => {
+    const { docker, calls } = fakeDocker([
+      {
+        exitCode: 1,
+        stdout: "[]\n",
+        stderr: `error: no such object: ${name}\n`,
+      },
+    ]);
+
+    await expect(inspectDockerResource(docker, { kind, name })).resolves.toMatchObject({
+      kind,
+      name,
+      state: "ABSENT",
+    });
+    expect(calls).toEqual([
+      kind === "container"
+        ? ["inspect", "--format", "{{json .Name}}", name]
+        : ["network", "inspect", "--format", "{{json .Name}}", name],
+    ]);
+  });
+
+  it("accepts Docker's formatted-inspect blank stdout with the exact no-such-object stderr", async () => {
+    const { docker } = fakeDocker([
+      { exitCode: 1, stdout: "\n", stderr: `error: no such object: ${config.container}\n` },
+    ]);
+
+    await expect(inspectDockerResource(docker, { kind: "container", name: config.container })).resolves.toMatchObject({
+      state: "ABSENT",
+    });
+  });
+
+  it.each([
+    ["container", config.container, `"/${config.container}"\n`],
+    ["network", config.transportNetwork, `"${config.transportNetwork}"\n`],
+  ] as const)("classifies an exact existing %s as PRESENT", async (kind, name, stdout) => {
+    const { docker } = fakeDocker([{ exitCode: 0, stdout }]);
+
+    await expect(inspectDockerResource(docker, { kind, name })).resolves.toMatchObject({
+      kind,
+      name,
+      state: "PRESENT",
+    });
+  });
+
+  it.each([
+    ["daemon unavailable", "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?"],
+    ["permission denied", "permission denied while trying to connect to the Docker daemon socket"],
+    ["unexpected exit code", "unexpected docker failure"],
+  ])("returns INSPECTION_ERROR for %s", async (_label, stderr) => {
+    const { docker } = fakeDocker([{ exitCode: _label === "unexpected exit code" ? 2 : 1, stderr }]);
+
+    await expect(inspectDockerResource(docker, { kind: "container", name: config.container })).resolves.toMatchObject({
+      state: "INSPECTION_ERROR",
+      diagnostic: expect.stringContaining(stderr),
+    });
+  });
+
+  it("returns INSPECTION_ERROR for malformed successful Docker output", async () => {
+    const { docker } = fakeDocker([{ exitCode: 0, stdout: "not-json\n" }]);
+
+    await expect(inspectDockerResource(docker, { kind: "container", name: config.container })).resolves.toMatchObject({
+      state: "INSPECTION_ERROR",
+      diagnostic: expect.stringContaining("not-json"),
+    });
+  });
+
+  it.each([
+    ["container", config.container, `"/${config.container}-similar"\n`],
+    ["network", config.transportNetwork, `"${config.transportNetwork}-similar"\n`],
+  ] as const)("does not classify a partial/similar %s name as PRESENT", async (kind, name, stdout) => {
+    const { docker } = fakeDocker([{ exitCode: 0, stdout }]);
+
+    await expect(inspectDockerResource(docker, { kind, name })).resolves.toMatchObject({
+      state: "INSPECTION_ERROR",
+    });
+  });
+
+  it("does not accept unrelated stderr merely because it contains not found", async () => {
+    const { docker } = fakeDocker([
+      { exitCode: 1, stdout: "[]\n", stderr: "unrelated lookup failed: target not found in registry\n" },
+    ]);
+
+    await expect(inspectDockerResource(docker, { kind: "container", name: config.container })).resolves.toMatchObject({
+      state: "INSPECTION_ERROR",
+    });
+  });
+
+  it("sanitizes secret-bearing Docker inspection diagnostics", async () => {
+    const { docker } = fakeDocker([
+      {
+        exitCode: 2,
+        stderr: "docker inspect failed password=synthetic-password P9_JWT_SECRET=synthetic-token\n",
+      },
+    ]);
+
+    const result = await inspectDockerResource(docker, { kind: "container", name: config.container });
+    expect(result.state).toBe("INSPECTION_ERROR");
+    expect(result.diagnostic).not.toContain("synthetic-password");
+    expect(result.diagnostic).not.toContain("synthetic-token");
+  });
+
+  it("fails closed before backend creation when resource inspection errors", async () => {
+    const { docker, calls } = fakeDocker([
+      { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
+      { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
+      { exitCode: 1, stdout: "[]\n", stderr: "permission denied while trying to connect to the Docker daemon socket\n" },
+    ]);
+
+    await expect(startAcceptanceRuntime(config, docker)).rejects.toThrow(/validation failed|permission denied/);
+    expect(calls.some((args) => args[0] === "run")).toBe(false);
+  });
+
+  it("fails closed when the exact backend container already exists", async () => {
+    const { docker, calls } = fakeDocker([
+      { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
+      { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
+      { exitCode: 0, stdout: `"/${config.container}"\n` },
+    ]);
+
+    await expect(startAcceptanceRuntime(config, docker)).rejects.toThrow(/already exists/);
+    expect(calls.some((args) => args[0] === "run")).toBe(false);
+  });
+
+  it("fails closed when the exact proxy container already exists", async () => {
+    const { docker, calls } = fakeDocker([
+      { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
+      { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
+      { exitCode: 1, stdout: "[]\n", stderr: `error: no such object: ${config.container}\n` },
+      { exitCode: 0, stdout: `"/${config.transportContainer}"\n` },
+    ]);
+
+    await expect(startAcceptanceRuntime(config, docker)).rejects.toThrow(/already exists/);
+    expect(calls.some((args) => args[0] === "run")).toBe(false);
+  });
+
+  it("fails closed when the exact transport network already exists", async () => {
+    const { docker, calls } = fakeDocker([
+      { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
+      { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
+      { exitCode: 1, stdout: "[]\n", stderr: `error: no such object: ${config.container}\n` },
+      { exitCode: 1, stdout: "[]\n", stderr: `error: no such object: ${config.transportContainer}\n` },
+      { exitCode: 0, stdout: `"${config.transportNetwork}"\n` },
+    ]);
+
+    await expect(startAcceptanceRuntime(config, docker)).rejects.toThrow(/already exists/);
+    expect(calls.some((args) => args[0] === "run")).toBe(false);
+  });
+
   it("builds a dedicated credential-free proxy transport with loopback-only publication", () => {
     const networkArgs = buildAcceptanceTransportNetworkArgs(config);
     const proxyArgs = buildAcceptanceTransportProxyArgs(config);
@@ -165,9 +325,9 @@ describe("P9 restored-target acceptance runtime", () => {
       { exitCode: 0 },
       { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
       { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
-      { exitCode: 1, stderr: "No such container" },
-      { exitCode: 1, stderr: "No such container" },
-      { exitCode: 1, stderr: "No such network" },
+      dockerAbsent(config.container),
+      dockerAbsent(config.transportContainer),
+      dockerAbsent(config.transportNetwork),
       { exitCode: 0, stdout: "1\n" },
       { exitCode: 0, stdout: "backend-id\n" },
       { exitCode: 0, stdout: "network-id\n" },
@@ -200,9 +360,9 @@ describe("P9 restored-target acceptance runtime", () => {
       { exitCode: 0 },
       { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
       { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
-      { exitCode: 1, stderr: "No such container" },
-      { exitCode: 1, stderr: "No such container" },
-      { exitCode: 1, stderr: "No such network" },
+      dockerAbsent(config.container),
+      dockerAbsent(config.transportContainer),
+      dockerAbsent(config.transportNetwork),
       { exitCode: 0, stdout: "1\n" },
       { exitCode: 0, stdout: "backend-id\n" },
       { exitCode: 0, stdout: "network-id\n" },
@@ -290,8 +450,8 @@ describe("P9 restored-target acceptance runtime", () => {
     expect(calls[0]).toEqual(["network", "inspect", config.network]);
     expect(calls[1]).toEqual(["network", "inspect", "--format", "{{json .}}", config.network]);
     expect(calls[2]).toEqual(["inspect", "--format", "{{.Config.Image}}", "bmo-p9-1-backend-1"]);
-    expect(calls[3]).toEqual(["inspect", config.container]);
-    expect(calls[4]).toEqual(["inspect", config.transportContainer]);
+    expect(calls[3]).toEqual(["inspect", "--format", "{{json .Name}}", config.container]);
+    expect(calls[4]).toEqual(["inspect", "--format", "{{json .Name}}", config.transportContainer]);
     expect(calls[6]?.slice(0, 5)).toEqual(["exec", config.postgresContainer, "psql", "-U", "bmo"]);
     expect(calls[7]?.[0]).toBe("run");
     expect(calls.filter((args) => args[0] === "run")).toHaveLength(2);
@@ -408,9 +568,9 @@ describe("P9 restored-target acceptance runtime", () => {
       { exitCode: 0 },
       { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
       { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
-      { exitCode: 1, stderr: "No such container" },
-      { exitCode: 1, stderr: "No such container" },
-      { exitCode: 1, stderr: "No such network" },
+      dockerAbsent(config.container),
+      dockerAbsent(config.transportContainer),
+      dockerAbsent(config.transportNetwork),
       { exitCode: 0, stdout: "\n" },
     ]);
 
@@ -418,14 +578,14 @@ describe("P9 restored-target acceptance runtime", () => {
     expect(calls.every((args) => args[0] !== "run")).toBe(true);
   });
 
-  it("removes only the acceptance container when its Docker start fails", async () => {
+  it("removes only the confirmed runtime when transport-network creation fails", async () => {
     const { docker, calls } = fakeDocker([
       { exitCode: 0 },
       { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
       { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
-      { exitCode: 1, stderr: "No such container" },
-      { exitCode: 1, stderr: "No such container" },
-      { exitCode: 1, stderr: "No such network" },
+      dockerAbsent(config.container),
+      dockerAbsent(config.transportContainer),
+      dockerAbsent(config.transportNetwork),
       { exitCode: 0, stdout: "1\n" },
       { exitCode: 0, stdout: "container-id\n" },
       { exitCode: 1, stderr: "network create failed" },
@@ -433,10 +593,24 @@ describe("P9 restored-target acceptance runtime", () => {
     ]);
 
     await expect(startAcceptanceRuntime(config, docker)).rejects.toThrow(/network create failed/);
-    expect(calls.slice(-2)).toEqual([
-      ["rm", "--force", config.container],
-      ["network", "rm", config.transportNetwork],
+    expect(calls.slice(-1)).toEqual([["rm", "--force", config.container]]);
+    expect(calls).not.toContain(["network", "rm", config.transportNetwork]);
+  });
+
+  it("does not remove a runtime whose Docker creation did not succeed", async () => {
+    const { docker, calls } = fakeDocker([
+      { exitCode: 0 },
+      { exitCode: 0, stdout: JSON.stringify({ Name: config.network, Driver: "bridge", Internal: true, Containers: {} }) },
+      { exitCode: 0, stdout: "bmo-p9.1-candidate:test\n" },
+      dockerAbsent(config.container),
+      dockerAbsent(config.transportContainer),
+      dockerAbsent(config.transportNetwork),
+      { exitCode: 0, stdout: "1\n" },
+      { exitCode: 1, stderr: "runtime create failed" },
     ]);
+
+    await expect(startAcceptanceRuntime(config, docker)).rejects.toThrow(/runtime create failed/);
+    expect(calls.some((args) => args[0] === "rm" || (args[0] === "network" && args[1] === "rm"))).toBe(false);
   });
 
   it("reports only the named acceptance runtime and proves its configured target", async () => {

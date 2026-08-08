@@ -13,6 +13,16 @@ export interface AcceptanceDocker {
   run(args: string[]): Promise<DockerResult>;
 }
 
+export type DockerResourceKind = "container" | "network";
+export type DockerResourceState = "ABSENT" | "PRESENT" | "INSPECTION_ERROR";
+
+export interface DockerResourceInspection {
+  kind: DockerResourceKind;
+  name: string;
+  state: DockerResourceState;
+  diagnostic: string;
+}
+
 export interface AcceptanceRuntimeHttpResult {
   status: number;
   body?: unknown;
@@ -218,23 +228,84 @@ async function ensureCandidateImage(docker: AcceptanceDocker, config: Acceptance
   }
 }
 
-async function ensureContainerAbsent(
-  docker: AcceptanceDocker,
-  container: string,
-  label: string,
-): Promise<void> {
-  const result = await docker.run(["inspect", container]);
-  if (result.exitCode === 0) throw new AcceptanceRuntimeError(`${label} already exists`);
-  if (!/no such container/i.test(`${result.stderr}\n${result.stdout}`)) {
-    throw new AcceptanceRuntimeError(`${label} validation failed: ${detail(result)}`);
-  }
+function dockerResourceInspectArgs(kind: DockerResourceKind, name: string): string[] {
+  return kind === "container"
+    ? ["inspect", "--format", "{{json .Name}}", name]
+    : ["network", "inspect", "--format", "{{json .Name}}", name];
 }
 
-async function ensureTransportNetworkAbsent(docker: AcceptanceDocker, config: AcceptanceConfig): Promise<void> {
-  const result = await docker.run(["network", "inspect", config.transportNetwork]);
-  if (result.exitCode === 0) throw new AcceptanceRuntimeError("acceptance transport network already exists");
-  if (!/no such network/i.test(`${result.stderr}\n${result.stdout}`)) {
-    throw new AcceptanceRuntimeError(`acceptance transport network validation failed: ${detail(result)}`);
+function normalizedDockerLine(value: string): string {
+  return value.replace(/\r\n/g, "\n").trim();
+}
+
+function isCanonicalDockerAbsence(
+  kind: DockerResourceKind,
+  name: string,
+  result: DockerResult,
+): boolean {
+  const stdout = normalizedDockerLine(result.stdout);
+  if (result.exitCode !== 1 || (stdout !== "" && stdout !== "[]")) return false;
+  const stderr = normalizedDockerLine(result.stderr);
+  const candidates = [
+    `error: no such object: ${name}`,
+    kind === "container" ? `Error: No such container: ${name}` : `Error response from daemon: network ${name} not found`,
+    kind === "container" ? `Error response from daemon: No such container: ${name}` : `Error: No such network: ${name}`,
+  ];
+  return candidates.includes(stderr);
+}
+
+function resourceInspectionError(
+  kind: DockerResourceKind,
+  name: string,
+  result: DockerResult,
+  fallback: string,
+): DockerResourceInspection {
+  const diagnostic = detail(result);
+  return {
+    kind,
+    name,
+    state: "INSPECTION_ERROR",
+    diagnostic: diagnostic === "no diagnostic output" ? fallback : diagnostic,
+  };
+}
+
+export async function inspectDockerResource(
+  docker: AcceptanceDocker,
+  resource: { kind: DockerResourceKind; name: string },
+): Promise<DockerResourceInspection> {
+  const { kind, name } = resource;
+  const result = await docker.run(dockerResourceInspectArgs(kind, name));
+  if (isCanonicalDockerAbsence(kind, name, result)) {
+    return { kind, name, state: "ABSENT", diagnostic: "confirmed absent" };
+  }
+  if (result.exitCode !== 0) {
+    return resourceInspectionError(kind, name, result, `Docker ${kind} inspection failed`);
+  }
+
+  let inspectedName: unknown;
+  try {
+    inspectedName = JSON.parse(normalizedDockerLine(result.stdout));
+  } catch {
+    return resourceInspectionError(kind, name, result, `Docker ${kind} inspection output is malformed`);
+  }
+  const normalizedInspectedName = typeof inspectedName === "string" && kind === "container" && inspectedName.startsWith("/")
+    ? inspectedName.slice(1)
+    : inspectedName;
+  if (normalizedInspectedName !== name) {
+    return resourceInspectionError(kind, name, result, `Docker ${kind} inspection identity is unexpected`);
+  }
+  return { kind, name, state: "PRESENT", diagnostic: "confirmed present" };
+}
+
+async function ensureDockerResourceAbsent(
+  docker: AcceptanceDocker,
+  resource: { kind: DockerResourceKind; name: string },
+  label: string,
+): Promise<void> {
+  const inspection = await inspectDockerResource(docker, resource);
+  if (inspection.state === "PRESENT") throw new AcceptanceRuntimeError(`${label} already exists`);
+  if (inspection.state === "INSPECTION_ERROR") {
+    throw new AcceptanceRuntimeError(`${label} validation failed: ${inspection.diagnostic}`);
   }
 }
 
@@ -463,17 +534,29 @@ export async function verifyAcceptanceTargetIdentity(
   }
 }
 
-function isMissingDockerResource(result: DockerResult): boolean {
-  return /no such (container|network)/i.test(`${result.stderr}\n${result.stdout}`);
+function isCanonicalDockerRemovalAbsence(
+  kind: DockerResourceKind,
+  name: string,
+  result: DockerResult,
+): boolean {
+  if (result.exitCode === 0 || normalizedDockerLine(result.stdout) !== "") return false;
+  const stderr = normalizedDockerLine(result.stderr);
+  const candidates = [
+    `error: no such object: ${name}`,
+    kind === "container" ? `Error: No such container: ${name}` : `Error response from daemon: network ${name} not found`,
+    kind === "container" ? `Error response from daemon: No such container: ${name}` : `Error: No such network: ${name}`,
+  ];
+  return candidates.includes(stderr);
 }
 
 async function removeDockerResource(
   docker: AcceptanceDocker,
   args: string[],
   label: string,
+  resource: { kind: DockerResourceKind; name: string },
 ): Promise<void> {
   const result = await docker.run(args);
-  if (result.exitCode !== 0 && !isMissingDockerResource(result)) {
+  if (result.exitCode !== 0 && !isCanonicalDockerRemovalAbsence(resource.kind, resource.name, result)) {
     throw new AcceptanceRuntimeError(`${label} cleanup failed: ${detail(result)}`);
   }
 }
@@ -484,17 +567,39 @@ async function cleanupAcceptanceResources(
   options: { runtime: boolean; transport: boolean; network: boolean },
 ): Promise<void> {
   let firstError: unknown;
-  const cleanup = async (args: string[], label: string): Promise<void> => {
+  const cleanup = async (
+    args: string[],
+    label: string,
+    resource: { kind: DockerResourceKind; name: string },
+  ): Promise<void> => {
     try {
-      await removeDockerResource(docker, args, label);
+      await removeDockerResource(docker, args, label, resource);
     } catch (error) {
       firstError ??= error;
     }
   };
 
-  if (options.transport) await cleanup(["rm", "--force", config.transportContainer], "acceptance transport");
-  if (options.runtime) await cleanup(["rm", "--force", config.container], "acceptance runtime");
-  if (options.network) await cleanup(["network", "rm", config.transportNetwork], "acceptance transport network");
+  if (options.transport) {
+    await cleanup(
+      ["rm", "--force", config.transportContainer],
+      "acceptance transport",
+      { kind: "container", name: config.transportContainer },
+    );
+  }
+  if (options.runtime) {
+    await cleanup(
+      ["rm", "--force", config.container],
+      "acceptance runtime",
+      { kind: "container", name: config.container },
+    );
+  }
+  if (options.network) {
+    await cleanup(
+      ["network", "rm", config.transportNetwork],
+      "acceptance transport network",
+      { kind: "network", name: config.transportNetwork },
+    );
+  }
   if (firstError) throw firstError;
 }
 
@@ -506,20 +611,32 @@ export async function startAcceptanceRuntime(
   await ensureCandidateNetwork(docker, config);
   await verifyCandidateNetworkPrivacy(docker, config);
   await ensureCandidateImage(docker, config);
-  await ensureContainerAbsent(docker, config.container, "acceptance runtime container");
-  await ensureContainerAbsent(docker, config.transportContainer, "acceptance transport container");
-  await ensureTransportNetworkAbsent(docker, config);
+  await ensureDockerResourceAbsent(
+    docker,
+    { kind: "container", name: config.container },
+    "acceptance runtime container",
+  );
+  await ensureDockerResourceAbsent(
+    docker,
+    { kind: "container", name: config.transportContainer },
+    "acceptance transport container",
+  );
+  await ensureDockerResourceAbsent(
+    docker,
+    { kind: "network", name: config.transportNetwork },
+    "acceptance transport network",
+  );
   await ensureTargetDatabase(docker, config);
   let runtimeCreated = false;
   let transportCreated = false;
   let transportNetworkCreated = false;
   try {
-    runtimeCreated = true;
     await requiredDocker(docker, buildAcceptanceRuntimeArgs(config), "acceptance runtime start");
-    transportNetworkCreated = true;
+    runtimeCreated = true;
     await requiredDocker(docker, buildAcceptanceTransportNetworkArgs(config), "acceptance transport network creation");
-    transportCreated = true;
+    transportNetworkCreated = true;
     await requiredDocker(docker, buildAcceptanceTransportProxyArgs(config), "acceptance transport start");
+    transportCreated = true;
     await requiredDocker(
       docker,
       ["network", "connect", config.network, config.transportContainer],

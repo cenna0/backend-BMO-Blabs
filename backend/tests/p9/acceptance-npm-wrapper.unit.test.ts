@@ -35,6 +35,7 @@ function stopFakeServer() {
 }
 if (args[0] === "network" && args[1] === "inspect") {
   const format = args[2] === "--format" ? args[3] || "" : "";
+  if (format.includes("{{json .Name}}") && last === "bmo-p9-1-restore-acceptance-transport") { process.stdout.write("[]\\n"); process.stderr.write("error: no such object: " + last + "\\n"); process.exit(1); }
   if (last === "bmo-p9-1-restore-acceptance-transport" && !format) { process.stderr.write("No such network\\n"); process.exit(1); }
   if (format.includes("{{json .}}")) {
     if (last === "bmo-p9-1_p9_private") process.stdout.write(JSON.stringify({Name:last, Driver:"bridge", Internal:true, Containers:{}}));
@@ -45,6 +46,7 @@ if (args[0] === "network" && args[1] === "inspect") {
 if (args[0] === "inspect" && args[1] === "--format") {
   const format = args[2] || "";
   if (last === "bmo-p9-1-backend-1") process.stdout.write("bmo-p9.1-candidate:test\\n");
+  else if (format.includes("{{json .Name}}")) { process.stdout.write("[]\\n"); process.stderr.write("error: no such object: " + last + "\\n"); process.exit(1); }
   else if (format.includes(".NetworkSettings.Ports")) process.stdout.write("running|" + JSON.stringify({"3010/tcp":[{HostIp:"127.0.0.1",HostPort:"3025"}]}) + "\\n");
   else if (format.includes(".NetworkSettings.Networks")) process.stdout.write(JSON.stringify({"bmo-p9-1_p9_private":{}}));
   else if (format.includes(".Config.Image")) process.stdout.write("running|bmo-p9.1-candidate:test\\n");
