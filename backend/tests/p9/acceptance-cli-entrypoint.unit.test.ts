@@ -306,6 +306,35 @@ describe("P9 acceptance CLI entrypoint", () => {
     void directory;
   });
 
+  it("reports transport cleanup failure separately without replacing the worker failure", async () => {
+    configureSyntheticEnvironment();
+    const calls: string[][] = [];
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const docker: AcceptanceDocker = {
+      run: async (args) => {
+        calls.push(args);
+        if (args[0] === "inspect") return { exitCode: 0, stdout: "running|0\n", stderr: "" };
+        if (args[0] === "run") return { exitCode: 17, stdout: "", stderr: "fixture worker failed" };
+        if (args[0] === "rm") return { exitCode: 1, stdout: "", stderr: "transport cleanup denied" };
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+    };
+    const http: AcceptanceRuntimeHttpClient = {
+      request: async (path) => path === "/api/v1/ops/db/readyz"
+        ? { status: 200, body: { status: "ok", database: "ready" } }
+        : { status: 200, body: { database: "bmo_restore_acceptance_test" } },
+    };
+
+    const result = await main(["fixture:create"], docker, { http });
+
+    expect(result).toBe(1);
+    const message = String(stderr.mock.calls.at(-1)?.[0]);
+    expect(message).toContain("fixture worker failed");
+    expect(message).toContain("acceptance failure cleanup failed");
+    expect(calls).toContainEqual(["rm", "--force", "bmo-p9-1-restore-acceptance-proxy"]);
+    stderr.mockRestore();
+  });
+
   it("cleans the acceptance transport when the application runner fails before login", async () => {
     const directory = configureSyntheticEnvironment();
     const statePath = process.env.P9_ACCEPTANCE_STATE_FILE as string;

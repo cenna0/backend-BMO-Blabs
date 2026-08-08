@@ -97,7 +97,8 @@ child.once("exit", (code, signal) => {
   cleanupRuntimeAcceptancePasswordIfNeeded();
   cleanupRuntimeAcceptanceStateIfNeeded();
   if (runtimeAcceptancePasswordCleanupFailed || runtimeAcceptanceStateCleanupFailed) {
-    process.exitCode = 1;
+    if (signal || code === 0 || code === null) process.exitCode = 1;
+    else process.exitCode = code;
     return;
   }
   if (signal) process.kill(process.pid, signal);

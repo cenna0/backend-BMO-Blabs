@@ -182,10 +182,11 @@ async function rethrowAfterRuntimeCleanup(
   docker: AcceptanceDocker,
   error: unknown,
 ): Promise<never> {
+  const primaryMessage = error instanceof Error ? error.message : "acceptance command failed";
   try {
     await stopAcceptanceRuntime(config, docker);
   } catch {
-    throw new Error("acceptance failure cleanup failed");
+    throw new Error(`${primaryMessage}; acceptance failure cleanup failed`);
   }
   throw error;
 }
