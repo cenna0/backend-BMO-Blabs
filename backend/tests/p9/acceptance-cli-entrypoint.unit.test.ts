@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,9 +13,11 @@ import type {
 
 const syntheticDirectories: string[] = [];
 
-function configureSyntheticEnvironment(): string {
+function configureSyntheticEnvironment(options: { workspaceExists?: boolean } = {}): string {
   const directory = mkdtempSync(join(tmpdir(), "p9-acceptance-cli-test-"));
   syntheticDirectories.push(directory);
+  const workspace = join(directory, "p9-acceptance");
+  if (options.workspaceExists !== false) mkdirSync(workspace, { mode: 0o700 });
   for (const name of ["postgres-password", "acceptance-password", "runtime.env"]) {
     const path = join(directory, name);
     writeFileSync(path, "synthetic-test-only\n", { mode: 0o600 });
@@ -36,7 +38,7 @@ function configureSyntheticEnvironment(): string {
     P9_POSTGRES_PASSWORD_FILE: join(directory, "postgres-password"),
     P9_ACCEPTANCE_PASSWORD_FILE: join(directory, "acceptance-password"),
     P9_ACCEPTANCE_RUNTIME_ENV_FILE: join(directory, "runtime.env"),
-    P9_ACCEPTANCE_STATE_FILE: join(directory, "fixture-state.json"),
+    P9_ACCEPTANCE_STATE_FILE: join(workspace, "fixture-state.json"),
   };
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   return directory;
@@ -74,7 +76,7 @@ describe("P9 acceptance CLI entrypoint", () => {
 
   it("creates the host pending state, hands only a runtime copy to the worker, and atomically accepts returned state", async () => {
     const directory = configureSyntheticEnvironment();
-    const statePath = join(directory, "fixture-state.json");
+    const statePath = join(directory, "p9-acceptance", "fixture-state.json");
     const calls: string[][] = [];
     const events: string[] = [];
     const docker: AcceptanceDocker = {
@@ -112,6 +114,116 @@ describe("P9 acceptance CLI entrypoint", () => {
     expect(identityEvent).toBeLessThan(events.lastIndexOf("docker:run"));
     expect(events.filter((event) => event.includes("/auth/login"))).toHaveLength(0);
     unlinkSync(statePath);
+  });
+
+  it("creates an absent host workspace before invoking the fixture worker exactly once", async () => {
+    const directory = configureSyntheticEnvironment({ workspaceExists: false });
+    const workspace = join(directory, "p9-acceptance");
+    const statePath = process.env.P9_ACCEPTANCE_STATE_FILE as string;
+    const calls: string[][] = [];
+    const events: string[] = [];
+    const docker: AcceptanceDocker = {
+      run: async (args) => {
+        calls.push(args);
+        events.push(`docker:${args[0]}`);
+        if (args[0] === "inspect") return { exitCode: 0, stdout: "running|0\n", stderr: "" };
+        const pending = JSON.parse(readFileSync(statePath, "utf8")) as Record<string, unknown>;
+        return {
+          exitCode: 0,
+          stdout: JSON.stringify({ state: { ...pending, userId: "11111111-1111-1111-1111-111111111111" } }),
+          stderr: "",
+        };
+      },
+    };
+    const http: AcceptanceRuntimeHttpClient = {
+      request: async (path) => {
+        events.push(`http:${path}`);
+        if (path === "/api/v1/ops/db/readyz") return { status: 200, body: { status: "ok", database: "ready" } };
+        return { status: 200, body: { database: "bmo_restore_acceptance_test" } };
+      },
+    };
+
+    expect(existsSync(workspace)).toBe(false);
+    const result = await main(["fixture:create"], docker, { http });
+
+    expect(result).toBe(0);
+    expect(calls.filter((args) => args[0] === "run")).toHaveLength(1);
+    expect(lstatSync(workspace).mode & 0o7777).toBe(0o700);
+    expect(statSync(statePath).mode & 0o7777).toBe(0o600);
+    expect(events.filter((event) => event.includes("/auth/login"))).toHaveLength(0);
+  });
+
+  it("rejects a malformed existing manifest before invoking the worker", async () => {
+    configureSyntheticEnvironment();
+    const statePath = process.env.P9_ACCEPTANCE_STATE_FILE as string;
+    writeFileSync(statePath, JSON.stringify({
+      version: 1,
+      database: "bmo_restore_acceptance_test",
+      runId: "run-1234",
+      userId: null,
+      email: "p9-acceptance-run-1234@example.invalid",
+      providerSubject: "p9-acceptance:run-1234",
+      displayName: "P9 restore acceptance fixture run-1234",
+      password: "synthetic-password",
+    }) + "\n", { mode: 0o600 });
+    const calls: string[][] = [];
+    const docker: AcceptanceDocker = {
+      run: async (args) => {
+        calls.push(args);
+        if (args[0] === "inspect") return { exitCode: 0, stdout: "running|0\n", stderr: "" };
+        if (args[0] === "rm" || args[0] === "network") return { exitCode: 0, stdout: "", stderr: "" };
+        throw new Error("fixture worker must not run");
+      },
+    };
+    const http: AcceptanceRuntimeHttpClient = {
+      request: async (path) => path === "/api/v1/ops/db/readyz"
+        ? { status: 200, body: { status: "ok", database: "ready" } }
+        : { status: 200, body: { database: "bmo_restore_acceptance_test" } },
+    };
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = await main(["fixture:create"], docker, { http });
+
+    expect(result).toBe(1);
+    expect(calls.every((args) => args[0] !== "run")).toBe(true);
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain("state");
+    stderr.mockRestore();
+  });
+
+  it("rejects a valid manifest bound to another restore target before invoking the worker", async () => {
+    configureSyntheticEnvironment();
+    const statePath = process.env.P9_ACCEPTANCE_STATE_FILE as string;
+    writeFileSync(statePath, JSON.stringify({
+      version: 1,
+      database: "bmo_restore_foreign_target",
+      runId: "run-1234",
+      userId: null,
+      email: "p9-acceptance-run-1234@example.invalid",
+      providerSubject: "p9-acceptance:run-1234",
+      displayName: "P9 restore acceptance fixture run-1234",
+    }) + "\n", { mode: 0o600 });
+    const calls: string[][] = [];
+    const docker: AcceptanceDocker = {
+      run: async (args) => {
+        calls.push(args);
+        if (args[0] === "inspect") return { exitCode: 0, stdout: "running|0\n", stderr: "" };
+        if (args[0] === "rm" || args[0] === "network") return { exitCode: 0, stdout: "", stderr: "" };
+        throw new Error("fixture worker must not run");
+      },
+    };
+    const http: AcceptanceRuntimeHttpClient = {
+      request: async (path) => path === "/api/v1/ops/db/readyz"
+        ? { status: 200, body: { status: "ok", database: "ready" } }
+        : { status: 200, body: { database: "bmo_restore_acceptance_test" } },
+    };
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = await main(["fixture:create"], docker, { http });
+
+    expect(result).toBe(1);
+    expect(calls.every((args) => args[0] !== "run")).toBe(true);
+    expect(String(stderr.mock.calls.at(-1)?.[0])).toContain("target");
+    stderr.mockRestore();
   });
 
   it("runs aggregate evidence without creating a state artifact", async () => {
@@ -163,7 +275,7 @@ describe("P9 acceptance CLI entrypoint", () => {
     void directory;
   });
 
-  it("cleans the acceptance transport and pending host state when fixture creation fails", async () => {
+  it("cleans the acceptance transport but retains pending host state when the worker fails", async () => {
     const directory = configureSyntheticEnvironment();
     const statePath = process.env.P9_ACCEPTANCE_STATE_FILE as string;
     const calls: string[][] = [];
@@ -184,7 +296,8 @@ describe("P9 acceptance CLI entrypoint", () => {
     const result = await main(["fixture:create"], docker, { http });
 
     expect(result).toBe(1);
-    expect(existsSync(statePath)).toBe(false);
+    expect(existsSync(statePath)).toBe(true);
+    expect(JSON.parse(readFileSync(statePath, "utf8"))).toMatchObject({ userId: null });
     expect(calls.slice(-3)).toEqual([
       ["rm", "--force", "bmo-p9-1-restore-acceptance-proxy"],
       ["rm", "--force", "bmo-p9-1-restore-acceptance-runtime"],

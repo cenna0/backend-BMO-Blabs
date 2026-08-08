@@ -73,6 +73,8 @@ export class AcceptanceFixtureError extends Error {
   }
 }
 
+const FIXTURE_STATE_KEYS = ["database", "displayName", "email", "providerSubject", "runId", "userId", "version"] as const;
+
 export function displayNameForRun(runId: string): string {
   return `P9 restore acceptance fixture ${runId}`;
 }
@@ -92,9 +94,25 @@ function runIdValue(value: string | undefined): string {
 }
 
 export function validateFixtureState(state: FixtureState): void {
-  if (state.version !== 1 || !state.database || !state.runId || !state.email || !state.providerSubject || !state.displayName) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) {
     throw new AcceptanceFixtureError("acceptance fixture state is invalid");
   }
+  const actualKeys = Object.keys(state as object).sort();
+  if (actualKeys.length !== FIXTURE_STATE_KEYS.length || actualKeys.some((key, index) => key !== FIXTURE_STATE_KEYS[index])) {
+    throw new AcceptanceFixtureError("acceptance fixture state is invalid");
+  }
+  if (
+    state.version !== 1 ||
+    typeof state.database !== "string" ||
+    typeof state.runId !== "string" ||
+    typeof state.email !== "string" ||
+    typeof state.providerSubject !== "string" ||
+    typeof state.displayName !== "string" ||
+    (state.userId !== null && typeof state.userId !== "string")
+  ) {
+    throw new AcceptanceFixtureError("acceptance fixture state is invalid");
+  }
+  assertRestoreTarget(state.database);
   if (
     !/^[A-Za-z0-9-]{8,80}$/.test(state.runId) ||
     state.email !== `p9-acceptance-${state.runId}@example.invalid` ||

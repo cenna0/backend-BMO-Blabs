@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,9 +7,14 @@ import { describe, expect, it } from "vitest";
 
 function setup(): { env: NodeJS.ProcessEnv; statePath: string; cleanup: () => void } {
   const directory = mkdtempSync(join(tmpdir(), "p9-npm-wrapper-test-"));
-  const statePath = join(directory, "fixture-state.json");
+  const workspace = join(directory, "p9-acceptance");
+  mkdirSync(workspace);
+  chmodSync(workspace, 0o700);
+  const statePath = join(workspace, "fixture-state.json");
+  const inputDirectory = join(directory, "inputs");
+  mkdirSync(inputDirectory);
   for (const name of ["postgres-password", "acceptance-password", "runtime.env"]) {
-    const path = join(directory, name);
+    const path = join(inputDirectory, name);
     writeFileSync(path, "synthetic-test-only\n", { mode: 0o600 });
     chmodSync(path, 0o600);
   }
@@ -91,9 +96,9 @@ process.exit(0);
     P9_ACCEPTANCE_CODE_DIR: process.cwd(),
     P9_ACCEPTANCE_MIGRATIONS_DISABLED: "true",
     P9_POSTGRES_USER: "bmo",
-    P9_POSTGRES_PASSWORD_FILE: join(directory, "postgres-password"),
-    P9_ACCEPTANCE_PASSWORD_FILE: join(directory, "acceptance-password"),
-    P9_ACCEPTANCE_RUNTIME_ENV_FILE: join(directory, "runtime.env"),
+    P9_POSTGRES_PASSWORD_FILE: join(inputDirectory, "postgres-password"),
+    P9_ACCEPTANCE_PASSWORD_FILE: join(inputDirectory, "acceptance-password"),
+    P9_ACCEPTANCE_RUNTIME_ENV_FILE: join(inputDirectory, "runtime.env"),
     P9_ACCEPTANCE_STATE_FILE: statePath,
   };
   const serverPidPath = join(directory, "fake-server.pid");
@@ -131,6 +136,7 @@ describe("documented P9 acceptance npm wrappers", () => {
       expect(runScript("p9:acceptance:evidence:snapshot", fixture.env)).toMatchObject({ status: 0 });
       expect(runScript("p9:acceptance:fixture:cleanup", fixture.env)).toMatchObject({ status: 0 });
       expect(existsSync(fixture.statePath)).toBe(false);
+      expect(readdirSync(join(fixture.statePath, ".."))).toEqual([]);
       expect(runScript("p9:acceptance:runtime:stop", fixture.env)).toMatchObject({ status: 0 });
 
       writeFileSync(fixture.statePath, JSON.stringify({ version: 1, database: "bmo_restore_acceptance_test", runId: "run-1234", userId: null, email: "p9-acceptance-run-1234@example.invalid", providerSubject: "p9-acceptance:run-1234", displayName: "P9 restore acceptance fixture run-1234" }) + "\n", { mode: 0o600 });

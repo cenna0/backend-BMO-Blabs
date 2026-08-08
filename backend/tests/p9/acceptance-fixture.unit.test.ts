@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -215,5 +215,27 @@ describe("P9 restored-target acceptance fixture", () => {
 
   it("rejects malformed state before any cleanup operation", () => {
     expect(() => validateFixtureState({ ...state(), runId: "bad state" })).toThrow(/invalid/);
+  });
+
+  it("rejects extra state fields that could carry credential material", () => {
+    expect(() => validateFixtureState({ ...state(), password: "synthetic-password" } as never)).toThrow(/invalid/);
+  });
+
+  it("rejects state fields with the wrong runtime types", () => {
+    expect(() => validateFixtureState({ ...state(), userId: 42 } as never)).toThrow(/invalid/);
+  });
+
+  it("keeps the host state manifest free of password, token, cookie, and authorization values", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "p9-state-secrets-test-"));
+    const path = join(directory, "fixture-state.json");
+    const stateStore = fileFixtureStateStore(path);
+    try {
+      await stateStore.write(createPendingAcceptanceFixtureState("bmo_restore_acceptance_test", "run-1234"));
+
+      const contents = readFileSync(path, "utf8");
+      expect(contents).not.toMatch(/password|token|cookie|authorization/i);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

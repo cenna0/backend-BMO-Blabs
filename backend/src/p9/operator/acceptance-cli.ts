@@ -1,5 +1,4 @@
-import { existsSync } from "node:fs";
-import { dirname, isAbsolute } from "node:path";
+import { isAbsolute } from "node:path";
 
 import { loadAcceptanceConfig, type AcceptanceConfig } from "./acceptance-config.js";
 import {
@@ -26,6 +25,7 @@ import {
   ACCEPTANCE_RUNTIME_STATE_TMPFS_SPEC,
   validateHostAcceptanceStateFile,
 } from "./acceptance-state.js";
+import { ensureAcceptanceWorkspace, validateAcceptanceWorkspace } from "./acceptance-workspace.js";
 import { sanitizeChildOutput } from "./compose.js";
 import {
   ACCEPTANCE_RUNTIME_PASSWORD_FILE,
@@ -45,21 +45,18 @@ function stateFilePath(): string {
   return value;
 }
 
-function assertStateDirectory(path: string): void {
-  if (!existsSync(dirname(path))) throw new Error("acceptance fixture state directory is unavailable");
-}
-
 function assertHostState(path: string): void {
   validateHostAcceptanceStateFile(path);
 }
 
 async function readHostState(path: string): Promise<FixtureState> {
+  validateAcceptanceWorkspace(path);
   assertHostState(path);
   return fileFixtureStateStore(path).read();
 }
 
 async function removeHostState(path: string): Promise<void> {
-  assertHostState(path);
+  await readHostState(path);
   await fileFixtureStateStore(path).remove();
 }
 
@@ -138,7 +135,11 @@ async function runWorker(
   docker: AcceptanceDocker,
 ): Promise<string> {
   const stateFile = includeState ? stateFilePath() : "";
-  if (includeState) assertHostState(stateFile);
+  if (includeState) {
+    validateAcceptanceWorkspace(stateFile);
+    assertHostState(stateFile);
+    await fileFixtureStateStore(stateFile).read();
+  }
   const result = await docker.run(buildAcceptanceWorkerArgs(config, stateFile, command, includePassword, includeState));
   if (result.exitCode !== 0) throw new Error(`acceptance worker failed: ${sanitizeChildOutput(result.stderr || result.stdout) || "no diagnostic output"}`);
   return result.stdout.trim();
@@ -152,9 +153,11 @@ async function createFixture(
   await waitForAcceptanceReadiness(config, docker, runtimeWait);
   await verifyAcceptanceTargetIdentity(config, runtimeWait.http);
   const statePath = stateFilePath();
-  assertStateDirectory(statePath);
-  if (existsSync(statePath)) {
+  const workspace = ensureAcceptanceWorkspace(statePath);
+  if (workspace.stateFilePresent) {
     assertHostState(statePath);
+    const existing = await fileFixtureStateStore(statePath).read();
+    if (existing.database !== config.database) throw new Error("acceptance fixture state target mismatch");
     throw new Error("acceptance fixture state already exists; cleanup is required");
   }
 
@@ -167,13 +170,9 @@ async function createFixture(
     const created = parseWorkerFixtureState(output);
     assertStateMatchesPending(pending, created);
     await stateStore.write(created);
+    validateAcceptanceWorkspace(statePath);
     assertHostState(statePath);
   } catch (error) {
-    try {
-      await stateStore.remove();
-    } catch {
-      throw new Error("acceptance fixture state cleanup failed");
-    }
     throw error;
   }
 }
@@ -232,7 +231,17 @@ export async function runAcceptanceCommand(
   }
   if (command === "fixture:status") {
     const statePath = stateFilePath();
-    if (!existsSync(statePath)) {
+    let workspace;
+    try {
+      workspace = validateAcceptanceWorkspace(statePath);
+    } catch (error) {
+      if (error instanceof Error && error.message === "acceptance workspace is unavailable") {
+        process.stdout.write("acceptance fixture absent\n");
+        return;
+      }
+      throw error;
+    }
+    if (!workspace.stateFilePresent) {
       process.stdout.write("acceptance fixture absent\n");
       return;
     }

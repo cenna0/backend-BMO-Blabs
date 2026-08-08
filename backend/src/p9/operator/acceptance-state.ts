@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 
 import { ACCEPTANCE_RUNTIME_GID, ACCEPTANCE_RUNTIME_UID } from "./acceptance-secret.js";
+import { ACCEPTANCE_HOST_GID, ACCEPTANCE_HOST_UID } from "./acceptance-workspace.js";
 import { validateProtectedFile, type ProtectedFileFs } from "./protected-file.js";
 
 export const ACCEPTANCE_RUNTIME_STATE_SOURCE_FILE = "/run/secrets/acceptance_state_source" as const;
@@ -41,21 +42,11 @@ const runtimeFs: RuntimeAcceptanceStateFs & ProtectedFileFs = {
   unlinkSync,
 };
 
-function currentUid(): number {
-  if (typeof process.getuid !== "function") throw new Error("acceptance host state runtime user is unavailable");
-  return process.getuid();
-}
-
-function currentGid(): number {
-  if (typeof process.getgid !== "function") throw new Error("acceptance host state runtime group is unavailable");
-  return process.getgid();
-}
-
 export function validateHostAcceptanceStateFile(
   path: string,
   fs: ProtectedFileFs = runtimeFs,
-  expectedUid = currentUid(),
-  expectedGid = currentGid(),
+  expectedUid = ACCEPTANCE_HOST_UID,
+  expectedGid = ACCEPTANCE_HOST_GID,
 ): string {
   return validateProtectedFile(path, { fs, expectedUid, expectedGid, mode: 0o600, label: "acceptance host state manifest" });
 }
