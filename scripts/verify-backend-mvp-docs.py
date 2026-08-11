@@ -381,7 +381,7 @@ current_doc_requirements = {
         [
             "Current next phase:",
             "P9.1 — PostgreSQL, auth, pairing, and settings foundation",
-            "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`",
+            "Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; isolated P9.1 candidate implemented; production activation not authorized`",
             "P7 is `VERIFIED — PRODUCTION`",
             "P8 is `P8_PIPER_PRODUCTION_VERIFIED`",
             "P8 completion does **not** authorize P9",
@@ -499,7 +499,7 @@ unique_state_declarations = [
         "docs/NEXT-ACTION.md phase state",
         next_action,
         r"^\*\*Phase state:\*\*\s*`([^`]+)`\s*$",
-        "P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; P9 implementation NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION",
+        "P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; isolated P9.1 candidate implemented; production activation not authorized",
     ),
     (
         "docs/roadmap/P8-EXECUTION-SPEC.md status",

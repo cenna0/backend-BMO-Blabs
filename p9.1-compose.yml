@@ -2,7 +2,7 @@ name: bmo-p9-1
 
 services:
   postgres:
-    image: postgres:16.10-alpine3.22@sha256:029660641a0cfc575b14f336ba448fb8a75fd595d42e1fa316b9fb4378742297
+    image: postgres:16.14-alpine3.22@sha256:786dab398303b8ce7cb76b407bb21ef2e4dfbbbd4c6abcf3d29b3130467ffdbc
     environment:
       POSTGRES_DB: ${P9_POSTGRES_DB:-bmo}
       POSTGRES_USER: ${P9_POSTGRES_USER:-bmo}

@@ -412,20 +412,23 @@ Regression      : BLOCKED — public fake-device reached valid auth and voice ac
 
 ```text
 Observed on VPS : 29.6.2 (Docker Compose 5.3.1)
-Verified at     : 2026-08-11T13:38:53+07:00 Asia/Jakarta
-Upstream check  : 29.7.2 from the official Docker apt repository and Engine release notes
-Status          : NOT ATTEMPTED — maintenance sequence stopped at the Hermes public voice regression blocker
+Verified at     : 2026-08-11T17:46:38+07:00 Asia/Jakarta
+Upstream check  : 29.6.2, latest stable v29 release listed in the official Docker Engine release notes
+Status          : CURRENT — no upgrade performed
 Compatibility   : same major line; current Compose/runtime inventory remained healthy
 ```
 
 ### PostgreSQL 16 candidate
 
 ```text
-Observed on VPS : 16.10-alpine3.22, private container bmo-p9-1-postgres-1 (healthy)
-Verified at     : 2026-08-11T13:38:53+07:00 Asia/Jakarta
+Observed on VPS : 16.14-alpine3.22, private container bmo-p9-1-postgres-1 (healthy); before update 16.10-alpine3.22
+Verified at     : 2026-08-11T17:46:38+07:00 Asia/Jakarta
 Upstream check  : PostgreSQL 16.14 official minor release
-Status          : NOT ATTEMPTED — maintenance sequence stopped at the Hermes public voice regression blocker
-Compatibility   : 16.x → 16.x only; no major upgrade or destructive migration was attempted
+Status          : UPDATED — controlled candidate-only recreate completed; production and unrelated databases were not touched
+Compatibility   : 16.x → 16.x only; same bind data, private network, secret path, and two completed migrations retained
+Health          : `pg_isready` PASS; `SELECT version()` reports 16.14; candidate backend remained healthy
+DB/API          : Prisma-backed `livez=200`, `readyz=200`, `migration_count=2`; P9 suite 30 passed, 1 skipped
+Backup          : existing 11 encrypted backup artifacts and SHA-256 sidecars validated PASS; prior isolated restore evidence retained
 ```
 
 ### Other live infrastructure observation

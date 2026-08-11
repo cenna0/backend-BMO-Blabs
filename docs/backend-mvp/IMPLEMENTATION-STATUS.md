@@ -1,6 +1,6 @@
 # BMO Backend MVP — Implementation Status
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-11
 **Backend reference lineage:** 1.0.1; current active documentation is date-audited and governed by this status file
 
 ## 1. Control state
@@ -23,14 +23,14 @@ P10 state: NOT_STARTED / dependency-gated after P9.6
 P6, P7, and P8 are verified. P8 fixed Piper Prudence as the production primary,
 retains Kokoro as automatic fallback, and preserves the public contract. Read
 `P8-PRODUCTION-ROLLOUT-EVIDENCE.md` for source synchronization, deployment,
-acceptance, and soak evidence. P9 is the next dependency phase but is not
-started or authorized.
+acceptance, and soak evidence. P9.1 is implemented and validated only as an
+isolated/private candidate; production activation remains separately gated.
 
 ## 2. Documentation status
 
 | Document | Status | Verification |
 |---|---|---|
-| `../NEXT-ACTION.md` | CURRENT P9 OPERATIONAL GATE | Selects P9 while requiring new explicit authorization and preventing accidental P10 execution |
+| `../NEXT-ACTION.md` | CURRENT P9 OPERATIONAL GATE | Records the isolated candidate checkpoint, requires explicit production activation authorization, and prevents accidental P10 execution |
 | `../roadmap/P6-EXECUTION-SPEC.md` | HISTORICAL / LOCKED VERIFIED P6 RECORD | Exact completed P6 scope, acceptance checklist, evidence, and stop condition |
 | `../roadmap/P8-EXECUTION-SPEC.md` | P8 VERIFIED | Piper production closure, rollback, archived RVC boundary, and P9 stop |
 | `00-AGENT-EXECUTION-GUIDE.md` | VERIFIED | Workflow, boundary, phase control, stop condition tersedia |
@@ -93,6 +93,13 @@ started or authorized.
 - The public production endpoint `api.personalbmo.web.id` is live and verified.
   Public fake-ESP32 acceptance passed `23/23`, and the P7 resource soak passed;
   this does not verify a physical ESP32.
+- Runtime maintenance on 2026-08-11 verified Codex CLI `0.147.0`, Hermes Agent
+  `0.20.0`, Docker Engine `29.6.2` as current stable, and upgraded only the
+  isolated/private P9.1 candidate PostgreSQL from `16.10-alpine3.22` to
+  `16.14-alpine3.22`. Production containers and unrelated databases were not
+  changed. Hermes public fake-device regression remains blocked by a duplicate
+  authenticated device connection (`CONNECTION_REPLACED`); physical ESP32
+  verification remains separate and unclaimed.
 
 ## 4. Verification types
 
