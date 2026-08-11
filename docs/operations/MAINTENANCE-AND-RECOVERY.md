@@ -378,3 +378,59 @@ Current reboot caveat:
 - `cloud-init.service` and `systemd-networkd-wait-online.service` retain old
   failed states from the current boot and must be reviewed before a planned
   reboot rather than silently cleared.
+
+## 11. Current live runtime maintenance inventory — 2026-08-11
+
+This section records the live maintenance pass. Historical version inventories
+above remain unchanged and are evidence for their original verification date.
+
+### Codex CLI
+
+```text
+Observed on VPS : codex-cli 0.147.0 (was 0.145.0)
+Verified at     : 2026-08-11T11:33:10+07:00 Asia/Jakarta
+Upstream check  : 0.147.0 from the official @openai/codex package and Codex CLI documentation
+Update method   : user-local npm prefix /home/bmo-admin/.local
+Impact          : no BMO service restart required; production services were not recreated
+```
+
+### Hermes Agent
+
+```text
+Observed on VPS : 0.19.0
+Verified at     : 2026-08-11T11:45:51+07:00 Asia/Jakarta
+Upstream check  : 0.20.0, official v2026.8.3 release
+Install method  : /home/hermes/.hermes/hermes-agent/venv, systemd unit hermes-gateway.service
+Status          : BLOCKED — update requires the hermes service owner/root credential
+Compatibility   : not promoted; v0.20.0 contains broad gateway, voice, A2A, webhook, and config changes that require a controlled Hermes-owned update and regression
+Health          : current 0.19.0 remained healthy; no service restart or configuration change was attempted
+```
+
+### Docker Engine
+
+```text
+Observed on VPS : 29.6.2 (Docker Compose 5.3.1)
+Verified at     : 2026-08-11T11:45:51+07:00 Asia/Jakarta
+Upstream check  : 29.7.2 from the official Docker apt repository and Engine release notes
+Status          : NOT ATTEMPTED — maintenance sequence stopped at the Hermes credential blocker
+Compatibility   : same major line; current Compose/runtime inventory remained healthy
+```
+
+### PostgreSQL 16 candidate
+
+```text
+Observed on VPS : 16.10-alpine3.22, private container bmo-p9-1-postgres-1 (healthy)
+Verified at     : 2026-08-11T11:45:51+07:00 Asia/Jakarta
+Upstream check  : PostgreSQL 16.14 official minor release
+Status          : NOT ATTEMPTED — maintenance sequence stopped at the Hermes credential blocker
+Compatibility   : 16.x → 16.x only; no major upgrade or destructive migration was attempted
+```
+
+### Other live infrastructure observation
+
+```text
+Observed on VPS : Tailscale 1.102.2
+Verified at     : 2026-08-11T11:45:51+07:00 Asia/Jakarta
+Upstream check  : outside this maintenance sequence; no update attempted
+Note            : the 1.98.9 value above is retained as historical P6 evidence, not current inventory
+```
