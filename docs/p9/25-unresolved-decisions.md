@@ -4,7 +4,7 @@ These do not change approved scope; they block only the named acceptance or requ
 
 | Gate/decision | State | Owner / required evidence |
 |---|---|---|
-| Prisma Studio `*:5555` exposure | `BLOCKED` | Operations: stop it and prove listeners/firewall |
+| Host firewall policy visibility | `BLOCKED` for final topology sign-off | Operations: provide privileged UFW/nft evidence; Phase 2 already stopped Prisma Studio and verified no listener, Docker publication, or Caddy route on 5555 |
 | Actual Hermes WhatsApp API/session/persistence/version | `BLOCKED` | Hermes/operations: sanitized local contract and working session evidence |
 | Spotify app credentials and callback registration | `BLOCKED` | Provider/operator: exact registered URI and secret availability |
 | First-boot Wi-Fi bootstrap | `PENDING_PHYSICAL_ESP` | Hardware product/firmware decision and bench evidence |

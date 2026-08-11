@@ -1,8 +1,8 @@
 # BMO — Next Execution Action
 
 **Last updated:** 2026-08-11
-**Current integration action:** Phase 2 Slice 1, only after review of the Phase 1 docs commit and explicit implementation authorization.
-**Starting point:** close the Prisma Studio `*:5555` security gate, verify drift, then integrate the existing P9.1 router into a production-shaped Backend API candidate while preserving device voice.
+**Current integration action:** Phase 2 Slice 1 implementation on `feat/vps-mobile-device-integration`.
+**Starting point:** Prisma Studio `*:5555` has been closed and source/runtime drift checked; next integrate the existing P9.1 router into a production-shaped Backend API candidate while preserving device voice.
 
 Read [`integration/00-START-HERE.md`](integration/00-START-HERE.md) and [`integration/04-VPS-IMPLEMENTATION-PLAN.md`](integration/04-VPS-IMPLEMENTATION-PLAN.md). Do not run a production migration, deploy, configure external credentials, or claim physical ESP behavior from this documentation freeze.
 
@@ -19,7 +19,7 @@ Read [`integration/00-START-HERE.md`](integration/00-START-HERE.md) and [`integr
 
 1. Check out the final Phase 1 documentation commit.
 2. Confirm route/schema/runtime drift and production provenance.
-3. With runtime authority, stop the undeclared Prisma Studio process and prove port/firewall closure without exposing its database URL.
+3. Preserve the recorded Prisma Studio remediation; obtain privileged UFW/nft output later for final topology sign-off without reopening the listener.
 4. Add tests around the existing P9.1 integration point and device voice regression.
 5. Integrate the existing P9.1 router into the production-shaped candidate service; do not create a parallel business API.
 6. Update status/matrix with the implementation commit. Production activation remains separately gated.

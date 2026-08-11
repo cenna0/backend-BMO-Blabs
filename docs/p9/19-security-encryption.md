@@ -7,9 +7,20 @@
 - PostgreSQL is private to the candidate network; Hermes and Audio Service are loopback-only; Caddy is the public edge.
 - Device credential verifier is SHA-256 in the current schema; raw credential is provisioned out-of-band.
 
-## Phase 1 blocker
+## Phase 2 port-5555 remediation
 
-A manually started Prisma Studio process listens on `*:5555`, is not part of declared Compose/systemd architecture, and can reach the candidate database. Current firewall rules could not be inspected without elevated privilege. This is `BLOCKED`: stop the process and verify listeners/firewall before Phase 2 or any deployment.
+At the Phase 2 preflight, PID 217206 was confirmed as a manually started
+`bmo-admin` Node process running Prisma Studio from the Backend workspace. It
+was not owned by Docker, Compose, systemd, or a user service. Docker published
+no port 5555 and the active sanitized Caddy config contained no 5555 route.
+The process was terminated with `SIGTERM`; subsequent `ss`, `lsof`, process,
+and local-connect checks found no listener or reachable service on port 5555.
+Backend, PostgreSQL candidate, Hermes, Audio Service, and the other declared
+containers remained healthy.
+
+Passwordless privilege was unavailable, so UFW/nft policy could not be read.
+That is retained as an operator evidence limitation for final topology sign-off,
+not as an active Prisma Studio exposure: no process currently accepts the port.
 
 ## Target controls
 

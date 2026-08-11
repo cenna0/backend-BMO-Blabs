@@ -1,6 +1,7 @@
-# Phase 1 Frozen Implementation Status
+# Phase 2 Implementation Status
 
 **Audited:** 2026-08-11
+**Last implementation checkpoint:** 2026-08-11 — Prisma Studio listener remediation
 **Baseline source:** `main` / `d638b20c381c676136c94524a38a1def5d70e565`
 **Documentation branch:** `docs/integration-contract-freeze`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -38,7 +39,7 @@
 | Caddy | `EXISTING_VERIFIED` | `api.personalbmo.web.id` -> `127.0.0.1:3000`; public `/livez` and `/readyz` deliberately return 404 |
 | Observability | `EXISTING_VERIFIED` | Beszel hub/agent and Telegram relay healthy |
 | Physical ESP additive integration | `PENDING_PHYSICAL_ESP` | No Phase 1 physical evidence |
-| Prisma Studio on `*:5555` | `BLOCKED` | Manually running, not a declared service; stop it and verify exposure before Phase 2/deploy |
+| Prisma Studio public listener | `EXISTING_VERIFIED` | Remediated on the Phase 2 implementation host: the manual user process was terminated and no TCP listener remains on port 5555. Docker publishes no port 5555 and active Caddy config contains no 5555 route. UFW/nft inspection remains unavailable without passworded sudo. |
 
 Host: Ubuntu 24.04, kernel `6.8.0-124`, 4 vCPU, 7.8 GiB RAM, no swap. Docker `29.6.2`, Compose `5.3.1`, Caddy `2.11.4`, Git `2.43.0`. Host Node `18.19.1` is unsupported by the project; verified project/runtime Node is `22.23.1`. Audio runtime uses Python `3.10.20`.
 
@@ -112,11 +113,10 @@ Current session gap: `Session.clientDeviceId` exists in Prisma, but the token-is
 
 ## Current blockers
 
-1. `BLOCKED`: Prisma Studio listens on all interfaces at port 5555; close and verify firewall/listeners before Phase 2 work proceeds.
-2. `BLOCKED`: live WhatsApp session/API/provider credentials are not proven.
-3. `BLOCKED`: Spotify application credentials/callback registration are not proven.
-4. `PENDING_PHYSICAL_ESP`: first-boot Wi-Fi bootstrap, battery sensing capability, additive events, and physical playback require firmware/bench evidence.
-5. Current UFW rules were not readable without elevated privileges; public exposure must be re-verified when closing the port-5555 gate.
+1. `BLOCKED`: live WhatsApp session/API/provider credentials are not proven.
+2. `BLOCKED`: Spotify application credentials/callback registration are not proven.
+3. `PENDING_PHYSICAL_ESP`: first-boot Wi-Fi bootstrap, battery sensing capability, additive events, and physical playback require firmware/bench evidence.
+4. Current UFW/nft rules remain unreadable without passworded elevated privileges. Listener, Docker, and Caddy evidence prove no service currently accepts port 5555; firewall-policy inspection remains an operator evidence gap for final public/private sign-off.
 
 ## Phase 2 starting point
 

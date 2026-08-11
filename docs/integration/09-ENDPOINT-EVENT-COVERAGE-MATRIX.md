@@ -16,6 +16,7 @@
 | GET | `/api/v1/ops/db/livez` | `EXISTING_VERIFIED` | Private candidate only (`includeOps=true`) |
 | GET | `/api/v1/ops/db/readyz` | `EXISTING_VERIFIED` | Private candidate only |
 | GET | `/api/v1/ops/db/migrations` | `EXISTING_VERIFIED` | Private candidate only; sanitized migration state |
+| TCP exposure | `*:5555` | `EXISTING_VERIFIED` | Phase 2 remediation: manual Prisma Studio stopped; no listener, Docker publication, or Caddy route. Firewall rules unreadable without passworded sudo. |
 
 ## Auth, profile, and settings
 
