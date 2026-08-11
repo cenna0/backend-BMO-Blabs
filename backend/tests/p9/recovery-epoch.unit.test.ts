@@ -68,13 +68,53 @@ function fixture() {
     passwordRecovery: { findUnique: vi.fn().mockResolvedValue(null) },
     auditEvent: { create: vi.fn(async (value) => { auditEvents.push(value); return {}; }) },
   };
+  let locked = false;
+  let activeLocks = 0;
+  let peakLocks = 0;
+  let lockWaits = 0;
+  const lockWaiters: Array<() => void> = [];
+  const acquireLock = async () => {
+    if (locked) {
+      lockWaits += 1;
+      await new Promise<void>((resolve) => { lockWaiters.push(resolve); });
+    } else {
+      locked = true;
+    }
+    activeLocks += 1;
+    peakLocks = Math.max(peakLocks, activeLocks);
+  };
+  const releaseLock = () => {
+    activeLocks -= 1;
+    const next = lockWaiters.shift();
+    if (next) next();
+    else locked = false;
+  };
+  const client = {
+    $transaction: async (work: any) => {
+      let holdsUserLock = false;
+      const lockAwareTransaction = {
+        ...transaction,
+        $executeRaw: async (...args: unknown[]) => {
+          await acquireLock();
+          holdsUserLock = true;
+          return transaction.$executeRaw(...args);
+        },
+      };
+      try {
+        return await work(lockAwareTransaction);
+      } finally {
+        if (holdsUserLock) releaseLock();
+      }
+    },
+  };
   return {
     auditEvents,
     recoveries,
     repositories,
     transaction,
+    lockStats: () => ({ active: activeLocks, peak: peakLocks, waits: lockWaits }),
     service: new RecoveryService(
-      { $transaction: (work: any) => work(transaction) } as any,
+      client as any,
       repositories as any,
       { ttlSeconds: 600, maxAttempts: 5 },
     ),
@@ -85,27 +125,36 @@ function fixture() {
 describe("password recovery token epochs", () => {
   it("serializes issuance and makes only the newest of two tokens usable without persisting either secret", async () => {
     const f = fixture();
-    const first = await f.service.verify({ email: "p@example.com", dateOfBirth: "2004-05-19" }, {
-      now: new Date("2026-08-11T12:00:00.000Z"), requestId: "verify-1",
-    });
-    const second = await f.service.verify({ email: "p@example.com", dateOfBirth: "2004-05-19" }, {
-      now: new Date("2026-08-11T12:01:00.000Z"), requestId: "verify-2",
-    });
+    const [first, second] = await Promise.all([
+      f.service.verify({ email: "p@example.com", dateOfBirth: "2004-05-19" }, {
+        now: new Date("2026-08-11T12:00:00.000Z"), requestId: "verify-1",
+      }),
+      f.service.verify({ email: "p@example.com", dateOfBirth: "2004-05-19" }, {
+        now: new Date("2026-08-11T12:01:00.000Z"), requestId: "verify-2",
+      }),
+    ]);
 
     expect(f.transaction.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(f.lockStats()).toMatchObject({ active: 0, peak: 1, waits: 1 });
     expect(f.recoveries).toHaveLength(2);
-    expect(f.recoveries[0]).toMatchObject({ tokenVerifier: sha256Hex(first.recoveryToken), usedAt: new Date("2026-08-11T12:01:00.000Z") });
-    expect(f.recoveries[1]).toMatchObject({ tokenVerifier: sha256Hex(second.recoveryToken), usedAt: null });
+    const resultsByVerifier = new Map([
+      [sha256Hex(first.recoveryToken), first],
+      [sha256Hex(second.recoveryToken), second],
+    ]);
+    const older = resultsByVerifier.get(f.recoveries[0]!.tokenVerifier)!;
+    const replacement = resultsByVerifier.get(f.recoveries[1]!.tokenVerifier)!;
+    expect(f.recoveries[0]).toMatchObject({ usedAt: expect.any(Date) });
+    expect(f.recoveries[1]).toMatchObject({ usedAt: null });
     expect(JSON.stringify({ recoveries: f.recoveries, auditEvents: f.auditEvents })).not.toContain(first.recoveryToken);
     expect(JSON.stringify({ recoveries: f.recoveries, auditEvents: f.auditEvents })).not.toContain(second.recoveryToken);
 
-    await expect(f.service.reset({ recoveryToken: first.recoveryToken, newPassword: "first-replacement-password" }, {
+    await expect(f.service.reset({ recoveryToken: older.recoveryToken, newPassword: "first-replacement-password" }, {
       now: new Date("2026-08-11T12:02:00.000Z"), requestId: "reset-old",
     })).rejects.toMatchObject({ code: "RECOVERY_INVALID" });
-    await expect(f.service.reset({ recoveryToken: second.recoveryToken, newPassword: "second-replacement-password" }, {
+    await expect(f.service.reset({ recoveryToken: replacement.recoveryToken, newPassword: "second-replacement-password" }, {
       now: new Date("2026-08-11T12:02:01.000Z"), requestId: "reset-new",
     })).resolves.toBeUndefined();
-    await expect(f.service.reset({ recoveryToken: second.recoveryToken, newPassword: "replayed-replacement-password" }, {
+    await expect(f.service.reset({ recoveryToken: replacement.recoveryToken, newPassword: "replayed-replacement-password" }, {
       now: new Date("2026-08-11T12:02:02.000Z"), requestId: "reset-replay",
     })).rejects.toMatchObject({ code: "RECOVERY_INVALID" });
   });

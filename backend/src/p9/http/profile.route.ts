@@ -9,9 +9,23 @@ import type { AvatarStorage } from "../services/avatar-storage.service.js";
 import type { AvatarService } from "../services/avatar.service.js";
 import type { ProfileService } from "../services/profile.service.js";
 import type { AccessTokenService, SessionService } from "../services/session.service.js";
+import {
+  avatarUploadAdmission,
+  createAvatarUploadAdmissionMiddleware,
+  releaseAvatarUploadAdmission,
+  retainAvatarUploadAdmission,
+  type AvatarUploadAdmission,
+} from "./avatar-upload-admission.js";
 import { asyncP9, currentAuth, ensureRequestContext, p9ErrorHandler, requireAuth } from "./middleware.js";
 
 const acceptedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+export interface AvatarUploadControls {
+  windowMs: number;
+  userLimit: number;
+  ipLimit: number;
+  admission?: AvatarUploadAdmission;
+}
 
 export function createProfileRouter(
   profile: ProfileService,
@@ -19,7 +33,7 @@ export function createProfileRouter(
   accessTokens: AccessTokenService,
   sessions: SessionService,
   maxBytes: number,
-  uploadRate: { windowMs: number; limit: number } = { windowMs: 900_000, limit: 10 },
+  uploadControls: AvatarUploadControls = { windowMs: 900_000, userLimit: 10, ipLimit: 20 },
 ): Router {
   const router = Router();
   const authenticated = requireAuth(accessTokens, sessions);
@@ -31,22 +45,33 @@ export function createProfileRouter(
       else callback(new Error("invalid avatar MIME"));
     },
   });
-  const avatarUploadLimiter = rateLimit({
-    windowMs: uploadRate.windowMs,
-    limit: uploadRate.limit,
+  const avatarUserLimiter = rateLimit({
+    windowMs: uploadControls.windowMs,
+    limit: uploadControls.userLimit,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    keyGenerator: (request) => sha256Hex(
-      `${request.p9Auth?.userId ?? "unauthenticated"}:${ipKeyGenerator(request.ip ?? "0.0.0.0")}`,
-    ),
+    keyGenerator: (request) => sha256Hex(request.p9Auth?.userId ?? "unauthenticated"),
     handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
   });
+  const avatarIpLimiter = rateLimit({
+    windowMs: uploadControls.windowMs,
+    limit: uploadControls.ipLimit,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (request) => ipKeyGenerator(request.ip ?? "0.0.0.0"),
+    handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
+  });
+  const admitAvatarUpload = createAvatarUploadAdmissionMiddleware(
+    uploadControls.admission ?? avatarUploadAdmission,
+  );
   const parseAvatar: RequestHandler = (request, response, next) => {
     upload.single("file")(request, response, (error) => {
       if (error) {
         response.status(400).json({ error: "INVALID_INPUT" });
         return;
       }
+      if (request.aborted) return;
+      retainAvatarUploadAdmission(request);
       next();
     });
   };
@@ -56,16 +81,28 @@ export function createProfileRouter(
     response.json({ user: await profile.update(auth.userId, request.body, auth.context.requestId) });
   }));
 
-  router.post("/me/avatar", authenticated, avatarUploadLimiter, parseAvatar, asyncP9(async (request, response) => {
-    const auth = currentAuth(request);
-    if (!request.file) throw new P9Error("INVALID_INPUT", 400, "Avatar file is required");
-    response.json(await avatars.upload(
-      auth.userId,
-      request.file.buffer,
-      request.file.mimetype,
-      auth.context.requestId,
-    ));
-  }));
+  router.post(
+    "/me/avatar",
+    authenticated,
+    avatarUserLimiter,
+    avatarIpLimiter,
+    admitAvatarUpload,
+    parseAvatar,
+    asyncP9(async (request, response) => {
+      try {
+        const auth = currentAuth(request);
+        if (!request.file) throw new P9Error("INVALID_INPUT", 400, "Avatar file is required");
+        response.json(await avatars.upload(
+          auth.userId,
+          request.file.buffer,
+          request.file.mimetype,
+          auth.context.requestId,
+        ));
+      } finally {
+        releaseAvatarUploadAdmission(request);
+      }
+    }),
+  );
   return router;
 }
 

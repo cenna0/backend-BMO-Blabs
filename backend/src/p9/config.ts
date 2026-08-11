@@ -93,7 +93,8 @@ export interface P9Config {
   avatarStorageDir: string;
   avatarMaxBytes: 5_242_880;
   avatarUploadWindowMs: 900_000;
-  avatarUploadLimit: 10;
+  avatarUploadUserLimit: 10;
+  avatarUploadIpLimit: 20;
   avatarGcIntervalMs: 3_600_000;
   avatarGcGraceMs: 86_400_000;
   avatarGcScanLimit: 200;
@@ -127,7 +128,8 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
       avatarMaxBytes: 5_242_880,
       avatarUploadWindowMs: 900_000,
-      avatarUploadLimit: 10,
+      avatarUploadUserLimit: 10,
+      avatarUploadIpLimit: 20,
       avatarGcIntervalMs: 3_600_000,
       avatarGcGraceMs: 86_400_000,
       avatarGcScanLimit: 200,
@@ -159,7 +161,8 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
     avatarMaxBytes: 5_242_880,
     avatarUploadWindowMs: 900_000,
-    avatarUploadLimit: 10,
+    avatarUploadUserLimit: 10,
+    avatarUploadIpLimit: 20,
     avatarGcIntervalMs: 3_600_000,
     avatarGcGraceMs: 86_400_000,
     avatarGcScanLimit: 200,

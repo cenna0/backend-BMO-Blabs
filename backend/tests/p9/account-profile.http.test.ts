@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { parseP9Config } from "../../src/p9/config.js";
 import { P9Error } from "../../src/p9/errors.js";
 import { createAuthRouter } from "../../src/p9/http/auth.route.js";
+import { BoundedAvatarUploadAdmission } from "../../src/p9/http/avatar-upload-admission.js";
 import { p9ErrorHandler } from "../../src/p9/http/middleware.js";
 import { createAvatarMediaRouter, createProfileRouter } from "../../src/p9/http/profile.route.js";
 import { createPersonalizationRouter } from "../../src/p9/http/personalization.route.js";
@@ -18,6 +19,12 @@ const enabledConfig = parseP9Config({
   PUBLIC_BASE_URL: "https://api.example.com",
   AVATAR_STORAGE_DIR: "/tmp/test-avatars",
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
 
 function buildApp(overrides: Record<string, unknown> = {}) {
   const recovery = {
@@ -145,8 +152,15 @@ describe("P9 request envelope", () => {
 });
 
 describe("Phase 2B authenticated profile/settings/media routes", () => {
-  function buildAuthedApp(maxBytes = 5 * 1024 * 1024, avatarUploadLimit = 10) {
-    const accessTokens = { verify: vi.fn().mockResolvedValue({ sub: "user-1", sid: "session-1" }) };
+  function buildAuthedApp(
+    maxBytes = 5 * 1024 * 1024,
+    uploadRate = { userLimit: 10, ipLimit: 20 },
+    admission?: { acquire(signal?: AbortSignal): Promise<{ release(): void }> },
+  ) {
+    const accessTokens = { verify: vi.fn(async (token: string) => ({
+      sub: token.startsWith("user-") ? token : "user-1",
+      sid: "session-1",
+    })) };
     const sessions = { isActive: vi.fn().mockResolvedValue(true) };
     const profile = { update: vi.fn().mockResolvedValue({ id: "user-1", username: "person" }) };
     const avatar = { upload: vi.fn().mockResolvedValue({ avatarUrl: "https://api.example.com/media/avatars/key.webp" }) };
@@ -170,7 +184,12 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
       accessTokens as any,
       sessions as any,
       maxBytes,
-      { windowMs: 15 * 60 * 1_000, limit: avatarUploadLimit },
+      {
+        windowMs: 15 * 60 * 1_000,
+        userLimit: uploadRate.userLimit,
+        ipLimit: uploadRate.ipLimit,
+        ...(admission ? { admission } : {}),
+      },
     ));
     app.use(createPersonalizationRouter(personalization as any, accessTokens as any, sessions as any));
     app.use(createAvatarMediaRouter(storage as any));
@@ -217,20 +236,123 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
       .attach("file", Buffer.alloc(11), { filename: "large.png", contentType: "image/png" })).status).toBe(400);
   });
 
-  it("rate limits avatar uploads by authenticated owner and proxy-aware client IP", async () => {
-    const f = buildAuthedApp(100, 2);
+  it("applies an independent authenticated-user avatar limit across changing client IPs", async () => {
+    const f = buildAuthedApp(100, { userLimit: 2, ipLimit: 20 });
     const upload = (ip: string) => request(f.app).post("/me/avatar")
-      .set("Authorization", "Bearer token")
+      .set("Authorization", "Bearer user-one")
       .set("X-Forwarded-For", ip)
       .attach("file", Buffer.from("image"), { filename: "avatar.png", contentType: "image/png" });
 
     expect((await upload("203.0.113.8")).status).toBe(200);
-    expect((await upload("203.0.113.8")).status).toBe(200);
-    const limited = await upload("203.0.113.8");
+    expect((await upload("203.0.113.9")).status).toBe(200);
+    const limited = await upload("203.0.113.10");
     expect(limited.status).toBe(429);
     expect(limited.body).toEqual({ error: "RATE_LIMITED" });
     expect(limited.headers["x-request-id"]).toEqual(expect.any(String));
-    expect((await upload("203.0.113.9")).status).toBe(200);
+  });
+
+  it("applies an independent proxy-aware IP avatar limit across changing users", async () => {
+    const f = buildAuthedApp(100, { userLimit: 20, ipLimit: 2 });
+    const upload = (token: string) => request(f.app).post("/me/avatar")
+      .set("Authorization", `Bearer ${token}`)
+      .set("X-Forwarded-For", "203.0.113.20")
+      .attach("file", Buffer.from("image"), { filename: "avatar.png", contentType: "image/png" });
+
+    expect((await upload("user-one")).status).toBe(200);
+    expect((await upload("user-two")).status).toBe(200);
+    expect((await upload("user-three")).status).toBe(429);
+  });
+
+  it("rejects admission overload before Multer MIME validation or file buffering", async () => {
+    const admission = new BoundedAvatarUploadAdmission(1, 0);
+    const held = await admission.acquire();
+    const f = buildAuthedApp(5 * 1024 * 1024, { userLimit: 20, ipLimit: 20 }, admission);
+
+    const response = await request(f.app).post("/me/avatar")
+      .set("Authorization", "Bearer token")
+      .attach("file", Buffer.alloc(5 * 1024 * 1024 - 1), { filename: "avatar.gif", contentType: "image/gif" });
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      error: "SERVICE_UNAVAILABLE",
+      message: "Avatar upload temporarily unavailable",
+    });
+    expect(admission.snapshot()).toEqual({ active: 1, waiting: 0 });
+    expect(f.avatar.upload).not.toHaveBeenCalled();
+    held.release();
+  });
+
+  it("admits only a bounded number of multipart bodies before Multer", async () => {
+    const admission = new BoundedAvatarUploadAdmission(1, 1);
+    const firstUpload = deferred<{ avatarUrl: string }>();
+    const f = buildAuthedApp(5 * 1024 * 1024, { userLimit: 20, ipLimit: 20 }, admission);
+    f.avatar.upload
+      .mockImplementationOnce(() => firstUpload.promise)
+      .mockResolvedValue({ avatarUrl: "https://api.example.com/media/avatars/key.webp" });
+    const body = Buffer.alloc(5 * 1024 * 1024 - 1);
+    const upload = (token: string) => request(f.app).post("/me/avatar")
+      .set("Authorization", `Bearer ${token}`)
+      .attach("file", body, { filename: "avatar.png", contentType: "image/png" });
+
+    const first = upload("user-one").then((response) => response);
+    await vi.waitFor(() => expect(f.avatar.upload).toHaveBeenCalledTimes(1));
+    const second = upload("user-two").then((response) => response);
+    await vi.waitFor(() => expect(admission.snapshot()).toEqual({ active: 1, waiting: 1 }));
+
+    const overloaded = await upload("user-three");
+    expect(overloaded.status).toBe(503);
+    expect(f.avatar.upload).toHaveBeenCalledTimes(1);
+
+    firstUpload.resolve({ avatarUrl: "https://api.example.com/media/avatars/key.webp" });
+    expect((await first).status).toBe(200);
+    expect((await second).status).toBe(200);
+    expect(f.avatar.upload).toHaveBeenCalledTimes(2);
+    expect(admission.snapshot()).toEqual({ active: 0, waiting: 0 });
+  });
+
+  it("releases multipart admission after success, Multer rejection, and service failure", async () => {
+    const admission = new BoundedAvatarUploadAdmission(1, 0);
+    const f = buildAuthedApp(100, { userLimit: 20, ipLimit: 20 }, admission);
+    const upload = (contentType = "image/png") => request(f.app).post("/me/avatar")
+      .set("Authorization", "Bearer token")
+      .attach("file", Buffer.from("image"), { filename: "avatar.bin", contentType });
+
+    expect((await upload()).status).toBe(200);
+    expect(admission.snapshot()).toEqual({ active: 0, waiting: 0 });
+    expect((await upload("image/gif")).status).toBe(400);
+    expect(admission.snapshot()).toEqual({ active: 0, waiting: 0 });
+    f.avatar.upload.mockRejectedValueOnce(new Error("private service failure"));
+    expect((await upload()).status).toBe(500);
+    expect(admission.snapshot()).toEqual({ active: 0, waiting: 0 });
+  });
+
+  it("retains admission after client disconnect until buffer-backed avatar work settles", async () => {
+    const admission = new BoundedAvatarUploadAdmission(1, 0);
+    const firstUpload = deferred<{ avatarUrl: string }>();
+    const f = buildAuthedApp(5 * 1024 * 1024, { userLimit: 20, ipLimit: 20 }, admission);
+    f.avatar.upload
+      .mockImplementationOnce(() => firstUpload.promise)
+      .mockResolvedValue({ avatarUrl: "https://api.example.com/media/avatars/key.webp" });
+    const body = Buffer.alloc(5 * 1024 * 1024 - 1);
+    const upload = (token: string) => request(f.app).post("/me/avatar")
+      .set("Authorization", `Bearer ${token}`)
+      .attach("file", body, { filename: "avatar.png", contentType: "image/png" });
+
+    const abandoned = upload("user-one");
+    abandoned.end(() => undefined);
+    await vi.waitFor(() => expect(f.avatar.upload).toHaveBeenCalledTimes(1));
+    abandoned.abort();
+    await new Promise<void>((resolve) => { setTimeout(resolve, 50); });
+    expect(admission.snapshot()).toEqual({ active: 1, waiting: 0 });
+
+    const overloaded = await upload("user-two");
+    expect(overloaded.status).toBe(503);
+    expect(f.avatar.upload).toHaveBeenCalledTimes(1);
+
+    firstUpload.resolve({ avatarUrl: "https://api.example.com/media/avatars/key.webp" });
+    await vi.waitFor(() => expect(admission.snapshot()).toEqual({ active: 0, waiting: 0 }));
+    expect((await upload("user-three")).status).toBe(200);
+    expect(f.avatar.upload).toHaveBeenCalledTimes(2);
   });
 
   it("serves only exact opaque WebP paths with hardened immutable headers", async () => {

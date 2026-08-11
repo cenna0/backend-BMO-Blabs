@@ -11,8 +11,10 @@ not been applied to the running candidate or production.
 
 Slice 2B registers the account/profile/recovery/avatar and personalization
 surfaces in source and verifies them with automated route/service/storage
-tests. The running private candidate was not recreated and still has only the
-two P9.1 migrations; public production remains unchanged.
+tests, including serialized recovery epochs and bounded avatar multipart and
+image-processing admission. The running private candidate was not recreated
+and still has only the two P9.1 migrations; public production remains
+unchanged.
 
 ## Runtime and existing voice surfaces
 
@@ -44,10 +46,10 @@ deployed or enabled there.
 | POST | `/api/v1/auth/logout` | `EXISTING_VERIFIED` | Private candidate |
 | POST | `/api/v1/auth/logout-all` | `EXISTING_VERIFIED` | Private candidate |
 | GET | `/api/v1/me` | `EXISTING_VERIFIED` | Private candidate legacy shape; Slice 2B source/tests return canonical username/avatar URL without DOB |
-| POST | `/api/v1/auth/password/recovery/verify` | `EXISTING_VERIFIED` | Slice 2B source/tests; generic enumeration-safe failure, request-ID-bearing independent IP/email limits, Jakarta calendar boundary, 600-second opaque token, SHA-256 verifier only; not deployed |
-| POST | `/api/v1/auth/password/recovery/reset` | `EXISTING_VERIFIED` | Slice 2B source/tests; per-user lock precedes refetch/atomic single use, Argon2id replacement, and all-session/refresh revocation; not deployed |
+| POST | `/api/v1/auth/password/recovery/verify` | `EXISTING_VERIFIED` | Slice 2B source/tests; generic enumeration-safe failure, request-ID-bearing independent IP/email limits, Jakarta calendar boundary, per-user serialized replacement epochs using a post-lock DB clock, 600-second opaque token, and SHA-256 verifier only; not deployed |
+| POST | `/api/v1/auth/password/recovery/reset` | `EXISTING_VERIFIED` | Slice 2B source/tests; per-user lock and post-lock DB clock precede refetch/atomic single use, sibling-epoch invalidation, Argon2id replacement, and transactional all-session/refresh revocation; not deployed |
 | PATCH | `/api/v1/me/profile` | `EXISTING_VERIFIED` | Slice 2B source/tests; bearer-owned strict display-name/normalized-username patch and sanitized conflict |
-| POST | `/api/v1/me/avatar` | `EXISTING_VERIFIED` | Slice 2B source/tests; 5 MiB multipart bound, decode validation, WebP transcode, temp-plus-atomic-rename UUID publication, nonfatal old cleanup, and DB-authoritative orphan reconciliation |
+| POST | `/api/v1/me/avatar` | `EXISTING_VERIFIED` | Slice 2B source/tests; independent user/IP limits, global 2-active/4-waiting admission before 5 MiB Multer buffering with post-parse leases retained through processing despite disconnect, separate 2-active/4-waiting Sharp admission, 8 MP/4096 px/4:1/single-page decode bounds, WebP transcode, hardened runtime-owned storage, temp-plus-atomic-rename UUID publication, nonfatal old cleanup, and aged bounded paginated DB-rechecked orphan reconciliation |
 | GET | `/media/avatars/:opaqueId.webp` | `EXISTING_VERIFIED` | Slice 2B source/tests; exact UUID WebP path, `image/webp`, `nosniff`, immutable cache, request context, and local sanitized errors; no directory listing |
 | GET | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
 | PATCH | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |

@@ -6,9 +6,10 @@
 **Implementation authority:** none; Phase 2 starts only from the checkpoint in `docs/NEXT-ACTION.md`.
 
 **Current source checkpoint:** Phase 2 Slice 2B account/profile/recovery/avatar
-and personalization is source/test verified. This does not alter the frozen
-Phase 1 runtime facts below: the running private candidate is still
-invitation-era/unmigrated and public production is unchanged.
+and personalization is source/test verified, including serialized recovery
+epochs and bounded avatar multipart/image-processing admission. This does not
+alter the frozen Phase 1 runtime facts below: the running private candidate is
+still invitation-era/unmigrated and public production is unchanged.
 
 ## 1. Terminology and authority
 
