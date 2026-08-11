@@ -8,6 +8,7 @@ import { createAuthRouter } from "../../src/p9/http/auth.route.js";
 import { p9ErrorHandler } from "../../src/p9/http/middleware.js";
 import { createAvatarMediaRouter, createProfileRouter } from "../../src/p9/http/profile.route.js";
 import { createPersonalizationRouter } from "../../src/p9/http/personalization.route.js";
+import { createP9Router } from "../../src/p9/http/router.js";
 
 const enabledConfig = parseP9Config({
   P9_ENABLED: "true",
@@ -57,9 +58,13 @@ describe("Phase 2B auth HTTP routes", () => {
       { email: "p@example.com", dateOfBirth: "2004-05-19" },
       expect.objectContaining({ ip: expect.any(String), requestId: expect.any(String) }),
     );
-    expect((await request(app).post("/auth/password/recovery/reset").send({
+    expect((await request(app).post("/auth/password/recovery/reset").set("X-Request-Id", "reset-1").send({
       recoveryToken: "opaque", newPassword: "new-password-long-enough",
     })).status).toBe(204);
+    expect(recovery.reset).toHaveBeenCalledWith(
+      { recoveryToken: "opaque", newPassword: "new-password-long-enough" },
+      { requestId: "reset-1" },
+    );
   });
 
   it("applies independent aggressive per-IP and normalized-email recovery limits", async () => {
@@ -95,8 +100,52 @@ describe("Phase 2B auth HTTP routes", () => {
   });
 });
 
+describe("P9 request envelope", () => {
+  function fullRouterApp() {
+    const app = express();
+    app.use("/api/v1", createP9Router({
+      config: enabledConfig,
+      auth: { register: vi.fn(), login: vi.fn() },
+      recovery: {},
+      sessions: {},
+      users: {},
+      devices: {},
+      pairing: {},
+      settings: {},
+      profile: {},
+      avatars: {},
+      personalization: {},
+      accessTokens: {},
+      repositories: {},
+    } as any));
+    return app;
+  }
+
+  it("creates request context before JSON parsing and sanitizes malformed JSON", async () => {
+    const response = await request(fullRouterApp())
+      .post("/api/v1/auth/login")
+      .set("Content-Type", "application/json")
+      .set("X-Request-Id", "bad-json-1")
+      .send('{"email":');
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "INVALID_INPUT" });
+    expect(response.headers["x-request-id"]).toBe("bad-json-1");
+  });
+
+  it("sanitizes oversized JSON as 413 and retains the request ID", async () => {
+    const response = await request(fullRouterApp())
+      .post("/api/v1/auth/login")
+      .set("Content-Type", "application/json")
+      .set("X-Request-Id", "large-json-1")
+      .send(JSON.stringify({ email: `${"a".repeat(33 * 1024)}@example.com` }));
+    expect(response.status).toBe(413);
+    expect(response.body).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(response.headers["x-request-id"]).toBe("large-json-1");
+  });
+});
+
 describe("Phase 2B authenticated profile/settings/media routes", () => {
-  function buildAuthedApp(maxBytes = 5 * 1024 * 1024) {
+  function buildAuthedApp(maxBytes = 5 * 1024 * 1024, avatarUploadLimit = 10) {
     const accessTokens = { verify: vi.fn().mockResolvedValue({ sub: "user-1", sid: "session-1" }) };
     const sessions = { isActive: vi.fn().mockResolvedValue(true) };
     const profile = { update: vi.fn().mockResolvedValue({ id: "user-1", username: "person" }) };
@@ -114,7 +163,15 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
     const storage = { read: vi.fn().mockResolvedValue(Buffer.from("webp")) };
     const app = express();
     app.use(express.json());
-    app.use(createProfileRouter(profile as any, avatar as any, accessTokens as any, sessions as any, maxBytes));
+    app.set("trust proxy", 1);
+    app.use(createProfileRouter(
+      profile as any,
+      avatar as any,
+      accessTokens as any,
+      sessions as any,
+      maxBytes,
+      { windowMs: 15 * 60 * 1_000, limit: avatarUploadLimit },
+    ));
     app.use(createPersonalizationRouter(personalization as any, accessTokens as any, sessions as any));
     app.use(createAvatarMediaRouter(storage as any));
     app.use(p9ErrorHandler);
@@ -158,6 +215,22 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
       .attach("photo", Buffer.from("image"), { filename: "wrong.png", contentType: "image/png" })).status).toBe(400);
     expect((await request(f.app).post("/me/avatar").set("Authorization", "Bearer token")
       .attach("file", Buffer.alloc(11), { filename: "large.png", contentType: "image/png" })).status).toBe(400);
+  });
+
+  it("rate limits avatar uploads by authenticated owner and proxy-aware client IP", async () => {
+    const f = buildAuthedApp(100, 2);
+    const upload = (ip: string) => request(f.app).post("/me/avatar")
+      .set("Authorization", "Bearer token")
+      .set("X-Forwarded-For", ip)
+      .attach("file", Buffer.from("image"), { filename: "avatar.png", contentType: "image/png" });
+
+    expect((await upload("203.0.113.8")).status).toBe(200);
+    expect((await upload("203.0.113.8")).status).toBe(200);
+    const limited = await upload("203.0.113.8");
+    expect(limited.status).toBe(429);
+    expect(limited.body).toEqual({ error: "RATE_LIMITED" });
+    expect(limited.headers["x-request-id"]).toEqual(expect.any(String));
+    expect((await upload("203.0.113.9")).status).toBe(200);
   });
 
   it("serves only exact opaque WebP paths with hardened immutable headers", async () => {

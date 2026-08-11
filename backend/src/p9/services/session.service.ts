@@ -146,7 +146,7 @@ export class SessionService {
     };
   }
 
-  async refresh(refreshToken: string, requestId?: string, now = new Date()): Promise<SessionTokens> {
+  async refresh(refreshToken: string, requestId?: string, now?: Date): Promise<SessionTokens> {
     const tokenHash = sha256Hex(refreshToken);
     const result = await withP9Transaction(this.options.client, async (transaction) => {
       const repositories = new P9Repositories(transaction);
@@ -164,15 +164,16 @@ export class SessionService {
       if (!stored || stored.session.userId !== discoveredToken.session.userId) {
         throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
       }
+      const operationNow = now ?? await repositories.databaseNow();
 
       const invalid =
         stored.usedAt !== null ||
         stored.revokedAt !== null ||
-        stored.expiresAt <= now ||
+        stored.expiresAt <= operationNow ||
         stored.session.revokedAt !== null ||
-        stored.session.expiresAt <= now;
+        stored.session.expiresAt <= operationNow;
       if (invalid) {
-        await this.revokeFamily(repositories, stored.familyId, now, "refresh_replay_or_expired");
+        await this.revokeFamily(repositories, stored.familyId, operationNow, "refresh_replay_or_expired");
         await audit.record({
           eventType: stored.usedAt ? "REFRESH_REPLAY_DETECTED" : "SESSION_REFRESH_REJECTED",
           outcome: "denied",
@@ -187,10 +188,10 @@ export class SessionService {
 
       const marked = await repositories.refreshToken.updateMany({
         where: { id: stored.id, usedAt: null, revokedAt: null },
-        data: { usedAt: now },
+        data: { usedAt: operationNow },
       });
       if (marked.count !== 1) {
-        await this.revokeFamily(repositories, stored.familyId, now, "refresh_replay");
+        await this.revokeFamily(repositories, stored.familyId, operationNow, "refresh_replay");
         await audit.record({
           eventType: "REFRESH_REPLAY_DETECTED",
           outcome: "denied",
@@ -212,7 +213,7 @@ export class SessionService {
           expiresAt: stored.session.expiresAt,
         },
       });
-      await repositories.session.update({ where: { id: stored.sessionId }, data: { lastUsedAt: now } });
+      await repositories.session.update({ where: { id: stored.sessionId }, data: { lastUsedAt: operationNow } });
       await audit.record({
         eventType: "SESSION_REFRESHED",
         outcome: "success",
@@ -224,7 +225,7 @@ export class SessionService {
       });
       const access = await this.options.accessTokens.issue(
         { userId: stored.session.userId, sessionId: stored.sessionId },
-        now,
+        operationNow,
       );
       return {
         kind: "success" as const,
@@ -241,18 +242,27 @@ export class SessionService {
     return result.tokens;
   }
 
-  async revokeCurrent(userId: string, sessionId: string, reason: string, requestId?: string): Promise<void> {
-    const now = new Date();
-    const result = await this.options.repositories.session.updateMany({
-      where: { id: sessionId, userId, revokedAt: null },
-      data: { revokedAt: now, revokedReason: reason },
-    });
-    if (result.count === 1) {
-      await this.options.repositories.refreshToken.updateMany({
-        where: { sessionId, revokedAt: null },
-        data: { revokedAt: now },
+  async revokeCurrent(
+    userId: string,
+    sessionId: string,
+    reason: string,
+    requestId?: string,
+    now?: Date,
+  ): Promise<void> {
+    await withP9Transaction(this.options.client, async (transaction) => {
+      const repositories = new P9Repositories(transaction);
+      await repositories.lockUser(userId);
+      const operationNow = now ?? await repositories.databaseNow();
+      const result = await repositories.session.updateMany({
+        where: { id: sessionId, userId, revokedAt: null },
+        data: { revokedAt: operationNow, revokedReason: reason },
       });
-      await new AuditService(this.options.repositories).record({
+      if (result.count !== 1) return;
+      await repositories.refreshToken.updateMany({
+        where: { sessionId, revokedAt: null },
+        data: { revokedAt: operationNow },
+      });
+      await new AuditService(repositories).record({
         eventType: "SESSION_REVOKED",
         outcome: "success",
         actorType: "user",
@@ -261,27 +271,31 @@ export class SessionService {
         userId,
         ...(requestId === undefined ? {} : { context: { requestId } }),
       });
-    }
+    });
   }
 
-  async revokeAll(userId: string, reason: string, requestId?: string): Promise<void> {
-    const now = new Date();
-    await this.options.repositories.session.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: now, revokedReason: reason },
-    });
-    await this.options.repositories.refreshToken.updateMany({
-      where: { session: { userId }, revokedAt: null },
-      data: { revokedAt: now },
-    });
-    await new AuditService(this.options.repositories).record({
-      eventType: "ALL_SESSIONS_REVOKED",
-      outcome: "success",
-      actorType: "user",
-      resourceType: "user",
-      resourceId: userId,
-      userId,
-      ...(requestId === undefined ? {} : { context: { requestId } }),
+  async revokeAll(userId: string, reason: string, requestId?: string, now?: Date): Promise<void> {
+    await withP9Transaction(this.options.client, async (transaction) => {
+      const repositories = new P9Repositories(transaction);
+      await repositories.lockUser(userId);
+      const operationNow = now ?? await repositories.databaseNow();
+      await repositories.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: operationNow, revokedReason: reason },
+      });
+      await repositories.refreshToken.updateMany({
+        where: { session: { userId }, revokedAt: null },
+        data: { revokedAt: operationNow },
+      });
+      await new AuditService(repositories).record({
+        eventType: "ALL_SESSIONS_REVOKED",
+        outcome: "success",
+        actorType: "user",
+        resourceType: "user",
+        resourceId: userId,
+        userId,
+        ...(requestId === undefined ? {} : { context: { requestId } }),
+      });
     });
   }
 

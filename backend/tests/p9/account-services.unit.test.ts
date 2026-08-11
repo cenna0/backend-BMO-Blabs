@@ -195,27 +195,37 @@ describe("avatar service cleanup", () => {
     expect(storage.release).toHaveBeenCalledWith(newKey);
   });
 
-  it("uses database avatar references as the authority for orphan reconciliation", async () => {
-    const findMany = vi.fn().mockResolvedValue([{ avatarKey: oldKey }, { avatarKey: newKey }, { avatarKey: null }]);
-    const reconcile = vi.fn().mockResolvedValue({ removed: 2 });
-    const service = new AvatarService({ user: { findMany } } as any, { reconcile } as any, "https://api.example.com");
+  it("rechecks each aged candidate in the database immediately before deletion", async () => {
+    const findFirst = vi.fn(async ({ where }: any) => where.avatarKey === oldKey ? { id: "user-1" } : null);
+    const storage = {
+      findReconciliationCandidates: vi.fn().mockResolvedValue({
+        avatarKeys: [oldKey, newKey], temporaryFiles: [".safe.tmp"], scanned: 3,
+      }),
+      delete: vi.fn().mockResolvedValue(undefined),
+      deleteTemporary: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new AvatarService({ user: { findFirst } } as any, storage as any, "https://api.example.com");
 
-    await expect(service.reconcile()).resolves.toEqual({ removed: 2 });
-    expect(findMany).toHaveBeenCalledWith({
-      where: { avatarKey: { not: null } }, select: { avatarKey: true },
+    await expect(service.reconcile(new Date("2026-08-11T12:00:00.000Z"), true)).resolves.toEqual({
+      removed: 1, temporaryRemoved: 1, scanned: 3, skipped: false,
     });
-    expect(reconcile).toHaveBeenCalledWith(new Set([oldKey, newKey]));
+    expect(findFirst).toHaveBeenNthCalledWith(1, { where: { avatarKey: oldKey }, select: { id: true } });
+    expect(findFirst).toHaveBeenNthCalledWith(2, { where: { avatarKey: newKey }, select: { id: true } });
+    expect(storage.delete).toHaveBeenCalledWith(newKey);
+    expect(storage.delete).not.toHaveBeenCalledWith(oldKey);
   });
 
-  it("does not take the reconciliation DB snapshot while an upload commit is in flight", async () => {
+  it("does not block uploads on a maintenance sweep", async () => {
     let finishUpdate!: () => void;
     const updateBlocked = new Promise<void>((resolve) => { finishUpdate = resolve; });
-    const findMany = vi.fn().mockResolvedValue([{ avatarKey: newKey }]);
     const storage = {
       store: vi.fn().mockResolvedValue({ key: newKey, contentType: "image/webp", byteSize: 123 }),
       delete: vi.fn().mockResolvedValue(undefined),
       release: vi.fn(),
-      reconcile: vi.fn().mockResolvedValue({ removed: 0 }),
+      findReconciliationCandidates: vi.fn().mockResolvedValue({
+        avatarKeys: [], temporaryFiles: [], scanned: 0,
+      }),
+      deleteTemporary: vi.fn(),
     };
     const transaction = {
       $executeRaw: vi.fn(),
@@ -226,19 +236,17 @@ describe("avatar service cleanup", () => {
     };
     const service = new AvatarService({
       $transaction: (work: any) => work(transaction),
-      user: { findMany },
+      user: { findFirst: vi.fn() },
     } as any, storage as any, "https://api.example.com");
     const upload = service.upload("user-1", Buffer.from("image"), "image/png");
     await vi.waitFor(() => expect(transaction.user.update).toHaveBeenCalled());
 
-    const reconciliation = service.reconcile();
-    await Promise.resolve();
-    expect(findMany).not.toHaveBeenCalled();
+    await expect(service.reconcile(new Date("2026-08-11T12:00:00.000Z"), true)).resolves.toEqual({
+      removed: 0, temporaryRemoved: 0, scanned: 0, skipped: false,
+    });
 
     finishUpdate();
     await upload;
-    await expect(reconciliation).resolves.toEqual({ removed: 0 });
-    expect(storage.reconcile).toHaveBeenCalledWith(new Set([newKey]));
   });
 });
 
@@ -252,11 +260,14 @@ describe("DOB recovery service", () => {
     const transactionDb = {
       $executeRaw: vi.fn().mockResolvedValue(1),
       passwordRecovery: {
+        create: vi.fn(async (value) => { created.push(value); return value; }),
         findUnique: vi.fn().mockResolvedValue({
           id: "recovery-1", userId: "user-1", usedAt: null,
           expiresAt: new Date("2026-08-11T12:10:00.000Z"), attemptCount: 0, maxAttempts: 5,
         }),
-        updateMany: vi.fn().mockImplementation(async () => ({ count: claimCounts.shift() ?? 0 })),
+        updateMany: vi.fn().mockImplementation(async ({ where }: any) => ({
+          count: typeof where.id === "string" ? (claimCounts.shift() ?? 0) : 0,
+        })),
       },
       passwordCredential: { update: vi.fn(async (value) => { passwordUpdates.push(value); }) },
       session: { updateMany: vi.fn(async (value) => { sessionRevocations.push(value); return { count: 2 }; }) },
@@ -266,7 +277,6 @@ describe("DOB recovery service", () => {
     const repositories = {
       user: { findUnique: vi.fn().mockResolvedValue(user) },
       passwordRecovery: {
-        create: vi.fn(async (value) => { created.push(value); return value; }),
         findUnique: vi.fn().mockResolvedValue(null),
       },
       auditEvent: { create: vi.fn(async (value) => { auditEvents.push(value); return {}; }) },
@@ -313,8 +323,12 @@ describe("DOB recovery service", () => {
   it("allows exactly one concurrent verifier claim, replaces Argon2id, and revokes every session/token", async () => {
     const f = fixture(null, [1, 0]);
     const attempts = await Promise.allSettled([
-      f.service.reset({ recoveryToken: "opaque-token", newPassword: "a-new-long-password" }, new Date("2026-08-11T12:00:00.000Z")),
-      f.service.reset({ recoveryToken: "opaque-token", newPassword: "another-long-password" }, new Date("2026-08-11T12:00:00.000Z")),
+      f.service.reset({ recoveryToken: "opaque-token", newPassword: "a-new-long-password" }, {
+        now: new Date("2026-08-11T12:00:00.000Z"),
+      }),
+      f.service.reset({ recoveryToken: "opaque-token", newPassword: "another-long-password" }, {
+        now: new Date("2026-08-11T12:00:00.000Z"),
+      }),
     ]);
     expect(attempts.map((attempt) => attempt.status).sort()).toEqual(["fulfilled", "rejected"]);
     expect(attempts.find((attempt) => attempt.status === "rejected")).toMatchObject({

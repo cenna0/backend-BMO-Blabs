@@ -51,12 +51,26 @@ describe("P9 configuration", () => {
       publicBaseUrl: "http://127.0.0.1:3000",
       avatarStorageDir: "/opt/bmo/data/avatars",
       avatarMaxBytes: 5 * 1024 * 1024,
+      avatarUploadWindowMs: 15 * 60 * 1000,
+      avatarUploadLimit: 10,
+      avatarGcIntervalMs: 60 * 60 * 1000,
+      avatarGcGraceMs: 24 * 60 * 60 * 1000,
+      avatarGcScanLimit: 200,
+      avatarGcBatchSize: 25,
       recoveryTokenTtlSeconds: 600,
       recoveryMaxAttempts: 5,
       recoveryWindowMs: 15 * 60 * 1000,
       recoveryIpLimit: 5,
       recoveryEmailLimit: 3,
     });
+  });
+
+  it("rejects avatar storage paths that are relative, root, traversal-normalized, or padded", () => {
+    for (const avatarStorageDir of ["avatars", "/", "/srv/bmo/../avatars", " /srv/bmo/avatars", "/srv/bmo/avatars "]) {
+      expect(() => parseP9Config({ ...enabled, AVATAR_STORAGE_DIR: avatarStorageDir })).toThrow();
+    }
+    expect(parseP9Config({ ...enabled, AVATAR_STORAGE_DIR: "/srv/bmo/avatars/" }).avatarStorageDir)
+      .toBe("/srv/bmo/avatars");
   });
 
   it("accepts explicit public avatar storage configuration without exposing it as a route", () => {

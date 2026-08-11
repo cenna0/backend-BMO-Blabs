@@ -1,6 +1,9 @@
 import { Router, type RequestHandler } from "express";
+import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 import multer from "multer";
 
+import { sha256Hex } from "../crypto.js";
+import { parseAvatarFileName } from "../avatar-key.js";
 import { P9Error } from "../errors.js";
 import type { AvatarStorage } from "../services/avatar-storage.service.js";
 import type { AvatarService } from "../services/avatar.service.js";
@@ -16,6 +19,7 @@ export function createProfileRouter(
   accessTokens: AccessTokenService,
   sessions: SessionService,
   maxBytes: number,
+  uploadRate: { windowMs: number; limit: number } = { windowMs: 900_000, limit: 10 },
 ): Router {
   const router = Router();
   const authenticated = requireAuth(accessTokens, sessions);
@@ -26,6 +30,16 @@ export function createProfileRouter(
       if (acceptedMimeTypes.has(file.mimetype)) callback(null, true);
       else callback(new Error("invalid avatar MIME"));
     },
+  });
+  const avatarUploadLimiter = rateLimit({
+    windowMs: uploadRate.windowMs,
+    limit: uploadRate.limit,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (request) => sha256Hex(
+      `${request.p9Auth?.userId ?? "unauthenticated"}:${ipKeyGenerator(request.ip ?? "0.0.0.0")}`,
+    ),
+    handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
   });
   const parseAvatar: RequestHandler = (request, response, next) => {
     upload.single("file")(request, response, (error) => {
@@ -42,7 +56,7 @@ export function createProfileRouter(
     response.json({ user: await profile.update(auth.userId, request.body, auth.context.requestId) });
   }));
 
-  router.post("/me/avatar", authenticated, parseAvatar, asyncP9(async (request, response) => {
+  router.post("/me/avatar", authenticated, avatarUploadLimiter, parseAvatar, asyncP9(async (request, response) => {
     const auth = currentAuth(request);
     if (!request.file) throw new P9Error("INVALID_INPUT", 400, "Avatar file is required");
     response.json(await avatars.upload(
@@ -60,12 +74,12 @@ export function createAvatarMediaRouter(storage: AvatarStorage): Router {
   router.use(ensureRequestContext);
   router.get("/media/avatars/:fileName", asyncP9(async (request, response) => {
     const fileName = String(request.params.fileName ?? "");
-    const match = fileName.match(/^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.webp$/);
-    if (!match?.[1]) {
+    const key = parseAvatarFileName(fileName);
+    if (!key) {
       response.status(404).json({ error: "NOT_FOUND" });
       return;
     }
-    const image = await storage.read(match[1]);
+    const image = await storage.read(key);
     if (!image) {
       response.status(404).json({ error: "NOT_FOUND" });
       return;

@@ -39,7 +39,6 @@ export class RecoveryService {
     } catch {
       throw new P9Error("RECOVERY_INVALID", 400, "Recovery verification failed");
     }
-    const now = context.now ?? new Date();
     const recoveryToken = createOpaqueToken();
     const tokenVerifier = sha256Hex(recoveryToken);
     const user = await this.repositories.user.findUnique({
@@ -59,77 +58,113 @@ export class RecoveryService {
       }).catch(() => undefined);
       throw new P9Error("RECOVERY_INVALID", 400, "Recovery verification failed");
     }
-    const expiresAt = new Date(now.getTime() + this.options.ttlSeconds * 1_000);
-    await this.repositories.passwordRecovery.create({
-      data: {
+    const expiresAt = await withP9Transaction(this.client, async (transaction) => {
+      const repositories = new P9Repositories(transaction);
+      await repositories.lockUser(user.id);
+      const now = context.now ?? await repositories.databaseNow();
+      const expiry = new Date(now.getTime() + this.options.ttlSeconds * 1_000);
+      await repositories.passwordRecovery.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: now, lastAttemptAt: now },
+      });
+      await repositories.passwordRecovery.create({
+        data: {
+          userId: user.id,
+          tokenVerifier,
+          expiresAt: expiry,
+          maxAttempts: this.options.maxAttempts,
+          ...(context.ip ? { requestIpHash: sha256Hex(context.ip) } : {}),
+          ...(context.userAgent ? { requestUserAgentHash: sha256Hex(context.userAgent) } : {}),
+          ...(context.requestId ? { requestId: context.requestId } : {}),
+        },
+      });
+      await new AuditService(repositories).record({
+        eventType: "PASSWORD_RECOVERY_VERIFIED",
+        outcome: "success",
+        actorType: "user",
+        resourceType: "password_recovery",
         userId: user.id,
-        tokenVerifier,
-        expiresAt,
-        maxAttempts: this.options.maxAttempts,
-        ...(context.ip ? { requestIpHash: sha256Hex(context.ip) } : {}),
-        ...(context.userAgent ? { requestUserAgentHash: sha256Hex(context.userAgent) } : {}),
-        ...(context.requestId ? { requestId: context.requestId } : {}),
-      },
-    });
-    await new AuditService(this.repositories).record({
-      eventType: "PASSWORD_RECOVERY_VERIFIED",
-      outcome: "success",
-      actorType: "user",
-      resourceType: "password_recovery",
-      userId: user.id,
-      ...(context.requestId ? { context: { requestId: context.requestId } } : {}),
+        ...(context.requestId ? { context: { requestId: context.requestId } } : {}),
+      });
+      return expiry;
     });
     return { recoveryToken, expiresAt };
   }
 
-  async reset(input: unknown, now = new Date()): Promise<void> {
+  async reset(input: unknown, context: RecoveryContext = {}): Promise<void> {
     let parsed: z.infer<typeof resetSchema>;
     try {
       parsed = resetSchema.parse(input);
     } catch {
+      await this.#recordResetDenied(context.requestId);
       throw new P9Error("RECOVERY_INVALID", 400, "Recovery token is invalid or expired");
     }
     const tokenVerifier = sha256Hex(parsed.recoveryToken);
     const passwordHash = await hashPassword(parsed.newPassword);
-    const accepted = await withP9Transaction(this.client, async (transaction) => {
-      const repositories = new P9Repositories(transaction);
-      const discoveredRecovery = await repositories.passwordRecovery.findUnique({ where: { tokenVerifier } });
-      if (!discoveredRecovery) return false;
-      await repositories.lockUser(discoveredRecovery.userId);
-      const recovery = await repositories.passwordRecovery.findUnique({ where: { tokenVerifier } });
-      if (!recovery || recovery.userId !== discoveredRecovery.userId) return false;
-      const claimed = await repositories.passwordRecovery.updateMany({
-        where: {
-          id: recovery.id,
-          usedAt: null,
-          expiresAt: { gt: now },
-          attemptCount: { lt: recovery.maxAttempts },
-        },
-        data: { usedAt: now, lastAttemptAt: now, attemptCount: { increment: 1 } },
+    let accepted: boolean;
+    try {
+      accepted = await withP9Transaction(this.client, async (transaction) => {
+        const repositories = new P9Repositories(transaction);
+        const discoveredRecovery = await repositories.passwordRecovery.findUnique({ where: { tokenVerifier } });
+        if (!discoveredRecovery) return false;
+        await repositories.lockUser(discoveredRecovery.userId);
+        const now = context.now ?? await repositories.databaseNow();
+        const recovery = await repositories.passwordRecovery.findUnique({ where: { tokenVerifier } });
+        if (!recovery || recovery.userId !== discoveredRecovery.userId) return false;
+        const claimed = await repositories.passwordRecovery.updateMany({
+          where: {
+            id: recovery.id,
+            usedAt: null,
+            expiresAt: { gt: now },
+            attemptCount: { lt: recovery.maxAttempts },
+          },
+          data: { usedAt: now, lastAttemptAt: now, attemptCount: { increment: 1 } },
+        });
+        if (claimed.count !== 1) return false;
+        await repositories.passwordRecovery.updateMany({
+          where: { userId: recovery.userId, id: { not: recovery.id }, usedAt: null },
+          data: { usedAt: now, lastAttemptAt: now },
+        });
+        await repositories.passwordCredential.update({
+          where: { userId: recovery.userId },
+          data: { passwordHash, algorithm: "argon2id" },
+        });
+        await repositories.session.updateMany({
+          where: { userId: recovery.userId, revokedAt: null },
+          data: { revokedAt: now, revokedReason: "password_reset" },
+        });
+        await repositories.refreshToken.updateMany({
+          where: { session: { userId: recovery.userId }, revokedAt: null },
+          data: { revokedAt: now },
+        });
+        await new AuditService(repositories).record({
+          eventType: "PASSWORD_RESET_SUCCEEDED",
+          outcome: "success",
+          actorType: "user",
+          resourceType: "user",
+          resourceId: recovery.userId,
+          userId: recovery.userId,
+          ...(context.requestId ? { context: { requestId: context.requestId } } : {}),
+        });
+        return true;
       });
-      if (claimed.count !== 1) return false;
-      await repositories.passwordCredential.update({
-        where: { userId: recovery.userId },
-        data: { passwordHash, algorithm: "argon2id" },
-      });
-      await repositories.session.updateMany({
-        where: { userId: recovery.userId, revokedAt: null },
-        data: { revokedAt: now, revokedReason: "password_reset" },
-      });
-      await repositories.refreshToken.updateMany({
-        where: { session: { userId: recovery.userId }, revokedAt: null },
-        data: { revokedAt: now },
-      });
-      await new AuditService(repositories).record({
-        eventType: "PASSWORD_RESET_SUCCEEDED",
-        outcome: "success",
-        actorType: "user",
-        resourceType: "user",
-        resourceId: recovery.userId,
-        userId: recovery.userId,
-      });
-      return true;
-    });
-    if (!accepted) throw new P9Error("RECOVERY_INVALID", 400, "Recovery token is invalid or expired");
+    } catch (error) {
+      await this.#recordResetDenied(context.requestId);
+      throw error;
+    }
+    if (!accepted) {
+      await this.#recordResetDenied(context.requestId);
+      throw new P9Error("RECOVERY_INVALID", 400, "Recovery token is invalid or expired");
+    }
+  }
+
+  async #recordResetDenied(requestId?: string): Promise<void> {
+    await new AuditService(this.repositories).record({
+      eventType: "PASSWORD_RESET_FAILED",
+      outcome: "denied",
+      actorType: "anonymous",
+      resourceType: "password_recovery",
+      ...(requestId ? { context: { requestId } } : {}),
+    }).catch(() => undefined);
   }
 }

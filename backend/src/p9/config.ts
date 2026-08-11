@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAbsolute, parse, resolve } from "node:path";
 
 export const P9_CANONICAL_TIMEZONE = "Asia/Jakarta" as const;
 
@@ -32,6 +33,28 @@ const publicBaseUrlSchema = z.string().transform((value, context) => {
   return url.origin;
 });
 
+const avatarStoragePathSchema = z.string().transform((value, context) => {
+  if (value !== value.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "AVATAR_STORAGE_DIR cannot contain surrounding whitespace" });
+    return z.NEVER;
+  }
+  if (!isAbsolute(value)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "AVATAR_STORAGE_DIR must be absolute" });
+    return z.NEVER;
+  }
+  const normalized = resolve(value);
+  const segments = value.split(/[\\/]+/u);
+  if (segments.includes(".") || segments.includes("..")) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "AVATAR_STORAGE_DIR must not contain traversal segments" });
+    return z.NEVER;
+  }
+  if (normalized === parse(normalized).root) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "AVATAR_STORAGE_DIR cannot be a filesystem root" });
+    return z.NEVER;
+  }
+  return normalized;
+});
+
 const rawSchema = z.object({
   P9_ENABLED: booleanString,
   DATABASE_URL: z.string().url().optional(),
@@ -41,7 +64,7 @@ const rawSchema = z.object({
   P9_PRISMA_POOL_SIZE: optionalPositiveInt(5),
   P9_POSTGRES_MAX_CONNECTIONS: optionalPositiveInt(20),
   PUBLIC_BASE_URL: publicBaseUrlSchema.default("http://127.0.0.1:3000"),
-  AVATAR_STORAGE_DIR: z.string().min(1).default("/opt/bmo/data/avatars"),
+  AVATAR_STORAGE_DIR: avatarStoragePathSchema.default("/opt/bmo/data/avatars"),
 });
 
 const strongSecret = (name: string, value: string | undefined): string => {
@@ -69,6 +92,12 @@ export interface P9Config {
   publicBaseUrl: string;
   avatarStorageDir: string;
   avatarMaxBytes: 5_242_880;
+  avatarUploadWindowMs: 900_000;
+  avatarUploadLimit: 10;
+  avatarGcIntervalMs: 3_600_000;
+  avatarGcGraceMs: 86_400_000;
+  avatarGcScanLimit: 200;
+  avatarGcBatchSize: 25;
   recoveryTokenTtlSeconds: 600;
   recoveryMaxAttempts: 5;
   recoveryWindowMs: 900_000;
@@ -97,6 +126,12 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       publicBaseUrl: parsed.PUBLIC_BASE_URL,
       avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
       avatarMaxBytes: 5_242_880,
+      avatarUploadWindowMs: 900_000,
+      avatarUploadLimit: 10,
+      avatarGcIntervalMs: 3_600_000,
+      avatarGcGraceMs: 86_400_000,
+      avatarGcScanLimit: 200,
+      avatarGcBatchSize: 25,
       recoveryTokenTtlSeconds: 600,
       recoveryMaxAttempts: 5,
       recoveryWindowMs: 900_000,
@@ -123,6 +158,12 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     publicBaseUrl: parsed.PUBLIC_BASE_URL,
     avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
     avatarMaxBytes: 5_242_880,
+    avatarUploadWindowMs: 900_000,
+    avatarUploadLimit: 10,
+    avatarGcIntervalMs: 3_600_000,
+    avatarGcGraceMs: 86_400_000,
+    avatarGcScanLimit: 200,
+    avatarGcBatchSize: 25,
     recoveryTokenTtlSeconds: 600,
     recoveryMaxAttempts: 5,
     recoveryWindowMs: 900_000,

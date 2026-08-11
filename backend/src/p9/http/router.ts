@@ -14,7 +14,7 @@ import { AvatarService } from "../services/avatar.service.js";
 import { PersonalizationService } from "../services/personalization.service.js";
 import { createAuthRouter } from "./auth.route.js";
 import { createDeviceRouter } from "./device.route.js";
-import { p9ErrorHandler } from "./middleware.js";
+import { ensureRequestContext, p9ErrorHandler } from "./middleware.js";
 import { createOpsRouter } from "./ops.route.js";
 import { createPairingRouter } from "./pairing.route.js";
 import { createSettingsRouter } from "./settings.route.js";
@@ -40,6 +40,7 @@ export interface P9RouterServices {
 
 export function createP9Router(services: P9RouterServices): Router {
   const router = Router();
+  router.use(ensureRequestContext);
   router.use(express.json({ limit: "32kb", strict: true }));
   router.use(createAuthRouter({
     config: services.config,
@@ -52,7 +53,14 @@ export function createP9Router(services: P9RouterServices): Router {
   router.use(createPairingRouter(services.pairing, services.accessTokens, services.sessions, services.config));
   router.use(createDeviceRouter(services.devices, services.settings, services.accessTokens, services.sessions));
   router.use(createSettingsRouter(services.settings, services.accessTokens, services.sessions));
-  router.use(createProfileRouter(services.profile, services.avatars, services.accessTokens, services.sessions, services.config.avatarMaxBytes));
+  router.use(createProfileRouter(
+    services.profile,
+    services.avatars,
+    services.accessTokens,
+    services.sessions,
+    services.config.avatarMaxBytes,
+    { windowMs: services.config.avatarUploadWindowMs, limit: services.config.avatarUploadLimit },
+  ));
   router.use(createPersonalizationRouter(services.personalization, services.accessTokens, services.sessions));
   if (services.includeOps === true) router.use(createOpsRouter(services.repositories));
   router.use(p9ErrorHandler);

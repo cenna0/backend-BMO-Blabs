@@ -17,13 +17,14 @@ import { ProfileService } from "./services/profile.service.js";
 import { PersonalizationService } from "./services/personalization.service.js";
 import { AvatarStorage } from "./services/avatar-storage.service.js";
 import { AvatarService } from "./services/avatar.service.js";
+import type { AvatarReconciliationResult } from "./services/avatar.service.js";
 import { createAvatarMediaRouter } from "./http/profile.route.js";
 
 export interface P9Runtime {
   router: Router;
   mediaRouter: Router;
   initialize(): Promise<void>;
-  reconcileAvatars(): Promise<{ removed: number }>;
+  reconcileAvatars(): Promise<AvatarReconciliationResult>;
   resolveDeviceBinding(hardwareId: string, deviceToken: string): Promise<ApplicationDeviceBinding | null>;
   authorizeDeviceBinding(binding: ApplicationDeviceBinding): Promise<boolean>;
   checkReadiness(): Promise<boolean>;
@@ -72,7 +73,12 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   const profile = new ProfileService(repositories, config.publicBaseUrl);
   const personalization = new PersonalizationService(repositories);
   const avatarStorage = new AvatarStorage(config.avatarStorageDir, config.avatarMaxBytes);
-  const avatars = new AvatarService(client, avatarStorage, config.publicBaseUrl);
+  const avatars = new AvatarService(client, avatarStorage, config.publicBaseUrl, {
+    intervalMs: config.avatarGcIntervalMs,
+    graceMs: config.avatarGcGraceMs,
+    scanLimit: config.avatarGcScanLimit,
+    batchSize: config.avatarGcBatchSize,
+  });
   const deviceBinding = new DeviceBindingService(repositories);
   return {
     router: createP9Router({ auth, sessions, users, devices, pairing, settings, recovery, profile, avatars, personalization, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
@@ -82,6 +88,9 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     resolveDeviceBinding: (hardwareId, deviceToken) => deviceBinding.resolve(hardwareId, deviceToken),
     authorizeDeviceBinding: (binding) => deviceBinding.isActive(binding),
     checkReadiness: () => checkP9Readiness(repositories),
-    close: () => disconnectP9Client(client),
+    close: async () => {
+      await avatarStorage.close();
+      await disconnectP9Client(client);
+    },
   };
 }

@@ -103,8 +103,8 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
     }));
 
     router.post("/auth/password/recovery/reset", ensureRequestContext, recoveryIpLimiter, asyncP9(async (request, response) => {
-      requestContext(request, response);
-      await options.recovery!.reset(request.body);
+      const context = requestContext(request, response);
+      await options.recovery!.reset(request.body, { requestId: context.requestId });
       response.status(204).send();
     }));
   }

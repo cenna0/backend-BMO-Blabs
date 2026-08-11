@@ -59,6 +59,14 @@ export function currentAuth(request: Request): { userId: string; sessionId: stri
 }
 
 export function sendP9Error(response: Response, error: unknown): void {
+  if (isBodyParserError(error, "entity.too.large", 413)) {
+    response.status(413).json({ error: "PAYLOAD_TOO_LARGE" });
+    return;
+  }
+  if (isBodyParserError(error, "entity.parse.failed", 400)) {
+    response.status(400).json({ error: "INVALID_INPUT" });
+    return;
+  }
   if (error instanceof ZodError) {
     response.status(400).json({ error: "INVALID_INPUT" });
     return;
@@ -68,6 +76,12 @@ export function sendP9Error(response: Response, error: unknown): void {
     return;
   }
   response.status(500).json({ error: "INTERNAL_ERROR" });
+}
+
+function isBodyParserError(error: unknown, type: string, status: number): boolean {
+  return typeof error === "object" && error !== null &&
+    "type" in error && error.type === type &&
+    "status" in error && error.status === status;
 }
 
 export function asyncP9(handler: (request: Request, response: Response, next: NextFunction) => Promise<void>): RequestHandler {

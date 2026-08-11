@@ -6,26 +6,22 @@ import { avatarUrl } from "../avatar-key.js";
 import type { AvatarStorage } from "./avatar-storage.service.js";
 
 export class AvatarService {
-  #activeUploads = 0;
-  #reconciliationBarrier: Promise<void> | null = null;
-  readonly #uploadWaiters: Array<() => void> = [];
+  #nextReconciliationAt = 0;
+  #reconciliation: Promise<AvatarReconciliationResult> | null = null;
 
   constructor(
     private readonly client: PrismaClient,
     private readonly storage: AvatarStorage,
     private readonly publicBaseUrl: string,
+    private readonly reconciliationOptions: AvatarReconciliationOptions = {
+      intervalMs: 3_600_000,
+      graceMs: 86_400_000,
+      scanLimit: 200,
+      batchSize: 25,
+    },
   ) {}
 
   async upload(userId: string, input: Buffer, declaredContentType: string, _requestId?: string) {
-    await this.#enterUpload();
-    try {
-      return await this.#upload(userId, input, declaredContentType);
-    } finally {
-      this.#leaveUpload();
-    }
-  }
-
-  async #upload(userId: string, input: Buffer, declaredContentType: string) {
     const stored = await this.storage.store(input, declaredContentType);
     let priorKey: string | null = null;
     try {
@@ -58,43 +54,56 @@ export class AvatarService {
     };
   }
 
-  async reconcile(): Promise<{ removed: number }> {
-    const leaveReconciliation = await this.#enterReconciliation();
+  async reconcile(now = new Date(), force = false): Promise<AvatarReconciliationResult> {
+    if (this.#reconciliation) return this.#reconciliation;
+    if (!force && now.getTime() < this.#nextReconciliationAt) {
+      return { removed: 0, temporaryRemoved: 0, scanned: 0, skipped: true };
+    }
+    this.#nextReconciliationAt = now.getTime() + this.reconciliationOptions.intervalMs;
+    const operation = this.#reconcile(now);
+    this.#reconciliation = operation;
     try {
-      const users = await this.client.user.findMany({
-        where: { avatarKey: { not: null } },
-        select: { avatarKey: true },
-      });
-      const referencedKeys = new Set(users.flatMap((user) => user.avatarKey ? [user.avatarKey] : []));
-      return await this.storage.reconcile(referencedKeys);
+      return await operation;
     } finally {
-      leaveReconciliation();
+      if (this.#reconciliation === operation) this.#reconciliation = null;
     }
   }
 
-  async #enterUpload(): Promise<void> {
-    while (this.#reconciliationBarrier) await this.#reconciliationBarrier;
-    this.#activeUploads += 1;
-  }
-
-  #leaveUpload(): void {
-    this.#activeUploads -= 1;
-    if (this.#activeUploads === 0) {
-      for (const resolve of this.#uploadWaiters.splice(0)) resolve();
+  async #reconcile(now: Date): Promise<AvatarReconciliationResult> {
+    const candidates = await this.storage.findReconciliationCandidates({
+      cutoff: new Date(now.getTime() - this.reconciliationOptions.graceMs),
+      scanLimit: this.reconciliationOptions.scanLimit,
+      batchSize: this.reconciliationOptions.batchSize,
+    });
+    let temporaryRemoved = 0;
+    for (const fileName of candidates.temporaryFiles) {
+      await this.storage.deleteTemporary(fileName);
+      temporaryRemoved += 1;
     }
-  }
-
-  async #enterReconciliation(): Promise<() => void> {
-    while (this.#reconciliationBarrier) await this.#reconciliationBarrier;
-    let release!: () => void;
-    const barrier = new Promise<void>((resolve) => { release = resolve; });
-    this.#reconciliationBarrier = barrier;
-    if (this.#activeUploads > 0) {
-      await new Promise<void>((resolve) => { this.#uploadWaiters.push(resolve); });
+    let removed = 0;
+    for (const key of candidates.avatarKeys) {
+      const reference = await this.client.user.findFirst({
+        where: { avatarKey: key },
+        select: { id: true },
+      });
+      if (reference) continue;
+      await this.storage.delete(key);
+      removed += 1;
     }
-    return () => {
-      if (this.#reconciliationBarrier === barrier) this.#reconciliationBarrier = null;
-      release();
-    };
+    return { removed, temporaryRemoved, scanned: candidates.scanned, skipped: false };
   }
+}
+
+export interface AvatarReconciliationOptions {
+  intervalMs: number;
+  graceMs: number;
+  scanLimit: number;
+  batchSize: number;
+}
+
+export interface AvatarReconciliationResult {
+  removed: number;
+  temporaryRemoved: number;
+  scanned: number;
+  skipped: boolean;
 }

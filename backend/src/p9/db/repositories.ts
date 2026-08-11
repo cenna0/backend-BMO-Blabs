@@ -12,6 +12,13 @@ export class P9Repositories {
     await this.db.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
   }
 
+  async databaseNow(): Promise<Date> {
+    const rows = await this.db.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS "now"`;
+    const now = rows[0]?.now;
+    if (!(now instanceof Date) || Number.isNaN(now.getTime())) throw new Error("database clock unavailable");
+    return now;
+  }
+
   async migrationStatus(): Promise<Array<{ name: string; finishedAt: Date | null }>> {
     const rows = await this.db.$queryRaw<Array<{ migration_name: string; finished_at: Date | null }>>`
       SELECT migration_name, finished_at

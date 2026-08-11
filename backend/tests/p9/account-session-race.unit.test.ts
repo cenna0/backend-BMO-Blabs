@@ -85,6 +85,7 @@ describe("account credential/session serialization", () => {
         resetCommitted = true;
         return 1;
       }),
+      $queryRaw: vi.fn().mockResolvedValue([{ now }]),
       refreshToken: {
         findUnique,
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -109,12 +110,15 @@ describe("account credential/session serialization", () => {
       refreshTokenTtlSeconds: 2_592_000,
     });
 
-    await expect(sessions.refresh("refresh-token", undefined, now)).rejects.toMatchObject({
+    await expect(sessions.refresh("refresh-token")).rejects.toMatchObject({
       code: "AUTHENTICATION_FAILED",
     });
 
     expect(findUnique).toHaveBeenCalledTimes(2);
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(transaction.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      transaction.$queryRaw.mock.invocationCallOrder[0]!,
+    );
     expect(transaction.refreshToken.create).not.toHaveBeenCalled();
   });
 });
