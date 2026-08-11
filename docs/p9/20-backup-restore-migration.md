@@ -1,6 +1,11 @@
 # Backup, Restore, and Migration Plan
 
-**Status:** `P9.1 LOCKED BASELINE; DESTINATION OPEN`
+**Status:** P9.1 candidate procedure `EXISTING_VERIFIED`; target integration
+migration `READY_TO_IMPLEMENT`; off-VPS destination `BLOCKED` for final sign-off.
+
+Phase 1 runs no migration or backup mutation. The candidate's two applied
+P9.1 migrations are not evidence that the target integration schema is applied
+to production.
 
 ## Backup policy
 

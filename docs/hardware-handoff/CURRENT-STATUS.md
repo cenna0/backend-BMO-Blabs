@@ -1,8 +1,8 @@
 # BMO Hardware Handoff — Current Backend Status
 
-**Audited:** 2026-08-03
+**Audited:** 2026-08-11
 **Deployment state:** `VERIFIED — PRODUCTION (P8 PIPER PRIMARY)`
-**Physical hardware state:** `NOT_RUN` — P10
+**Physical hardware state:** `PENDING_PHYSICAL_ESP` — existing and additive physical acceptance not run
 
 This file separates verified public production behavior from future physical
 ESP32 acceptance. The public endpoint is now available to the hardware team for
@@ -34,8 +34,9 @@ device, decoder, speaker, timing, or Wi-Fi behavior.
 |---|---|---|
 | Real RVC inference | **NOT VERIFIED** | P8 archived experimental boundary; RVC disabled |
 | RVC replacement architecture | **ARCHIVED / NOT A PRODUCTION DEPENDENCY** | compact P8 evidence and Git history retained |
-| Physical ESP32 integration | **NOT RUN** | P10 |
-| PostgreSQL/Prisma application data layer | **NOT IMPLEMENTED/DEPLOYED** | P9 |
+| Physical ESP32 integration | **PENDING_PHYSICAL_ESP** | Hardware/P10 |
+| PostgreSQL/Prisma application data layer | **SOURCE + PRIVATE CANDIDATE VERIFIED; NOT PRODUCTION** | P9.1 |
+| Wi-Fi/log/telemetry/settings/proactive additive events | **PENDING_PHYSICAL_ESP** | Phase 2 backend + ESP firmware |
 
 ## What the hardware team can do now
 
@@ -46,6 +47,12 @@ device, decoder, speaker, timing, or Wi-Fi behavior.
 - execute development/integration work against the canonical hardware
   contract without depending on RVC state;
 - prepare and later execute the physical acceptance matrix in P10.
+
+For additive integration requirements, read
+[`../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md`](../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md)
+and [`../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`](../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md).
+Those documents do not claim current firmware implementation. First-boot Wi-Fi,
+battery measurement, and every new event require real-device evidence.
 
 The verified public endpoint satisfies the former P7 dependency. It does
 **not** equal:

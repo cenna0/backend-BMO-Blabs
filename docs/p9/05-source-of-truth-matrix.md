@@ -1,31 +1,22 @@
-# P9 Data Ownership and Source-of-Truth Matrix
+# Source-of-Truth Matrix — Frozen
 
-**Status:** `LOCKED + PROPOSED`
+| Data/decision | Source of truth | Derived/cache only |
+|---|---|---|
+| Account/profile/DOB credential | PostgreSQL | access-token claims |
+| Session/refresh revocation | PostgreSQL | mobile secure storage holds raw refresh token |
+| Device ownership/pairing | PostgreSQL | live socket registry |
+| Physical authenticated connection | Backend in-memory device socket registry | PostgreSQL binding resolves owner capability |
+| User/device/personalization settings | PostgreSQL | ESP applied/current cache |
+| Wi-Fi desired state | encrypted PostgreSQL record | ESP local active network; mobile status |
+| Chat/history | PostgreSQL | Hermes request context |
+| Curated memory | PostgreSQL via MemoryGateway | bounded prompt context |
+| Schedule/run/delivery | PostgreSQL | worker lease/in-memory timer |
+| Device telemetry current state/logs | PostgreSQL with bounded retention | observability metrics |
+| Generic proactive delivery | PostgreSQL | live socket attempt |
+| Spotify tokens/action audit | encrypted PostgreSQL + provider playback truth | normalized Hermes/mobile result |
+| WhatsApp session | Hermes/provider persistence | PostgreSQL connection metadata/rules/delivery audit |
+| Existing voice request lifecycle | Backend in-memory registry | temporary WAV/MP3 artifacts |
+| STT/TTS model state | Audio Service runtime | Backend readiness summary |
+| Public routing/TLS | Caddy active runtime config | repository templates |
 
-| Data | Source of truth | Read consumers | Retention/deletion owner | Notes |
-|---|---|---|---|---|
-| User identity/profile | PostgreSQL via Backend | Mobile, Backend, audit | User/Backend | Provider identity is linked, not authoritative |
-| Login/session state | PostgreSQL/secure session store | Backend | Backend/session expiry | Access token is short-lived; only opaque refresh-token hashes are persisted |
-| Device ownership/pairing | PostgreSQL via Backend | Mobile, Backend, device adapter | User/Backend | Device secret is out-of-band and hashed/rotated |
-| User settings | PostgreSQL via Backend | Backend, mobile, Hermes context adapter | User/Backend | Language, response length, automatic candidates, server-enforced `Asia/Jakarta` |
-| Device settings | PostgreSQL via Backend | Backend, mobile, device/audio adapter | User/Backend | Display/default device, volume, quiet hours, notifications, Prudence, speed |
-| Chat sessions/messages | PostgreSQL via Backend | Mobile, Backend, scoped Hermes context | User/Backend | All valid text and voice transcripts; not memory by default |
-| Long-term memory | PostgreSQL via `MemoryGateway` | Backend/Hermes context, mobile review | User/Backend | Curated records only; editable/deletable |
-| Memory candidates | PostgreSQL via Backend | Mobile, review workflow | User/Backend | Candidate is not memory until accepted/auto-policy-approved |
-| Schedules/runs/attempts | PostgreSQL via Backend/worker | Worker, mobile, audit | User/Backend | Structured records; never memory |
-| Spotify connection metadata | PostgreSQL via Backend | Mobile, Spotify adapter | User/Backend | Tokens encrypted; plaintext never leaves adapter |
-| Spotify access/refresh tokens | Encrypted secret field/key boundary | Spotify adapter only | User/Backend/provider revoke | Key rotation and revocation required |
-| WhatsApp rules/audit | PostgreSQL via Backend | Mobile, WhatsApp adapter | User/Backend | Session bytes stay with Hermes persistent volume |
-| WhatsApp session | Hermes-owned persistent volume | Hermes gateway | Hermes/operator | Not copied into PostgreSQL or memory |
-| Hermes conversation context | Hermes runtime | Hermes | Hermes policy | Not durable chat history; Backend persists its own messages |
-| Raw WAV input | Temporary backend/audio storage | Audio pipeline | Backend cleanup | Never permanent chat history |
-| Generated MP3 | Temporary backend/audio storage | Device playback | Backend TTL/playback cleanup | Never permanent chat history |
-| Provider search results | Provider/short-lived action result | Backend/Hermes/mobile | Request lifecycle | Not automatic memory |
-| Hardware protocol | HW Contract v1.0.5 | Firmware/backend | Contract governance | P9 proposal may be additive vNext only; no P9.1 change |
-| Backup artifact | Encrypted backup store | Recovery operator | Backup policy | Restore must be tested |
-
-## Conflict rule
-
-If two stores disagree, Backend resolves according to this matrix and records
-an audit event. Markdown/Obsidian exports are derived snapshots; imports remain
-disabled until a validated identity/conflict process is approved.
+If source and runtime differ, the integration status must name both tiers; neither docs nor a client cache may silently override the owner above.

@@ -310,11 +310,13 @@ RVC artifacts are not provisioned in current production. The P8 RVC branch is
 archived and was not merged because its canary required a larger host. Do not
 guess filenames, enable RVC, or use runtime downloads.
 
-### `postgres.env` — P9 only
+### `postgres.env` — private P9 candidate only
 
-PostgreSQL/Prisma is not implemented or deployed. P9 generates the database
-name/user/password and activates `DATABASE_URL`; do not create or require those
-credentials before P9 authorization, and never commit them.
+PostgreSQL/Prisma is implemented in the repository and verified in the private
+P9.1 candidate network; it is not part of the public production Backend API
+deployment. Its database name/user/password and `DATABASE_URL` remain outside
+Git. A later production activation must preserve the private port, use the
+reviewed migration gate, and never print or commit those values.
 
 Real secret values must never appear in docs, Git history, logs, or deployment reports.
 

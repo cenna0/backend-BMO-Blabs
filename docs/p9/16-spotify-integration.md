@@ -1,49 +1,12 @@
-# Spotify Integration Boundary
+# Spotify Integration
 
-**Status:** `PROPOSED`
+**Adapter/API:** `READY_TO_IMPLEMENT`
+**Live OAuth:** `BLOCKED` until app credentials and exact callback registration are proven.
 
-Backend owns Spotify OAuth, token encryption, provider calls, action policy,
-and normalized status. Mobile owns the consent UI; Hermes may propose a typed
-action but never receives tokens or calls Spotify directly.
+Backend is the confidential OAuth client and token/action owner. The frozen flow uses server-side Authorization Code, exact allow-listed callback, single-use expiring state, least scopes, encrypted token storage, and server refresh. Mobile receives only normalized connection/playback state.
 
-## OAuth boundary
+Initial route surface is enumerated in the integration matrix, including `GET /api/v1/integrations/spotify/callback`. Initial actions are play/search, pause/resume, next/previous, volume, shuffle, queue, current playback, and device list. Each is ownership-checked, allow-listed, confirmed when policy requires, idempotent where possible, and audited without raw provider payloads.
 
-```text
-Mobile → Backend creates state and authorization URL
-       → Spotify consent
-       → Backend callback validates state + exact redirect
-       → Backend exchanges code and encrypts access/refresh tokens
-       → Mobile receives connection status only
-```
+Spotify playback occurs on a user's Spotify device, not the BMO speaker. No active player yields `NO_ACTIVE_SPOTIFY_DEVICE`. Client secret, access/refresh token, authorization code, and provider body never enter mobile state, Hermes context, logs, chat, memory, or exports.
 
-The initial implementation should re-check current Spotify policy and use the
-server-side Authorization Code flow when the client secret is protected by the
-Backend. PKCE remains the alternative when an authorization code is handled by
-the mobile client. Redirect URIs are exact allow-listed values and state is
-single-use. Current official guidance distinguishes these flows and requires
-refresh handling; the implementation phase must pin the applicable scopes and
-policy rather than copying an old scope list.
-
-Reference: [Spotify authorization guidance](https://developer.spotify.com/documentation/web-api/concepts/authorization).
-
-## Action boundary
-
-Supported initial action families are play/search, pause, resume, next,
-previous, volume, shuffle, current playback, queue, and device listing. Each
-action is user-scoped, validated against an allowlist, idempotent where the
-provider permits it, and recorded as a redacted `SpotifyAction`.
-
-Spotify playback happens on the user's active Spotify device, not through the
-BMO speaker. If no active device exists, Backend returns a distinct
-`NO_ACTIVE_SPOTIFY_DEVICE` result and BMO gives a short honest response.
-
-## Credential policy
-
-- Encrypt access and refresh tokens before PostgreSQL storage using an
-  application key-management boundary and `keyVersion`.
-- Keep client secret, tokens, authorization codes, and verifiers out of logs,
-  chat history, memory, exports, mobile state, and Hermes payloads.
-- Revoke/disconnect deletes ciphertext after provider revocation confirmation
-  or records a bounded cleanup retry.
-- Provider response is normalized to status/device metadata; raw payload is not
-  returned to Hermes by default.
+Provider authorization behavior must be rechecked against current official Spotify documentation during implementation.

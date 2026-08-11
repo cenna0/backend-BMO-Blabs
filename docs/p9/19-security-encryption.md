@@ -1,68 +1,25 @@
-# Security and Encryption Architecture
+# Security and Encryption — Frozen Requirements
 
-**Status:** `P9.1 LOCKED CONTROLS; P9.2–P9.6 PROPOSED`
+## Existing controls
 
-## Secret ownership
+- Argon2id password hashes; short HS256 access JWT; opaque hashed/rotating refresh tokens with replay-family revocation.
+- Pairing codes are keyed digests with 10-minute TTL, single use, five attempts, and mobile authentication.
+- PostgreSQL is private to the candidate network; Hermes and Audio Service are loopback-only; Caddy is the public edge.
+- Device credential verifier is SHA-256 in the current schema; raw credential is provisioned out-of-band.
 
-| Secret/data | Owner | Storage/handling |
-|---|---|---|
-| App/session signing or encryption key | Backend operator/key boundary | outside Git, rotated by version |
-| Device credential verifier | Backend/PostgreSQL | salted hash; raw credential only out-of-band |
-| Hermes API key | Backend runtime config | loopback only; never mobile/Hermes prompt |
-| Audio internal token | Backend/Audio runtime config | loopback only; never user/API response |
-| Spotify client secret/tokens | Backend Spotify adapter | field-level authenticated encryption + key version |
-| WhatsApp session | Hermes persistent volume | not copied to PostgreSQL or mobile |
-| Database password | PostgreSQL/Backend runtime config | outside Git; least-privilege roles |
-| Backup encryption key | operator/key boundary | separate from backup artifact and VPS checkout |
+## Phase 1 blocker
 
-## P9.1 authentication and audit controls
+A manually started Prisma Studio process listens on `*:5555`, is not part of declared Compose/systemd architecture, and can reach the candidate database. Current firewall rules could not be inspected without elevated privilege. This is `BLOCKED`: stop the process and verify listeners/firewall before Phase 2 or any deployment.
 
-- Registration is invite-only; passwords are hashed with Argon2id.
-- Access tokens are short-lived, targeted at approximately 15 minutes.
-- Refresh tokens are opaque and cryptographically random; only their hashes
-  are stored in PostgreSQL, and rotation/replay handling is server-side.
-- Sessions are revocable per authenticated client/device.
-- Pairing codes are six-digit, ten-minute, single-use values; only hashes are
-  persisted and attempts are rate-limited.
-- The server enforces `Asia/Jakarta`; clients cannot change the timezone.
+## Target controls
 
-Audit at minimum records login success/failure, session refresh/revocation,
-pairing requested/succeeded/failed/expired/revoked, device unpaired, settings
-changes, and administrative/security actions.
+- DOB recovery is intentionally weaker than provider/MFA recovery: use uniform failure, aggressive per-IP/email throttling, short single-use hashed token, audit, and logout-all after reset. Never return/store DOB in normal safe-user surfaces or logs.
+- Configure proxy-aware rate limiting deliberately for Caddy; current in-memory limiter and `trust proxy=false` require review before public activation.
+- Encrypt Wi-Fi passwords and provider tokens with application AEAD, unique nonce/tag, and key version. Keep keys outside Git, DB, container image, and backups.
+- Scope every query/action by authenticated user; validate physical binding before owner-only device payloads.
+- Bound/redact logs, telemetry, upload metadata, provider errors, Hermes context, and bug-report attachments.
+- Apply content type/size/transcode/opaque-path controls to avatar media.
+- Public/private claims require Caddy, listener, container/network, and firewall evidence.
+- Production migrations are explicit operator jobs after encrypted backup/restore and candidate evidence; never startup migration, `db push`, or reset.
 
-Never log passwords, raw access/refresh tokens, full expired pairing codes,
-OAuth tokens, WhatsApp credentials, or private message contents.
-
-No secret, credential, token, OTP, or raw provider payload belongs in this
-documentation branch.
-
-## Controls
-
-- TLS for mobile/provider/public traffic; existing device TLS/WSS requirements
-  remain unchanged.
-- Session cookies/tokens are short-lived or rotated, server-revocable, and
-  stored/transported with secure client policy.
-- Every query is user-scoped; ownership is checked in the service layer and
-  again at sensitive mutation boundaries.
-- Pairing, provider actions, outbound WhatsApp sends, memory deletion, and
-  account deletion are rate-limited and audited.
-- Secrets and sensitive content are excluded from logs, metrics labels, error
-  responses, exports, memory, and Hermes context.
-- External provider adapters use least scopes, timeout, retry, circuit-breaker
-  behavior, and normalized error codes.
-- PostgreSQL is private-only with a dedicated application role; migrations
-  run as a separate controlled operator step.
-- Backups are encrypted, integrity checked, access logged, and restore-tested.
-
-## Encryption proposal
-
-Use application-level AEAD for provider tokens and other high-risk fields,
-with a key identifier/version stored beside ciphertext. The key must be
-provided from an operator-controlled secret boundary; storing the key next to
-the database backup defeats the control. Key rotation re-encrypts active
-records in a transactionally resumable job and preserves the old key only for
-the documented recovery window.
-
-Exact library, key service, rotation interval, and deleted-content purge
-period are OPEN implementation decisions for P9.6 and must be selected from
-maintained, audited dependencies.
+Never document or log passwords, raw device/Wi-Fi/provider/Hermes/audio/database tokens, refresh/recovery/pairing values, session bytes, or database URLs.

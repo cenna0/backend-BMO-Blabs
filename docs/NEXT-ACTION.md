@@ -1,139 +1,37 @@
 # BMO — Next Execution Action
 
 **Last updated:** 2026-08-11
-**Audience:** Codex / infrastructure-backend coding agent
-**Current next phase:** **P9.1 — PostgreSQL, auth, pairing, and settings foundation**
+**Current integration action:** Phase 2 Slice 1, only after review of the Phase 1 docs commit and explicit implementation authorization.
+**Starting point:** close the Prisma Studio `*:5555` security gate, verify drift, then integrate the existing P9.1 router into a production-shaped Backend API candidate while preserving device voice.
+
+Read [`integration/00-START-HERE.md`](integration/00-START-HERE.md) and [`integration/04-VPS-IMPLEMENTATION-PLAN.md`](integration/04-VPS-IMPLEMENTATION-PLAN.md). Do not run a production migration, deploy, configure external credentials, or claim physical ESP behavior from this documentation freeze.
+
+## Current checkpoint
+
+- Source base at audit: `main` / `d638b20c381c676136c94524a38a1def5d70e565`; P9.1 source is already present there.
+- Production voice Backend/Audio/Hermes integration remains verified; production Hermes integration uses the P6 host runtime. The private origins only boundary is Backend `127.0.0.1:3000`, Audio `127.0.0.1:8001`, and Hermes `127.0.0.1:8642`.
+- P7 is `VERIFIED — PRODUCTION`; P8 is `P8_PIPER_PRODUCTION_VERIFIED`; real RVC inference is not verified.
+- P9.1 auth/pairing/device/settings/PostgreSQL is source/private-candidate verified, not public-production enabled.
+- All new integration surfaces are classified in `integration/05-IMPLEMENTATION-STATUS.md`; all routes/events are in `integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`.
+- Physical ESP32 integration is not verified.
+
+## Exact Phase 2 first slice
+
+1. Check out the final Phase 1 documentation commit.
+2. Confirm route/schema/runtime drift and production provenance.
+3. With runtime authority, stop the undeclared Prisma Studio process and prove port/firewall closure without exposing its database URL.
+4. Add tests around the existing P9.1 integration point and device voice regression.
+5. Integrate the existing P9.1 router into the production-shaped candidate service; do not create a parallel business API.
+6. Update status/matrix with the implementation commit. Production activation remains separately gated.
+
+Do not execute P10 or promote `PENDING_PHYSICAL_ESP` without real firmware/bench evidence. P8 completion does **not** authorize P9 deployment; the user's Phase 2 authorization must still be scoped to implementation versus production execution. An operator may later say `execute P9` only with the frozen plan and explicit runtime gates.
+
+## Verifier-locked predecessor declaration
+
+The legacy voice-phase verifier still requires the following predecessor declaration. It is retained as a historical control record and is not the current integration starting point:
+
+Legacy Current next phase: P9.1 — PostgreSQL, auth, pairing, and settings foundation
+
 **Phase state:** `P8_PIPER_PRODUCTION_VERIFIED; P9.1 ARCHITECTURE LOCKED; isolated P9.1 candidate implemented; production activation not authorized`
 
-> P8 is `P8_PIPER_PRODUCTION_VERIFIED`. P8 completion did not authorize P9.
-> The isolated P9.1 candidate was later executed under explicit authorization;
-> it remains private/candidate-only and is not a production database deployment.
-
-## 1. Current checkpoint
-
-P6 VPS Foundation and Operations Baseline remains `VERIFIED`. P7 backend,
-Audio Service, and Hermes production integration is `VERIFIED — PRODUCTION`.
-P7 is `VERIFIED — PRODUCTION`. P8 is `P8_PIPER_PRODUCTION_VERIFIED` with Piper
-Prudence primary, Kokoro fallback, and RVC disabled. P8 completion does **not**
-authorize production P9 activation. The P9 architecture set and isolated
-candidate evidence are available under [`p9/README.md`](p9/README.md); do not
-promote the private candidate from this documentation gate. Do not execute P10
-from this gate.
-P8 completion does **not** authorize P9.
-Sanitized proof is in
-[`backend-mvp/P7-TEST-EVIDENCE.md`](backend-mvp/P7-TEST-EVIDENCE.md).
-
-Verified P7 outcomes include:
-
-- immutable deployment source
-  `4d7b472adc4c2243d8f7364032a491ad70efb6d3`;
-- backend image
-  `bmo-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7`;
-- Audio Service image
-  `bmo-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e`;
-- verified public HTTPS API and WSS at `api.personalbmo.web.id`;
-- private origins only: backend `127.0.0.1:3000`, Audio Service
-  `127.0.0.1:8001`, and Hermes `127.0.0.1:8642`;
-- production Whisper/Kokoro inference from pinned curated artifacts with
-  runtime downloads disabled, plus FFmpeg output;
-- production Hermes integration through the P6 host runtime;
-- public fake-ESP32 acceptance passed `23/23`;
-- final resource soak passed for 3,665 seconds / 61 minutes 5 seconds with
-  `13/13` samples, zero new OOM events, and zero backend/audio restarts;
-- minimum `MemAvailable` was 3.209 GiB and minimum relevant free disk was
-  59.137 GiB;
-- protected backup `20260730T115645Z` and the P6 Caddy rollback anchor remain
-  retained;
-- [`hardware-handoff/DEPLOYMENT-CONFIG.md`](hardware-handoff/DEPLOYMENT-CONFIG.md)
-  is the verified live endpoint handoff.
-
-Production uses Piper Prudence as the fixed primary and Kokoro `af_heart` at
-`0.80` as automatic fallback; real RVC inference is not verified and RVC
-remains disabled. Physical ESP32 acceptance
-is not run. PostgreSQL/Prisma is implemented and verified only in the isolated
-private P9.1 candidate; it is not deployed as production data infrastructure.
-
-P9.1 architecture is now approved and locked for invite-only email/password
-authentication, Argon2id, short-lived access tokens, rotating opaque refresh
-tokens by hash, server-enforced `Asia/Jakarta`, six-digit ten-minute pairing,
-private PostgreSQL targets, persisted user/device settings, migration policy,
-backup/restore, and audit/redaction controls. The isolated P9.1 candidate is
-implemented and validated; production activation remains separately gated.
-
-## 2. Locked execution order
-
-```text
-P6 VPS foundation                         VERIFIED
-  ↓
-P7 backend/audio production deployment   VERIFIED — PRODUCTION
-  ↓ explicit new authorization required
-P8 fixed Piper primary + Kokoro fallback VERIFIED — PRODUCTION
-  ↓ completed/verified status + explicit authorization
-P9 PostgreSQL + Prisma readiness         ISOLATED CANDIDATE VERIFIED / NOT PRODUCTION
-  ↓ VERIFIED + explicit authorization
-P10 physical ESP32 acceptance            NOT_STARTED / dependency-gated
-```
-
-Do not collapse phases or infer execution authority from technical readiness.
-P8 completion does not automatically start P9.
-
-## 3. Read before a future P9 execution
-
-Read in this order:
-
-1. `NEXT-ACTION.md` — this operational gate.
-2. `backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md` — closed P8 evidence.
-3. `roadmap/P8-EXECUTION-SPEC.md` — historical P8 closure boundaries.
-4. `backend-mvp/IMPLEMENTATION-STATUS.md` — current status authority.
-5. `backend-mvp/P7-TEST-EVIDENCE.md` — immutable P7 baseline and headroom.
-6. `backend-mvp/04-AUDIO-SERVICE.md` — current adapter/model rules.
-7. `backend-mvp/CURRENT-RUNTIME-CONFIG.md` — verified P8 runtime values.
-8. `backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` — verified production
-   topology and operational controls.
-9. `hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — read-only
-   public protocol contract.
-10. `operations/MAINTENANCE-AND-RECOVERY.md` — live recovery procedures.
-11. `p9/README.md` — approved P9.1 architecture lock and later subphase gates.
-
-Historical P1–P7 plans/evidence remain evidence, not execution authority.
-
-## 4. P8 closed boundary
-
-P8 closed with the fixed Piper Prudence primary, Kokoro fallback, offline
-pinned assets, integrated persistent worker controls, production canary,
-fallback/recovery tests, public regression, resource soak, rollback retention,
-and sanitized evidence. The exact result is in
-[`backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](backend-mvp/P8-PRODUCTION-ROLLOUT-EVIDENCE.md).
-
-The RVC experiment was not deployed. Its compact evidence and Git history are
-archived; no RVC runtime or Docker artifact is part of production and
-`RVC_ENABLED=false` remains locked.
-
-P8 did not:
-
-- change the locked public hardware contract;
-- invent endpoints, events, fields, or protocol behavior;
-- implement P9 database work;
-- perform P10 physical ESP32 acceptance;
-- remove the Kokoro fallback;
-- expose backend, Hermes, or device secrets to any audio runtime;
-- change the public hardware contract;
-- begin P9 implementation without a new explicit authorization.
-
-## 5. P9 authorization and first action
-
-The current P9.1 candidate has already been executed in an isolated worktree
-and verified privately. Do not promote it to production from this gate. Any
-future P9.1 production activation or P9.2–P9.6 work requires its own explicit
-authorization (for example, `execute P9.1`) and completed predecessor gate.
-
-Document and stop on any conflict with the locked hardware contract, P7
-production provenance, secret isolation, offline model policy, or Kokoro
-fallback requirement.
-
-## 6. P8 finish line
-
-P8 is closed as `P8_PIPER_PRODUCTION_VERIFIED`. Do not repeat P8 work from this
-gate. P9 implementation requires the explicit authorization described in §5;
-the architecture branch only supplies the reviewable design and execution
-gates.
+The Phase 1 freeze supersedes the action implied by that legacy label, not its historical truth.

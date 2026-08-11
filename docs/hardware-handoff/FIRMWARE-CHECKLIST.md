@@ -157,3 +157,14 @@ playback_state = waiting | downloading | playing | done_pending_send | failed_pe
 - [ ] Fake ESP32 public-domain E2E is PASS.
 - [ ] Execute all physical tests in `ACCEPTANCE-TESTS.md`.
 - [ ] Record firmware build ID and request IDs used as evidence.
+
+## M. Additive integration — not yet implemented
+
+All items here are `PENDING_PHYSICAL_ESP` and use the payloads in
+`../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`:
+
+- [ ] Wi-Fi pending/apply/rollback/reconnect/result without secret logging.
+- [ ] Bounded device logs and RSSI telemetry; battery omitted/null until proven.
+- [ ] Generic proactive MP3 dedupe and done/failed acknowledgement.
+- [ ] Versioned playback-volume application and acknowledgement.
+- [ ] Existing voice checklist remains green after each addition.

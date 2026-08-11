@@ -46,7 +46,7 @@ Not public:
   3000 → BMO backend origin at 127.0.0.1:3000
   8001 → Audio Service at 127.0.0.1:8001
   8642 → Hermes at 127.0.0.1:8642
-  5432 → PostgreSQL not deployed; must remain private if P9 activates it
+  5432 → PostgreSQL candidate has no published host port; must remain private on production activation
   Beszel origin port → reverse proxy only
 
 Admin access:

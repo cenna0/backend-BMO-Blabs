@@ -1,10 +1,10 @@
 # Single-VPS Resource Budget
 
-**Status:** `P9.1 LOCKED INITIAL TARGETS; EXACT CAPS OPEN`
+**Status:** Candidate baseline `EXISTING_VERIFIED`; final mixed-load caps `BLOCKED` pending evidence.
 
 ## Evidence baseline
 
-P8 evidence describes the current host as approximately 8.3 GiB RAM with no
+The 2026-08-11 audit reports approximately 7.8 GiB usable RAM with no
 swap. The P8 production canary observed approximately 2.596–2.689 GiB host
 `MemAvailable`; the retained P7 soak recorded a 3.209 GiB minimum. Piper's
 current Audio Service is the dominant memory consumer and must not be
@@ -25,9 +25,10 @@ These are evidence baselines, not permission to increase concurrency.
 | Mobile/API requests | rate limits and bounded payloads; no unbounded provider fan-out | load test |
 | Host reserve | preserve a measured emergency reserve before enabling optional features | capacity gate |
 
-The initial targets above are LOCKED for P9.1 capacity testing. Exact final
-container caps and PostgreSQL tuning remain OPEN until isolated resource tests
-measure the live deployment.
+The private candidate currently runs PostgreSQL 16.14 and the P9.1 Backend on
+an internal Compose network, but this is not mixed-load production acceptance.
+Exact final container caps and PostgreSQL tuning remain blocked until isolated
+resource tests measure the production-shaped candidate.
 The initial operating policy is single-VPS, low concurrency, no vector service,
 no simultaneous TTS model loading, no unbounded scheduler backlog, and no
 overlapping production canary instances for Audio Service.

@@ -1,100 +1,43 @@
-# P9 System Architecture
-
-**Status:** `P9.1 LOCKED; P9.2–P9.6 PROPOSED`
-
-## Target topology
+# P9 System Architecture — Frozen
 
 ```text
-Mobile app ──HTTPS──┐
-                    ▼
-              Caddy / public API
-                    ▼
-        Backend application boundary
-        ├─ auth/session and device ownership
-        ├─ chat/history and MemoryGateway
-        ├─ schedules/worker/delivery
-        ├─ Spotify and WhatsApp adapters
-        ├─ action-intent validator/executor
-        └─ existing voice pipeline + HW v1.0.5 adapter
-          │             │             │
-          │             │             └─ Hermes localhost adapter
-          │             └─ Audio Service localhost adapter
-          └─ Prisma ── private PostgreSQL
+Mobile --HTTPS/WSS /api/v1/ws--> Caddy --> Backend API service
+                                              |-- Prisma --> private PostgreSQL
+                                              |-- loopback --> Hermes
+                                              |-- loopback --> Audio Service
+                                              |-- HTTPS --> Spotify
+                                              `-- adapter --> Hermes-owned WhatsApp session
 
-Future additive path:
-  Scheduler → ProactiveSpeechCoordinator → Backend audio generation
-            → proposed scheduled-audio HW events → device/mobile target
+ESP32 --WSS /ws + HTTP raw WAV/MP3--> Caddy --> Backend API service
 ```
 
-The single VPS remains the initial deployment shape. Backend, Audio Service,
-and PostgreSQL are private origins; Caddy is the only public application edge.
-P9.1 PostgreSQL is one pinned-major container with an initial 768 MiB memory
-target, Prisma pool target 5, and approximately 20 database connections;
-capacity testing may revise exact caps before implementation acceptance.
-Hermes remains a host runtime at `127.0.0.1:8642`. Existing production Piper
-and Kokoro behavior is an internal audio implementation detail and is not
-replaced by P9.
+## Boundary rules
 
-## Trust boundaries
+- Caddy owns TLS/routing only. Backend owns authentication, authorization, APIs, application state, orchestration, and audit.
+- PostgreSQL owns durable BMO data. Hermes owns reasoning/personality and its WhatsApp session, not BMO application records.
+- Audio Service owns bounded STT/TTS/FFmpeg processing, not identity or durable media.
+- Mobile never calls PostgreSQL, Hermes, Audio Service, ESP, or provider APIs directly.
+- ESP owns local Wi-Fi application, recording, playback, display, and firmware behavior. The VPS owns desired state and delivery records.
+- Mobile realtime and device WSS are independent contracts.
 
-1. **Mobile ↔ Backend:** email/password authentication, short-lived access
-   token, opaque rotating refresh token, TLS, user authorization, rate limits,
-   response filtering.
-2. **Device ↔ Backend:** existing device credential/WebSocket/HTTP contract;
-   v1.0.5 is immutable.
-3. **Backend ↔ Hermes:** loopback bearer key, typed request/response adapter,
-   no database/API access for Hermes.
-4. **Backend ↔ Audio Service:** loopback internal token, bounded text/audio
-   payloads, no external provider credentials.
-5. **Backend ↔ PostgreSQL:** private network, least-privilege database role,
-   encrypted backups and migrations.
-6. **Backend ↔ providers:** provider credentials stay in Backend-side secret
-   storage and provider adapters; mobile and Hermes receive redacted results.
+## Frozen flows
 
-## Request flows
+### Pairing and identity
 
-### Mobile chat
+Mobile bearer creates/reads/claims/revokes a six-digit challenge. Claim supplies the out-of-band device credential. Later device authentication uses current runtime `device_id`/`device_token`; owner-only features bind only when an active Prisma Device matches hardware ID and SHA-256 token verifier.
 
-```text
-Mobile → Backend auth/session check
-       → create/append ChatMessage
-       → scoped context retrieval via MemoryGateway
-       → Hermes request with bounded context
-       → persist assistant ChatMessage
-       → review-safe memory candidate (optional)
-       → response to Mobile
-```
+### Wi-Fi
 
-Voice input follows the existing ESP32 pipeline. When a user/device identity
-is known, the transcript and assistant text are appended to chat history by
-Backend; WAV and MP3 remain temporary operational artifacts.
+Mobile -> Backend authorization -> encrypted desired state in PostgreSQL -> device event queue -> ESP applies/reconnects -> receipt/result -> Backend state -> mobile realtime. First-boot connectivity is firmware-owned and unresolved.
 
-### External action
+### Chat
 
-```text
-Hermes → typed ActionIntent proposal
-       → Backend schema/policy/ownership/confirmation checks
-       → provider adapter or device adapter
-       → ActionExecution audit/result
-       → Hermes/mobile receives bounded result
-```
+Mobile REST creates an idempotent message -> Backend persists -> bounded memory context -> Hermes -> Backend persists assistant result -> mobile realtime. Hermes has no direct DB access.
 
-### Scheduled speech
+### Proactive speech and schedule
 
-```text
-Schedule → due ScheduleRun → idempotent worker claim
-         → delivery target selection
-         → optional Hermes wording
-         → audio generation
-         → additive scheduled-audio event lifecycle
-         → acknowledgement/attempt audit
-```
+Schedule/WhatsApp/chat source -> Backend generic delivery -> optional Hermes wording -> Audio Service MP3 -> additive ESP event -> physical acknowledgement. Backend success is not playback success.
 
-No scheduled flow writes memory merely because it produced speech.
+### Telemetry and settings
 
-## P9.1 time and settings rule
-
-All initial user-facing and mobile schedule times are interpreted and displayed
-in `Asia/Jakarta`. The timezone is server-enforced and not user-editable.
-Persisted database timestamps use UTC-compatible PostgreSQL `timestamptz`;
-future schedule metadata also defaults to `Asia/Jakarta`.
+ESP sends sanitized logs/telemetry -> Backend validates/bounds -> PostgreSQL current state/audit -> mobile. Mobile settings -> Backend DB -> optional additive ESP settings event -> applied acknowledgement.

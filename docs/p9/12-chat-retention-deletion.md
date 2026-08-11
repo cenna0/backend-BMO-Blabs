@@ -1,6 +1,6 @@
 # Chat Retention and Deletion
 
-**Status:** `PROPOSED + OPEN POLICY VALUES`
+**Status:** `READY_TO_IMPLEMENT`; retention defaults are a named privacy blocker.
 
 ## Stored history
 

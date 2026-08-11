@@ -1,6 +1,6 @@
 # Rollout, Canary, and Rollback
 
-**Status:** `PROPOSED`
+**Status:** `READY_TO_IMPLEMENT`; production execution requires a separate authorization gate.
 
 ## Rollout sequence
 
@@ -34,8 +34,9 @@ export paths may be enabled before writes only after privacy review.
 - limited mobile/API traffic;
 - only then broader activation after the relevant acceptance matrix passes.
 
-Scheduled device delivery must remain disabled until the additive hardware
-contract is approved and capability negotiation exists.
+Physical device delivery must remain disabled until the additive contract has
+backend evidence and the ESP capability has real-device evidence. Backend
+queue/API completion alone does not promote `PENDING_PHYSICAL_ESP`.
 
 ## Rollback triggers
 

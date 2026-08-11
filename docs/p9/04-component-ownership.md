@@ -1,28 +1,16 @@
-# P9 Component Ownership
+# Component Ownership — Frozen
 
-**Status:** `LOCKED + PROPOSED`
+| Component | Owns | Must not own |
+|---|---|---|
+| Mobile | presentation, local secure session handle, explicit user intent/confirmation | provider secrets, DB, Hermes/Audio calls, firmware state |
+| Caddy | public TLS, host/path routing, edge policy | application auth, data, business state |
+| Backend API service | auth/session, authorization, device ownership, APIs, chat, memory policy, schedules, delivery, provider adapters, audit | LLM personality, firmware implementation, provider session bytes |
+| Prisma | schema mapping, typed DB access, controlled migrations | business policy or startup migration |
+| PostgreSQL | durable BMO application state and audit | raw audio, Hermes provider session, plaintext secrets |
+| Hermes | reasoning/personality, bounded responses, WhatsApp gateway/session capability | BMO source of truth, mobile API, direct provider policy |
+| Audio Service | STT/TTS/FFmpeg and temporary audio output | identity, authorization, durable history |
+| ESP32 | local network application, recording, playback, display, device acknowledgements | user/session/database/schedule truth |
+| Spotify | provider playback/account state | BMO user ownership/audit |
+| WhatsApp/Hermes session | provider connectivity/conversation session | BMO notification rules, confirmations, delivery audit |
 
-| Component | Owns | Does not own | Boundary |
-|---|---|---|---|
-| Backend | auth, sessions, ownership, APIs, chat, memory policy, schedules, provider actions, audit | LLM personality, raw provider SDK exposure, firmware protocol changes | versioned HTTP APIs and existing HW adapter |
-| Prisma data layer | schema mapping, transactions, migrations, query types | business policy, provider tokens in plaintext | repository/service interfaces |
-| PostgreSQL | durable application records and audit | model cache, raw audio, Hermes private store, WhatsApp session bytes | private DB network |
-| Hermes | personality, reasoning, context response, typed intent proposals | PostgreSQL, mobile APIs, provider credentials, memory CRUD | loopback adapter with explicit payloads |
-| MemoryGateway | memory search/write/update/delete/export semantics | chat history ownership, raw audio, provider actions | interface implemented first by PostgresMemoryGateway |
-| Scheduler worker | due-run claiming, retries, idempotency, delivery attempt lifecycle | memory, chat policy, hardware wire format | scheduler service interface |
-| Audio Service | STT/TTS/FFmpeg and bounded audio output | user identity, tokens, provider actions, long-term storage | existing internal HTTP interface |
-| Mobile app | presentation, local session state, user-initiated confirmation | secrets, direct DB/Hermes/provider access | authenticated Backend API |
-| ESP32 firmware | local recording/playback/display and v1.0.5 event handling | user auth/session, schedules, database | immutable v1.0.5 contract |
-| Spotify adapter | OAuth/provider calls/token refresh | action policy and user consent | Backend-owned interface |
-| WhatsApp adapter | Hermes gateway calls/session status | notification policy, confirmation, memory ingestion | Backend-owned interface |
-| Caddy | TLS and public routing | auth, business logic, persistence | public edge only |
-
-## Ownership rules
-
-- A record has one write owner. Other components use a service boundary.
-- Provider response data is normalized before it crosses into chat, mobile, or
-  Hermes.
-- Sensitive values are represented by opaque IDs or redacted metadata outside
-  the owning adapter.
-- A failure in an optional integration cannot make the existing voice health
-  route falsely report a core dependency failure.
+An external side effect is authorized by Backend, executed by the owning adapter/device, and recorded as an idempotent attempt/result. No component may infer ownership from a display name, username, socket address, or Hermes conversation identifier.

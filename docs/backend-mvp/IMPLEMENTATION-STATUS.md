@@ -1,9 +1,32 @@
-# BMO Backend MVP — Implementation Status
+# BMO Backend MVP — Voice Lineage and Integration Overlay
 
 **Last updated:** 2026-08-11
 **Backend reference lineage:** 1.0.1; current active documentation is date-audited and governed by this status file
 
-## 1. Control state
+## Current integration overlay
+
+The exact pre-Phase-2 baseline is now canonical in
+[`../integration/05-IMPLEMENTATION-STATUS.md`](../integration/05-IMPLEMENTATION-STATUS.md)
+and the route/event inventory is in
+[`../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md).
+
+At the 2026-08-11 audit:
+
+- existing device voice is public production and must remain unchanged;
+- P9.1 auth/pairing/device/settings source exists at audited `main` and runs in
+  a private candidate with PostgreSQL 16.14 and two applied migrations;
+- production does not enable the P9.1 router;
+- all approved later backend capabilities remain `READY_TO_IMPLEMENT`, while
+  additive firmware behavior remains `PENDING_PHYSICAL_ESP`;
+- Prisma Studio listening on `*:5555` is a `BLOCKED` security gate before
+  Phase 2/deployment.
+
+No Phase 1 application/runtime/database change was made. The following control
+record is retained for the legacy voice/P9.1 verifier and historical phase
+lineage. Its “current next phase” label is superseded by `../NEXT-ACTION.md` and
+must not be interpreted as the current integration starting point.
+
+## 1. Legacy control state
 
 ```text
 Documentation package: CURRENT / P8 PRODUCTION CLOSED

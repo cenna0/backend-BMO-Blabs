@@ -1,74 +1,28 @@
-# Authentication and Device-Pairing Flow
+# Authentication, Device Identity, and Pairing
 
-**Status:** `P9.1 LOCKED`
+## Existing private candidate
 
-## Authentication — locked P9.1 contract
+- Registration requires `invitationToken`, email, password of at least 12 characters, and optional display name.
+- Passwords use Argon2id (`m=19456`, `t=3`, `p=1`); access JWT is HS256 with 15-minute lifetime, issuer `bmo-p9`, audience `bmo-mobile`.
+- Opaque 30-day refresh tokens are stored by hash, rotate on use, and revoke their family on replay. Logout and logout-all exist.
+- Six-digit pairing has 600-second TTL, five-attempt maximum, keyed HMAC digest, single use, and active-challenge invalidation.
+- Every pairing route requires mobile bearer auth. Claim body is `code`, `hardwareId`, `deviceName`, and an out-of-band `deviceCredential`; the ESP does not claim on `/ws`.
 
-1. Registration is invite-only. The invitation is single-use, expiring, and
-   stored by hash; registration cannot proceed without a valid invitation.
-2. Mobile submits email and password over TLS to Backend. Backend verifies the
-   password with Argon2id and never stores or logs the plaintext password.
-3. Backend issues a short-lived access token targeted at approximately 15
-   minutes plus an opaque cryptographically random refresh token.
-4. Only the refresh-token hash is stored in PostgreSQL. Refresh rotates the
-   token; reuse/replay revokes the affected token family/session.
-5. Mobile calls Backend only over TLS. Backend authorizes every resource from
-   the server-side session subject; a client-supplied `user_id` is never
-   trusted.
-6. Logout, expiry, explicit per-device revocation, suspected compromise, and
-   security action revoke server-side session state.
+## Approved target
 
-The identity schema remains provider-neutral for future expansion, but P9.1
-has no social login or external identity provider. Production email delivery
-and password-reset strategy remain OPEN and are not silently added to P9.1.
+- Make registration self-service and add DOB recovery with uniform responses, strong rate limiting, single-use recovery token, audit, and session-family revocation after reset.
+- Add username/profile/avatar without exposing DOB or credential fields.
+- Complete client-device session binding before claiming per-device mobile revocation.
+- Preserve current pairing code semantics and route shapes.
 
-## Pairing — locked P9.1 contract
+## Physical identity bridge
+
+The current `/ws` and voice HTTP auth remains config-based. After it succeeds, owner-only device capabilities resolve only when:
 
 ```text
-Authenticated mobile
-  → POST /api/v1/pairing/challenges
-  ← six-digit numeric code, valid for 10 minutes
-Device presents the code over the existing device channel
-  → Backend verifies code, hardware identity, and ownership policy
-  → authenticated user claims the device in one transaction
-  → transaction creates Device + hashed device credential + audit event
-  ← mobile receives device summary, never the stored credential
+Device.status == ACTIVE
+Device.hardwareId == authenticated device_id
+Device.tokenHash == SHA-256(authenticated device_token)
 ```
 
-Pairing codes are single-use, valid for 10 minutes, rate-limited, replay-
-protected, bound to the authenticated user, and invalidated after consumption,
-expiry, or failed-attempt threshold. Generating a new code invalidates the
-previous active code. Only a hash is persisted; full expired codes are never
-logged. A device already owned by another user cannot be silently claimed.
-
-## Recovery and revocation
-
-- User can revoke a device from mobile; Backend invalidates future device
-  authentication while preserving the ownership/audit record.
-- Credential rotation issues a new out-of-band device secret and stores only a
-  verifier/hash; the old credential is invalidated atomically.
-- Lost-device recovery does not require changing Hardware Contract v1.0.5.
-- Pairing is an application workflow; it does not alter the current ESP32
-  WebSocket event schema.
-
-All pairing lifecycle events are audited: requested, succeeded, failed,
-expired, revoked, and device unpaired.
-
-## Proposed API groups
-
-```text
-POST   /api/v1/auth/register
-POST   /api/v1/auth/login
-POST   /api/v1/auth/refresh
-POST   /api/v1/auth/logout
-POST   /api/v1/auth/sessions/:sessionId/revoke
-GET    /api/v1/me
-POST   /api/v1/pairing/challenges
-POST   /api/v1/pairing/complete
-GET    /api/v1/devices
-PATCH  /api/v1/devices/:deviceId
-POST   /api/v1/devices/:deviceId/rotate-credential
-POST   /api/v1/devices/:deviceId/revoke
-```
-
-All routes are `PROPOSED`; none exists in the current Backend.
+If no row matches, keep valid legacy voice working but deny owner-specific Wi-Fi/settings/telemetry/proactive operations. Do not silently rotate credentials during binding. Physical pairing proof is `PENDING_PHYSICAL_ESP`.

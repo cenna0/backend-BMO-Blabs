@@ -818,3 +818,11 @@ Firmware is ready for backend integration when:
 2. the deployment file says the backend is available;
 3. the physical-device matrix in [`ACCEPTANCE-TESTS.md`](ACCEPTANCE-TESTS.md) passes;
 4. no workaround changes endpoint/event/payload semantics from the canonical contract.
+
+## Additive Phase 2 handoff
+
+The checklist above remains the existing voice-v1.0.5 gate. Approved additive
+Wi-Fi, logs, telemetry/RSSI, playback-volume sync, and generic proactive-audio
+requirements are separate and remain `PENDING_PHYSICAL_ESP`; read
+[`../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md`](../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md).
+Do not merge their acceptance status into the existing public fake-client result.

@@ -224,3 +224,12 @@ only when:
 - all mandatory tests above are `PASS` or an explicitly approved hardware/environment exception is documented;
 - firmware build ID and representative request IDs are recorded;
 - no protocol workaround changes canonical endpoint/event/payload semantics.
+
+## Additive Phase 2 acceptance boundary
+
+The declaration above applies to the existing v1.0.5 voice matrix. It does not
+verify Wi-Fi configuration, device logs/telemetry, settings sync, or generic
+proactive playback. Those capabilities remain `PENDING_PHYSICAL_ESP` and need
+the separate real-device cases in
+[`../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md`](../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md)
+after Backend handlers exist.

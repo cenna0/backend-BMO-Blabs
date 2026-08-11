@@ -1,6 +1,6 @@
 # Hermes ↔ Backend Action-Intent Schema
 
-**Status:** `PROPOSED`
+**Status:** `READY_TO_IMPLEMENT`
 
 Hermes proposes; Backend authenticates, authorizes, validates, confirms, and
 executes. The action schema is versioned and discriminated so unsupported
@@ -45,7 +45,8 @@ type ActionIntent =
     }};
 ```
 
-The final implementation uses strict schemas, length limits, allowlists,
+`device.speech` creates the generic proactive delivery; physical playback is
+`PENDING_PHYSICAL_ESP`. The final implementation uses strict schemas, length limits, allowlists,
 provider/device ownership checks, per-kind confirmation requirements, and
 safe result types. It never evaluates arbitrary `schedule` or provider input
 as code. Schedule intents use the server-enforced `Asia/Jakarta` timezone;
