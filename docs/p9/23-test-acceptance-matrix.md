@@ -2,9 +2,9 @@
 
 | Area | Phase 1 evidence | Phase 2 acceptance |
 |---|---|---|
-| Backend tests | Node 22.23.1: 199 passed, 1 skipped DB HTTP suite; Slice 2A focused schema/repository run 17 passed | Unit + authenticated HTTP integration with disposable Postgres |
+| Backend tests | Node 22.23.1: 200 passed, 1 skipped DB HTTP suite; Slice 2A focused schema/repository run 18 passed | Unit + authenticated HTTP integration with disposable Postgres |
 | Build/typecheck | Passed on Node 22.23.1 | Repeat on pinned build/runtime |
-| Prisma | Validate/generate passed; exact 38-model list, every new table's scalar SQL types, embedded destructive/data-rewrite SQL rejection, nullable check guards, provider-subtype integrity, repository delegates, and readiness manifest matching all three source migrations are statically verified | Empty/repeat/upgrade migration, constraints, backup/restore, no startup migration at an authorized disposable/candidate gate; Slice 2A migration is not applied |
+| Prisma | Validate/generate passed; exact 38-model list, every new table's scalar SQL types, embedded destructive/data-rewrite SQL rejection, nullable check guards, provider-subtype integrity, repository delegates, and readiness manifest matching all three source migrations are statically verified. Disposable PostgreSQL passed an empty three-migration deploy, repeat deploy with no pending migration, and populated two-to-three upgrade preserving seeded rows in all 11 P9.1 models. Explicit relation maps correct the 14 constraint-name-only introspection proposals without database renames. | Constraint and backup/restore acceptance at an authorized candidate gate; no startup migration. Slice 2A remains unapplied to the running `bmo` candidate. |
 | Audio | 103 passed in production audio image | Existing suite + voice regression |
 | Existing device voice | Production contract/runtime inspected | Public fake-device regression plus no raw-WAV/MP3/event drift |
 | Auth/recovery | P9.1 auth source/private candidate exists; nullable DOB and verifier-only recovery storage exist in unapplied source schema; `SafeUser` remains DOB-free | Self-service, Argon2id, rotation/replay, DOB enumeration/rate/reuse, logout-all, tenant isolation |

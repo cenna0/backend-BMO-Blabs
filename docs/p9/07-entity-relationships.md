@@ -1,8 +1,8 @@
 # Entity Relationships — Phase 2 Source Foundation
 
-**Evidence tier:** Prisma schema and unapplied migration source only. The running
-candidate and production databases still contain the P9.1 foundation; Slice 2A
-did not apply or deploy this graph.
+**Evidence tier:** Prisma schema plus disposable PostgreSQL migration evidence.
+The running `bmo` candidate and production databases still contain the P9.1
+foundation; Slice 2A did not apply or deploy this graph to either runtime.
 
 ```text
 User
@@ -34,3 +34,8 @@ own user chat or memory data. Schedules remain structured records, not memory,
 and provider session bytes do not become BMO entities. Spotify and WhatsApp
 subtypes are additionally bound through the connection's provider discriminator;
 a subtype cannot point at a connection for the other provider.
+
+The disposable gate passed empty deployment, repeat deployment with no pending
+migrations, and a populated two-to-three migration upgrade preserving one seeded
+row in every P9.1 model. Explicit Prisma relation maps match the 14 deployed
+custom foreign-key names, avoiding constraint-name-only introspection drift.

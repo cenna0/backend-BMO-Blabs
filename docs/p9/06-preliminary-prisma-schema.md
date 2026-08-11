@@ -1,9 +1,10 @@
 # Prisma Schema — Phase 2 Application Foundation
 
-**Source state:** `EXISTING_VERIFIED` for schema and migration source only.
+**Source state:** `EXISTING_VERIFIED` for schema and migration source, plus an
+authorized disposable PostgreSQL migration gate.
 **Runtime state:** migration `20260811190000_phase2_application_foundation` has
-not been applied to the running candidate or production. This document does not
-authorize a database migration.
+not been applied to the running `bmo` candidate or production. This document
+does not authorize a database migration.
 
 ## Existing P9.1 schema — `EXISTING_VERIFIED`
 
@@ -75,6 +76,16 @@ adds nullable `User` columns plus backward-compatible `DeviceSettings` delivery
 metadata. It contains no destructive statement. Existing P9.1 IDs, fields,
 constraints, and records are not renamed or removed.
 
+### Disposable migration evidence
+
+- Empty PostgreSQL: deploying all three source migrations passed.
+- Repeat deployment: passed with no pending migrations.
+- Populated PostgreSQL: upgrading from the two P9.1 migrations to all three passed and preserved the seeded row in each of the 11 P9.1 models.
+- The first post-deploy Prisma diff proposed only 14 foreign-key constraint renames. The schema now maps those deployed constraint names explicitly, correcting introspection without editing the applied historical migrations or renaming database constraints.
+
+This evidence is disposable-tier only. It does not state or imply that the
+running private `bmo` candidate was migrated.
+
 ### Account/profile/recovery
 
 - `User.dateOfBirth` is nullable `DATE`; `username` is nullable, unique, and normalized by a database check; `avatarKey` is nullable/unique with content type and positive byte-size shape checks. Username length `3–30` remains an application-layer rule. `SafeUser` still omits DOB.
@@ -122,7 +133,7 @@ constraints, and records are not renamed or removed.
 
 ## Migration and rollout constraints
 
-1. The reviewed source migration is not runtime evidence. Use `prisma migrate deploy` only at an authorized disposable/candidate gate, then separately authorize production. Never use `db push`, startup migration, destructive reset, or blind down migration in production.
+1. Reviewed source plus disposable-gate evidence does not authorize candidate or production rollout. Use `prisma migrate deploy` only at a separately authorized candidate gate, then separately authorize production. Never use `db push`, startup migration, destructive reset, or blind down migration in production.
 2. Add constraints/indexes after evaluating existing rows; use expand/backfill/enforce/contract when a required field cannot be introduced safely.
 3. Encrypt Wi-Fi/provider secrets with application AEAD and key versioning. Encryption keys stay outside DB/Git/backups.
 4. Every tenant query is scoped by authenticated user ownership; every delivery/action has an idempotency or uniqueness boundary.

@@ -67,6 +67,27 @@ const destructiveSqlPatterns = [
   /\bALTER\s+(?:INDEX|TABLE|TYPE)\b[^;]*\bRENAME\b/i,
 ];
 
+const expectedMappedForeignKeys = [
+  ["Session", "clientDevice", "Session_client_device_owner_fkey"],
+  ["RefreshToken", "session", "RefreshToken_session_family_fkey"],
+  ["DevicePairing", "device", "DevicePairing_device_owner_fkey"],
+  ["ChatSession", "device", "ChatSession_device_owner_fkey"],
+  ["ChatMessage", "sourceDevice", "ChatMessage_source_device_owner_fkey"],
+  ["Schedule", "targetDevice", "Schedule_target_device_owner_fkey"],
+  ["ProactiveDelivery", "device", "ProactiveDelivery_device_owner_fkey"],
+  ["DeliveryAttempt", "delivery", "DeliveryAttempt_delivery_owner_fkey"],
+  ["DeliveryAttempt", "device", "DeliveryAttempt_device_owner_fkey"],
+  ["SpotifyCredential", "connection", "SpotifyCredential_connection_owner_provider_fkey"],
+  ["SpotifyAction", "connection", "SpotifyAction_connection_owner_provider_fkey"],
+  [
+    "WhatsAppNotificationRule",
+    "connection",
+    "WhatsAppNotificationRule_connection_owner_provider_fkey",
+  ],
+  ["WhatsAppSendRequest", "connection", "WhatsAppSendRequest_connection_owner_provider_fkey"],
+  ["WhatsAppDelivery", "connection", "WhatsAppDelivery_connection_owner_provider_fkey"],
+] as const;
+
 describe("P9 Prisma schema", () => {
   it("keeps the runtime readiness manifest identical to source migration directories", async () => {
     const migrationDirectory = new URL("../../prisma/migrations/", import.meta.url);
@@ -168,6 +189,27 @@ describe("P9 Prisma schema", () => {
     expect(migrationSql).toContain("DeviceSettings_voice_bounds_ck");
   });
 
+  it("maps deployed custom foreign-key names for stable Prisma introspection", async () => {
+    const schema = await readFile(schemaPath, "utf8");
+    const migrationDirectory = new URL("../../prisma/migrations/", import.meta.url);
+    const migrationEntries = await readdir(migrationDirectory, { withFileTypes: true });
+    const migrationSql = (
+      await Promise.all(
+        migrationEntries
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => readFile(new URL(`${entry.name}/migration.sql`, migrationDirectory), "utf8")),
+      )
+    ).join("\n");
+
+    for (const [modelName, relationField, constraintName] of expectedMappedForeignKeys) {
+      const relationLine = prismaModelDefinition(schema, modelName)
+        .split("\n")
+        .find((line) => new RegExp(`^\\s*${relationField}\\s`).test(line));
+      expect(relationLine, `${modelName}.${relationField}`).toContain(`map: "${constraintName}"`);
+      expect(migrationSql, constraintName).toContain(`CONSTRAINT "${constraintName}"`);
+    }
+  });
+
   it("adds profile and recovery data without exposing plaintext verifiers", async () => {
     const schema = await readFile(schemaPath, "utf8");
     expect(schema).toMatch(/dateOfBirth\s+DateTime\?\s+@db\.Date/);
@@ -186,10 +228,10 @@ describe("P9 Prisma schema", () => {
     expect(schema).toMatch(/model ChatOperation[\s\S]*status\s+ChatOperationStatus/);
     expect(schema).toMatch(/model ChatMessageFeedback[\s\S]*@@unique\(\[userId, messageId\]\)/);
     expect(schema).toContain(
-      '@relation("ChatSessionDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)',
+      '@relation("ChatSessionDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict, map: "ChatSession_device_owner_fkey")',
     );
     expect(schema).toContain(
-      "delivery      ProactiveDelivery     @relation(fields: [deliveryId, userId], references: [id, userId], onDelete: Cascade)",
+      'delivery      ProactiveDelivery     @relation(fields: [deliveryId, userId], references: [id, userId], onDelete: Cascade, map: "DeliveryAttempt_delivery_owner_fkey")',
     );
   });
 
@@ -306,7 +348,7 @@ describe("P9 Prisma schema", () => {
       const model = prismaModelDefinition(schema, modelName);
       expect(model).toMatch(new RegExp(`provider\\s+IntegrationProvider\\s+@default\\(${provider}\\)`));
       expect(model).toContain(
-        "@relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)",
+        `@relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "${modelName}_connection_owner_provider_fkey")`,
       );
       expect(sqlTableDefinition(migrationSql, modelName)).toContain(
         `"provider" "IntegrationProvider" NOT NULL DEFAULT '${provider}'`,

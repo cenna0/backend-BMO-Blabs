@@ -305,7 +305,7 @@ model Session {
   createdAt      DateTime       @default(now()) @db.Timestamptz(3)
   lastUsedAt     DateTime?      @db.Timestamptz(3)
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clientDevice   Device?        @relation("SessionClientDevice", fields: [clientDeviceId, userId], references: [id, userId], onDelete: Restrict)
+  clientDevice   Device?        @relation("SessionClientDevice", fields: [clientDeviceId, userId], references: [id, userId], onDelete: Restrict, map: "Session_client_device_owner_fkey")
   refreshTokens  RefreshToken[]
 
   @@unique([familyId])
@@ -324,7 +324,7 @@ model RefreshToken {
   expiresAt DateTime  @db.Timestamptz(3)
   usedAt    DateTime? @db.Timestamptz(3)
   revokedAt DateTime? @db.Timestamptz(3)
-  session   Session   @relation(fields: [sessionId, familyId], references: [id, familyId], onDelete: Cascade)
+  session   Session   @relation(fields: [sessionId, familyId], references: [id, familyId], onDelete: Cascade, map: "RefreshToken_session_family_fkey")
 
   @@index([sessionId, familyId, expiresAt])
   @@index([familyId, usedAt, revokedAt])
@@ -375,7 +375,7 @@ model DevicePairing {
   invalidatedAt DateTime?     @db.Timestamptz(3)
   createdAt     DateTime      @default(now()) @db.Timestamptz(3)
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  device        Device?       @relation(fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+  device        Device?       @relation(fields: [deviceId, userId], references: [id, userId], onDelete: Restrict, map: "DevicePairing_device_owner_fkey")
 
   @@index([userId, status, expiresAt])
   @@index([codeHash, status])
@@ -483,7 +483,7 @@ model ChatSession {
   createdAt         DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime          @updatedAt @db.Timestamptz(3)
   user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  device            Device?           @relation("ChatSessionDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+  device            Device?           @relation("ChatSessionDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict, map: "ChatSession_device_owner_fkey")
   messages          ChatMessage[]
 
   @@unique([id, userId])
@@ -506,7 +506,7 @@ model ChatMessage {
   deletedAt        DateTime?             @db.Timestamptz(3)
   session          ChatSession           @relation(fields: [sessionId, userId], references: [id, userId], onDelete: Cascade)
   user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceDevice     Device?               @relation("ChatMessageSourceDevice", fields: [sourceDeviceId, userId], references: [id, userId], onDelete: Restrict)
+  sourceDevice     Device?               @relation("ChatMessageSourceDevice", fields: [sourceDeviceId, userId], references: [id, userId], onDelete: Restrict, map: "ChatMessage_source_device_owner_fkey")
   operations       ChatOperation[]
   feedback         ChatMessageFeedback[]
   memoryCandidates MemoryCandidate[]
@@ -646,7 +646,7 @@ model Schedule {
   createdAt      DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  targetDevice   Device?        @relation("ScheduleTargetDevice", fields: [targetDeviceId, userId], references: [id, userId], onDelete: Restrict)
+  targetDevice   Device?        @relation("ScheduleTargetDevice", fields: [targetDeviceId, userId], references: [id, userId], onDelete: Restrict, map: "Schedule_target_device_owner_fkey")
   runs           ScheduleRun[]
 
   @@unique([id, userId])
@@ -696,7 +696,7 @@ model ProactiveDelivery {
   createdAt          DateTime                @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime                @updatedAt @db.Timestamptz(3)
   user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  device             Device?                 @relation("ProactiveDeliveryDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+  device             Device?                 @relation("ProactiveDeliveryDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict, map: "ProactiveDelivery_device_owner_fkey")
   attempts           DeliveryAttempt[]
 
   @@unique([userId, idempotencyKey])
@@ -723,9 +723,9 @@ model DeliveryAttempt {
   playedAt      DateTime?             @db.Timestamptz(3)
   createdAt     DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime              @updatedAt @db.Timestamptz(3)
-  delivery      ProactiveDelivery     @relation(fields: [deliveryId, userId], references: [id, userId], onDelete: Cascade)
+  delivery      ProactiveDelivery     @relation(fields: [deliveryId, userId], references: [id, userId], onDelete: Cascade, map: "DeliveryAttempt_delivery_owner_fkey")
   user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  device        Device?               @relation("DeliveryAttemptDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+  device        Device?               @relation("DeliveryAttemptDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict, map: "DeliveryAttempt_device_owner_fkey")
 
   @@unique([deliveryId, attemptNumber])
   @@index([userId, status, createdAt])
@@ -844,7 +844,7 @@ model SpotifyCredential {
   createdAt              DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime              @updatedAt @db.Timestamptz(3)
   user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection             IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
+  connection             IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "SpotifyCredential_connection_owner_provider_fkey")
 
   @@unique([connectionId, userId, provider])
 }
@@ -866,7 +866,7 @@ model SpotifyAction {
   createdAt             DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection            IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
+  connection            IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "SpotifyAction_connection_owner_provider_fkey")
 
   @@unique([userId, idempotencyKey])
   @@index([userId, status, createdAt])
@@ -885,7 +885,7 @@ model WhatsAppNotificationRule {
   createdAt       DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime              @updatedAt @db.Timestamptz(3)
   user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection      IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
+  connection      IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "WhatsAppNotificationRule_connection_owner_provider_fkey")
 
   // The SQL migration enforces target shape and separate global/targeted partial unique indexes.
   @@index([userId, enabled, updatedAt])
@@ -907,7 +907,7 @@ model WhatsAppSendRequest {
   createdAt             DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection            IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
+  connection            IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "WhatsAppSendRequest_connection_owner_provider_fkey")
   deliveries            WhatsAppDelivery[]
 
   @@unique([id, userId])
@@ -932,7 +932,7 @@ model WhatsAppDelivery {
   createdAt          DateTime                  @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime                  @updatedAt @db.Timestamptz(3)
   user               User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection         IntegrationConnection     @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
+  connection         IntegrationConnection     @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "WhatsAppDelivery_connection_owner_provider_fkey")
   sendRequest        WhatsAppSendRequest?      @relation(fields: [sendRequestId, userId], references: [id, userId], onDelete: Restrict)
 
   @@index([userId, status, createdAt])

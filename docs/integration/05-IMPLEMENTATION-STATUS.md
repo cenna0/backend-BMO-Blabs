@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-11
-**Last implementation checkpoint:** 2026-08-11 — Slice 2A additive application data foundation in source
+**Last implementation checkpoint:** 2026-08-11 — Slice 2A additive application data foundation and disposable migration gate
 **Baseline source:** `main` / `d638b20c381c676136c94524a38a1def5d70e565`
 **Documentation branch:** `docs/integration-contract-freeze`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -72,7 +72,7 @@ At audit time the candidate database was approximately 9.3 MB with two active co
 | Six-digit pairing | `EXISTING_VERIFIED` | Source + DB-backed candidate; mobile bearer routes, 10-minute TTL, five attempts; physical pairing not proven |
 | Device CRUD/settings | `EXISTING_VERIFIED` | Source + private candidate; settings are DB-only and do not sync to ESP |
 | P9.1 Prisma foundation | `EXISTING_VERIFIED` | 11 models; two additive migrations; not the target integration schema |
-| Phase 2 application data foundation | `EXISTING_VERIFIED` | Source schema/migration only: 27 additive models (38 total), explicit ownership/idempotency/secret-shape constraints, provider-subtype connection integrity, required bounded device-log expiry, repository delegates, and migration `20260811190000_phase2_application_foundation`. The migration has not been applied to the running private candidate or public production. |
+| Phase 2 application data foundation | `EXISTING_VERIFIED` | Source schema plus disposable PostgreSQL evidence: 27 additive models (38 total), explicit ownership/idempotency/secret-shape constraints, provider-subtype connection integrity, required bounded device-log expiry, repository delegates, and migration `20260811190000_phase2_application_foundation`. Empty three-migration deploy, repeat deploy with no pending migration, and populated two-to-three migration upgrade all passed. The migration has not been applied to the running private `bmo` candidate or public production. |
 | Production P9.1 activation | `READY_TO_IMPLEMENT` | Existing router is disabled on production |
 | Production-shaped P9.1 integration | `EXISTING_VERIFIED` | Source + automated review-runtime packaging: the full Backend runtime registers P9 and existing voice surfaces together. Review Compose keeps Backend on host networking for loopback Hermes/Audio, removes PostgreSQL host publication, and connects Backend to PostgreSQL through a shared Unix-socket volume. The running private candidate has not been recreated and public production remains unchanged. |
 
@@ -99,9 +99,9 @@ present and finished whenever P9 is enabled; a static test keeps that manifest
 identical to the migration directories. A failed, incomplete, or stalled
 database probe is bounded by the readiness timeout and sanitized as
 `database: error` with HTTP 503, while `/livez` remains dependency-free and the
-P9-disabled response shape is unchanged. Public/candidate database acceptance
-remains pending the Slice 2 migration/review environment; no public availability
-is claimed.
+P9-disabled response shape is unchanged. The disposable database gate passed;
+running private-candidate and public-production acceptance remain pending, and
+no public availability is claimed.
 
 One-hop Express/Supertest coverage verifies that Caddy's rightmost forwarded
 client address owns the auth rate-limit bucket: attacker-controlled earlier
@@ -140,9 +140,9 @@ is liveness evidence and never substitutes for integrated readiness.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 199 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs. Slice 2A focused schema/repository coverage passed 17 tests.
+- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 200 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs. Slice 2A focused schema/repository coverage passed 18 tests.
 - Backend typecheck and build: passed on Node `22.23.1`.
-- Prisma validation and generated-client typecheck/build: passed. The source manifest now requires three migrations. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the new migration is not applied there.
+- Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. On disposable PostgreSQL, an empty three-migration deploy passed, repeat deploy reported no pending migrations, and a populated two-to-three migration upgrade preserved seeded rows in all 11 P9.1 models. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the new migration is not applied to the running `bmo` candidate.
 - Static/rendered integrated-candidate packaging: passed; PostgreSQL has no host-published port and Backend uses the named Unix-socket volume. The live candidate was not recreated.
 - Audio Service: 103 tests passed in the production audio image.
 - Documentation verifier: passed before synchronization and must pass again on the final tree.
@@ -157,4 +157,4 @@ is liveness evidence and never substitutes for integrated readiness.
 
 ## Phase 2 next source slice
 
-Use `04-VPS-IMPLEMENTATION-PLAN.md`. Build account/profile/recovery and personalization services/routes against the reviewed additive source schema, preserving `SafeUser` DOB exclusion and existing P9.1 behavior. Review and execute the new migration only at a separately authorized disposable/candidate gate; do not apply it to the running candidate or production from this source checkpoint.
+Use `04-VPS-IMPLEMENTATION-PLAN.md`. Build account/profile/recovery and personalization services/routes against the reviewed additive source schema, preserving `SafeUser` DOB exclusion and existing P9.1 behavior. The disposable migration gate is complete; execute against the running candidate or production only under separate authorization.
