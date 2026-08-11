@@ -2,6 +2,7 @@ export interface BackendReadinessState {
   hermesReady: boolean;
   audioReady: boolean;
   rvcAvailable: boolean;
+  databaseReady?: boolean;
 }
 
 export interface BackendReadinessPort {
@@ -18,6 +19,7 @@ interface BackendReadinessServiceOptions {
   audioServiceBaseUrl: string;
   timeoutMs: number;
   fetcher?: Fetcher;
+  databaseReadiness?: () => Promise<boolean>;
 }
 
 interface AudioReadiness {
@@ -78,15 +80,26 @@ export class BackendReadinessService implements BackendReadinessPort {
     };
   }
 
+  async #checkDatabase(): Promise<boolean | undefined> {
+    if (!this.options.databaseReadiness) return undefined;
+    try {
+      return await this.options.databaseReadiness();
+    } catch {
+      return false;
+    }
+  }
+
   async check(): Promise<BackendReadinessState> {
-    const [hermesReady, audio] = await Promise.all([
+    const [hermesReady, audio, databaseReady] = await Promise.all([
       this.#checkHermes(),
       this.#checkAudio(),
+      this.#checkDatabase(),
     ]);
     return {
       hermesReady,
       audioReady: audio.ready,
       rvcAvailable: audio.rvcAvailable,
+      ...(databaseReady === undefined ? {} : { databaseReady }),
     };
   }
 }

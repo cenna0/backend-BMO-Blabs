@@ -73,21 +73,40 @@ At audit time the candidate database was approximately 9.3 MB with two active co
 | Device CRUD/settings | `EXISTING_VERIFIED` | Source + private candidate; settings are DB-only and do not sync to ESP |
 | P9.1 Prisma foundation | `EXISTING_VERIFIED` | 11 models; two additive migrations; not the target integration schema |
 | Production P9.1 activation | `READY_TO_IMPLEMENT` | Existing router is disabled on production |
-| Production-shaped P9.1 integration | `EXISTING_VERIFIED` | Source + automated review-runtime packaging: the full Backend runtime registers P9 and existing voice surfaces together. Review Compose binds Backend/PostgreSQL to host loopback only; running private candidate has not been recreated and public production remains unchanged. |
+| Production-shaped P9.1 integration | `EXISTING_VERIFIED` | Source + automated review-runtime packaging: the full Backend runtime registers P9 and existing voice surfaces together. Review Compose keeps Backend on host networking for loopback Hermes/Audio, removes PostgreSQL host publication, and connects Backend to PostgreSQL through a shared Unix-socket volume. The running private candidate has not been recreated and public production remains unchanged. |
 
 Session issuance now accepts an optional `clientDeviceId` only after querying an
 active `Device` owned by the authenticated user. Pre-pairing sessions remain
 valid with a null binding; refresh rotation retains the binding on the same
-session. Client-supplied user ownership is never used.
+session. Default issuance opens a transaction and takes the same per-user
+advisory lock as unpair before validation and token/session writes; registration
+reuses its existing transaction without nesting. Client-supplied user ownership
+is never used.
 
 The device `/ws` now performs an asynchronous application binding after the
 unchanged runtime credential succeeds. It resolves only an active matching
-hardware ID and SHA-256 token verifier. A missing/mismatched row emits the safe
-`DEVICE_NOT_BOUND` diagnostic while legacy voice remains connected.
+hardware ID and SHA-256 token verifier. Cached owner identity is never exposed
+directly: the only server accessor asynchronously revalidates the exact device,
+user, hardware ID, and `ACTIVE` status, and clears a revoked or stale binding.
+A missing/mismatched row emits the safe `DEVICE_NOT_BOUND` diagnostic while
+legacy voice remains connected; callback rejection is contained.
 
 The optional `Session.clientDeviceId` issuance path is source/unit verified with
-active-owner validation. Public/candidate database acceptance remains pending
-the Slice 2 migration/review environment; no public availability is claimed.
+transaction/lock ordering and active-owner validation. Integrated readiness now
+requires PostgreSQL health and at least one fully finished migration whenever
+P9 is enabled; a failed/pending database is sanitized as `database: error` with
+HTTP 503, while `/livez` remains dependency-free and P9-disabled response shape
+is unchanged. Public/candidate database acceptance remains pending the Slice 2
+migration/review environment; no public availability is claimed.
+
+One-hop Express/Supertest coverage verifies that Caddy's rightmost forwarded
+client address owns the auth rate-limit bucket: attacker-controlled earlier
+`X-Forwarded-For` entries do not reset it, while distinct rightmost clients use
+distinct buckets. Candidate packaging tests verify PostgreSQL has no published
+host port and that the socket-aware entrypoint retains hostname/port fallback.
+The candidate image healthcheck intentionally probes dependency-free `/livez`
+only; candidate acceptance must separately query `/readyz`, so container health
+is liveness evidence and never substitutes for integrated readiness.
 
 ## Approved integration scope
 
@@ -117,9 +136,10 @@ the Slice 2 migration/review environment; no public availability is claimed.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 36 files passed, 1 skipped; 155 tests passed, 1 skipped. The skipped suite requires `POSTGRES_TEST_URL`.
+- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 183 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs.
 - Backend typecheck and build: passed on Node `22.23.1`.
 - Prisma validation: passed. Candidate `/ops/db/livez`, `/readyz`, and `/migrations`: healthy/private.
+- Static/rendered integrated-candidate packaging: passed; PostgreSQL has no host-published port and Backend uses the named Unix-socket volume. The live candidate was not recreated.
 - Audio Service: 103 tests passed in the production audio image.
 - Documentation verifier: passed before synchronization and must pass again on the final tree.
 - A host-Node test attempt failed with `ERR_IPC_CHANNEL_CLOSED`; this is an environment mismatch, not a test regression.

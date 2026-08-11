@@ -78,6 +78,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     ...(p9 === undefined ? {} : {
       resolveApplicationDevice: (deviceId: string, deviceToken: string) =>
         p9.resolveDeviceBinding(deviceId, deviceToken),
+      authorizeApplicationDevice: (binding) => p9.authorizeDeviceBinding(binding),
       onDeviceNotBound: (deviceId: string) => {
         logger.warn({ device_id: deviceId, diagnostic: "DEVICE_NOT_BOUND" }, "device has no application binding");
       },
@@ -117,6 +118,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     hermesBaseUrl: config.HERMES_API_URL,
     audioServiceBaseUrl: config.AUDIO_SERVICE_URL,
     timeoutMs: config.READINESS_PROBE_TIMEOUT_MS,
+    ...(p9 === undefined ? {} : { databaseReadiness: () => p9.checkReadiness() }),
   });
   const conversationQueue = new ConversationQueue();
   const pipeline = new VoicePipelineService({
@@ -163,7 +165,11 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     }
   };
 
-  app.use(createHealthRouter({ hardwareTestMode: config.HARDWARE_TEST_MODE, readiness }));
+  app.use(createHealthRouter({
+    hardwareTestMode: config.HARDWARE_TEST_MODE,
+    databaseEnabled: p9 !== undefined,
+    readiness,
+  }));
   if (p9) {
     app.use("/api/v1", p9.router);
   }

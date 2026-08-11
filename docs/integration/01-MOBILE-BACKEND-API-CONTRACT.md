@@ -138,10 +138,12 @@ POST /api/v1/auth/logout-all
 GET  /api/v1/me
 ```
 
-The existing Prisma `Session.clientDeviceId` field is not populated by the
-current issuance path. Do not claim per-mobile-device session revocation until
-Phase 2 binds and tests it; current verified controls are logout, logout-all,
-refresh rotation, and replay-family revocation.
+Login may populate the existing Prisma `Session.clientDeviceId` only for an
+active device owned by the authenticated user. Issuance and unpair serialize on
+the same per-user transaction lock, so validation and session/token creation
+cannot race device revocation. Pre-pairing registration/login may keep the field
+null; logout, logout-all, refresh rotation, and replay-family revocation remain
+the other verified controls.
 
 ## 2.4 Forgot password using date of birth
 

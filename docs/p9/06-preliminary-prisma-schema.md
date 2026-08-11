@@ -30,7 +30,7 @@ Applied candidate migrations:
 20260804123000_p9_1_integrity_constraints
 ```
 
-Key existing facts: email is unique/canonicalized; refresh tokens and device credentials are stored as verifiers; `Device.hardwareId` is unique; pairing code is a keyed digest with expiry/use/attempt fields; user and device settings are one-to-one. `Session.clientDeviceId` exists, but the current auth issue path does not populate it, so per-client session revocation is not complete.
+Key existing facts: email is unique/canonicalized; refresh tokens and device credentials are stored as verifiers; `Device.hardwareId` is unique; pairing code is a keyed digest with expiry/use/attempt fields; user and device settings are one-to-one. Login may populate `Session.clientDeviceId` after transaction-locked active-owner validation; pre-pairing sessions remain nullable.
 
 ## Additive target requirements — `READY_TO_IMPLEMENT`
 

@@ -54,6 +54,61 @@ describe("backend health endpoints", () => {
     await request(app).get("/health").expect(200, expected);
   });
 
+  it("adds healthy database readiness only when P9 is enabled", async () => {
+    const app = express();
+    app.use(
+      createHealthRouter({
+        hardwareTestMode: false,
+        databaseEnabled: true,
+        readiness: {
+          check: async () => ({
+            hermesReady: true,
+            audioReady: true,
+            rvcAvailable: true,
+            databaseReady: true,
+          }),
+        },
+      }),
+    );
+
+    await request(app).get("/readyz").expect(200, {
+      status: "ok",
+      backend: "ok",
+      hermes: "ok",
+      audio_service: "ok",
+      rvc: "available",
+      database: "ok",
+    });
+  });
+
+  it("returns sanitized 503 database:error while P9 migrations are pending", async () => {
+    const app = express();
+    app.use(
+      createHealthRouter({
+        hardwareTestMode: false,
+        databaseEnabled: true,
+        readiness: {
+          check: async () => ({
+            hermesReady: true,
+            audioReady: true,
+            rvcAvailable: true,
+            databaseReady: false,
+          }),
+        },
+      }),
+    );
+
+    await request(app).get("/readyz").expect(503, {
+      status: "error",
+      backend: "ok",
+      hermes: "ok",
+      audio_service: "ok",
+      rvc: "available",
+      database: "error",
+    });
+    await request(app).get("/livez").expect(200, { status: "ok", backend: "ok" });
+  });
+
   it("keeps readiness successful and degraded when optional RVC is unavailable", async () => {
     const app = express();
     app.use(

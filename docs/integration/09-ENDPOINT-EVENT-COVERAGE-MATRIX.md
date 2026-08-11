@@ -7,9 +7,9 @@
 
 | Method/surface | Path/event | Status | Availability / evidence |
 |---|---|---|---|
-| GET | `/health` | `EXISTING_VERIFIED` | Public production 200 |
+| GET | `/health` | `EXISTING_VERIFIED` | Public production 200; integrated source returns sanitized `database: error`/503 when enabled P9 DB health or migrations are not ready |
 | GET | `/livez` | `EXISTING_VERIFIED` | Backend loopback 200; Caddy deliberately returns public 404 |
-| GET | `/readyz` | `EXISTING_VERIFIED` | Backend loopback; Caddy deliberately returns public 404 |
+| GET | `/readyz` | `EXISTING_VERIFIED` | Backend loopback; P9-enabled source includes DB health/migration readiness; Caddy deliberately returns public 404 |
 | POST | `/api/v1/voice` | `EXISTING_VERIFIED` | Production device-authenticated whole raw-WAV upload |
 | GET | `/audio/:fileName` | `EXISTING_VERIFIED` | Canonical client form `/audio/:audioId.mp3`; production MP3 delivery |
 | WSS | `/ws` | `EXISTING_VERIFIED` | Production physical-device contract; not mobile realtime |
@@ -28,7 +28,7 @@ deployed or enabled there.
 | Method | Path | Status | Availability / gap |
 |---|---|---|---|
 | POST | `/api/v1/auth/register` | `EXISTING_VERIFIED` | Private candidate; currently requires `invitationToken`; self-service change `READY_TO_IMPLEMENT` |
-| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + source tests; optional `clientDeviceId` requires an active device owned by the authenticated user |
+| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + source tests; optional `clientDeviceId` issuance transaction-locks the user against unpair, then requires an active owned device |
 | POST | `/api/v1/auth/refresh` | `EXISTING_VERIFIED` | Private candidate; opaque rotating refresh token |
 | POST | `/api/v1/auth/logout` | `EXISTING_VERIFIED` | Private candidate |
 | POST | `/api/v1/auth/logout-all` | `EXISTING_VERIFIED` | Private candidate |
@@ -128,7 +128,7 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Direction | Event | Status | Evidence |
 |---|---|---|---|
-| ESP -> Backend | `authenticate` | `EXISTING_VERIFIED` | Config-based `DEVICE_ID`/`DEVICE_TOKEN`; 8 KiB max payload; source tests verify additive active hardware-ID/SHA-256 application binding without regressing legacy voice |
+| ESP -> Backend | `authenticate` | `EXISTING_VERIFIED` | Config-based `DEVICE_ID`/`DEVICE_TOKEN`; 8 KiB max payload; source tests verify additive active hardware-ID/SHA-256 binding plus ACTIVE revalidation/clear before owner use without regressing legacy voice |
 | Backend -> ESP | `authenticated` | `EXISTING_VERIFIED` | Current production source/runtime |
 | Backend -> ESP | `authentication_failed` | `EXISTING_VERIFIED` | Current source |
 | Backend -> ESP | `connection_replaced` | `EXISTING_VERIFIED` | One active connection per device |

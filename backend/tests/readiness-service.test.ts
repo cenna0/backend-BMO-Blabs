@@ -74,4 +74,56 @@ describe("BackendReadinessService", () => {
       rvcAvailable: false,
     });
   });
+
+  it("includes sanitized P9 database readiness when the callback is configured", async () => {
+    const databaseReadiness = vi.fn().mockResolvedValue(true);
+    const readiness = new BackendReadinessService({
+      hermesBaseUrl: "http://127.0.0.1:8642",
+      audioServiceBaseUrl: "http://127.0.0.1:8001",
+      timeoutMs: 100,
+      fetcher: async (url) => String(url).endsWith("/health")
+        ? Response.json({ status: "ok" })
+        : Response.json({
+          status: "ok",
+          stt_loaded: true,
+          kokoro_loaded: true,
+          rvc_available: true,
+          ffmpeg_available: true,
+        }),
+      databaseReadiness,
+    });
+
+    await expect(readiness.check()).resolves.toEqual({
+      hermesReady: true,
+      audioReady: true,
+      rvcAvailable: true,
+      databaseReady: true,
+    });
+    expect(databaseReadiness).toHaveBeenCalledTimes(1);
+  });
+
+  it("contains P9 probe failures as database not-ready", async () => {
+    const readiness = new BackendReadinessService({
+      hermesBaseUrl: "http://127.0.0.1:8642",
+      audioServiceBaseUrl: "http://127.0.0.1:8001",
+      timeoutMs: 100,
+      fetcher: async (url) => String(url).endsWith("/health")
+        ? Response.json({ status: "ok" })
+        : Response.json({
+          status: "degraded",
+          stt_loaded: true,
+          kokoro_loaded: true,
+          rvc_available: false,
+          ffmpeg_available: true,
+        }),
+      databaseReadiness: vi.fn().mockRejectedValue(new Error("private database detail")),
+    });
+
+    await expect(readiness.check()).resolves.toEqual({
+      hermesReady: true,
+      audioReady: true,
+      rvcAvailable: false,
+      databaseReady: false,
+    });
+  });
 });

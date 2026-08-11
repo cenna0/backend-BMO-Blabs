@@ -28,9 +28,12 @@ Mobile bearer creates/reads/claims/revokes a six-digit challenge. Claim supplies
 
 Slice 1 implements this bridge in the single Backend runtime. Binding is
 asynchronous after legacy credential success: the live socket remains voice-
-capable when no row binds, while the registry exposes no application owner for
-additive operations. The review candidate packages this runtime on loopback;
-public Caddy routing and production deployment are unchanged.
+capable when no row binds. Cached application identity has no raw server getter;
+the authorization accessor re-queries the exact device/user/hardware tuple with
+`ACTIVE` status and clears stale or revoked cache state before returning it for
+additive owner operations. The review candidate keeps Backend host networking
+for loopback Hermes/Audio but reaches unpublished PostgreSQL through a shared
+Unix socket; public Caddy routing and production deployment are unchanged.
 
 ### Wi-Fi
 

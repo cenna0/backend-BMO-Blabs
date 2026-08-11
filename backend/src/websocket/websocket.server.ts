@@ -40,6 +40,7 @@ export interface DeviceWebSocketServerOptions {
     deviceId: string,
     deviceToken: string,
   ) => Promise<ApplicationDeviceBinding | null>;
+  authorizeApplicationDevice?: (binding: ApplicationDeviceBinding) => Promise<boolean>;
   onDeviceNotBound?: (deviceId: string) => void | Promise<void>;
 }
 
@@ -68,8 +69,12 @@ export class DeviceWebSocketServer {
     return this.options.registry.isAuthenticated(deviceId, socket);
   }
 
-  getApplicationBinding(deviceId: string): ApplicationDeviceBinding | null {
-    return this.options.registry.getApplicationBinding(deviceId);
+  async authorizeApplicationBinding(deviceId: string): Promise<ApplicationDeviceBinding | null> {
+    if (!this.options.authorizeApplicationDevice) return null;
+    return this.options.registry.authorizeApplicationBinding(
+      deviceId,
+      this.options.authorizeApplicationDevice,
+    );
   }
 
   sendThinking(deviceId: string, requestId: string): boolean {
@@ -252,7 +257,11 @@ export class DeviceWebSocketServer {
       // Binding failure must not regress a valid legacy voice connection.
     }
     if (this.options.registry.isAuthenticated(deviceId, socket)) {
-      await this.options.onDeviceNotBound?.(deviceId);
+      try {
+        await this.options.onDeviceNotBound?.(deviceId);
+      } catch {
+        // Diagnostics must not create an unhandled rejection on this detached task.
+      }
     }
   }
 

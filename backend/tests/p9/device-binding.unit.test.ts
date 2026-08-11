@@ -42,4 +42,39 @@ describe("physical device application binding", () => {
       "physical-device-credential-012345",
     )).resolves.toBeNull();
   });
+
+  it("revalidates the exact cached identity as ACTIVE before owner-specific use", async () => {
+    const repositories = {
+      device: { findFirst: vi.fn().mockResolvedValue({ id: "device-1" }) },
+    };
+    const binding = {
+      deviceId: "00000000-0000-4000-8000-000000000001",
+      userId: "00000000-0000-4000-8000-000000000010",
+      hardwareId: "bmo-001",
+    };
+
+    await expect(new DeviceBindingService(repositories as never).isActive(binding)).resolves.toBe(true);
+
+    expect(repositories.device.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: binding.deviceId,
+        userId: binding.userId,
+        hardwareId: binding.hardwareId,
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    });
+  });
+
+  it("rejects a cached identity after its Device is revoked", async () => {
+    const repositories = {
+      device: { findFirst: vi.fn().mockResolvedValue(null) },
+    };
+
+    await expect(new DeviceBindingService(repositories as never).isActive({
+      deviceId: "00000000-0000-4000-8000-000000000001",
+      userId: "00000000-0000-4000-8000-000000000010",
+      hardwareId: "bmo-001",
+    })).resolves.toBe(false);
+  });
 });

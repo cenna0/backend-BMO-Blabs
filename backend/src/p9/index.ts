@@ -15,11 +15,25 @@ import type { Router } from "express";
 export interface P9Runtime {
   router: Router;
   resolveDeviceBinding(hardwareId: string, deviceToken: string): Promise<ApplicationDeviceBinding | null>;
+  authorizeDeviceBinding(binding: ApplicationDeviceBinding): Promise<boolean>;
+  checkReadiness(): Promise<boolean>;
   close(): Promise<void>;
 }
 
 export interface P9RuntimeOptions {
   includeOps?: boolean;
+}
+
+export async function checkP9Readiness(
+  repositories: Pick<P9Repositories, "healthCheck" | "migrationStatus">,
+): Promise<boolean> {
+  try {
+    await repositories.healthCheck();
+    const migrations = await repositories.migrationStatus();
+    return migrations.length > 0 && migrations.every((migration) => migration.finishedAt !== null);
+  } catch {
+    return false;
+  }
 }
 
 export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}): P9Runtime {
@@ -45,6 +59,8 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   return {
     router: createP9Router({ auth, sessions, users, devices, pairing, settings, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
     resolveDeviceBinding: (hardwareId, deviceToken) => deviceBinding.resolve(hardwareId, deviceToken),
+    authorizeDeviceBinding: (binding) => deviceBinding.isActive(binding),
+    checkReadiness: () => checkP9Readiness(repositories),
     close: () => disconnectP9Client(client),
   };
 }

@@ -31,9 +31,14 @@ If no row matches, keep valid legacy voice working but deny owner-specific Wi-Fi
 
 - Optional `clientDeviceId` token issuance now queries `Device` with the
   authenticated user ID and `ACTIVE` state before persisting the session
-  binding; sessions issued before pairing remain nullable.
+  binding. Issuance runs in a transaction under the same per-user advisory lock
+  as unpair; registration reuses its open transaction and sessions issued before
+  pairing remain nullable.
 - Device `/ws` resolves `hardwareId` plus a timing-safe comparison of the stored
-  SHA-256 verifier after the unchanged runtime credential succeeds.
+  SHA-256 verifier after the unchanged runtime credential succeeds. Before any
+  owner-specific use, the only server authorization accessor revalidates exact
+  device/user/hardware identity plus `ACTIVE` state and clears invalid cache.
 - Unit/integration tests cover owner rejection, token mismatch, successful
-  binding, and unbound legacy voice continuity. This is source evidence, not
-  public production or physical pairing evidence.
+  binding, post-bind revocation, delayed-resolver stale binding, and unbound
+  legacy voice continuity. This is source evidence, not public production or
+  physical pairing evidence.

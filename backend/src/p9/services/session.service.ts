@@ -87,9 +87,20 @@ export class SessionService {
 
   async issueSession(
     input: { userId: string; clientDeviceId?: string; requestId?: string },
-    repositories = this.options.repositories,
+    repositories?: P9Repositories,
     now = new Date(),
   ): Promise<SessionTokens> {
+    if (repositories) return this.#issueLocked(input, repositories, now);
+    return withP9Transaction(this.options.client, async (transaction) =>
+      this.#issueLocked(input, new P9Repositories(transaction), now));
+  }
+
+  async #issueLocked(
+    input: { userId: string; clientDeviceId?: string; requestId?: string },
+    repositories: P9Repositories,
+    now: Date,
+  ): Promise<SessionTokens> {
+    await repositories.lockUser(input.userId);
     if (input.clientDeviceId !== undefined) {
       const ownedDevice = await repositories.device.findFirst({
         where: {

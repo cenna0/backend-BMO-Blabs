@@ -7,6 +7,7 @@ import type {
 
 interface HealthRouterOptions {
   hardwareTestMode: boolean;
+  databaseEnabled?: boolean;
   readiness: BackendReadinessPort;
 }
 
@@ -16,14 +17,20 @@ const unavailable: BackendReadinessState = {
   rvcAvailable: false,
 };
 
-function sendReadiness(response: Response, state: BackendReadinessState): void {
-  const ready = state.hermesReady && state.audioReady;
+function sendReadiness(
+  response: Response,
+  state: BackendReadinessState,
+  databaseEnabled: boolean,
+): void {
+  const databaseReady = !databaseEnabled || state.databaseReady === true;
+  const ready = state.hermesReady && state.audioReady && databaseReady;
   response.status(ready ? 200 : 503).json({
     status: ready ? (state.rvcAvailable ? "ok" : "degraded") : "error",
     backend: "ok",
     hermes: state.hermesReady ? "ok" : "error",
     audio_service: state.audioReady ? "ok" : "error",
     rvc: state.rvcAvailable ? "available" : "unavailable",
+    ...(databaseEnabled ? { database: databaseReady ? "ok" : "error" } : {}),
   });
 }
 
@@ -45,14 +52,15 @@ export function createHealthRouter(options: HealthRouterOptions): Router {
         hermes: "bypassed",
         audio_service: "bypassed",
         rvc: "bypassed",
+        ...(options.databaseEnabled === true ? { database: "bypassed" } : {}),
       });
       return;
     }
 
     try {
-      sendReadiness(response, await options.readiness.check());
+      sendReadiness(response, await options.readiness.check(), options.databaseEnabled === true);
     } catch {
-      sendReadiness(response, unavailable);
+      sendReadiness(response, unavailable, options.databaseEnabled === true);
     }
   };
 

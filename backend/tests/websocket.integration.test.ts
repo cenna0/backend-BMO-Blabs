@@ -25,7 +25,12 @@ async function startRuntime(options: {
     userId: string;
     hardwareId: string;
   } | null>;
-  onDeviceNotBound?: (deviceId: string) => void;
+  authorizeApplicationDevice?: (binding: {
+    deviceId: string;
+    userId: string;
+    hardwareId: string;
+  }) => Promise<boolean>;
+  onDeviceNotBound?: (deviceId: string) => void | Promise<void>;
 } = {}) {
   const httpServer = createServer();
   const requestStore = new RequestStore();
@@ -41,6 +46,9 @@ async function startRuntime(options: {
     maxMessageBytes: 8_192,
     ...(options.resolveApplicationDevice === undefined ? {} : {
       resolveApplicationDevice: options.resolveApplicationDevice,
+    }),
+    ...(options.authorizeApplicationDevice === undefined ? {} : {
+      authorizeApplicationDevice: options.authorizeApplicationDevice,
     }),
     ...(options.onDeviceNotBound === undefined ? {} : {
       onDeviceNotBound: options.onDeviceNotBound,
@@ -141,24 +149,83 @@ describe("P1 WebSocket contract", () => {
     expect(runtime.socketServer.isAuthenticated("bmo-001")).toBe(true);
   });
 
-  it("records an application binding after legacy voice authentication", async () => {
+  it("authorizes a cached application binding only after an ACTIVE revalidation", async () => {
     const resolveApplicationDevice = vi.fn().mockResolvedValue({
       deviceId: "00000000-0000-4000-8000-000000000001",
       userId: "00000000-0000-4000-8000-000000000010",
       hardwareId: "bmo-001",
     });
-    const runtime = await startRuntime({ resolveApplicationDevice });
+    const authorizeApplicationDevice = vi.fn().mockResolvedValue(true);
+    const runtime = await startRuntime({ resolveApplicationDevice, authorizeApplicationDevice });
     const socket = await connect(runtime.url);
     const authenticated = nextJson(socket);
     authenticate(socket);
     await authenticated;
 
-    await expect.poll(() => runtime.socketServer.getApplicationBinding("bmo-001")).toEqual({
+    await expect.poll(() => runtime.socketServer.authorizeApplicationBinding("bmo-001")).toEqual({
       deviceId: "00000000-0000-4000-8000-000000000001",
       userId: "00000000-0000-4000-8000-000000000010",
       hardwareId: "bmo-001",
     });
     expect(resolveApplicationDevice).toHaveBeenCalledWith("bmo-001", "test-device-secret");
+    expect(authorizeApplicationDevice).toHaveBeenCalledWith({
+      deviceId: "00000000-0000-4000-8000-000000000001",
+      userId: "00000000-0000-4000-8000-000000000010",
+      hardwareId: "bmo-001",
+    });
+  });
+
+  it("clears a cached application binding when its Device is revoked", async () => {
+    const authorizeApplicationDevice = vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValue(false);
+    const runtime = await startRuntime({
+      resolveApplicationDevice: vi.fn().mockResolvedValue({
+        deviceId: "00000000-0000-4000-8000-000000000001",
+        userId: "00000000-0000-4000-8000-000000000010",
+        hardwareId: "bmo-001",
+      }),
+      authorizeApplicationDevice,
+    });
+    const socket = await connect(runtime.url);
+    const authenticated = nextJson(socket);
+    authenticate(socket);
+    await authenticated;
+
+    await expect.poll(() => runtime.socketServer.authorizeApplicationBinding("bmo-001")).not.toBeNull();
+    await expect(runtime.socketServer.authorizeApplicationBinding("bmo-001")).resolves.toBeNull();
+    await expect(runtime.socketServer.authorizeApplicationBinding("bmo-001")).resolves.toBeNull();
+    expect(authorizeApplicationDevice).toHaveBeenCalledTimes(2);
+    expect(socket.readyState).toBe(WebSocket.OPEN);
+  });
+
+  it("rejects a stale binding returned by a delayed resolver after unpair-style revocation", async () => {
+    let finishResolution!: (binding: {
+      deviceId: string;
+      userId: string;
+      hardwareId: string;
+    }) => void;
+    const resolveApplicationDevice = vi.fn(() => new Promise<{
+      deviceId: string;
+      userId: string;
+      hardwareId: string;
+    }>((resolve) => { finishResolution = resolve; }));
+    const authorizeApplicationDevice = vi.fn().mockResolvedValue(false);
+    const runtime = await startRuntime({ resolveApplicationDevice, authorizeApplicationDevice });
+    const socket = await connect(runtime.url);
+    const authenticated = nextJson(socket);
+    authenticate(socket);
+    await authenticated;
+    finishResolution({
+      deviceId: "00000000-0000-4000-8000-000000000001",
+      userId: "00000000-0000-4000-8000-000000000010",
+      hardwareId: "bmo-001",
+    });
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await expect(runtime.socketServer.authorizeApplicationBinding("bmo-001")).resolves.toBeNull();
+    expect(authorizeApplicationDevice).toHaveBeenCalledTimes(1);
+    expect(socket.readyState).toBe(WebSocket.OPEN);
   });
 
   it("keeps legacy voice connected but reports a safe diagnostic when unbound", async () => {
@@ -174,7 +241,23 @@ describe("P1 WebSocket contract", () => {
     await expect(authenticated).resolves.toMatchObject({ event: "authenticated", status: "ok" });
     await expect.poll(() => onDeviceNotBound.mock.calls.length).toBe(1);
     expect(socket.readyState).toBe(WebSocket.OPEN);
-    expect(runtime.socketServer.getApplicationBinding("bmo-001")).toBeNull();
+    await expect(runtime.socketServer.authorizeApplicationBinding("bmo-001")).resolves.toBeNull();
+  });
+
+  it("contains a rejected unbound diagnostic callback without an unhandled rejection", async () => {
+    const onDeviceNotBound = vi.fn().mockRejectedValue(new Error("diagnostic sink unavailable"));
+    const runtime = await startRuntime({
+      resolveApplicationDevice: vi.fn().mockResolvedValue(null),
+      onDeviceNotBound,
+    });
+    const socket = await connect(runtime.url);
+    const authenticated = nextJson(socket);
+    authenticate(socket);
+
+    await expect(authenticated).resolves.toMatchObject({ event: "authenticated", status: "ok" });
+    await expect.poll(() => onDeviceNotBound.mock.calls.length).toBe(1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(socket.readyState).toBe(WebSocket.OPEN);
   });
 
   it("closes with 4001 when first message is not authenticate", async () => {

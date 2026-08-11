@@ -18,4 +18,17 @@ export class DeviceBindingService {
     if (!device || !safeDigestEqual(device.tokenHash, sha256Hex(deviceToken))) return null;
     return { deviceId: device.id, userId: device.userId, hardwareId: device.hardwareId };
   }
+
+  async isActive(binding: ApplicationDeviceBinding): Promise<boolean> {
+    const device = await this.repositories.device.findFirst({
+      where: {
+        id: binding.deviceId,
+        userId: binding.userId,
+        hardwareId: binding.hardwareId,
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    });
+    return device !== null;
+  }
 }

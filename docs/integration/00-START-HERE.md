@@ -53,7 +53,7 @@ Verified current boundaries:
 - a private P9.1 candidate and PostgreSQL 16.14 run on an internal Docker network with two applied migrations and no host-published port;
 - the P9.1 candidate is not the production Backend API service;
 - mobile `WSS /api/v1/ws`, chat/history, memory, scheduler, integration adapters, Wi-Fi DB/API, telemetry/log storage, proactive queue, personalization, DOB recovery, profile/avatar, plugins, and bug reports are `READY_TO_IMPLEMENT`;
-- the existing device identity is a runtime `DEVICE_ID`/`DEVICE_TOKEN`; P9.1 application devices are DB rows and there is no resolver between them yet;
+- the existing device identity remains runtime `DEVICE_ID`/`DEVICE_TOKEN`; Slice 1 resolves an optional active P9.1 application row after legacy authentication and revalidates it before any owner-specific use;
 - Hermes 0.20.0 is healthy on loopback; Audio Service is healthy/degraded only because RVC is intentionally disabled; Caddy exposes the public API through port 443;
 - physical ESP32 acceptance and every new additive firmware capability remain unverified.
 - a manual Prisma Studio process listening on `*:5555` is outside the declared architecture and is `BLOCKED` until stopped and its listener/firewall exposure is verified.

@@ -25,11 +25,9 @@ services:
         target: /var/lib/postgresql/data
         bind:
           create_host_path: false
-    ports:
-      - target: 5432
-        published: "5433"
-        host_ip: 127.0.0.1
-        protocol: tcp
+      - type: volume
+        source: p9_postgres_socket
+        target: /var/run/postgresql
     networks:
       - p9_private
     mem_limit: 768m
@@ -65,8 +63,7 @@ services:
       P9_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
       P9_POSTGRES_USER: ${P9_POSTGRES_USER:-bmo}
       P9_POSTGRES_DB: ${P9_POSTGRES_DB:-bmo}
-      P9_POSTGRES_HOST: 127.0.0.1
-      P9_POSTGRES_PORT: "5433"
+      P9_POSTGRES_SOCKET_DIR: /var/run/postgresql
       P9_JWT_SECRET: ${P9_JWT_SECRET:?Set P9_JWT_SECRET outside Git}
       P9_PAIRING_PEPPER: ${P9_PAIRING_PEPPER:?Set P9_PAIRING_PEPPER outside Git}
     depends_on:
@@ -75,6 +72,11 @@ services:
     network_mode: host
     secrets:
       - postgres_password
+    volumes:
+      - type: volume
+        source: p9_postgres_socket
+        target: /var/run/postgresql
+        read_only: true
     mem_limit: 512m
     memswap_limit: 512m
     cpus: "1.0"
@@ -96,6 +98,9 @@ services:
 networks:
   p9_private:
     internal: true
+
+volumes:
+  p9_postgres_socket:
 
 secrets:
   postgres_password:

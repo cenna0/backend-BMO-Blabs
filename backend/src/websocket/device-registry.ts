@@ -61,8 +61,28 @@ export class DeviceRegistry {
     return true;
   }
 
-  getApplicationBinding(deviceId: string): ApplicationDeviceBinding | null {
-    return this.#connections.get(deviceId)?.applicationBinding ?? null;
+  async authorizeApplicationBinding(
+    deviceId: string,
+    authorize: (binding: ApplicationDeviceBinding) => Promise<boolean>,
+  ): Promise<ApplicationDeviceBinding | null> {
+    const connection = this.#connections.get(deviceId);
+    const binding = connection?.applicationBinding;
+    if (!connection || !binding) return null;
+
+    let active = false;
+    try {
+      active = await authorize(binding);
+    } catch {
+      active = false;
+    }
+
+    const current = this.#connections.get(deviceId);
+    if (current !== connection || current.applicationBinding !== binding) return null;
+    if (!active) {
+      current.applicationBinding = null;
+      return null;
+    }
+    return binding;
   }
 
   isAuthenticated(deviceId: string, socket?: WebSocket): boolean {

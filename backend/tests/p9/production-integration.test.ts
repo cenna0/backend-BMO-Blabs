@@ -46,7 +46,10 @@ describe("production-shaped P9 integration", () => {
     expect(compose).toContain("BACKEND_HOST: 127.0.0.1");
     expect(compose).toContain('BACKEND_PORT: "3010"');
     expect(compose).toContain('TRUST_PROXY_HOPS: "0"');
-    expect(compose).toMatch(/host_ip:\s*127\.0\.0\.1/);
-    expect(compose).toMatch(/published:\s*"5433"/);
+    expect(compose).not.toMatch(/published:\s*"5433"/);
+    expect(compose).not.toMatch(/postgres:[\s\S]*?ports:/);
+    expect(compose).toContain("P9_POSTGRES_SOCKET_DIR: /var/run/postgresql");
+    expect(compose.match(/source: p9_postgres_socket/g)).toHaveLength(2);
+    expect(compose.match(/target: \/var\/run\/postgresql/g)).toHaveLength(2);
   });
 });

@@ -4,7 +4,7 @@
 
 - Argon2id password hashes; short HS256 access JWT; opaque hashed/rotating refresh tokens with replay-family revocation.
 - Pairing codes are keyed digests with 10-minute TTL, single use, five attempts, and mobile authentication.
-- PostgreSQL is private to the candidate network; Hermes and Audio Service are loopback-only; Caddy is the public edge.
+- PostgreSQL has no host-published port; the host-networked integrated candidate reaches it only through a shared Unix-socket volume. Hermes and Audio Service are loopback-only; Caddy is the public edge.
 - Device credential verifier is SHA-256 in the current schema; raw credential is provisioned out-of-band.
 
 ## Phase 2 port-5555 remediation
@@ -25,7 +25,7 @@ not as an active Prisma Studio exposure: no process currently accepts the port.
 ## Target controls
 
 - DOB recovery is intentionally weaker than provider/MFA recovery: use uniform failure, aggressive per-IP/email throttling, short single-use hashed token, audit, and logout-all after reset. Never return/store DOB in normal safe-user surfaces or logs.
-- Configure proxy-aware rate limiting deliberately for Caddy; current in-memory limiter and `trust proxy=false` require review before public activation.
+- Keep proxy trust fixed to exactly one hop behind local Caddy. Real Express tests must prove the rightmost Caddy-supplied address owns the bucket and earlier forwarded entries cannot evade it. The in-memory store remains single-instance only.
 - Encrypt Wi-Fi passwords and provider tokens with application AEAD, unique nonce/tag, and key version. Keep keys outside Git, DB, container image, and backups.
 - Scope every query/action by authenticated user; validate physical binding before owner-only device payloads.
 - Bound/redact logs, telemetry, upload metadata, provider errors, Hermes context, and bug-report attachments.
@@ -37,6 +37,7 @@ Never document or log passwords, raw device/Wi-Fi/provider/Hermes/audio/database
 
 Slice 1 now configures Express proxy trust as an explicit bounded hop count.
 Production Compose sets exactly one trusted hop for local Caddy; the private
-direct review candidate sets zero. Tests reject values above one, preventing an
-arbitrary forwarded chain from becoming the rate-limit identity. Public
-activation remains gated.
+direct review candidate sets zero. Tests reject values above one, and real
+router/Supertest cases prove attacker-controlled earlier `X-Forwarded-For`
+entries cannot evade the rightmost-client bucket while distinct rightmost
+clients remain separate. Public activation remains gated.
