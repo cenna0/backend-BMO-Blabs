@@ -25,6 +25,11 @@ services:
         target: /var/lib/postgresql/data
         bind:
           create_host_path: false
+    ports:
+      - target: 5432
+        published: "5433"
+        host_ip: 127.0.0.1
+        protocol: tcp
     networks:
       - p9_private
     mem_limit: 768m
@@ -44,20 +49,30 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.p9.1
+    env_file:
+      - path: ${BACKEND_ENV_FILE:-/opt/bmo/config/backend.env}
+        required: true
     environment:
+      NODE_ENV: production
+      BACKEND_HOST: 127.0.0.1
+      BACKEND_PORT: "3010"
+      PUBLIC_BASE_URL: http://127.0.0.1:3010
+      TRUST_PROXY_HOPS: "0"
+      HERMES_API_URL: http://127.0.0.1:8642
+      AUDIO_SERVICE_URL: http://127.0.0.1:8001
+      HARDWARE_TEST_MODE: "false"
       P9_ENABLED: "true"
-      P9_BIND_HOST: 0.0.0.0
-      P9_BIND_PORT: "3010"
       P9_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
       P9_POSTGRES_USER: ${P9_POSTGRES_USER:-bmo}
       P9_POSTGRES_DB: ${P9_POSTGRES_DB:-bmo}
+      P9_POSTGRES_HOST: 127.0.0.1
+      P9_POSTGRES_PORT: "5433"
       P9_JWT_SECRET: ${P9_JWT_SECRET:?Set P9_JWT_SECRET outside Git}
       P9_PAIRING_PEPPER: ${P9_PAIRING_PEPPER:?Set P9_PAIRING_PEPPER outside Git}
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - p9_private
+    network_mode: host
     secrets:
       - postgres_password
     mem_limit: 512m
@@ -67,6 +82,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
+      - /opt/bmo/temp/audio:rw,noexec,nosuid,nodev,size=64m
     cap_drop:
       - ALL
     cap_add:

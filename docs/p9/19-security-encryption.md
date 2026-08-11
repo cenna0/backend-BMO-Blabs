@@ -34,3 +34,9 @@ not as an active Prisma Studio exposure: no process currently accepts the port.
 - Production migrations are explicit operator jobs after encrypted backup/restore and candidate evidence; never startup migration, `db push`, or reset.
 
 Never document or log passwords, raw device/Wi-Fi/provider/Hermes/audio/database tokens, refresh/recovery/pairing values, session bytes, or database URLs.
+
+Slice 1 now configures Express proxy trust as an explicit bounded hop count.
+Production Compose sets exactly one trusted hop for local Caddy; the private
+direct review candidate sets zero. Tests reject values above one, preventing an
+arbitrary forwarded chain from becoming the rate-limit identity. Public
+activation remains gated.

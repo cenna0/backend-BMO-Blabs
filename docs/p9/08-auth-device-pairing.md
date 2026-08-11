@@ -26,3 +26,14 @@ Device.tokenHash == SHA-256(authenticated device_token)
 ```
 
 If no row matches, keep valid legacy voice working but deny owner-specific Wi-Fi/settings/telemetry/proactive operations. Do not silently rotate credentials during binding. Physical pairing proof is `PENDING_PHYSICAL_ESP`.
+
+## Phase 2 Slice 1 evidence
+
+- Optional `clientDeviceId` token issuance now queries `Device` with the
+  authenticated user ID and `ACTIVE` state before persisting the session
+  binding; sessions issued before pairing remain nullable.
+- Device `/ws` resolves `hardwareId` plus a timing-safe comparison of the stored
+  SHA-256 verifier after the unchanged runtime credential succeeds.
+- Unit/integration tests cover owner rejection, token mismatch, successful
+  binding, and unbound legacy voice continuity. This is source evidence, not
+  public production or physical pairing evidence.

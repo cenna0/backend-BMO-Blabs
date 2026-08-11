@@ -90,6 +90,19 @@ export class SessionService {
     repositories = this.options.repositories,
     now = new Date(),
   ): Promise<SessionTokens> {
+    if (input.clientDeviceId !== undefined) {
+      const ownedDevice = await repositories.device.findFirst({
+        where: {
+          id: input.clientDeviceId,
+          userId: input.userId,
+          status: "ACTIVE",
+        },
+        select: { id: true },
+      });
+      if (!ownedDevice) {
+        throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
+      }
+    }
     const familyId = randomUUID();
     const refreshToken = createOpaqueToken();
     const refreshTokenExpiresAt = new Date(now.getTime() + this.options.refreshTokenTtlSeconds * 1_000);

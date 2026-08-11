@@ -244,6 +244,7 @@ class ComposePackagingTests(unittest.TestCase):
             self._bind_mounts(audio),
             {
                 "/opt/bmo/models/runtime": ("/opt/bmo/models/runtime", True),
+                "/opt/bmo/models/piper": ("/opt/bmo/models/piper", True),
                 "/opt/bmo/cache/audio": ("/opt/bmo/cache/audio", False),
                 "/opt/bmo/temp/tts": ("/opt/bmo/temp/tts", False),
             },

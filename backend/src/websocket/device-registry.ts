@@ -2,11 +2,13 @@ import type WebSocket from "ws";
 
 import type { RequestStore, VoiceRequestRecord } from "../domain/request-store.js";
 import type { BackendState } from "./events.js";
+import type { ApplicationDeviceBinding } from "../p9/services/device-binding.service.js";
 
 interface DeviceConnection {
   socket: WebSocket;
   authenticatedAt: number;
   lastPongAt: number;
+  applicationBinding: ApplicationDeviceBinding | null;
 }
 
 export interface DeviceBackendState {
@@ -22,7 +24,12 @@ export class DeviceRegistry {
   authenticate(deviceId: string, socket: WebSocket): WebSocket | null {
     const previous = this.#connections.get(deviceId)?.socket ?? null;
     const now = Date.now();
-    this.#connections.set(deviceId, { socket, authenticatedAt: now, lastPongAt: now });
+    this.#connections.set(deviceId, {
+      socket,
+      authenticatedAt: now,
+      lastPongAt: now,
+      applicationBinding: null,
+    });
     return previous === socket ? null : previous;
   }
 
@@ -41,6 +48,21 @@ export class DeviceRegistry {
 
   getSocket(deviceId: string): WebSocket | undefined {
     return this.#connections.get(deviceId)?.socket;
+  }
+
+  setApplicationBinding(
+    deviceId: string,
+    socket: WebSocket,
+    binding: ApplicationDeviceBinding,
+  ): boolean {
+    const connection = this.#connections.get(deviceId);
+    if (connection?.socket !== socket) return false;
+    connection.applicationBinding = binding;
+    return true;
+  }
+
+  getApplicationBinding(deviceId: string): ApplicationDeviceBinding | null {
+    return this.#connections.get(deviceId)?.applicationBinding ?? null;
   }
 
   isAuthenticated(deviceId: string, socket?: WebSocket): boolean {

@@ -6,6 +6,7 @@ import type { VoiceRequestRecord } from "../domain/request-store.js";
 import { deviceTokenMatches } from "../utils/device-auth.js";
 import type { DeviceRegistry } from "./device-registry.js";
 import { inboundEventSchema, type InboundEvent, type OutboundEvent } from "./events.js";
+import type { ApplicationDeviceBinding } from "../p9/services/device-binding.service.js";
 
 function rawDataToBuffer(data: WebSocket.RawData): Buffer {
   if (Array.isArray(data)) return Buffer.concat(data);
@@ -35,6 +36,11 @@ export interface DeviceWebSocketServerOptions {
     requestId: string,
     reason: "DOWNLOAD_FAILED" | "DECODE_FAILED" | "PLAYBACK_FAILED",
   ) => void | Promise<void>;
+  resolveApplicationDevice?: (
+    deviceId: string,
+    deviceToken: string,
+  ) => Promise<ApplicationDeviceBinding | null>;
+  onDeviceNotBound?: (deviceId: string) => void | Promise<void>;
 }
 
 export class DeviceWebSocketServer {
@@ -60,6 +66,10 @@ export class DeviceWebSocketServer {
 
   isAuthenticated(deviceId: string, socket?: WebSocket): boolean {
     return this.options.registry.isAuthenticated(deviceId, socket);
+  }
+
+  getApplicationBinding(deviceId: string): ApplicationDeviceBinding | null {
+    return this.options.registry.getApplicationBinding(deviceId);
   }
 
   sendThinking(deviceId: string, requestId: string): boolean {
@@ -223,6 +233,26 @@ export class DeviceWebSocketServer {
           this.sendAudioReady(backend.activeRequest!);
         }
       });
+    }
+
+    if (this.options.resolveApplicationDevice) {
+      void this.#resolveApplicationBinding(socket, event.device_id, event.device_token);
+    }
+  }
+
+  async #resolveApplicationBinding(
+    socket: WebSocket,
+    deviceId: string,
+    deviceToken: string,
+  ): Promise<void> {
+    try {
+      const binding = await this.options.resolveApplicationDevice?.(deviceId, deviceToken);
+      if (binding && this.options.registry.setApplicationBinding(deviceId, socket, binding)) return;
+    } catch {
+      // Binding failure must not regress a valid legacy voice connection.
+    }
+    if (this.options.registry.isAuthenticated(deviceId, socket)) {
+      await this.options.onDeviceNotBound?.(deviceId);
     }
   }
 

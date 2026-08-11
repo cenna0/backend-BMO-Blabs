@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
 
 import { RequestStore } from "../src/domain/request-store.js";
@@ -17,7 +17,16 @@ interface TestRuntime {
 
 const runtimes: TestRuntime[] = [];
 
-async function startRuntime(options: { heartbeatMs?: number; maxMissedPongs?: number } = {}) {
+async function startRuntime(options: {
+  heartbeatMs?: number;
+  maxMissedPongs?: number;
+  resolveApplicationDevice?: (deviceId: string, deviceToken: string) => Promise<{
+    deviceId: string;
+    userId: string;
+    hardwareId: string;
+  } | null>;
+  onDeviceNotBound?: (deviceId: string) => void;
+} = {}) {
   const httpServer = createServer();
   const requestStore = new RequestStore();
   const registry = new DeviceRegistry(requestStore);
@@ -30,6 +39,12 @@ async function startRuntime(options: { heartbeatMs?: number; maxMissedPongs?: nu
     heartbeatIntervalMs: options.heartbeatMs ?? 1_000,
     maxMissedPongs: options.maxMissedPongs ?? 2,
     maxMessageBytes: 8_192,
+    ...(options.resolveApplicationDevice === undefined ? {} : {
+      resolveApplicationDevice: options.resolveApplicationDevice,
+    }),
+    ...(options.onDeviceNotBound === undefined ? {} : {
+      onDeviceNotBound: options.onDeviceNotBound,
+    }),
   });
 
   await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
@@ -124,6 +139,42 @@ describe("P1 WebSocket contract", () => {
       active_request_id: null,
     });
     expect(runtime.socketServer.isAuthenticated("bmo-001")).toBe(true);
+  });
+
+  it("records an application binding after legacy voice authentication", async () => {
+    const resolveApplicationDevice = vi.fn().mockResolvedValue({
+      deviceId: "00000000-0000-4000-8000-000000000001",
+      userId: "00000000-0000-4000-8000-000000000010",
+      hardwareId: "bmo-001",
+    });
+    const runtime = await startRuntime({ resolveApplicationDevice });
+    const socket = await connect(runtime.url);
+    const authenticated = nextJson(socket);
+    authenticate(socket);
+    await authenticated;
+
+    await expect.poll(() => runtime.socketServer.getApplicationBinding("bmo-001")).toEqual({
+      deviceId: "00000000-0000-4000-8000-000000000001",
+      userId: "00000000-0000-4000-8000-000000000010",
+      hardwareId: "bmo-001",
+    });
+    expect(resolveApplicationDevice).toHaveBeenCalledWith("bmo-001", "test-device-secret");
+  });
+
+  it("keeps legacy voice connected but reports a safe diagnostic when unbound", async () => {
+    const onDeviceNotBound = vi.fn();
+    const runtime = await startRuntime({
+      resolveApplicationDevice: vi.fn().mockResolvedValue(null),
+      onDeviceNotBound,
+    });
+    const socket = await connect(runtime.url);
+    const authenticated = nextJson(socket);
+    authenticate(socket);
+
+    await expect(authenticated).resolves.toMatchObject({ event: "authenticated", status: "ok" });
+    await expect.poll(() => onDeviceNotBound.mock.calls.length).toBe(1);
+    expect(socket.readyState).toBe(WebSocket.OPEN);
+    expect(runtime.socketServer.getApplicationBinding("bmo-001")).toBeNull();
   });
 
   it("closes with 4001 when first message is not authenticate", async () => {

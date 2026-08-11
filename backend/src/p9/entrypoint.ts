@@ -7,7 +7,9 @@ function loadDatabaseUrlFromSecret(): void {
   if (!password) throw new Error("P9 database password secret is empty");
   const user = process.env.P9_POSTGRES_USER ?? "bmo";
   const database = process.env.P9_POSTGRES_DB ?? "bmo";
-  process.env.DATABASE_URL = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@postgres:5432/${encodeURIComponent(database)}`;
+  const host = process.env.P9_POSTGRES_HOST ?? "postgres";
+  const port = process.env.P9_POSTGRES_PORT ?? "5432";
+  process.env.DATABASE_URL = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(database)}`;
 }
 
 loadDatabaseUrlFromSecret();

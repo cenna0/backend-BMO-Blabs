@@ -8,14 +8,14 @@
 | Audio | 103 passed in production audio image | Existing suite + voice regression |
 | Existing device voice | Production contract/runtime inspected | Public fake-device regression plus no raw-WAV/MP3/event drift |
 | Auth/recovery | P9.1 auth source/private candidate exists | Self-service, Argon2id, rotation/replay, DOB enumeration/rate/reuse, logout-all, tenant isolation |
-| Pairing/identity | Six-digit source/tests/private DB state | TTL/attempt/replay/owner tests; exact hash binding; physical result remains separate |
+| Pairing/identity | Six-digit source/tests/private DB state; Slice 1 exact hash binding and optional owned session-device binding source tests | TTL/attempt/replay/owner tests remain regression gates; physical result remains separate |
 | Chat/mobile WSS | Absent | 202/idempotency, cursor order, reconnect/replay, auth expiry, no audio/token stream |
 | Memory | Absent | gateway contract, candidate/privacy, delete/forget/clear/export, tenant isolation |
 | Scheduler/delivery | Absent | recurrence/timezone, unique due claim, retry/missed/offline/expiry, delivery idempotency |
 | Device additions | Absent | Backend schema/parser/state tests, then real ESP evidence for any physical promotion |
 | Spotify | Provider docs checked; BMO adapter absent | state/callback, encryption/refresh, scope, confirmation, normalized errors; live credential gate |
 | WhatsApp | Hermes capability only | Exact local API/session recovery, rules, confirmation replay, no auto-memory; live session gate |
-| Security | Port-5555 blocker found | Listener/firewall closure, authz matrix, secret/log scans, dependency/image checks, proxy limiter |
+| Security | Port-5555 listener closed; firewall visibility remains operator-gated; one-hop Caddy proxy trust source-tested | Authz matrix, secret/log scans, dependency/image checks, privileged firewall evidence |
 | Public/private | Caddy/runtime inspected | Only intended routes public; DB/Hermes/Audio/internal ops private |
 | Documentation | Baseline verifier passed | Verifier, links, vocabulary, route/schema/WS drift loop, docs-only/secret diff |
 

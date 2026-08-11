@@ -26,6 +26,12 @@ ESP32 --WSS /ws + HTTP raw WAV/MP3--> Caddy --> Backend API service
 
 Mobile bearer creates/reads/claims/revokes a six-digit challenge. Claim supplies the out-of-band device credential. Later device authentication uses current runtime `device_id`/`device_token`; owner-only features bind only when an active Prisma Device matches hardware ID and SHA-256 token verifier.
 
+Slice 1 implements this bridge in the single Backend runtime. Binding is
+asynchronous after legacy credential success: the live socket remains voice-
+capable when no row binds, while the registry exposes no application owner for
+additive operations. The review candidate packages this runtime on loopback;
+public Caddy routing and production deployment are unchanged.
+
 ### Wi-Fi
 
 Mobile -> Backend authorization -> encrypted desired state in PostgreSQL -> device event queue -> ESP applies/reconnects -> receipt/result -> Backend state -> mobile realtime. First-boot connectivity is firmware-owned and unresolved.

@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-11
-**Last implementation checkpoint:** 2026-08-11 — Prisma Studio listener remediation
+**Last implementation checkpoint:** 2026-08-11 — Slice 1 source/review-candidate integration
 **Baseline source:** `main` / `d638b20c381c676136c94524a38a1def5d70e565`
 **Documentation branch:** `docs/integration-contract-freeze`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -73,8 +73,21 @@ At audit time the candidate database was approximately 9.3 MB with two active co
 | Device CRUD/settings | `EXISTING_VERIFIED` | Source + private candidate; settings are DB-only and do not sync to ESP |
 | P9.1 Prisma foundation | `EXISTING_VERIFIED` | 11 models; two additive migrations; not the target integration schema |
 | Production P9.1 activation | `READY_TO_IMPLEMENT` | Existing router is disabled on production |
+| Production-shaped P9.1 integration | `EXISTING_VERIFIED` | Source + automated review-runtime packaging: the full Backend runtime registers P9 and existing voice surfaces together. Review Compose binds Backend/PostgreSQL to host loopback only; running private candidate has not been recreated and public production remains unchanged. |
 
-Current session gap: `Session.clientDeviceId` exists in Prisma, but the token-issuance path does not populate it. Therefore logout-all/family replay controls exist, while a claim of working per-mobile-device revocation is not yet justified.
+Session issuance now accepts an optional `clientDeviceId` only after querying an
+active `Device` owned by the authenticated user. Pre-pairing sessions remain
+valid with a null binding; refresh rotation retains the binding on the same
+session. Client-supplied user ownership is never used.
+
+The device `/ws` now performs an asynchronous application binding after the
+unchanged runtime credential succeeds. It resolves only an active matching
+hardware ID and SHA-256 token verifier. A missing/mismatched row emits the safe
+`DEVICE_NOT_BOUND` diagnostic while legacy voice remains connected.
+
+The optional `Session.clientDeviceId` issuance path is source/unit verified with
+active-owner validation. Public/candidate database acceptance remains pending
+the Slice 2 migration/review environment; no public availability is claimed.
 
 ## Approved integration scope
 

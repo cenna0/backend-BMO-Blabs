@@ -20,7 +20,11 @@ const registrationSchema = z
   })
   .strict();
 
-const loginSchema = z.object({ email: z.string(), password: z.string().min(1).max(256) }).strict();
+const loginSchema = z.object({
+  email: z.string(),
+  password: z.string().min(1).max(256),
+  clientDeviceId: z.string().uuid().optional(),
+}).strict();
 
 export interface AuthResult {
   user: ReturnType<typeof publicUser>;
@@ -133,7 +137,11 @@ export class AuthService {
       }).catch(() => undefined);
       throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
     }
-    const session = await this.options.sessions.issueSession({ userId: user.id, ...(requestId === undefined ? {} : { requestId }) });
+    const session = await this.options.sessions.issueSession({
+      userId: user.id,
+      ...(parsed.clientDeviceId === undefined ? {} : { clientDeviceId: parsed.clientDeviceId }),
+      ...(requestId === undefined ? {} : { requestId }),
+    });
     await new AuditService(this.options.repositories).record({
       eventType: "LOGIN_SUCCEEDED",
       outcome: "success",

@@ -20,12 +20,15 @@
 
 ## Auth, profile, and settings
 
-Existing P9.1 rows below are source- and private-candidate-verified but public production currently returns 404 because the P9 router is disabled there.
+Existing P9.1 rows below are source- and private-candidate-verified. Slice 1 also
+packages them with the full Backend voice runtime in a production-shaped review
+candidate, but public production still returns 404 because it has not been
+deployed or enabled there.
 
 | Method | Path | Status | Availability / gap |
 |---|---|---|---|
 | POST | `/api/v1/auth/register` | `EXISTING_VERIFIED` | Private candidate; currently requires `invitationToken`; self-service change `READY_TO_IMPLEMENT` |
-| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate |
+| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + source tests; optional `clientDeviceId` requires an active device owned by the authenticated user |
 | POST | `/api/v1/auth/refresh` | `EXISTING_VERIFIED` | Private candidate; opaque rotating refresh token |
 | POST | `/api/v1/auth/logout` | `EXISTING_VERIFIED` | Private candidate |
 | POST | `/api/v1/auth/logout-all` | `EXISTING_VERIFIED` | Private candidate |
@@ -125,7 +128,7 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Direction | Event | Status | Evidence |
 |---|---|---|---|
-| ESP -> Backend | `authenticate` | `EXISTING_VERIFIED` | Config-based `DEVICE_ID`/`DEVICE_TOKEN`; 8 KiB max payload |
+| ESP -> Backend | `authenticate` | `EXISTING_VERIFIED` | Config-based `DEVICE_ID`/`DEVICE_TOKEN`; 8 KiB max payload; source tests verify additive active hardware-ID/SHA-256 application binding without regressing legacy voice |
 | Backend -> ESP | `authenticated` | `EXISTING_VERIFIED` | Current production source/runtime |
 | Backend -> ESP | `authentication_failed` | `EXISTING_VERIFIED` | Current source |
 | Backend -> ESP | `connection_replaced` | `EXISTING_VERIFIED` | One active connection per device |

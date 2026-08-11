@@ -8,11 +8,13 @@ import { PairingService } from "./services/pairing.service.js";
 import { AccessTokenService, SessionService } from "./services/session.service.js";
 import { SettingsService } from "./services/settings.service.js";
 import { UserService } from "./services/user.service.js";
+import { DeviceBindingService, type ApplicationDeviceBinding } from "./services/device-binding.service.js";
 import { createP9Router } from "./http/router.js";
 import type { Router } from "express";
 
 export interface P9Runtime {
   router: Router;
+  resolveDeviceBinding(hardwareId: string, deviceToken: string): Promise<ApplicationDeviceBinding | null>;
   close(): Promise<void>;
 }
 
@@ -39,8 +41,10 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   const devices = new DeviceService(client, repositories);
   const pairing = new PairingService({ client, repositories, pepper: config.pairingPepper, ttlSeconds: config.pairingTtlSeconds });
   const settings = new SettingsService(client, repositories);
+  const deviceBinding = new DeviceBindingService(repositories);
   return {
     router: createP9Router({ auth, sessions, users, devices, pairing, settings, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
+    resolveDeviceBinding: (hardwareId, deviceToken) => deviceBinding.resolve(hardwareId, deviceToken),
     close: () => disconnectP9Client(client),
   };
 }

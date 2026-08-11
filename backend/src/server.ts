@@ -36,6 +36,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   const logger: Logger = pino({ level: config.NODE_ENV === "test" ? "silent" : "info" });
   const app = express();
   app.disable("x-powered-by");
+  app.set("trust proxy", config.TRUST_PROXY_HOPS);
   const httpServer = createServer(app);
   const requestStore = new RequestStore({
     tombstoneTtlMs: config.REQUEST_TOMBSTONE_TTL_SECONDS * 1_000,
@@ -45,7 +46,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   const tempAudio = new TempAudioService(config.TEMP_AUDIO_DIR, config.TEMP_AUDIO_TTL_SECONDS);
   let publicBaseUrl = config.PUBLIC_BASE_URL.replace(/\/$/, "");
   let cleanupInterval: NodeJS.Timeout | undefined;
-  let p9: P9Runtime | undefined;
+  const p9: P9Runtime | undefined = config.p9.enabled ? createP9Runtime(config.p9) : undefined;
 
   const removeOutput = async (deviceId: string, requestId: string, failed: boolean) => {
     const record = requestStore.get(requestId);
@@ -74,6 +75,13 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     heartbeatIntervalMs: config.WS_HEARTBEAT_INTERVAL_MS,
     maxMissedPongs: config.WS_MAX_MISSED_PONGS,
     maxMessageBytes: config.WS_MAX_MESSAGE_BYTES,
+    ...(p9 === undefined ? {} : {
+      resolveApplicationDevice: (deviceId: string, deviceToken: string) =>
+        p9.resolveDeviceBinding(deviceId, deviceToken),
+      onDeviceNotBound: (deviceId: string) => {
+        logger.warn({ device_id: deviceId, diagnostic: "DEVICE_NOT_BOUND" }, "device has no application binding");
+      },
+    }),
     onPlaybackDone: (deviceId, requestId) => removeOutput(deviceId, requestId, false),
     onPlaybackFailed: (deviceId, requestId) => removeOutput(deviceId, requestId, true),
   });
@@ -156,8 +164,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   };
 
   app.use(createHealthRouter({ hardwareTestMode: config.HARDWARE_TEST_MODE, readiness }));
-  if (config.p9.enabled) {
-    p9 = createP9Runtime(config.p9);
+  if (p9) {
     app.use("/api/v1", p9.router);
   }
   app.use(createVoiceRouter({ config, requestStore, sockets, tempAudio, hardwareTest, pipeline, logger }));

@@ -1,8 +1,8 @@
 # BMO — Next Execution Action
 
 **Last updated:** 2026-08-11
-**Current integration action:** Phase 2 Slice 1 implementation on `feat/vps-mobile-device-integration`.
-**Starting point:** Prisma Studio `*:5555` has been closed and source/runtime drift checked; next integrate the existing P9.1 router into a production-shaped Backend API candidate while preserving device voice.
+**Current integration action:** Phase 2 Slice 2 additive schema and account/profile implementation on `feat/vps-mobile-device-integration`.
+**Starting point:** Prisma Studio is closed. Slice 1 integrates the P9.1 router, proxy trust, optional owned session-device identity, and physical application binding in the full Backend source/review packaging while preserving device voice. Public deployment and live candidate recreation remain gated.
 
 Read [`integration/00-START-HERE.md`](integration/00-START-HERE.md) and [`integration/04-VPS-IMPLEMENTATION-PLAN.md`](integration/04-VPS-IMPLEMENTATION-PLAN.md). Do not run a production migration, deploy, configure external credentials, or claim physical ESP behavior from this documentation freeze.
 

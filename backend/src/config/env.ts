@@ -10,11 +10,14 @@ const booleanString = z
 const positiveInt = (fallback: number) =>
   z.coerce.number().int().positive().default(fallback);
 
+const trustedProxyHops = z.coerce.number().int().min(0).max(1).default(0);
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     BACKEND_HOST: z.string().min(1).default("127.0.0.1"),
     BACKEND_PORT: positiveInt(3_000),
+    TRUST_PROXY_HOPS: trustedProxyHops,
     PUBLIC_BASE_URL: z.string().url(),
     DEVICE_ID: z.string().min(1),
     DEVICE_TOKEN: z.string().min(16),

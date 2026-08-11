@@ -21,6 +21,7 @@ describe("parseEnv", () => {
     expect(config.WS_AUTH_TIMEOUT_MS).toBe(5_000);
     expect(config.WS_HEARTBEAT_INTERVAL_MS).toBe(60_000);
     expect(config.WS_MAX_MISSED_PONGS).toBe(2);
+    expect(config.TRUST_PROXY_HOPS).toBe(0);
   });
 
   it("uses canonical P4 local orchestration defaults", () => {
@@ -68,6 +69,11 @@ describe("parseEnv", () => {
 
     expect(parseEnv(production).BACKEND_HOST).toBe("127.0.0.1");
     expect(() => parseEnv({ ...production, BACKEND_HOST: "0.0.0.0" })).toThrow(/BACKEND_HOST/);
+  });
+
+  it("accepts exactly one trusted proxy hop for the Caddy topology", () => {
+    expect(parseEnv({ ...minimal, TRUST_PROXY_HOPS: "1" }).TRUST_PROXY_HOPS).toBe(1);
+    expect(() => parseEnv({ ...minimal, TRUST_PROXY_HOPS: "2" })).toThrow(/TRUST_PROXY_HOPS/);
   });
 
   it("rejects weak or missing device credentials", () => {

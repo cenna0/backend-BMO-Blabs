@@ -11,6 +11,7 @@ services:
       NODE_ENV: production
       BACKEND_HOST: 127.0.0.1
       BACKEND_PORT: "3000"
+      TRUST_PROXY_HOPS: "1"
       HERMES_API_URL: http://127.0.0.1:8642
       AUDIO_SERVICE_URL: http://127.0.0.1:8001
       HARDWARE_TEST_MODE: "false"
