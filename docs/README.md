@@ -1,7 +1,7 @@
 # BMO Documentation — Current Entry Point
 
 **Last audited:** 2026-08-11
-**Current milestone:** Phase 1 VPS Audit + Documentation Freeze complete when the integration docs commit is recorded.
+**Current milestone:** Phase 2 VPS integration implementation on the feature branch; production rollout remains gated.
 
 ## Read first for Phase 2
 
@@ -30,7 +30,7 @@ Historical phase records such as [`roadmap/P8-EXECUTION-SPEC.md`](roadmap/P8-EXE
 - Candidate PostgreSQL/Prisma exists privately with the two P9.1 migrations; it is not production application persistence.
 - Hermes is a host systemd runtime on `127.0.0.1:8642`; production Hermes integration is verified. Audio Service is private on `127.0.0.1:8001`; Backend is private on `127.0.0.1:3000`. Caddy is the public edge.
 - physical ESP32 integration is not verified. All additive Wi-Fi/log/telemetry/settings/proactive events remain `PENDING_PHYSICAL_ESP`.
-- A manual Prisma Studio listener on `*:5555` is a `BLOCKED` security gate before Phase 2.
+- The manual Prisma Studio `*:5555` listener was stopped in Phase 2; no listener, Docker publication, or Caddy route remains. Privileged firewall-policy inspection is still an operator evidence gap.
 
 ### Hermes host bootstrap clarification
 

@@ -56,7 +56,7 @@ Verified current boundaries:
 - the existing device identity remains runtime `DEVICE_ID`/`DEVICE_TOKEN`; Slice 1 resolves an optional active P9.1 application row after legacy authentication and revalidates it before any owner-specific use;
 - Hermes 0.20.0 is healthy on loopback; Audio Service is healthy/degraded only because RVC is intentionally disabled; Caddy exposes the public API through port 443;
 - physical ESP32 acceptance and every new additive firmware capability remain unverified.
-- a manual Prisma Studio process listening on `*:5555` is outside the declared architecture and is `BLOCKED` until stopped and its listener/firewall exposure is verified.
+- at the Phase 1 freeze, a manual Prisma Studio process listened on `*:5555`; Phase 2 stopped it and verified no listener, Docker publication, or Caddy route remains. Privileged firewall-policy visibility is still an operator evidence gap.
 
 Exact route, schema, runtime, test, and blocker evidence is in `05-IMPLEMENTATION-STATUS.md`.
 
