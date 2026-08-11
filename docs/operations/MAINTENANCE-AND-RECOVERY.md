@@ -398,21 +398,23 @@ Impact          : no BMO service restart required; production services were not 
 
 ```text
 Observed on VPS : 0.19.0
-Verified at     : 2026-08-11T11:45:51+07:00 Asia/Jakarta
+Verified at     : 2026-08-11T13:38:53+07:00 Asia/Jakarta
 Upstream check  : 0.20.0, official v2026.8.3 release
 Install method  : /home/hermes/.hermes/hermes-agent/venv, systemd unit hermes-gateway.service
-Status          : BLOCKED — update requires the hermes service owner/root credential
+Update attempt  : 2026-08-11T13:37:42+07:00 Asia/Jakarta, official `hermes update` invoked once with non-interactive sudo
+Status          : BLOCKED — updater restored local changes, then failed because branch `main` does not exist locally or on `origin` (`origin/main` is not a commit)
 Compatibility   : not promoted; v0.20.0 contains broad gateway, voice, A2A, webhook, and config changes that require a controlled Hermes-owned update and regression
-Health          : current 0.19.0 remained healthy; no service restart or configuration change was attempted
+Health          : current 0.19.0 remained healthy (`127.0.0.1:8642/health` status=ok); no service restart or configuration change was attempted
+Regression      : not run because the target version was not installed; production remains on the previously verified baseline
 ```
 
 ### Docker Engine
 
 ```text
 Observed on VPS : 29.6.2 (Docker Compose 5.3.1)
-Verified at     : 2026-08-11T11:45:51+07:00 Asia/Jakarta
+Verified at     : 2026-08-11T13:38:53+07:00 Asia/Jakarta
 Upstream check  : 29.7.2 from the official Docker apt repository and Engine release notes
-Status          : NOT ATTEMPTED — maintenance sequence stopped at the Hermes credential blocker
+Status          : NOT ATTEMPTED — maintenance sequence stopped at the Hermes updater git blocker
 Compatibility   : same major line; current Compose/runtime inventory remained healthy
 ```
 
@@ -420,9 +422,9 @@ Compatibility   : same major line; current Compose/runtime inventory remained he
 
 ```text
 Observed on VPS : 16.10-alpine3.22, private container bmo-p9-1-postgres-1 (healthy)
-Verified at     : 2026-08-11T11:45:51+07:00 Asia/Jakarta
+Verified at     : 2026-08-11T13:38:53+07:00 Asia/Jakarta
 Upstream check  : PostgreSQL 16.14 official minor release
-Status          : NOT ATTEMPTED — maintenance sequence stopped at the Hermes credential blocker
+Status          : NOT ATTEMPTED — maintenance sequence stopped at the Hermes updater git blocker
 Compatibility   : 16.x → 16.x only; no major upgrade or destructive migration was attempted
 ```
 
