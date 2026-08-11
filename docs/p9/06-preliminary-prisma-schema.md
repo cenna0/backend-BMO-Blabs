@@ -81,7 +81,9 @@ constraints, and records are not renamed or removed.
 - Empty PostgreSQL: deploying all three source migrations passed.
 - Repeat deployment: passed with no pending migrations.
 - Populated PostgreSQL: upgrading from the two P9.1 migrations to all three passed and preserved the seeded row in each of the 11 P9.1 models.
-- The first post-deploy Prisma diff proposed only 14 foreign-key constraint renames. The schema now maps those deployed constraint names explicitly, correcting introspection without editing the applied historical migrations or renaming database constraints.
+- The first post-deploy Prisma diff proposed only 14 foreign-key constraint renames. The schema now maps those deployed constraint names explicitly, correcting introspection without editing the applied historical migrations or renaming database constraints; the repeated database-to-schema diff returned `No difference detected`.
+- Transaction-rolled-back positive/negative probes passed for avatar completeness, open/protected Wi-Fi secret shape, nullable battery capability, required future device-log expiry, provider subtype ownership, nonempty Spotify refresh material, and WhatsApp global/target rule constraints.
+- The three explicitly named disposable databases and two review image tags were removed after evidence capture. The running private `bmo` database remained on its two P9.1 migrations.
 
 This evidence is disposable-tier only. It does not state or imply that the
 running private `bmo` candidate was migrated.
