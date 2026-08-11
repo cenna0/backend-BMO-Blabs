@@ -393,7 +393,7 @@ CREATE TABLE "DeviceLog" (
     "message" VARCHAR(1000) NOT NULL,
     "metadata" VARCHAR(2000),
     "observedAt" TIMESTAMPTZ(3) NOT NULL,
-    "expiresAt" TIMESTAMPTZ(3),
+    "expiresAt" TIMESTAMPTZ(3) NOT NULL,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "DeviceLog_pkey" PRIMARY KEY ("id")
@@ -436,6 +436,7 @@ CREATE TABLE "SpotifyCredential" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "connectionId" UUID NOT NULL,
+    "provider" "IntegrationProvider" NOT NULL DEFAULT 'SPOTIFY',
     "accessTokenCiphertext" TEXT NOT NULL,
     "accessTokenNonce" VARCHAR(128) NOT NULL,
     "accessTokenTag" VARCHAR(128) NOT NULL,
@@ -456,6 +457,7 @@ CREATE TABLE "SpotifyAction" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "connectionId" UUID NOT NULL,
+    "provider" "IntegrationProvider" NOT NULL DEFAULT 'SPOTIFY',
     "action" VARCHAR(64) NOT NULL,
     "payload" JSONB NOT NULL,
     "idempotencyKey" VARCHAR(128) NOT NULL,
@@ -476,6 +478,7 @@ CREATE TABLE "WhatsAppNotificationRule" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "connectionId" UUID NOT NULL,
+    "provider" "IntegrationProvider" NOT NULL DEFAULT 'WHATSAPP',
     "scope" "WhatsAppRuleScope" NOT NULL,
     "opaqueTargetRef" VARCHAR(255),
     "enabled" BOOLEAN NOT NULL DEFAULT true,
@@ -492,6 +495,7 @@ CREATE TABLE "WhatsAppSendRequest" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "connectionId" UUID NOT NULL,
+    "provider" "IntegrationProvider" NOT NULL DEFAULT 'WHATSAPP',
     "opaqueRecipientRef" VARCHAR(255) NOT NULL,
     "preview" VARCHAR(1000) NOT NULL,
     "idempotencyKey" VARCHAR(128) NOT NULL,
@@ -511,6 +515,7 @@ CREATE TABLE "WhatsAppDelivery" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "connectionId" UUID NOT NULL,
+    "provider" "IntegrationProvider" NOT NULL DEFAULT 'WHATSAPP',
     "sendRequestId" UUID,
     "direction" "WhatsAppDeliveryDirection" NOT NULL,
     "status" "WhatsAppDeliveryStatus" NOT NULL,
@@ -702,7 +707,7 @@ CREATE INDEX "IntegrationConnection_status_updatedAt_idx" ON "IntegrationConnect
 CREATE UNIQUE INDEX "IntegrationConnection_userId_provider_key" ON "IntegrationConnection"("userId", "provider");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "IntegrationConnection_id_userId_key" ON "IntegrationConnection"("id", "userId");
+CREATE UNIQUE INDEX "IntegrationConnection_id_userId_provider_key" ON "IntegrationConnection"("id", "userId", "provider");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "OAuthState_stateVerifier_key" ON "OAuthState"("stateVerifier");
@@ -717,7 +722,7 @@ CREATE UNIQUE INDEX "SpotifyCredential_userId_key" ON "SpotifyCredential"("userI
 CREATE UNIQUE INDEX "SpotifyCredential_connectionId_key" ON "SpotifyCredential"("connectionId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SpotifyCredential_connectionId_userId_key" ON "SpotifyCredential"("connectionId", "userId");
+CREATE UNIQUE INDEX "SpotifyCredential_connectionId_userId_provider_key" ON "SpotifyCredential"("connectionId", "userId", "provider");
 
 -- CreateIndex
 CREATE INDEX "SpotifyAction_userId_status_createdAt_idx" ON "SpotifyAction"("userId", "status", "createdAt");
@@ -867,31 +872,31 @@ ALTER TABLE "OAuthState" ADD CONSTRAINT "OAuthState_userId_fkey" FOREIGN KEY ("u
 ALTER TABLE "SpotifyCredential" ADD CONSTRAINT "SpotifyCredential_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SpotifyCredential" ADD CONSTRAINT "SpotifyCredential_connectionId_userId_fkey" FOREIGN KEY ("connectionId", "userId") REFERENCES "IntegrationConnection"("id", "userId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "SpotifyCredential" ADD CONSTRAINT "SpotifyCredential_connection_owner_provider_fkey" FOREIGN KEY ("connectionId", "userId", "provider") REFERENCES "IntegrationConnection"("id", "userId", "provider") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SpotifyAction" ADD CONSTRAINT "SpotifyAction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SpotifyAction" ADD CONSTRAINT "SpotifyAction_connectionId_userId_fkey" FOREIGN KEY ("connectionId", "userId") REFERENCES "IntegrationConnection"("id", "userId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "SpotifyAction" ADD CONSTRAINT "SpotifyAction_connection_owner_provider_fkey" FOREIGN KEY ("connectionId", "userId", "provider") REFERENCES "IntegrationConnection"("id", "userId", "provider") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "WhatsAppNotificationRule" ADD CONSTRAINT "WhatsAppNotificationRule_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "WhatsAppNotificationRule" ADD CONSTRAINT "WhatsAppNotificationRule_connectionId_userId_fkey" FOREIGN KEY ("connectionId", "userId") REFERENCES "IntegrationConnection"("id", "userId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "WhatsAppNotificationRule" ADD CONSTRAINT "WhatsAppNotificationRule_connection_owner_provider_fkey" FOREIGN KEY ("connectionId", "userId", "provider") REFERENCES "IntegrationConnection"("id", "userId", "provider") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "WhatsAppSendRequest" ADD CONSTRAINT "WhatsAppSendRequest_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "WhatsAppSendRequest" ADD CONSTRAINT "WhatsAppSendRequest_connectionId_userId_fkey" FOREIGN KEY ("connectionId", "userId") REFERENCES "IntegrationConnection"("id", "userId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "WhatsAppSendRequest" ADD CONSTRAINT "WhatsAppSendRequest_connection_owner_provider_fkey" FOREIGN KEY ("connectionId", "userId", "provider") REFERENCES "IntegrationConnection"("id", "userId", "provider") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "WhatsAppDelivery" ADD CONSTRAINT "WhatsAppDelivery_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "WhatsAppDelivery" ADD CONSTRAINT "WhatsAppDelivery_connectionId_userId_fkey" FOREIGN KEY ("connectionId", "userId") REFERENCES "IntegrationConnection"("id", "userId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "WhatsAppDelivery" ADD CONSTRAINT "WhatsAppDelivery_connection_owner_provider_fkey" FOREIGN KEY ("connectionId", "userId", "provider") REFERENCES "IntegrationConnection"("id", "userId", "provider") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "WhatsAppDelivery" ADD CONSTRAINT "WhatsAppDelivery_sendRequestId_userId_fkey" FOREIGN KEY ("sendRequestId", "userId") REFERENCES "WhatsAppSendRequest"("id", "userId") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -910,7 +915,14 @@ ALTER TABLE "User"
   ADD CONSTRAINT "User_avatar_metadata_ck"
   CHECK (
     ("avatarKey" IS NULL AND "avatarContentType" IS NULL AND "avatarByteSize" IS NULL)
-    OR ("avatarKey" IS NOT NULL AND "avatarContentType" IS NOT NULL AND "avatarByteSize" > 0)
+    OR (
+      "avatarKey" IS NOT NULL
+      AND length(btrim("avatarKey")) > 0
+      AND "avatarContentType" IS NOT NULL
+      AND length(btrim("avatarContentType")) > 0
+      AND "avatarByteSize" IS NOT NULL
+      AND "avatarByteSize" > 0
+    )
   );
 
 ALTER TABLE "PasswordRecovery"
@@ -975,8 +987,12 @@ ALTER TABLE "DeviceWifiConfiguration"
     OR
     ("security" = 'WPA_PSK'
       AND "secretCiphertext" IS NOT NULL
+      AND length(btrim("secretCiphertext")) > 0
       AND "secretNonce" IS NOT NULL
+      AND length(btrim("secretNonce")) > 0
       AND "secretTag" IS NOT NULL
+      AND length(btrim("secretTag")) > 0
+      AND "secretKeyVersion" IS NOT NULL
       AND "secretKeyVersion" > 0)
   );
 
@@ -984,7 +1000,9 @@ ALTER TABLE "DeviceTelemetryCurrent"
   ADD CONSTRAINT "DeviceTelemetryCurrent_battery_ck"
   CHECK (
     ("batterySupported" = false AND "batteryPercent" IS NULL)
-    OR ("batterySupported" = true AND "batteryPercent" BETWEEN 0 AND 100)
+    OR ("batterySupported" = true
+      AND "batteryPercent" IS NOT NULL
+      AND "batteryPercent" BETWEEN 0 AND 100)
   ),
   ADD CONSTRAINT "DeviceTelemetryCurrent_rssi_ck"
   CHECK ("wifiRssi" IS NULL OR "wifiRssi" BETWEEN -127 AND 0);
@@ -998,25 +1016,44 @@ ALTER TABLE "DeviceSettings"
       OR ("appliedVersion" IS NOT NULL AND "appliedAt" IS NOT NULL))
   );
 
+ALTER TABLE "DeviceLog"
+  ADD CONSTRAINT "DeviceLog_expiry_ck"
+  CHECK ("expiresAt" > "createdAt");
+
 ALTER TABLE "OAuthState"
   ADD CONSTRAINT "OAuthState_verifier_expiry_ck"
   CHECK ("stateVerifier" ~ '^[0-9a-f]{64}$' AND "expiresAt" > "createdAt");
 
 ALTER TABLE "SpotifyCredential"
+  ADD CONSTRAINT "SpotifyCredential_provider_ck"
+  CHECK ("provider" = 'SPOTIFY'),
   ADD CONSTRAINT "SpotifyCredential_encryption_shape_ck"
   CHECK (
     "keyVersion" > 0
-    AND length("accessTokenCiphertext") > 0
-    AND length("accessTokenNonce") > 0
-    AND length("accessTokenTag") > 0
+    AND length(btrim("accessTokenCiphertext")) > 0
+    AND length(btrim("accessTokenNonce")) > 0
+    AND length(btrim("accessTokenTag")) > 0
     AND (
       ("refreshTokenCiphertext" IS NULL AND "refreshTokenNonce" IS NULL AND "refreshTokenTag" IS NULL)
       OR
-      ("refreshTokenCiphertext" IS NOT NULL AND "refreshTokenNonce" IS NOT NULL AND "refreshTokenTag" IS NOT NULL)
+      (
+        "refreshTokenCiphertext" IS NOT NULL
+        AND length(btrim("refreshTokenCiphertext")) > 0
+        AND "refreshTokenNonce" IS NOT NULL
+        AND length(btrim("refreshTokenNonce")) > 0
+        AND "refreshTokenTag" IS NOT NULL
+        AND length(btrim("refreshTokenTag")) > 0
+      )
     )
   );
 
+ALTER TABLE "SpotifyAction"
+  ADD CONSTRAINT "SpotifyAction_provider_ck"
+  CHECK ("provider" = 'SPOTIFY');
+
 ALTER TABLE "WhatsAppNotificationRule"
+  ADD CONSTRAINT "WhatsAppNotificationRule_provider_ck"
+  CHECK ("provider" = 'WHATSAPP'),
   ADD CONSTRAINT "WhatsAppNotificationRule_target_shape_ck"
   CHECK (
     ("scope" = 'ALL' AND "opaqueTargetRef" IS NULL)
@@ -1027,6 +1064,14 @@ ALTER TABLE "WhatsAppNotificationRule"
       AND length(btrim("opaqueTargetRef")) > 0
     )
   );
+
+ALTER TABLE "WhatsAppSendRequest"
+  ADD CONSTRAINT "WhatsAppSendRequest_provider_ck"
+  CHECK ("provider" = 'WHATSAPP');
+
+ALTER TABLE "WhatsAppDelivery"
+  ADD CONSTRAINT "WhatsAppDelivery_provider_ck"
+  CHECK ("provider" = 'WHATSAPP');
 
 ALTER TABLE "BugReportAttachment"
   ADD CONSTRAINT "BugReportAttachment_size_digest_ck"

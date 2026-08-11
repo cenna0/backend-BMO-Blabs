@@ -31,4 +31,6 @@ delivery attempts within deliveries, memory candidates linked to messages, and
 provider records linked to integration connections. Device-owned telemetry,
 Wi-Fi configuration, and logs inherit ownership through `Device`; devices do not
 own user chat or memory data. Schedules remain structured records, not memory,
-and provider session bytes do not become BMO entities.
+and provider session bytes do not become BMO entities. Spotify and WhatsApp
+subtypes are additionally bound through the connection's provider discriminator;
+a subtype cannot point at a connection for the other provider.

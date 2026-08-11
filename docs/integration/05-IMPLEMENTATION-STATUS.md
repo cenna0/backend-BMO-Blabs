@@ -72,7 +72,7 @@ At audit time the candidate database was approximately 9.3 MB with two active co
 | Six-digit pairing | `EXISTING_VERIFIED` | Source + DB-backed candidate; mobile bearer routes, 10-minute TTL, five attempts; physical pairing not proven |
 | Device CRUD/settings | `EXISTING_VERIFIED` | Source + private candidate; settings are DB-only and do not sync to ESP |
 | P9.1 Prisma foundation | `EXISTING_VERIFIED` | 11 models; two additive migrations; not the target integration schema |
-| Phase 2 application data foundation | `EXISTING_VERIFIED` | Source schema/migration only: 27 additive models (38 total), explicit ownership/idempotency/secret-shape constraints, repository delegates, and migration `20260811190000_phase2_application_foundation`. The migration has not been applied to the running private candidate or public production. |
+| Phase 2 application data foundation | `EXISTING_VERIFIED` | Source schema/migration only: 27 additive models (38 total), explicit ownership/idempotency/secret-shape constraints, provider-subtype connection integrity, required bounded device-log expiry, repository delegates, and migration `20260811190000_phase2_application_foundation`. The migration has not been applied to the running private candidate or public production. |
 | Production P9.1 activation | `READY_TO_IMPLEMENT` | Existing router is disabled on production |
 | Production-shaped P9.1 integration | `EXISTING_VERIFIED` | Source + automated review-runtime packaging: the full Backend runtime registers P9 and existing voice surfaces together. Review Compose keeps Backend on host networking for loopback Hermes/Audio, removes PostgreSQL host publication, and connects Backend to PostgreSQL through a shared Unix-socket volume. The running private candidate has not been recreated and public production remains unchanged. |
 
@@ -140,7 +140,7 @@ is liveness evidence and never substitutes for integrated readiness.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 195 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs.
+- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 199 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs. Slice 2A focused schema/repository coverage passed 17 tests.
 - Backend typecheck and build: passed on Node `22.23.1`.
 - Prisma validation and generated-client typecheck/build: passed. The source manifest now requires three migrations. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the new migration is not applied there.
 - Static/rendered integrated-candidate packaging: passed; PostgreSQL has no host-published port and Backend uses the named Unix-socket volume. The live candidate was not recreated.

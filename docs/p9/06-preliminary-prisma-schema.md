@@ -106,16 +106,16 @@ constraints, and records are not renamed or removed.
 
 ### Device configuration and observability
 
-- `DeviceWifiConfiguration`: versioned device record with bounded SSID, `OPEN|WPA_PSK`, AEAD ciphertext/nonce/tag/key version, full status lifecycle including `SUPERSEDED`, delivery/application/error timestamps, and a database check that open networks have no secret material while protected networks have the complete encrypted shape. Never return ciphertext/plaintext through read APIs.
-- `DeviceTelemetryCurrent`: unique device; Wi-Fi connected, nullable RSSI, battery-supported flag, nullable battery percent, nullable firmware version, observed time.
-- `DeviceLog`: device, bounded level/code/message/metadata, observed time, expiry/retention index.
+- `DeviceWifiConfiguration`: versioned device record with bounded SSID, `OPEN|WPA_PSK`, AEAD ciphertext/nonce/tag/key version, full status lifecycle including `SUPERSEDED`, delivery/application/error timestamps, and a database check that open networks have no secret material while protected networks have complete, nonempty encrypted material and a positive key version. Never return ciphertext/plaintext through read APIs.
+- `DeviceTelemetryCurrent`: unique device; Wi-Fi connected, nullable RSSI, battery-supported flag, nullable battery percent, nullable firmware version, observed time. The database requires battery percent to be absent when unsupported and present within `0..100` when supported.
+- `DeviceLog`: device, bounded level/code/message/metadata, observed time, required application-assigned expiry later than creation, and a retention index. There is deliberately no database expiry default; writers own the retention duration.
 - Existing `DeviceSettings` now has additive version/delivered/applied/error metadata with version-shape checks; initial physical setting remains playback volume.
 
 ### Integrations and support
 
-- `IntegrationConnection`: unique user/provider state, opaque external reference, scopes/status, timestamps; no WhatsApp session bytes.
+- `IntegrationConnection`: unique user/provider state, opaque external reference, scopes/status, timestamps; no WhatsApp session bytes. Provider-specific child rows carry a constant discriminator and use a composite connection/user/provider foreign key, so Spotify rows cannot reference WhatsApp connections and vice versa.
 - `OAuthState`: unique SHA-256 state verifier, exact redirect URI, expiry and single-use timestamp.
-- `SpotifyCredential`: unique user/connection with encrypted access/refresh token ciphertext/nonce/tag/key version, expiry/scope, and encryption-shape checks.
+- `SpotifyCredential`: unique user/connection with encrypted access/refresh token ciphertext/nonce/tag/key version, expiry/scope, and encryption-shape checks. A refresh token is either fully absent or a complete nonempty ciphertext/nonce/tag triple.
 - `SpotifyAction`: user, normalized action, idempotency key, confirmation/provider result, redacted audit.
 - `WhatsAppNotificationRule`, `WhatsAppSendRequest`, and `WhatsAppDelivery`: user-scoped rules, confirmation expiry, idempotency, bounded metadata; message retention minimized. SQL check/partial indexes allow one global `ALL` rule with no target and distinct nonblank `CONTACT`/`GROUP` targets. Prisma deliberately exposes no misleading compound-unique API for this SQL-only partial uniqueness.
 - `BugReport` and optional attachment/media metadata: reporter, category, sanitized description/context, state, timestamps; no secret dumps.

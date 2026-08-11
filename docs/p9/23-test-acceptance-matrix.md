@@ -2,9 +2,9 @@
 
 | Area | Phase 1 evidence | Phase 2 acceptance |
 |---|---|---|
-| Backend tests | Node 22.23.1: 195 passed, 1 skipped DB HTTP suite; Slice 2A focused schema/repository run 13 passed | Unit + authenticated HTTP integration with disposable Postgres |
+| Backend tests | Node 22.23.1: 199 passed, 1 skipped DB HTTP suite; Slice 2A focused schema/repository run 17 passed | Unit + authenticated HTTP integration with disposable Postgres |
 | Build/typecheck | Passed on Node 22.23.1 | Repeat on pinned build/runtime |
-| Prisma | Validate/generate passed; exact 38-model list, non-destructive SQL, constraints, repository delegates, and readiness manifest matching all three source migrations are statically verified | Empty/repeat/upgrade migration, constraints, backup/restore, no startup migration at an authorized disposable/candidate gate; Slice 2A migration is not applied |
+| Prisma | Validate/generate passed; exact 38-model list, every new table's scalar SQL types, embedded destructive/data-rewrite SQL rejection, nullable check guards, provider-subtype integrity, repository delegates, and readiness manifest matching all three source migrations are statically verified | Empty/repeat/upgrade migration, constraints, backup/restore, no startup migration at an authorized disposable/candidate gate; Slice 2A migration is not applied |
 | Audio | 103 passed in production audio image | Existing suite + voice regression |
 | Existing device voice | Production contract/runtime inspected | Public fake-device regression plus no raw-WAV/MP3/event drift |
 | Auth/recovery | P9.1 auth source/private candidate exists; nullable DOB and verifier-only recovery storage exist in unapplied source schema; `SafeUser` remains DOB-free | Self-service, Argon2id, rotation/replay, DOB enumeration/rate/reuse, logout-all, tenant isolation |

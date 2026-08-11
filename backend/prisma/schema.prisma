@@ -780,7 +780,7 @@ model DeviceLog {
   message    String         @db.VarChar(1000)
   metadata   String?        @db.VarChar(2000)
   observedAt DateTime       @db.Timestamptz(3)
-  expiresAt  DateTime?      @db.Timestamptz(3)
+  expiresAt  DateTime       @db.Timestamptz(3)
   createdAt  DateTime       @default(now()) @db.Timestamptz(3)
   device     Device         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
@@ -808,7 +808,7 @@ model IntegrationConnection {
   whatsAppDeliveries   WhatsAppDelivery[]
 
   @@unique([userId, provider])
-  @@unique([id, userId])
+  @@unique([id, userId, provider])
   @@index([status, updatedAt])
 }
 
@@ -831,6 +831,7 @@ model SpotifyCredential {
   id                     String                @id @default(uuid()) @db.Uuid
   userId                 String                @unique @db.Uuid
   connectionId           String                @unique @db.Uuid
+  provider               IntegrationProvider   @default(SPOTIFY)
   accessTokenCiphertext  String                @db.Text
   accessTokenNonce       String                @db.VarChar(128)
   accessTokenTag         String                @db.VarChar(128)
@@ -843,15 +844,16 @@ model SpotifyCredential {
   createdAt              DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime              @updatedAt @db.Timestamptz(3)
   user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection             IntegrationConnection @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+  connection             IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
 
-  @@unique([connectionId, userId])
+  @@unique([connectionId, userId, provider])
 }
 
 model SpotifyAction {
   id                    String                @id @default(uuid()) @db.Uuid
   userId                String                @db.Uuid
   connectionId          String                @db.Uuid
+  provider              IntegrationProvider   @default(SPOTIFY)
   action                String                @db.VarChar(64)
   payload               Json
   idempotencyKey        String                @db.VarChar(128)
@@ -864,7 +866,7 @@ model SpotifyAction {
   createdAt             DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection            IntegrationConnection @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+  connection            IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
 
   @@unique([userId, idempotencyKey])
   @@index([userId, status, createdAt])
@@ -874,6 +876,7 @@ model WhatsAppNotificationRule {
   id              String                @id @default(uuid()) @db.Uuid
   userId          String                @db.Uuid
   connectionId    String                @db.Uuid
+  provider        IntegrationProvider   @default(WHATSAPP)
   scope           WhatsAppRuleScope
   opaqueTargetRef String?               @db.VarChar(255)
   enabled         Boolean               @default(true)
@@ -882,7 +885,7 @@ model WhatsAppNotificationRule {
   createdAt       DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime              @updatedAt @db.Timestamptz(3)
   user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection      IntegrationConnection @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+  connection      IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
 
   // The SQL migration enforces target shape and separate global/targeted partial unique indexes.
   @@index([userId, enabled, updatedAt])
@@ -892,6 +895,7 @@ model WhatsAppSendRequest {
   id                    String                @id @default(uuid()) @db.Uuid
   userId                String                @db.Uuid
   connectionId          String                @db.Uuid
+  provider              IntegrationProvider   @default(WHATSAPP)
   opaqueRecipientRef    String                @db.VarChar(255)
   preview               String                @db.VarChar(1000)
   idempotencyKey        String                @db.VarChar(128)
@@ -903,7 +907,7 @@ model WhatsAppSendRequest {
   createdAt             DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection            IntegrationConnection @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+  connection            IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
   deliveries            WhatsAppDelivery[]
 
   @@unique([id, userId])
@@ -916,6 +920,7 @@ model WhatsAppDelivery {
   id                 String                    @id @default(uuid()) @db.Uuid
   userId             String                    @db.Uuid
   connectionId       String                    @db.Uuid
+  provider           IntegrationProvider       @default(WHATSAPP)
   sendRequestId      String?                   @db.Uuid
   direction          WhatsAppDeliveryDirection
   status             WhatsAppDeliveryStatus
@@ -927,7 +932,7 @@ model WhatsAppDelivery {
   createdAt          DateTime                  @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime                  @updatedAt @db.Timestamptz(3)
   user               User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection         IntegrationConnection     @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+  connection         IntegrationConnection     @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade)
   sendRequest        WhatsAppSendRequest?      @relation(fields: [sendRequestId, userId], references: [id, userId], onDelete: Restrict)
 
   @@index([userId, status, createdAt])
