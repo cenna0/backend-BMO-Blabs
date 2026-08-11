@@ -19,6 +19,12 @@ At freeze SHA `d638b20c381c676136c94524a38a1def5d70e565`:
 - every other route in this file is absent;
 - exact per-route state is authoritative in `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`.
 
+Slice 2B source now implements the account/profile/recovery/avatar and
+personalization routes in sections 2, 3, and 5. This is source and automated
+review-candidate evidence only: the running private `bmo` candidate still has
+the invitation-era image and only the two P9.1 migrations, while public
+production remains unchanged.
+
 `EXISTING_VERIFIED` in the matrix means verified at the stated availability tier; it does not imply public availability.
 
 ---
@@ -330,8 +336,11 @@ Rules:
 - bounded strings;
 - custom instructions max baseline 4000 chars;
 - Backend owns persistence;
-- apply allowed personalization to both mobile chat and voice Hermes context;
+- a later chat/voice slice will apply allowed personalization to Hermes context;
 - user custom instructions cannot override system/security rules.
+
+Slice 2B owns strict persistence and retrieval only; Hermes context integration
+is not present yet.
 
 No ESP32 protocol change is required.
 

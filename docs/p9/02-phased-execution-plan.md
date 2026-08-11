@@ -5,7 +5,7 @@
 The historical P9.1–P9.6 grouping remains useful for lineage, but Phase 2 executes tracer slices against one Backend API and additive schema:
 
 1. Close the port-5555 security gate and integrate the existing P9.1 router into a production-shaped candidate without voice regression.
-2. Add target schema migrations and account/profile/personalization surfaces.
+2. Add target schema migrations and account/profile/personalization surfaces. Slice 2A schema and Slice 2B account source/tests are `EXISTING_VERIFIED`; runtime migration/deployment is not.
 3. Establish the physical device identity bridge and separate mobile realtime socket.
 4. Add chat/history, memory, and scheduler/proactive delivery.
 5. Add device Wi-Fi/log/telemetry/settings data plane; firmware work remains `PENDING_PHYSICAL_ESP`.

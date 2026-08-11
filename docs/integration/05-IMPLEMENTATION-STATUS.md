@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-11
-**Last implementation checkpoint:** 2026-08-11 — Slice 2A additive application data foundation and disposable migration gate
+**Last implementation checkpoint:** 2026-08-11 — Slice 2B account/profile/recovery/avatar and personalization source candidate
 **Baseline source:** `main` / `d638b20c381c676136c94524a38a1def5d70e565`
 **Documentation branch:** `docs/integration-contract-freeze`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -68,7 +68,7 @@ At audit time the candidate database was approximately 9.3 MB with two active co
 | Capability | Status | Availability / limitation |
 |---|---|---|
 | Device WSS `/ws`, raw whole WAV HTTP, MP3 HTTP | `EXISTING_VERIFIED` | Production/public contract |
-| P9.1 register/login/refresh/logout/logout-all/me | `EXISTING_VERIFIED` | Source + private candidate; registration still invitation-gated |
+| Account auth register/login/refresh/logout/logout-all/me | `EXISTING_VERIFIED` | Slice 2B source/tests provide self-service DOB registration and canonical `SafeUser`; the running private candidate remains on the invitation-era image and public production remains unchanged |
 | Six-digit pairing | `EXISTING_VERIFIED` | Source + DB-backed candidate; mobile bearer routes, 10-minute TTL, five attempts; physical pairing not proven |
 | Device CRUD/settings | `EXISTING_VERIFIED` | Source + private candidate; settings are DB-only and do not sync to ESP |
 | P9.1 Prisma foundation | `EXISTING_VERIFIED` | 11 models; two additive migrations; not the target integration schema |
@@ -112,14 +112,40 @@ The candidate image healthcheck intentionally probes dependency-free `/livez`
 only; candidate acceptance must separately query `/readyz`, so container health
 is liveness evidence and never substitutes for integrated readiness.
 
+Slice 2B source removes the mobile invitation requirement while retaining
+optional legacy invitation consumption and operator tooling. Registration
+strictly normalizes email, requires a valid non-future calendar DOB, preserves
+Argon2id/session issuance, and returns `username`/`avatarUrl` without DOB.
+Profile updates bind only to bearer ownership, normalize username to the
+database-enforced lowercase form, sanitize uniqueness conflicts, and prevent
+mass assignment.
+
+DOB recovery uses identical public failure envelopes for unknown email and
+wrong DOB, independent one-hop-proxy-aware IP and normalized-email limiters, a
+fixed 600-second token lifetime, SHA-256 verifier-only storage, atomic single
+use, Argon2id credential replacement, and transaction-scoped revocation of all
+sessions and refresh families. DOB is explicitly a weak MVP recovery factor;
+raw DOB and recovery tokens are absent from `SafeUser`, persistence fields, and
+audit metadata.
+
+Avatar upload accepts only bounded JPEG/PNG/WebP multipart input, decodes and
+re-encodes through Sharp to stripped WebP, generates a UUID storage key, and
+serves only the exact opaque `.webp` path with `nosniff` and immutable caching.
+Candidate and production-shaped Compose source provide a dedicated writable
+persistent mount within the otherwise read-only Backend container; no host
+directory was created. Personalization GET safe-upserts defaults and PATCH
+accepts only the seven bounded canonical owner-scoped fields. Persistence is
+verified; Hermes context consumption is deliberately deferred to a later
+slice.
+
 ## Approved integration scope
 
 | Capability | Status | Exact gap / gate |
 |---|---|---|
-| Self-service registration | `READY_TO_IMPLEMENT` | Remove invitation dependency without weakening existing credential handling |
-| DOB password recovery | `READY_TO_IMPLEMENT` | Nullable DOB and verifier-only bounded recovery storage are source-verified; service abuse controls and routes remain absent |
-| Profile, username, avatar | `READY_TO_IMPLEMENT` | Nullable normalized username and opaque avatar metadata are source-verified; application validation/media/routes remain absent |
-| Personalization | `READY_TO_IMPLEMENT` | One-to-one source model is verified; service/routes remain absent |
+| Self-service registration | `EXISTING_VERIFIED` | Source + automated route/service tests; optional legacy invitation compatibility retained; running candidate/public production unchanged |
+| DOB password recovery | `EXISTING_VERIFIED` | Source + automated enumeration/rate/TTL/hash/reuse/revocation tests; weak MVP factor and not deployed |
+| Profile, username, avatar | `EXISTING_VERIFIED` | Source + automated validation/media/storage/cleanup tests; persistent mounts declared but not created/deployed |
+| Personalization | `EXISTING_VERIFIED` | Source + automated defaults/strict patch/owner tests; Hermes context integration remains `READY_TO_IMPLEMENT` in a later slice |
 | Mobile realtime `/api/v1/ws` | `READY_TO_IMPLEMENT` | Separate contract absent |
 | Chat/history and Hermes-backed send | `READY_TO_IMPLEMENT` | Durable source models/cursors/idempotency/202-operation state are verified; services/routes/Hermes orchestration remain absent |
 | Memory | `READY_TO_IMPLEMENT` | Durable record/candidate/action/topic-forget/summary source models are verified; gateway/routes/lifecycle runtime remain absent |
@@ -140,12 +166,13 @@ is liveness evidence and never substitutes for integrated readiness.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 200 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs. Slice 2A focused schema/repository coverage passed 18 tests.
+- Backend on Node `22.23.1`: 46 files passed, 1 skipped; 226 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs. Slice 2B focused account/profile/recovery/avatar/personalization coverage is included in those totals.
 - Backend typecheck and build: passed on Node `22.23.1`.
 - Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. On disposable PostgreSQL, an empty three-migration deploy passed, repeat deploy reported no pending migrations, and a populated two-to-three migration upgrade preserved seeded rows in all 11 P9.1 models. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints, and the repeated database-to-schema diff returned `No difference detected`. Transaction-rolled-back positive/negative probes also verified avatar, Wi-Fi AEAD, battery, device-log expiry, provider-subtype, Spotify refresh-secret, and WhatsApp rule constraints. The disposable databases and review images were removed after verification. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the running `bmo` database still has only the two P9.1 migrations.
-- Static/rendered integrated-candidate packaging: passed; PostgreSQL has no host-published port and Backend uses the named Unix-socket volume. The live candidate was not recreated.
+- Static/rendered packaging: 13 tests passed, 1 unrelated packaging test skipped. PostgreSQL has no host-published port, Backend uses the named Unix-socket volume, and avatar storage uses a separate writable named volume without adding public routing. Fresh production Backend and P9 review-candidate image builds passed; no container was started and the live candidate was not recreated.
 - Audio Service: 103 tests passed in the production audio image.
-- Documentation verifier: passed before synchronization and must pass again on the final tree.
+- Documentation verifier: 4 regression tests passed and the direct verifier returned `PASS` on the synchronized tree.
+- Production dependency audit: 0 vulnerabilities at `high` or above (and 0 total after the pinned `nanoid` override); Multer `2.2.0` and Sharp `0.35.3` are exact lockfile dependencies.
 - A host-Node test attempt failed with `ERR_IPC_CHANNEL_CLOSED`; this is an environment mismatch, not a test regression.
 
 ## Current blockers
@@ -157,4 +184,9 @@ is liveness evidence and never substitutes for integrated readiness.
 
 ## Phase 2 next source slice
 
-Use `04-VPS-IMPLEMENTATION-PLAN.md`. Build account/profile/recovery and personalization services/routes against the reviewed additive source schema, preserving `SafeUser` DOB exclusion and existing P9.1 behavior. The disposable migration gate is complete; execute against the running candidate or production only under separate authorization.
+Use `04-VPS-IMPLEMENTATION-PLAN.md`. The next source boundary is the separate
+mobile realtime/chat/memory/schedule slice, including eventual safe
+personalization-to-Hermes context assembly. Slice 2A remains unapplied to the
+running candidate and production; candidate recreation, migration execution,
+public activation, provider configuration, and physical ESP work all require
+separate authorization/evidence.

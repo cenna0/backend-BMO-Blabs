@@ -3,6 +3,34 @@ import { z } from "zod";
 import { P9_CANONICAL_TIMEZONE } from "./config.js";
 
 const emailSchema = z.string().trim().min(3).max(320).email();
+const displayNameSchema = z.string().trim().min(1).max(120);
+const usernameSchema = z.string().trim().transform((value) => value.normalize("NFKC").toLowerCase()).pipe(
+  z.string().regex(/^[a-z0-9_.]{3,30}$/),
+);
+
+const registrationSchema = z.object({
+  invitationToken: z.string().min(1).max(256).optional(),
+  email: z.string(),
+  password: z.string().min(12).max(256),
+  displayName: displayNameSchema.optional(),
+  dateOfBirth: z.string(),
+}).strict();
+
+const profilePatchSchema = z.object({
+  displayName: displayNameSchema.nullable().optional(),
+  username: usernameSchema.optional(),
+}).strict().refine((value) => Object.keys(value).length > 0);
+
+const boundedPersonalization = z.string().trim().max(32);
+const personalizationPatchSchema = z.object({
+  baseStyleTone: boundedPersonalization.optional(),
+  warmth: boundedPersonalization.optional(),
+  enthusiasm: boundedPersonalization.optional(),
+  headerAndLists: boundedPersonalization.optional(),
+  emoji: boundedPersonalization.optional(),
+  fastAnswers: z.boolean().optional(),
+  customInstructions: z.string().max(4_000).optional(),
+}).strict().refine((value) => Object.keys(value).length > 0);
 
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
@@ -53,6 +81,38 @@ export interface QuietHours {
 export function normalizeEmail(value: string): string {
   const normalized = emailSchema.parse(value).normalize("NFKC").toLowerCase();
   return emailSchema.parse(normalized);
+}
+
+export function parseDateOfBirth(value: unknown, now = new Date()): Date {
+  const text = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(value);
+  const [year, month, day] = text.split("-").map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    text > now.toISOString().slice(0, 10)
+  ) {
+    throw new z.ZodError([{ code: z.ZodIssueCode.custom, path: [], message: "Invalid date of birth" }]);
+  }
+  return date;
+}
+
+export function parseRegistration(value: unknown, now = new Date()) {
+  const parsed = registrationSchema.parse(value);
+  return {
+    ...parsed,
+    email: normalizeEmail(parsed.email),
+    dateOfBirth: parseDateOfBirth(parsed.dateOfBirth, now),
+  };
+}
+
+export function parseProfilePatch(value: unknown): z.infer<typeof profilePatchSchema> {
+  return profilePatchSchema.parse(value);
+}
+
+export function parsePersonalizationPatch(value: unknown): z.infer<typeof personalizationPatchSchema> {
+  return personalizationPatchSchema.parse(value);
 }
 
 export function isUuid(value: string): boolean {

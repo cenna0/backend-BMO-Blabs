@@ -5,20 +5,11 @@ import { hashPassword, verifyPassword } from "../crypto.js";
 import { withP9Transaction } from "../db/client.js";
 import { P9Repositories } from "../db/repositories.js";
 import { P9Error } from "../errors.js";
-import { normalizeEmail } from "../validation.js";
+import { normalizeEmail, parseRegistration } from "../validation.js";
 import { AuditService } from "./audit.service.js";
 import { InvitationService } from "./invitation.service.js";
 import { SessionService, type SessionTokens } from "./session.service.js";
 import { publicUser, type PublicUserRecord } from "./user.service.js";
-
-const registrationSchema = z
-  .object({
-    invitationToken: z.string().min(1).max(256),
-    email: z.string(),
-    password: z.string().min(12).max(256),
-    displayName: z.string().trim().min(1).max(120).optional(),
-  })
-  .strict();
 
 const loginSchema = z.object({
   email: z.string(),
@@ -36,6 +27,7 @@ export interface AuthServiceOptions {
   repositories: P9Repositories;
   invitations: InvitationService;
   sessions: SessionService;
+  publicBaseUrl?: string;
 }
 
 const dummyPasswordHash = hashPassword("p9-dummy-password-that-is-never-accepted");
@@ -44,32 +36,28 @@ export class AuthService {
   constructor(private readonly options: AuthServiceOptions) {}
 
   async register(input: unknown, requestId?: string): Promise<AuthResult> {
-    let parsed: z.infer<typeof registrationSchema>;
+    let parsed: ReturnType<typeof parseRegistration>;
     try {
-      parsed = registrationSchema.parse(input);
+      parsed = parseRegistration(input);
     } catch {
       throw new P9Error("INVALID_INPUT", 400, "Invalid registration request");
     }
-    let email: string;
-    try {
-      email = normalizeEmail(parsed.email);
-    } catch {
-      throw new P9Error("INVALID_INPUT", 400, "Invalid registration request");
+    const email = parsed.email;
+    if (parsed.invitationToken) {
+      await this.options.invitations.expireIfNeeded(parsed.invitationToken, new Date(), requestId);
     }
-    await this.options.invitations.expireIfNeeded(parsed.invitationToken, new Date(), requestId);
     const passwordHash = await hashPassword(parsed.password);
     try {
       return await withP9Transaction(this.options.client, async (transaction) => {
         const repositories = new P9Repositories(transaction);
-        const invitation = await this.options.invitations.consumeForRegistration(
-          parsed.invitationToken,
-          email,
-          repositories,
-        );
+        const invitation = parsed.invitationToken
+          ? await this.options.invitations.consumeForRegistration(parsed.invitationToken, email, repositories)
+          : null;
         const user = await repositories.user.create({
           data: {
             email,
             ...(parsed.displayName === undefined ? {} : { displayName: parsed.displayName }),
+            dateOfBirth: parsed.dateOfBirth,
             passwordCredential: { create: { passwordHash, algorithm: "argon2id" } },
             identities: { create: { provider: "password", providerSubject: `local:${email}` } },
             userSettings: { create: { timezone: "Asia/Jakarta" } },
@@ -87,12 +75,14 @@ export class AuthService {
           resourceId: user.id,
           userId: user.id,
           ...(requestId === undefined ? {} : { context: { requestId } }),
-          metadata: { email, resourceId: invitation.id },
+          metadata: { email, ...(invitation ? { resourceId: invitation.id } : {}) },
         });
-        return { user: publicUser(user), session };
+        return { user: publicUser(user, this.options.publicBaseUrl), session };
       });
     } catch (error) {
-      await this.options.invitations.expireIfNeeded(parsed.invitationToken, new Date(), requestId).catch(() => undefined);
+      if (parsed.invitationToken) {
+        await this.options.invitations.expireIfNeeded(parsed.invitationToken, new Date(), requestId).catch(() => undefined);
+      }
       await new AuditService(this.options.repositories).record({
         eventType: "REGISTRATION_FAILED",
         outcome: "failure",
@@ -102,6 +92,9 @@ export class AuthService {
         metadata: { email },
       }).catch(() => undefined);
       if (error instanceof P9Error) throw error;
+      if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+        throw new P9Error("CONFLICT", 409, "Account already exists");
+      }
       throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
     }
   }
@@ -151,6 +144,6 @@ export class AuthService {
       userId: user.id,
       ...(requestId === undefined ? {} : { context: { requestId } }),
     });
-    return { user: publicUser(user as PublicUserRecord), session };
+    return { user: publicUser(user as PublicUserRecord, this.options.publicBaseUrl), session };
   }
 }

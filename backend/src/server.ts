@@ -172,6 +172,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   }));
   if (p9) {
     app.use("/api/v1", p9.router);
+    app.use(p9.mediaRouter);
   }
   app.use(createVoiceRouter({ config, requestStore, sockets, tempAudio, hardwareTest, pipeline, logger }));
   app.use(createAudioRouter(tempAudio, { requestStore, sockets }));
@@ -190,6 +191,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     runMaintenance,
     async start(port = config.BACKEND_PORT) {
       await tempAudio.initialize();
+      if (p9) await p9.initialize();
       try {
         await tempAudio.startupCleanup();
       } catch (error) {

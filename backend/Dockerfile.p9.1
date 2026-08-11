@@ -26,6 +26,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && npm ci --omit=dev \
     && npm cache clean --force
+RUN install -d -o 1000 -g 1000 -m 0700 /opt/bmo/data/avatars
 COPY --from=build /app/dist/src ./dist/src
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/prisma ./prisma

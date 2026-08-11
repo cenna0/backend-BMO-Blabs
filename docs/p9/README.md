@@ -9,7 +9,10 @@ P9.1 source is present at the audited `main` SHA and is verified in a private ca
 
 - Existing production: device `/ws`, raw whole WAV over HTTP, MP3 over HTTP, Hermes and Audio Service integration.
 - Existing private candidate: P9.1 auth/session, pairing, devices/settings, 11-model Prisma schema, two applied migrations.
-- `READY_TO_IMPLEMENT`: approved mobile/account/profile/chat/memory/scheduler/integration backend scope.
+- Source/test `EXISTING_VERIFIED`: Slice 2B self-service account recovery,
+  profile/avatar, and personalization persistence; the private candidate and
+  public production are unchanged.
+- `READY_TO_IMPLEMENT`: approved mobile realtime/chat/memory/scheduler/integration backend scope and later personalization-to-Hermes context assembly.
 - `PENDING_PHYSICAL_ESP`: all additive firmware events and physical acceptance.
 - `BLOCKED`: the exact operational/provider gates in the integration status file.
 

@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = ROOT / "p9.1-compose.yml"
+DOCKERFILE = ROOT / "backend" / "Dockerfile.p9.1"
 
 
 class P9CandidatePackagingTests(unittest.TestCase):
@@ -86,6 +87,30 @@ class P9CandidatePackagingTests(unittest.TestCase):
             self.assertEqual(socket_mounts[0]["source"], "p9_postgres_socket")
 
         self.assertIn("p9_postgres_socket", self.config["volumes"])
+
+    def test_backend_has_private_writable_persistent_avatar_storage(self) -> None:
+        backend = self.config["services"]["backend"]
+        mounts = [
+            mount for mount in backend["volumes"]
+            if mount["target"] == "/opt/bmo/data/avatars"
+        ]
+        self.assertEqual(len(mounts), 1)
+        self.assertEqual(mounts[0]["type"], "volume")
+        self.assertEqual(mounts[0]["source"], "p9_avatar_data")
+        self.assertFalse(mounts[0].get("read_only", False))
+        self.assertEqual(
+            backend["environment"]["AVATAR_STORAGE_DIR"],
+            "/opt/bmo/data/avatars",
+        )
+        self.assertNotIn("ports", backend)
+        self.assertIn("p9_avatar_data", self.config["volumes"])
+
+    def test_candidate_image_seeds_avatar_volume_with_runtime_ownership(self) -> None:
+        dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+        self.assertIn(
+            "install -d -o 1000 -g 1000 -m 0700 /opt/bmo/data/avatars",
+            dockerfile,
+        )
 
 
 if __name__ == "__main__":

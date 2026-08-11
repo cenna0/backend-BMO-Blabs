@@ -23,6 +23,10 @@ function appWithOps(
     devices: {} as never,
     pairing: {} as never,
     settings: {} as never,
+    recovery: {} as never,
+    profile: {} as never,
+    avatars: {} as never,
+    personalization: {} as never,
     accessTokens: {} as never,
     repositories: {
       healthCheck: async () => undefined,
@@ -33,6 +37,7 @@ function appWithOps(
       loginLimit: 5,
       pairingWindowMs: 900_000,
       pairingLimit: 10,
+      avatarMaxBytes: 5 * 1024 * 1024,
     } as never,
   }));
   return app;

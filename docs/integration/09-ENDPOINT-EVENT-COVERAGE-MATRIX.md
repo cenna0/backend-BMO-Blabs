@@ -9,6 +9,11 @@ not register any route or event, so their `READY_TO_IMPLEMENT` and
 `20260811190000_phase2_application_foundation` is source-verified only and has
 not been applied to the running candidate or production.
 
+Slice 2B registers the account/profile/recovery/avatar and personalization
+surfaces in source and verifies them with automated route/service/storage
+tests. The running private candidate was not recreated and still has only the
+two P9.1 migrations; public production remains unchanged.
+
 ## Runtime and existing voice surfaces
 
 | Method/surface | Path/event | Status | Availability / evidence |
@@ -33,21 +38,21 @@ deployed or enabled there.
 
 | Method | Path | Status | Availability / gap |
 |---|---|---|---|
-| POST | `/api/v1/auth/register` | `EXISTING_VERIFIED` | Private candidate; currently requires `invitationToken`; self-service change `READY_TO_IMPLEMENT` |
-| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + source tests; optional `clientDeviceId` issuance transaction-locks the user against unpair, then requires an active owned device |
+| POST | `/api/v1/auth/register` | `EXISTING_VERIFIED` | Slice 2B source/tests: self-service email/password/DOB; optional invitation compatibility only. Running private candidate remains invitation-era and public production unchanged |
+| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + Slice 2B source tests; canonical `SafeUser` adds username/avatar URL, and optional `clientDeviceId` issuance remains owner-locked |
 | POST | `/api/v1/auth/refresh` | `EXISTING_VERIFIED` | Private candidate; opaque rotating refresh token |
 | POST | `/api/v1/auth/logout` | `EXISTING_VERIFIED` | Private candidate |
 | POST | `/api/v1/auth/logout-all` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/me` | `EXISTING_VERIFIED` | Private candidate; extended profile fields absent |
-| POST | `/api/v1/auth/password/recovery/verify` | `READY_TO_IMPLEMENT` | Not registered; verifier-only recovery storage exists in source schema only |
-| POST | `/api/v1/auth/password/recovery/reset` | `READY_TO_IMPLEMENT` | Not registered; source schema does not imply runtime abuse controls |
-| PATCH | `/api/v1/me/profile` | `READY_TO_IMPLEMENT` | Not registered; nullable DOB/username/avatar metadata exist in source schema only |
-| POST | `/api/v1/me/avatar` | `READY_TO_IMPLEMENT` | Not registered; opaque media metadata exists in source schema only |
-| GET | `/media/avatars/:opaqueId.webp` | `READY_TO_IMPLEMENT` | Not registered; opaque public media identifier target |
+| GET | `/api/v1/me` | `EXISTING_VERIFIED` | Private candidate legacy shape; Slice 2B source/tests return canonical username/avatar URL without DOB |
+| POST | `/api/v1/auth/password/recovery/verify` | `EXISTING_VERIFIED` | Slice 2B source/tests; generic enumeration-safe failure, independent IP/email limits, 600-second opaque token, SHA-256 verifier only; not deployed |
+| POST | `/api/v1/auth/password/recovery/reset` | `EXISTING_VERIFIED` | Slice 2B source/tests; atomic single use, Argon2id replacement, all-session/refresh revocation; not deployed |
+| PATCH | `/api/v1/me/profile` | `EXISTING_VERIFIED` | Slice 2B source/tests; bearer-owned strict display-name/normalized-username patch and sanitized conflict |
+| POST | `/api/v1/me/avatar` | `EXISTING_VERIFIED` | Slice 2B source/tests; 5 MiB multipart bound, decode validation, WebP transcode, UUID key and replacement cleanup |
+| GET | `/media/avatars/:opaqueId.webp` | `EXISTING_VERIFIED` | Slice 2B source/tests; exact UUID WebP path, `image/webp`, `nosniff`, immutable cache; no directory listing |
 | GET | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
 | PATCH | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/settings/personalization` | `READY_TO_IMPLEMENT` | Not registered; one-to-one source model exists |
-| PATCH | `/api/v1/settings/personalization` | `READY_TO_IMPLEMENT` | Not registered; service validation remains absent |
+| GET | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B source/tests; owner-scoped safe upsert returns canonical defaults; Hermes context use is later |
+| PATCH | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B source/tests; strict nonempty bounded canonical owner patch; Hermes context use is later |
 
 ## Pairing and devices
 

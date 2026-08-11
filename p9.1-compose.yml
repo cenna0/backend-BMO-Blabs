@@ -66,6 +66,7 @@ services:
       P9_POSTGRES_SOCKET_DIR: /var/run/postgresql
       P9_JWT_SECRET: ${P9_JWT_SECRET:?Set P9_JWT_SECRET outside Git}
       P9_PAIRING_PEPPER: ${P9_PAIRING_PEPPER:?Set P9_PAIRING_PEPPER outside Git}
+      AVATAR_STORAGE_DIR: /opt/bmo/data/avatars
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,6 +78,9 @@ services:
         source: p9_postgres_socket
         target: /var/run/postgresql
         read_only: true
+      - type: volume
+        source: p9_avatar_data
+        target: /opt/bmo/data/avatars
     mem_limit: 512m
     memswap_limit: 512m
     cpus: "1.0"
@@ -101,6 +105,7 @@ networks:
 
 volumes:
   p9_postgres_socket:
+  p9_avatar_data:
 
 secrets:
   postgres_password:

@@ -35,6 +35,18 @@ additive owner operations. The review candidate keeps Backend host networking
 for loopback Hermes/Audio but reaches unpublished PostgreSQL through a shared
 Unix socket; public Caddy routing and production deployment are unchanged.
 
+### Account/profile and personalization
+
+Slice 2B registers self-service DOB-backed account recovery, bearer-owned
+profile updates, opaque persistent WebP avatars, and owner-scoped
+personalization through the existing router/service/repository injection
+boundaries. PostgreSQL stores only the DATE, normalized username, avatar
+metadata, SHA-256 recovery verifier, and personalization record; the protected
+avatar volume stores only UUID-named transcoded WebP files. `SafeUser` builds
+its avatar URL from configured public base URL plus opaque key and never
+contains DOB. Personalization is persisted but is not yet assembled into
+Hermes context.
+
 ### Wi-Fi
 
 Mobile -> Backend authorization -> encrypted desired state in PostgreSQL -> device event queue -> ESP applies/reconnects -> receipt/result -> Backend state -> mobile realtime. First-boot connectivity is firmware-owned and unresolved.

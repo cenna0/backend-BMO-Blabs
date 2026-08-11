@@ -24,6 +24,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
+RUN install -d -o node -g node -m 0700 /opt/bmo/data/avatars
 
 COPY --from=build /app/dist/src ./dist/src
 

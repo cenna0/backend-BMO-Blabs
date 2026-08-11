@@ -7,7 +7,8 @@ export type P9ErrorCode =
   | "PAIRING_INVALID"
   | "RATE_LIMITED"
   | "DATABASE_UNAVAILABLE"
-  | "CONFLICT";
+  | "CONFLICT"
+  | "RECOVERY_INVALID";
 
 export class P9Error extends Error {
   readonly code: P9ErrorCode;

@@ -37,6 +37,11 @@ Create reviewed, additive Prisma migrations for profile/DOB recovery, personaliz
 
 Implement self-service registration, DOB-based password recovery with abuse controls, username/profile/avatar, personalization, and session-management completion. Keep credentials and provider tokens server-side.
 
+Source checkpoint 2026-08-11: the account/profile/recovery/avatar and
+personalization portion is `EXISTING_VERIFIED` in source and automated tests.
+The running private candidate was not recreated or migrated, and public
+activation remains separately gated.
+
 ### Slice 4 — identity bridge and mobile realtime
 
 - Resolve a physical connection to an active Prisma `Device` only when `Device.hardwareId == device_id` and `Device.tokenHash == SHA-256(device_token)`.

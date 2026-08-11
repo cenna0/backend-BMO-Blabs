@@ -5,6 +5,11 @@
 **Phase:** Phase 1 — VPS Audit + Documentation Freeze
 **Implementation authority:** none; Phase 2 starts only from the checkpoint in `docs/NEXT-ACTION.md`.
 
+**Current source checkpoint:** Phase 2 Slice 2B account/profile/recovery/avatar
+and personalization is source/test verified. This does not alter the frozen
+Phase 1 runtime facts below: the running private candidate is still
+invitation-era/unmigrated and public production is unchanged.
+
 ## 1. Terminology and authority
 
 For this project, **backend** means the complete BMO VPS platform:
@@ -52,7 +57,7 @@ Verified current boundaries:
 - current repository contains the implemented P9.1 invitation-auth, session, six-digit pairing, device, and settings source;
 - a private P9.1 candidate and PostgreSQL 16.14 run on an internal Docker network with two applied migrations and no host-published port;
 - the P9.1 candidate is not the production Backend API service;
-- mobile `WSS /api/v1/ws`, chat/history, memory, scheduler, integration adapters, Wi-Fi DB/API, telemetry/log storage, proactive queue, personalization, DOB recovery, profile/avatar, plugins, and bug reports are `READY_TO_IMPLEMENT`;
+- mobile `WSS /api/v1/ws`, chat/history, memory, scheduler, integration adapters, Wi-Fi DB/API, telemetry/log storage, proactive queue, plugins, and bug reports remain `READY_TO_IMPLEMENT`; Slice 2B account/profile/recovery/avatar and personalization are `EXISTING_VERIFIED` at source/test tier only;
 - the existing device identity remains runtime `DEVICE_ID`/`DEVICE_TOKEN`; Slice 1 resolves an optional active P9.1 application row after legacy authentication and revalidates it before any owner-specific use;
 - Hermes 0.20.0 is healthy on loopback; Audio Service is healthy/degraded only because RVC is intentionally disabled; Caddy exposes the public API through port 443;
 - physical ESP32 acceptance and every new additive firmware capability remain unverified.

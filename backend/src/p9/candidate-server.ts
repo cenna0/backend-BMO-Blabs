@@ -18,9 +18,12 @@ const config = parseP9Config(process.env);
 if (!config.enabled) throw new Error("P9 candidate requires P9_ENABLED=true");
 
 const runtime = createP9Runtime(config, { includeOps: true });
+await runtime.initialize();
 const app = express();
 app.disable("x-powered-by");
+app.set("trust proxy", Number(process.env.TRUST_PROXY_HOPS ?? "0"));
 app.use("/api/v1", runtime.router);
+app.use(runtime.mediaRouter);
 
 const host = process.env.P9_BIND_HOST ?? "127.0.0.1";
 const port = Number(process.env.P9_BIND_PORT ?? "3010");

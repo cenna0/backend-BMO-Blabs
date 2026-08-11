@@ -18,6 +18,8 @@ const rawSchema = z.object({
   P9_TIMEZONE: z.string().default(P9_CANONICAL_TIMEZONE),
   P9_PRISMA_POOL_SIZE: optionalPositiveInt(5),
   P9_POSTGRES_MAX_CONNECTIONS: optionalPositiveInt(20),
+  PUBLIC_BASE_URL: z.string().url().default("http://127.0.0.1:3000"),
+  AVATAR_STORAGE_DIR: z.string().min(1).default("/opt/bmo/data/avatars"),
 });
 
 const strongSecret = (name: string, value: string | undefined): string => {
@@ -42,6 +44,14 @@ export interface P9Config {
   loginLimit: 5;
   pairingWindowMs: 900_000;
   pairingLimit: 10;
+  publicBaseUrl: string;
+  avatarStorageDir: string;
+  avatarMaxBytes: 5_242_880;
+  recoveryTokenTtlSeconds: 600;
+  recoveryMaxAttempts: 5;
+  recoveryWindowMs: 900_000;
+  recoveryIpLimit: 5;
+  recoveryEmailLimit: 3;
 }
 
 export function parseP9Config(input: Record<string, unknown>): P9Config {
@@ -62,6 +72,14 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       loginLimit: 5,
       pairingWindowMs: 900_000,
       pairingLimit: 10,
+      publicBaseUrl: parsed.PUBLIC_BASE_URL.replace(/\/$/, ""),
+      avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
+      avatarMaxBytes: 5_242_880,
+      recoveryTokenTtlSeconds: 600,
+      recoveryMaxAttempts: 5,
+      recoveryWindowMs: 900_000,
+      recoveryIpLimit: 5,
+      recoveryEmailLimit: 3,
     };
   }
 
@@ -80,5 +98,13 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     loginLimit: 5,
     pairingWindowMs: 900_000,
     pairingLimit: 10,
+    publicBaseUrl: parsed.PUBLIC_BASE_URL.replace(/\/$/, ""),
+    avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
+    avatarMaxBytes: 5_242_880,
+    recoveryTokenTtlSeconds: 600,
+    recoveryMaxAttempts: 5,
+    recoveryWindowMs: 900_000,
+    recoveryIpLimit: 5,
+    recoveryEmailLimit: 3,
   };
 }

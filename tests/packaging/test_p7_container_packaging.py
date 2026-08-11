@@ -50,6 +50,10 @@ class DockerfilePackagingTests(unittest.TestCase):
         self.assertIn("npm run build", dockerfile)
         self.assertIn("npm ci --omit=dev", dockerfile)
         self.assertRegex(dockerfile, r"(?m)^USER\s+node$")
+        self.assertIn(
+            "install -d -o node -g node -m 0700 /opt/bmo/data/avatars",
+            dockerfile,
+        )
         self._assert_revision_label(dockerfile)
         self._assert_liveness_healthcheck(dockerfile)
 
@@ -238,7 +242,12 @@ class ComposePackagingTests(unittest.TestCase):
             self._bind_mounts(backend),
             {
                 "/opt/bmo/temp/audio": ("/opt/bmo/temp/audio", False),
+                "/opt/bmo/data/avatars": ("/opt/bmo/data/avatars", False),
             },
+        )
+        self.assertEqual(
+            backend["environment"]["AVATAR_STORAGE_DIR"],
+            "/opt/bmo/data/avatars",
         )
         self.assertEqual(
             self._bind_mounts(audio),

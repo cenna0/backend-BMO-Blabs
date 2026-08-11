@@ -8,12 +8,18 @@ import { PairingService } from "../services/pairing.service.js";
 import { SessionService, AccessTokenService } from "../services/session.service.js";
 import { SettingsService } from "../services/settings.service.js";
 import { UserService } from "../services/user.service.js";
+import { RecoveryService } from "../services/recovery.service.js";
+import { ProfileService } from "../services/profile.service.js";
+import { AvatarService } from "../services/avatar.service.js";
+import { PersonalizationService } from "../services/personalization.service.js";
 import { createAuthRouter } from "./auth.route.js";
 import { createDeviceRouter } from "./device.route.js";
 import { p9ErrorHandler } from "./middleware.js";
 import { createOpsRouter } from "./ops.route.js";
 import { createPairingRouter } from "./pairing.route.js";
 import { createSettingsRouter } from "./settings.route.js";
+import { createProfileRouter } from "./profile.route.js";
+import { createPersonalizationRouter } from "./personalization.route.js";
 
 export interface P9RouterServices {
   auth: AuthService;
@@ -25,16 +31,29 @@ export interface P9RouterServices {
   accessTokens: AccessTokenService;
   repositories: P9Repositories;
   config: P9Config;
+  recovery: RecoveryService;
+  profile: ProfileService;
+  avatars: AvatarService;
+  personalization: PersonalizationService;
   includeOps?: boolean;
 }
 
 export function createP9Router(services: P9RouterServices): Router {
   const router = Router();
   router.use(express.json({ limit: "32kb", strict: true }));
-  router.use(createAuthRouter({ config: services.config, auth: services.auth, sessions: services.sessions, users: services.users, accessTokens: services.accessTokens }));
+  router.use(createAuthRouter({
+    config: services.config,
+    auth: services.auth,
+    recovery: services.recovery,
+    sessions: services.sessions,
+    users: services.users,
+    accessTokens: services.accessTokens,
+  }));
   router.use(createPairingRouter(services.pairing, services.accessTokens, services.sessions, services.config));
   router.use(createDeviceRouter(services.devices, services.settings, services.accessTokens, services.sessions));
   router.use(createSettingsRouter(services.settings, services.accessTokens, services.sessions));
+  router.use(createProfileRouter(services.profile, services.avatars, services.accessTokens, services.sessions, services.config.avatarMaxBytes));
+  router.use(createPersonalizationRouter(services.personalization, services.accessTokens, services.sessions));
   if (services.includeOps === true) router.use(createOpsRouter(services.repositories));
   router.use(p9ErrorHandler);
   return router;

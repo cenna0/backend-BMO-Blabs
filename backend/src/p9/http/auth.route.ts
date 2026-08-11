@@ -6,6 +6,7 @@ import type { P9Config } from "../config.js";
 import { AuthService } from "../services/auth.service.js";
 import { AccessTokenService, SessionService } from "../services/session.service.js";
 import { UserService } from "../services/user.service.js";
+import { RecoveryService } from "../services/recovery.service.js";
 import { normalizeEmail } from "../validation.js";
 import { asyncP9, currentAuth, requireAuth, requestContext } from "./middleware.js";
 
@@ -15,6 +16,7 @@ interface AuthRouteOptions {
   sessions: SessionService;
   users: UserService;
   accessTokens: AccessTokenService;
+  recovery?: RecoveryService;
 }
 
 function sessionResponse(session: Awaited<ReturnType<SessionService["issueSession"]>>) {
@@ -47,6 +49,31 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
     handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
   });
   const refreshLimiter = rateLimit({ windowMs: options.config.loginWindowMs, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
+  const recoveryIpLimiter = rateLimit({
+    windowMs: options.config.recoveryWindowMs,
+    limit: options.config.recoveryIpLimit,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (request) => ipKeyGenerator(request.ip ?? "0.0.0.0"),
+    handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
+  });
+  const recoveryEmailLimiter = rateLimit({
+    windowMs: options.config.recoveryWindowMs,
+    limit: options.config.recoveryEmailLimit,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (request) => {
+      const rawEmail = typeof request.body?.email === "string" ? request.body.email : "";
+      let email = rawEmail;
+      try {
+        email = normalizeEmail(rawEmail);
+      } catch {
+        email = rawEmail.trim().normalize("NFKC").toLowerCase();
+      }
+      return sha256Hex(email);
+    },
+    handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
+  });
 
   router.post("/auth/register", authLimiter, asyncP9(async (request, response) => {
     const context = requestContext(request, response);
@@ -59,6 +86,28 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
     const result = await options.auth.login(request.body, context.requestId);
     response.status(200).json({ user: result.user, session: sessionResponse(result.session) });
   }));
+
+  if (options.recovery) {
+    router.post("/auth/password/recovery/verify", recoveryIpLimiter, recoveryEmailLimiter, asyncP9(async (request, response) => {
+      const context = requestContext(request, response);
+      const userAgent = request.get("user-agent");
+      const result = await options.recovery!.verify(request.body, {
+        requestId: context.requestId,
+        ...(request.ip === undefined ? {} : { ip: request.ip }),
+        ...(userAgent === undefined ? {} : { userAgent }),
+      });
+      response.status(200).json({
+        recoveryToken: result.recoveryToken,
+        expiresAt: result.expiresAt.toISOString(),
+      });
+    }));
+
+    router.post("/auth/password/recovery/reset", recoveryIpLimiter, asyncP9(async (request, response) => {
+      requestContext(request, response);
+      await options.recovery!.reset(request.body);
+      response.status(204).send();
+    }));
+  }
 
   router.post("/auth/refresh", refreshLimiter, asyncP9(async (request, response) => {
     const context = requestContext(request, response);

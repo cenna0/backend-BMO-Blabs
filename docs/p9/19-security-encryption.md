@@ -41,3 +41,19 @@ direct review candidate sets zero. Tests reject values above one, and real
 router/Supertest cases prove attacker-controlled earlier `X-Forwarded-For`
 entries cannot evade the rightmost-client bucket while distinct rightmost
 clients remain separate. Public activation remains gated.
+
+Slice 2B implements the weak MVP DOB recovery control in source: the two
+verification failure cases share one sanitized envelope and timing-oriented
+service path; IP and normalized-email counters are independent; the opaque
+token lives for exactly 600 seconds and only its SHA-256 verifier is stored;
+transactional compare-and-set permits one reset while revoking all session and
+refresh families. Audits contain event/user/request identifiers only, never DOB
+or the raw recovery token.
+
+Avatar source limits multipart input to 5 MiB and JPEG/PNG/WebP declarations,
+then verifies decoded metadata, bounds decoded pixels, strips metadata through
+a WebP transcode, and writes a generated UUID key at mode 0600 in the dedicated
+persistent Backend mount. Retrieval accepts only the exact UUID `.webp` path,
+sets `image/webp`, `nosniff`, and immutable caching, and cannot address other
+files. Compose declarations add no listener or public route. The review
+candidate was not recreated and no production storage directory was created.

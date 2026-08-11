@@ -12,9 +12,17 @@ import { DeviceBindingService, type ApplicationDeviceBinding } from "./services/
 import { createP9Router } from "./http/router.js";
 import type { Router } from "express";
 import { areRequiredP9MigrationsFinished } from "./migration-manifest.js";
+import { RecoveryService } from "./services/recovery.service.js";
+import { ProfileService } from "./services/profile.service.js";
+import { PersonalizationService } from "./services/personalization.service.js";
+import { AvatarStorage } from "./services/avatar-storage.service.js";
+import { AvatarService } from "./services/avatar.service.js";
+import { createAvatarMediaRouter } from "./http/profile.route.js";
 
 export interface P9Runtime {
   router: Router;
+  mediaRouter: Router;
+  initialize(): Promise<void>;
   resolveDeviceBinding(hardwareId: string, deviceToken: string): Promise<ApplicationDeviceBinding | null>;
   authorizeDeviceBinding(binding: ApplicationDeviceBinding): Promise<boolean>;
   checkReadiness(): Promise<boolean>;
@@ -51,14 +59,24 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   });
   const sessions = new SessionService({ client, repositories, accessTokens, refreshTokenTtlSeconds: config.refreshTokenTtlSeconds });
   const invitations = new InvitationService(repositories);
-  const auth = new AuthService({ client, repositories, invitations, sessions });
-  const users = new UserService(repositories);
+  const auth = new AuthService({ client, repositories, invitations, sessions, publicBaseUrl: config.publicBaseUrl });
+  const users = new UserService(repositories, config.publicBaseUrl);
   const devices = new DeviceService(client, repositories);
   const pairing = new PairingService({ client, repositories, pepper: config.pairingPepper, ttlSeconds: config.pairingTtlSeconds });
   const settings = new SettingsService(client, repositories);
+  const recovery = new RecoveryService(client, repositories, {
+    ttlSeconds: config.recoveryTokenTtlSeconds,
+    maxAttempts: config.recoveryMaxAttempts,
+  });
+  const profile = new ProfileService(repositories, config.publicBaseUrl);
+  const personalization = new PersonalizationService(repositories);
+  const avatarStorage = new AvatarStorage(config.avatarStorageDir, config.avatarMaxBytes);
+  const avatars = new AvatarService(client, avatarStorage, config.publicBaseUrl);
   const deviceBinding = new DeviceBindingService(repositories);
   return {
-    router: createP9Router({ auth, sessions, users, devices, pairing, settings, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
+    router: createP9Router({ auth, sessions, users, devices, pairing, settings, recovery, profile, avatars, personalization, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
+    mediaRouter: createAvatarMediaRouter(avatarStorage),
+    initialize: () => avatarStorage.initialize(),
     resolveDeviceBinding: (hardwareId, deviceToken) => deviceBinding.resolve(hardwareId, deviceToken),
     authorizeDeviceBinding: (binding) => deviceBinding.isActive(binding),
     checkReadiness: () => checkP9Readiness(repositories),

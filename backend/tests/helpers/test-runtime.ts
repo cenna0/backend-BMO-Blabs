@@ -74,6 +74,7 @@ export async function startTestRuntime(
     DEVICE_ID: "bmo-001",
     DEVICE_TOKEN: "test-device-secret",
     TEMP_AUDIO_DIR: tempDir,
+    AVATAR_STORAGE_DIR: join(tempDir, "avatars"),
     HARDWARE_TEST_MODE: String(hardwareTestMode),
     HARDWARE_TEST_MP3_PATH: fixture,
     AUDIO_SERVICE_STT_TIMEOUT_MS: "1000",

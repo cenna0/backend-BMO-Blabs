@@ -15,6 +15,23 @@
 - Complete client-device session binding before claiming per-device mobile revocation.
 - Preserve current pairing code semantics and route shapes.
 
+## Phase 2 Slice 2B source evidence
+
+- Registration is self-service with normalized email, password minimum 12,
+  optional bounded display name, and required exact non-future calendar DOB.
+  Optional valid invitations remain consumable for legacy clients and operator
+  tooling remains intact. Argon2id/session behavior is unchanged.
+- Canonical `SafeUser` now contains nullable normalized username and a public
+  opaque avatar URL, never DOB. Profile updates use only the authenticated user
+  ID and sanitize uniqueness conflicts.
+- Recovery verification gives unknown email and wrong DOB the same public
+  error, uses independent one-hop-proxy-aware IP and normalized-email limits,
+  stores only a SHA-256 verifier, and expires at 600 seconds. Reset claims the
+  verifier once inside the credential/session transaction, replaces the
+  Argon2id hash, and revokes every session and refresh token.
+- These are source/automated-test facts only. The running private candidate
+  remains invitation-era/unmigrated and public production is unchanged.
+
 ## Physical identity bridge
 
 The current `/ws` and voice HTTP auth remains config-based. After it succeeds, owner-only device capabilities resolve only when:

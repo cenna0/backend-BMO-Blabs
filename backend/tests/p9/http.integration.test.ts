@@ -57,6 +57,7 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
       email: emailA,
       password,
       displayName: "P9 User A",
+      dateOfBirth: "2004-05-19",
     });
     expect(registration.status).toBe(201);
     const registrationBody = required(registration.body);
@@ -66,13 +67,22 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     const refreshA = String(sessionA.refreshToken);
     expect(userA.email).toBe(emailA);
     expect(JSON.stringify(registration.body)).not.toMatch(/passwordHash|tokenHash|pairingCode/);
-    expect((await json("POST", "/auth/register", { invitationToken: "invalid-invitation", email: emailA, password })).status).toBe(400);
-    expect((await json("POST", "/auth/register", { invitationToken: invitationA, email: emailA, password })).status).toBe(400);
-    expect((await json("POST", "/auth/register", { invitationToken: invitationExpired, email: `p9-expired-${suffix}@example.com`, password })).status).toBe(400);
+    expect((await json("POST", "/auth/register", { invitationToken: "invalid-invitation", email: emailA, password, dateOfBirth: "2004-05-19" })).status).toBe(400);
+    expect((await json("POST", "/auth/register", { invitationToken: invitationA, email: emailA, password, dateOfBirth: "2004-05-19" })).status).toBe(400);
+    expect((await json("POST", "/auth/register", { invitationToken: invitationExpired, email: `p9-expired-${suffix}@example.com`, password, dateOfBirth: "2004-05-19" })).status).toBe(400);
+
+    const selfService = await json("POST", "/auth/register", {
+      email: `p9-self-${suffix}@example.com`,
+      password,
+      dateOfBirth: "2004-05-19",
+    });
+    expect(selfService.status).toBe(201);
+    expect(required(selfService.body).user).toMatchObject({ username: null, avatarUrl: null });
+    expect(JSON.stringify(selfService.body)).not.toContain("dateOfBirth");
 
     const concurrentRegistrations = await Promise.all([
-      json("POST", "/auth/register", { invitationToken: invitationC, email: emailC, password, displayName: "P9 User C" }),
-      json("POST", "/auth/register", { invitationToken: invitationC, email: emailC, password, displayName: "P9 User C" }),
+      json("POST", "/auth/register", { invitationToken: invitationC, email: emailC, password, displayName: "P9 User C", dateOfBirth: "2004-05-19" }),
+      json("POST", "/auth/register", { invitationToken: invitationC, email: emailC, password, displayName: "P9 User C", dateOfBirth: "2004-05-19" }),
     ]);
     expect(concurrentRegistrations.map((result) => result.status).sort()).toEqual([201, 400]);
 
@@ -214,6 +224,7 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
       email: emailB,
       password,
       displayName: "P9 User B",
+      dateOfBirth: "2004-05-19",
     });
     expect(registrationB.status).toBe(201);
     const accessB = String(required(required(registrationB.body).session).accessToken);

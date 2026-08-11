@@ -48,6 +48,26 @@ describe("P9 configuration", () => {
       loginLimit: 5,
       pairingWindowMs: 15 * 60 * 1000,
       pairingLimit: 10,
+      publicBaseUrl: "http://127.0.0.1:3000",
+      avatarStorageDir: "/opt/bmo/data/avatars",
+      avatarMaxBytes: 5 * 1024 * 1024,
+      recoveryTokenTtlSeconds: 600,
+      recoveryMaxAttempts: 5,
+      recoveryWindowMs: 15 * 60 * 1000,
+      recoveryIpLimit: 5,
+      recoveryEmailLimit: 3,
+    });
+  });
+
+  it("accepts explicit public avatar storage configuration without exposing it as a route", () => {
+    expect(parseP9Config({
+      ...enabled,
+      PUBLIC_BASE_URL: "https://api.example.com/",
+      AVATAR_STORAGE_DIR: "/srv/bmo/avatars",
+    })).toMatchObject({
+      publicBaseUrl: "https://api.example.com",
+      avatarStorageDir: "/srv/bmo/avatars",
+      avatarMaxBytes: 5 * 1024 * 1024,
     });
   });
 

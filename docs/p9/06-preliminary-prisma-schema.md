@@ -94,6 +94,14 @@ running private `bmo` candidate was migrated.
 - `PasswordRecovery`: user, unique lowercase SHA-256 verifier only, expiry/used time, bounded attempts, optional hashed request IP/user agent, and a bounded request ID. No recovery token plaintext or unbounded JSON audit metadata is stored.
 - `PersonalizationSettings`: one-to-one user; tone, warmth, enthusiasm, headings/lists, emoji, answer speed, custom instructions, timestamps.
 
+Slice 2B application source now exercises these existing Slice 2A models:
+self-service registration writes an exact validated `DATE`; recovery writes
+only a SHA-256 verifier with a fixed 600-second expiry and atomically consumes
+it during reset; profile writes normalized username and complete UUID/WebP
+avatar metadata; personalization safe-upserts canonical defaults. No new
+migration was added or applied in Slice 2B, and the running private `bmo`
+database remains on the two P9.1 migrations.
+
 ### Chat
 
 - `ChatSession`: user, optional same-owner device composite FK, temporary flag, title/status, last-message cursor/time, and nullable expiry/deletion timestamps.
