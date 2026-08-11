@@ -226,7 +226,7 @@ CREATE TABLE "MemoryAction" (
     "resourceType" VARCHAR(32) NOT NULL,
     "resourceId" UUID,
     "idempotencyKey" VARCHAR(128) NOT NULL,
-    "metadata" VARCHAR(2000),
+    "metadata" JSONB,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "MemoryAction_pkey" PRIMARY KEY ("id")
@@ -391,7 +391,7 @@ CREATE TABLE "DeviceLog" (
     "level" "DeviceLogLevel" NOT NULL,
     "code" VARCHAR(64) NOT NULL,
     "message" VARCHAR(1000) NOT NULL,
-    "metadata" JSONB,
+    "metadata" VARCHAR(2000),
     "observedAt" TIMESTAMPTZ(3) NOT NULL,
     "expiresAt" TIMESTAMPTZ(3),
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -729,7 +729,10 @@ CREATE UNIQUE INDEX "SpotifyAction_userId_idempotencyKey_key" ON "SpotifyAction"
 CREATE INDEX "WhatsAppNotificationRule_userId_enabled_updatedAt_idx" ON "WhatsAppNotificationRule"("userId", "enabled", "updatedAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "WhatsAppNotificationRule_userId_connectionId_scope_opaqueTa_key" ON "WhatsAppNotificationRule"("userId", "connectionId", "scope", "opaqueTargetRef");
+CREATE UNIQUE INDEX "WhatsAppNotificationRule_global_unique" ON "WhatsAppNotificationRule"("userId", "connectionId") WHERE "scope" = 'ALL';
+
+-- CreateIndex
+CREATE UNIQUE INDEX "WhatsAppNotificationRule_target_unique" ON "WhatsAppNotificationRule"("userId", "connectionId", "scope", "opaqueTargetRef") WHERE "scope" IN ('CONTACT', 'GROUP');
 
 -- CreateIndex
 CREATE INDEX "WhatsAppSendRequest_userId_status_createdAt_idx" ON "WhatsAppSendRequest"("userId", "status", "createdAt");
@@ -1010,6 +1013,18 @@ ALTER TABLE "SpotifyCredential"
       ("refreshTokenCiphertext" IS NULL AND "refreshTokenNonce" IS NULL AND "refreshTokenTag" IS NULL)
       OR
       ("refreshTokenCiphertext" IS NOT NULL AND "refreshTokenNonce" IS NOT NULL AND "refreshTokenTag" IS NOT NULL)
+    )
+  );
+
+ALTER TABLE "WhatsAppNotificationRule"
+  ADD CONSTRAINT "WhatsAppNotificationRule_target_shape_ck"
+  CHECK (
+    ("scope" = 'ALL' AND "opaqueTargetRef" IS NULL)
+    OR
+    (
+      "scope" IN ('CONTACT', 'GROUP')
+      AND "opaqueTargetRef" IS NOT NULL
+      AND length(btrim("opaqueTargetRef")) > 0
     )
   );
 

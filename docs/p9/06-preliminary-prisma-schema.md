@@ -78,7 +78,7 @@ constraints, and records are not renamed or removed.
 ### Account/profile/recovery
 
 - `User.dateOfBirth` is nullable `DATE`; `username` is nullable, unique, and normalized by a database check; `avatarKey` is nullable/unique with content type and positive byte-size shape checks. Username length `3–30` remains an application-layer rule. `SafeUser` still omits DOB.
-- `PasswordRecovery`: user, unique lowercase SHA-256 verifier only, expiry/used time, bounded attempts, hashed request IP and JSON audit metadata. No recovery token plaintext is stored.
+- `PasswordRecovery`: user, unique lowercase SHA-256 verifier only, expiry/used time, bounded attempts, optional hashed request IP/user agent, and a bounded request ID. No recovery token plaintext or unbounded JSON audit metadata is stored.
 - `PersonalizationSettings`: one-to-one user; tone, warmth, enthusiasm, headings/lists, emoji, answer speed, custom instructions, timestamps.
 
 ### Chat
@@ -117,7 +117,7 @@ constraints, and records are not renamed or removed.
 - `OAuthState`: unique SHA-256 state verifier, exact redirect URI, expiry and single-use timestamp.
 - `SpotifyCredential`: unique user/connection with encrypted access/refresh token ciphertext/nonce/tag/key version, expiry/scope, and encryption-shape checks.
 - `SpotifyAction`: user, normalized action, idempotency key, confirmation/provider result, redacted audit.
-- `WhatsAppNotificationRule`, `WhatsAppSendRequest`, and `WhatsAppDelivery`: user-scoped rules, confirmation expiry, idempotency, bounded metadata; message retention minimized.
+- `WhatsAppNotificationRule`, `WhatsAppSendRequest`, and `WhatsAppDelivery`: user-scoped rules, confirmation expiry, idempotency, bounded metadata; message retention minimized. SQL check/partial indexes allow one global `ALL` rule with no target and distinct nonblank `CONTACT`/`GROUP` targets. Prisma deliberately exposes no misleading compound-unique API for this SQL-only partial uniqueness.
 - `BugReport` and optional attachment/media metadata: reporter, category, sanitized description/context, state, timestamps; no secret dumps.
 
 ## Migration and rollout constraints

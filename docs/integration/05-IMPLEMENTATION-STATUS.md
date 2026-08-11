@@ -140,7 +140,7 @@ is liveness evidence and never substitutes for integrated readiness.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 193 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs.
+- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 195 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs.
 - Backend typecheck and build: passed on Node `22.23.1`.
 - Prisma validation and generated-client typecheck/build: passed. The source manifest now requires three migrations. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the new migration is not applied there.
 - Static/rendered integrated-candidate packaging: passed; PostgreSQL has no host-published port and Backend uses the named Unix-socket volume. The live candidate was not recreated.

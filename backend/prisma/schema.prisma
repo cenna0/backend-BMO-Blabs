@@ -884,7 +884,7 @@ model WhatsAppNotificationRule {
   user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   connection      IntegrationConnection @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
 
-  @@unique([userId, connectionId, scope, opaqueTargetRef])
+  // The SQL migration enforces target shape and separate global/targeted partial unique indexes.
   @@index([userId, enabled, updatedAt])
 }
 

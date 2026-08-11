@@ -10,6 +10,18 @@ const phase2MigrationPath = new URL(
   import.meta.url,
 );
 
+function sqlTableDefinition(sql: string, tableName: string): string {
+  const match = sql.match(new RegExp(`CREATE TABLE "${tableName}" \\(([\\s\\S]*?)\\n\\);`));
+  expect(match, `missing SQL table ${tableName}`).not.toBeNull();
+  return match?.[1] ?? "";
+}
+
+function prismaModelDefinition(schema: string, modelName: string): string {
+  const match = schema.match(new RegExp(`model ${modelName} \\{([\\s\\S]*?)\\n\\}`));
+  expect(match, `missing Prisma model ${modelName}`).not.toBeNull();
+  return match?.[1] ?? "";
+}
+
 describe("P9 Prisma schema", () => {
   it("keeps the runtime readiness manifest identical to source migration directories", async () => {
     const migrationDirectory = new URL("../../prisma/migrations/", import.meta.url);
@@ -170,5 +182,31 @@ describe("P9 Prisma schema", () => {
     expect(migrationSql).toContain("DeviceWifiConfiguration_secret_shape_ck");
     expect(migrationSql).toContain("DeviceTelemetryCurrent_battery_ck");
     expect(migrationSql).toContain("DeviceSettings_delivery_version_ck");
+  });
+
+  it("keeps MemoryAction and DeviceLog migration column types identical to Prisma", async () => {
+    const migrationSql = await readFile(phase2MigrationPath, "utf8");
+    expect(sqlTableDefinition(migrationSql, "MemoryAction")).toContain('"metadata" JSONB');
+    expect(sqlTableDefinition(migrationSql, "DeviceLog")).toContain('"metadata" VARCHAR(2000)');
+  });
+
+  it("enforces disjoint global and targeted WhatsApp notification-rule uniqueness", async () => {
+    const [schema, migrationSql] = await Promise.all([
+      readFile(schemaPath, "utf8"),
+      readFile(phase2MigrationPath, "utf8"),
+    ]);
+    const model = prismaModelDefinition(schema, "WhatsAppNotificationRule");
+    expect(model).not.toContain("@@unique([userId, connectionId, scope, opaqueTargetRef])");
+    expect(model).toContain("partial unique indexes");
+    expect(migrationSql).toContain('CONSTRAINT "WhatsAppNotificationRule_target_shape_ck"');
+    expect(migrationSql).toMatch(/"scope" = 'ALL'\s+AND "opaqueTargetRef" IS NULL/);
+    expect(migrationSql).toMatch(/"scope" IN \('CONTACT', 'GROUP'\)[\s\S]*"opaqueTargetRef" IS NOT NULL[\s\S]*length\(btrim\("opaqueTargetRef"\)\) > 0/);
+    expect(migrationSql).toContain(
+      'CREATE UNIQUE INDEX "WhatsAppNotificationRule_global_unique" ON "WhatsAppNotificationRule"("userId", "connectionId") WHERE "scope" = \'ALL\';',
+    );
+    expect(migrationSql).toContain(
+      'CREATE UNIQUE INDEX "WhatsAppNotificationRule_target_unique" ON "WhatsAppNotificationRule"("userId", "connectionId", "scope", "opaqueTargetRef") WHERE "scope" IN (\'CONTACT\', \'GROUP\');',
+    );
+    expect(migrationSql).not.toContain("WhatsAppNotificationRule_userId_connectionId_scope_opaqueTa_key");
   });
 });
