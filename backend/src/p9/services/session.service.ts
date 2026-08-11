@@ -151,11 +151,19 @@ export class SessionService {
     const result = await withP9Transaction(this.options.client, async (transaction) => {
       const repositories = new P9Repositories(transaction);
       const audit = new AuditService(repositories);
+      const discoveredToken = await repositories.refreshToken.findUnique({
+        where: { tokenHash },
+        include: { session: true },
+      });
+      if (!discoveredToken) throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
+      await repositories.lockUser(discoveredToken.session.userId);
       const stored = await repositories.refreshToken.findUnique({
         where: { tokenHash },
         include: { session: true },
       });
-      if (!stored) throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
+      if (!stored || stored.session.userId !== discoveredToken.session.userId) {
+        throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
+      }
 
       const invalid =
         stored.usedAt !== null ||

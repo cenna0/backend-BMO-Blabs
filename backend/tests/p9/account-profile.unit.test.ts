@@ -28,6 +28,14 @@ describe("Phase 2B account validation", () => {
     },
   );
 
+  it("uses the Asia/Jakarta calendar boundary during the early local hours", () => {
+    const earlyJakarta = new Date("2026-08-10T17:30:00.000Z");
+    expect(parseDateOfBirth("2026-08-11", earlyJakarta)).toEqual(
+      new Date("2026-08-11T00:00:00.000Z"),
+    );
+    expect(() => parseDateOfBirth("2026-08-12", earlyJakarta)).toThrow();
+  });
+
   it("rejects missing DOB, short password, and unknown registration ownership fields", () => {
     expect(() => parseRegistration({ email: "p@example.com", password: "short" })).toThrow();
     expect(() => parseRegistration({

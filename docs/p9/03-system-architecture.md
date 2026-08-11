@@ -43,9 +43,12 @@ personalization through the existing router/service/repository injection
 boundaries. PostgreSQL stores only the DATE, normalized username, avatar
 metadata, SHA-256 recovery verifier, and personalization record; the protected
 avatar volume stores only UUID-named transcoded WebP files. `SafeUser` builds
-its avatar URL from configured public base URL plus opaque key and never
-contains DOB. Personalization is persisted but is not yet assembled into
-Hermes context.
+its avatar URL with the URL API only from a validated HTTP(S) origin plus a
+validated UUID-v4 key, and never contains DOB. Avatar writes publish by atomic
+rename and a database-authoritative reconciler removes only exact unreferenced
+UUID WebP files while coordinating with in-flight commits. Personalization is
+persisted and returned as the bare canonical seven-field object, but is not yet
+assembled into Hermes context.
 
 ### Wi-Fi
 

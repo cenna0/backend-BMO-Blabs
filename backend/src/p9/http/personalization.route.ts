@@ -13,11 +13,11 @@ export function createPersonalizationRouter(
   const authenticated = requireAuth(accessTokens, sessions);
   router.get("/settings/personalization", authenticated, asyncP9(async (request, response) => {
     const auth = currentAuth(request);
-    response.json({ settings: await personalization.get(auth.userId) });
+    response.json(await personalization.get(auth.userId));
   }));
   router.patch("/settings/personalization", authenticated, asyncP9(async (request, response) => {
     const auth = currentAuth(request);
-    response.json({ settings: await personalization.update(auth.userId, request.body, auth.context.requestId) });
+    response.json(await personalization.update(auth.userId, request.body, auth.context.requestId));
   }));
   return router;
 }

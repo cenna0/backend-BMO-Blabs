@@ -93,8 +93,11 @@ export class RecoveryService {
     const passwordHash = await hashPassword(parsed.newPassword);
     const accepted = await withP9Transaction(this.client, async (transaction) => {
       const repositories = new P9Repositories(transaction);
+      const discoveredRecovery = await repositories.passwordRecovery.findUnique({ where: { tokenVerifier } });
+      if (!discoveredRecovery) return false;
+      await repositories.lockUser(discoveredRecovery.userId);
       const recovery = await repositories.passwordRecovery.findUnique({ where: { tokenVerifier } });
-      if (!recovery) return false;
+      if (!recovery || recovery.userId !== discoveredRecovery.userId) return false;
       const claimed = await repositories.passwordRecovery.updateMany({
         where: {
           id: recovery.id,

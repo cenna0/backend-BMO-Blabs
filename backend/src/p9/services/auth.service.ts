@@ -113,13 +113,12 @@ export class AuthService {
       await verifyPassword(await dummyPasswordHash, parsed.password);
       throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
     }
-    const user = await this.options.repositories.user.findUnique({
+    const discoveredUser = await this.options.repositories.user.findUnique({
       where: { email },
-      include: { passwordCredential: true },
+      select: { id: true },
     });
-    const passwordHash = user?.passwordCredential?.passwordHash ?? (await dummyPasswordHash);
-    const valid = await verifyPassword(passwordHash, parsed.password);
-    if (!user || !user.passwordCredential || !valid) {
+    if (!discoveredUser) {
+      await verifyPassword(await dummyPasswordHash, parsed.password);
       await new AuditService(this.options.repositories).record({
         eventType: "LOGIN_FAILED",
         outcome: "failure",
@@ -130,20 +129,41 @@ export class AuthService {
       }).catch(() => undefined);
       throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
     }
-    const session = await this.options.sessions.issueSession({
-      userId: user.id,
-      ...(parsed.clientDeviceId === undefined ? {} : { clientDeviceId: parsed.clientDeviceId }),
-      ...(requestId === undefined ? {} : { requestId }),
+    const result = await withP9Transaction(this.options.client, async (transaction) => {
+      const repositories = new P9Repositories(transaction);
+      await repositories.lockUser(discoveredUser.id);
+      const user = await repositories.user.findUnique({
+        where: { id: discoveredUser.id },
+        include: { passwordCredential: true },
+      });
+      const passwordHash = user?.passwordCredential?.passwordHash ?? (await dummyPasswordHash);
+      const valid = await verifyPassword(passwordHash, parsed.password);
+      if (!user || !user.passwordCredential || !valid) return null;
+      const session = await this.options.sessions.issueSession({
+        userId: user.id,
+        ...(parsed.clientDeviceId === undefined ? {} : { clientDeviceId: parsed.clientDeviceId }),
+        ...(requestId === undefined ? {} : { requestId }),
+      }, repositories);
+      await new AuditService(repositories).record({
+        eventType: "LOGIN_SUCCEEDED",
+        outcome: "success",
+        actorType: "user",
+        resourceType: "session",
+        resourceId: session.sessionId,
+        userId: user.id,
+        ...(requestId === undefined ? {} : { context: { requestId } }),
+      });
+      return { user: publicUser(user as PublicUserRecord, this.options.publicBaseUrl), session };
     });
+    if (result) return result;
     await new AuditService(this.options.repositories).record({
-      eventType: "LOGIN_SUCCEEDED",
-      outcome: "success",
-      actorType: "user",
+      eventType: "LOGIN_FAILED",
+      outcome: "failure",
+      actorType: "anonymous",
       resourceType: "session",
-      resourceId: session.sessionId,
-      userId: user.id,
       ...(requestId === undefined ? {} : { context: { requestId } }),
-    });
-    return { user: publicUser(user as PublicUserRecord, this.options.publicBaseUrl), session };
+      metadata: { email },
+    }).catch(() => undefined);
+    throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
   }
 }

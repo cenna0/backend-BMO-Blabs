@@ -10,6 +10,28 @@ const booleanString = z
 const optionalPositiveInt = (fallback: number) =>
   z.coerce.number().int().positive().default(fallback);
 
+const publicBaseUrlSchema = z.string().transform((value, context) => {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "PUBLIC_BASE_URL must be a valid URL" });
+    return z.NEVER;
+  }
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.pathname !== "/" ||
+    url.search !== "" ||
+    url.hash !== ""
+  ) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "PUBLIC_BASE_URL must be an HTTP(S) origin" });
+    return z.NEVER;
+  }
+  return url.origin;
+});
+
 const rawSchema = z.object({
   P9_ENABLED: booleanString,
   DATABASE_URL: z.string().url().optional(),
@@ -18,7 +40,7 @@ const rawSchema = z.object({
   P9_TIMEZONE: z.string().default(P9_CANONICAL_TIMEZONE),
   P9_PRISMA_POOL_SIZE: optionalPositiveInt(5),
   P9_POSTGRES_MAX_CONNECTIONS: optionalPositiveInt(20),
-  PUBLIC_BASE_URL: z.string().url().default("http://127.0.0.1:3000"),
+  PUBLIC_BASE_URL: publicBaseUrlSchema.default("http://127.0.0.1:3000"),
   AVATAR_STORAGE_DIR: z.string().min(1).default("/opt/bmo/data/avatars"),
 });
 
@@ -72,7 +94,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       loginLimit: 5,
       pairingWindowMs: 900_000,
       pairingLimit: 10,
-      publicBaseUrl: parsed.PUBLIC_BASE_URL.replace(/\/$/, ""),
+      publicBaseUrl: parsed.PUBLIC_BASE_URL,
       avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
       avatarMaxBytes: 5_242_880,
       recoveryTokenTtlSeconds: 600,
@@ -98,7 +120,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     loginLimit: 5,
     pairingWindowMs: 900_000,
     pairingLimit: 10,
-    publicBaseUrl: parsed.PUBLIC_BASE_URL.replace(/\/$/, ""),
+    publicBaseUrl: parsed.PUBLIC_BASE_URL,
     avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
     avatarMaxBytes: 5_242_880,
     recoveryTokenTtlSeconds: 600,

@@ -115,7 +115,11 @@ is liveness evidence and never substitutes for integrated readiness.
 Slice 2B source removes the mobile invitation requirement while retaining
 optional legacy invitation consumption and operator tooling. Registration
 strictly normalizes email, requires a valid non-future calendar DOB, preserves
-Argon2id/session issuance, and returns `username`/`avatarUrl` without DOB.
+Argon2id/session issuance, and returns `username`/`avatarUrl` without DOB. The
+DOB future boundary uses the fixed `Asia/Jakarta` calendar day. Login discovers
+the account, takes the per-user advisory lock, refetches the credential, then
+verifies and issues the session in one transaction, preventing an old-password
+verification from issuing after a completed reset.
 Profile updates bind only to bearer ownership, normalize username to the
 database-enforced lowercase form, sanitize uniqueness conflicts, and prevent
 mass assignment.
@@ -126,26 +130,38 @@ fixed 600-second token lifetime, SHA-256 verifier-only storage, atomic single
 use, Argon2id credential replacement, and transaction-scoped revocation of all
 sessions and refresh families. DOB is explicitly a weak MVP recovery factor;
 raw DOB and recovery tokens are absent from `SafeUser`, persistence fields, and
-audit metadata.
+audit metadata. Reset takes the same per-user advisory lock before refetch,
+single-use claim, password replacement, and revocation. Refresh likewise
+discovers its owner, locks, and refetches the token/session before validation
+and rotation, retaining replay-family revocation semantics. Recovery limiter
+responses receive the same idempotent request context and `X-Request-Id` as
+handler responses.
 
 Avatar upload accepts only bounded JPEG/PNG/WebP multipart input, decodes and
 re-encodes through Sharp to stripped WebP, generates a UUID storage key, and
 serves only the exact opaque `.webp` path with `nosniff` and immutable caching.
+Writes use a private temporary file followed by atomic rename and failure
+cleanup. Upload/database commits are coordinated with database-authoritative
+orphan reconciliation so exact unreferenced UUID WebP files are removed while
+referenced and in-flight files are preserved; failure to delete a superseded
+file after commit does not turn the successful request into HTTP 500. The
+public base URL is restricted to a normalized HTTP(S) origin, URL projection
+uses the URL API, and corrupt stored avatar keys project as null.
 Candidate and production-shaped Compose source provide a dedicated writable
 persistent mount within the otherwise read-only Backend container; no host
 directory was created. Personalization GET safe-upserts defaults and PATCH
-accepts only the seven bounded canonical owner-scoped fields. Persistence is
-verified; Hermes context consumption is deliberately deferred to a later
-slice.
+accepts only the seven bounded canonical owner-scoped fields; both return the
+bare seven-field object. Persistence is verified; Hermes context consumption
+is deliberately deferred to a later slice.
 
 ## Approved integration scope
 
 | Capability | Status | Exact gap / gate |
 |---|---|---|
 | Self-service registration | `EXISTING_VERIFIED` | Source + automated route/service tests; optional legacy invitation compatibility retained; running candidate/public production unchanged |
-| DOB password recovery | `EXISTING_VERIFIED` | Source + automated enumeration/rate/TTL/hash/reuse/revocation tests; weak MVP factor and not deployed |
-| Profile, username, avatar | `EXISTING_VERIFIED` | Source + automated validation/media/storage/cleanup tests; persistent mounts declared but not created/deployed |
-| Personalization | `EXISTING_VERIFIED` | Source + automated defaults/strict patch/owner tests; Hermes context integration remains `READY_TO_IMPLEMENT` in a later slice |
+| DOB password recovery | `EXISTING_VERIFIED` | Source + automated enumeration/rate/TTL/hash/reuse/revocation and deterministic user-lock interleaving tests; weak MVP factor and not deployed |
+| Profile, username, avatar | `EXISTING_VERIFIED` | Source + automated validation/media/atomic-storage/DB-authoritative reconciliation tests; persistent mounts declared but not created/deployed |
+| Personalization | `EXISTING_VERIFIED` | Source + exact bare seven-field response/defaults/strict patch/owner tests; Hermes context integration remains `READY_TO_IMPLEMENT` in a later slice |
 | Mobile realtime `/api/v1/ws` | `READY_TO_IMPLEMENT` | Separate contract absent |
 | Chat/history and Hermes-backed send | `READY_TO_IMPLEMENT` | Durable source models/cursors/idempotency/202-operation state are verified; services/routes/Hermes orchestration remain absent |
 | Memory | `READY_TO_IMPLEMENT` | Durable record/candidate/action/topic-forget/summary source models are verified; gateway/routes/lifecycle runtime remain absent |
@@ -166,7 +182,7 @@ slice.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 46 files passed, 1 skipped; 226 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs. Slice 2B focused account/profile/recovery/avatar/personalization coverage is included in those totals.
+- Backend on Node `22.23.1`: 47 files passed, 1 skipped; 239 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs and was not run. Slice 2B focused account/profile/recovery/avatar/personalization and review-race coverage is included in those totals.
 - Backend typecheck and build: passed on Node `22.23.1`.
 - Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. On disposable PostgreSQL, an empty three-migration deploy passed, repeat deploy reported no pending migrations, and a populated two-to-three migration upgrade preserved seeded rows in all 11 P9.1 models. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints, and the repeated database-to-schema diff returned `No difference detected`. Transaction-rolled-back positive/negative probes also verified avatar, Wi-Fi AEAD, battery, device-log expiry, provider-subtype, Spotify refresh-secret, and WhatsApp rule constraints. The disposable databases and review images were removed after verification. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the running `bmo` database still has only the two P9.1 migrations.
 - Static/rendered packaging: 13 tests passed, 1 unrelated packaging test skipped. PostgreSQL has no host-published port, Backend uses the named Unix-socket volume, and avatar storage uses a separate writable named volume without adding public routing. Fresh production Backend and P9 review-candidate image builds passed; no container was started and the live candidate was not recreated.

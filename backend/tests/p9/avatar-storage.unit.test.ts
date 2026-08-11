@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -51,5 +51,55 @@ describe("avatar storage", () => {
     expect(await storage.read(stored.key)).toBeInstanceOf(Buffer);
     await storage.delete(stored.key);
     expect(await storage.read(stored.key)).toBeNull();
+  });
+
+  it("cleans every temporary/final artifact when atomic publication fails", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "bmo-avatar-test-"));
+    directories.push(directory);
+    const storage = new AvatarStorage(directory, 5 * 1024 * 1024, {
+      rename: async () => { throw new Error("rename failed"); },
+    });
+    await storage.initialize();
+
+    await expect(storage.store(onePixelPng, "image/png")).rejects.toThrow("rename failed");
+    expect(await readdir(directory)).toEqual([]);
+  });
+
+  it("reconciles only unreferenced exact UUID WebP files and preserves referenced/in-flight files", async () => {
+    const { directory, storage } = await fixture();
+    const referenced = await storage.store(onePixelPng, "image/png");
+    storage.release(referenced.key);
+    const orphan = await storage.store(onePixelPng, "image/png");
+    storage.release(orphan.key);
+    const inFlight = await storage.store(onePixelPng, "image/png");
+    await writeFile(join(directory, ".upload-in-progress.tmp"), "temporary");
+    await writeFile(join(directory, "not-an-avatar.webp"), "unrelated");
+
+    await expect(storage.reconcile(new Set([referenced.key]))).resolves.toEqual({ removed: 1 });
+    expect(await storage.read(referenced.key)).toBeInstanceOf(Buffer);
+    expect(await storage.read(inFlight.key)).toBeInstanceOf(Buffer);
+    expect(await storage.read(orphan.key)).toBeNull();
+    expect(await readdir(directory)).toEqual(expect.arrayContaining([
+      `${referenced.key}.webp`, `${inFlight.key}.webp`, ".upload-in-progress.tmp", "not-an-avatar.webp",
+    ]));
+  });
+
+  it("keeps the in-flight snapshot protected when an upload commits during directory scanning", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "bmo-avatar-test-"));
+    directories.push(directory);
+    let storage: AvatarStorage;
+    let committingKey = "";
+    storage = new AvatarStorage(directory, 5 * 1024 * 1024, {
+      readdir: async (path) => {
+        storage.release(committingKey);
+        return readdir(path);
+      },
+    });
+    await storage.initialize();
+    const committing = await storage.store(onePixelPng, "image/png");
+    committingKey = committing.key;
+
+    await expect(storage.reconcile(new Set())).resolves.toEqual({ removed: 0 });
+    expect(await storage.read(committing.key)).toBeInstanceOf(Buffer);
   });
 });

@@ -23,6 +23,7 @@ export interface P9Runtime {
   router: Router;
   mediaRouter: Router;
   initialize(): Promise<void>;
+  reconcileAvatars(): Promise<{ removed: number }>;
   resolveDeviceBinding(hardwareId: string, deviceToken: string): Promise<ApplicationDeviceBinding | null>;
   authorizeDeviceBinding(binding: ApplicationDeviceBinding): Promise<boolean>;
   checkReadiness(): Promise<boolean>;
@@ -77,6 +78,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     router: createP9Router({ auth, sessions, users, devices, pairing, settings, recovery, profile, avatars, personalization, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
     mediaRouter: createAvatarMediaRouter(avatarStorage),
     initialize: () => avatarStorage.initialize(),
+    reconcileAvatars: () => avatars.reconcile(),
     resolveDeviceBinding: (hardwareId, deviceToken) => deviceBinding.resolve(hardwareId, deviceToken),
     authorizeDeviceBinding: (binding) => deviceBinding.isActive(binding),
     checkReadiness: () => checkP9Readiness(repositories),

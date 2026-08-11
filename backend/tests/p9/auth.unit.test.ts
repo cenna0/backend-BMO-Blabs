@@ -26,4 +26,11 @@ describe("P9 safe user projection", () => {
     });
     expect(JSON.stringify(publicUser(userRecord, "https://api.example.com"))).not.toContain("dateOfBirth");
   });
+
+  it("projects a corrupt stored avatar key as null", () => {
+    expect(publicUser({
+      id: "user-1", email: "person@example.com", displayName: null,
+      avatarKey: "javascript:alert(1)", createdAt: new Date("2026-08-04T00:00:00.000Z"),
+    }, "https://api.example.com").avatarUrl).toBeNull();
+  });
 });

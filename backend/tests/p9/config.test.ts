@@ -71,6 +71,20 @@ describe("P9 configuration", () => {
     });
   });
 
+  it("accepts only an HTTP(S) origin and normalizes its trailing slash", () => {
+    expect(parseP9Config({ ...enabled, PUBLIC_BASE_URL: "https://api.example.com:8443/" }).publicBaseUrl)
+      .toBe("https://api.example.com:8443");
+    for (const publicBaseUrl of [
+      "javascript:alert(1)",
+      "https://user:secret@api.example.com",
+      "https://api.example.com/v1",
+      "https://api.example.com?tenant=one",
+      "https://api.example.com/#fragment",
+    ]) {
+      expect(() => parseP9Config({ ...enabled, PUBLIC_BASE_URL: publicBaseUrl })).toThrow();
+    }
+  });
+
   it("does not allow the timezone to be configured", () => {
     expect(() => parseP9Config({ ...enabled, P9_TIMEZONE: "UTC" })).toThrow(
       /Asia\/Jakarta/,

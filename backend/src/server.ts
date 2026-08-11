@@ -163,6 +163,16 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     } catch (error) {
       logger.warn({ err: error }, "periodic orphan temp-audio cleanup failed");
     }
+    if (p9) {
+      try {
+        const cleanup = await p9.reconcileAvatars();
+        if (cleanup.removed > 0) {
+          logger.info({ removed_files: cleanup.removed }, "removed orphan avatar files");
+        }
+      } catch (error) {
+        logger.warn({ err: error }, "periodic orphan avatar cleanup failed");
+      }
+    }
   };
 
   app.use(createHealthRouter({

@@ -6,7 +6,7 @@ import type { AvatarStorage } from "../services/avatar-storage.service.js";
 import type { AvatarService } from "../services/avatar.service.js";
 import type { ProfileService } from "../services/profile.service.js";
 import type { AccessTokenService, SessionService } from "../services/session.service.js";
-import { asyncP9, currentAuth, requireAuth } from "./middleware.js";
+import { asyncP9, currentAuth, ensureRequestContext, p9ErrorHandler, requireAuth } from "./middleware.js";
 
 const acceptedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -57,6 +57,7 @@ export function createProfileRouter(
 
 export function createAvatarMediaRouter(storage: AvatarStorage): Router {
   const router = Router();
+  router.use(ensureRequestContext);
   router.get("/media/avatars/:fileName", asyncP9(async (request, response) => {
     const fileName = String(request.params.fileName ?? "");
     const match = fileName.match(/^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.webp$/);
@@ -74,5 +75,6 @@ export function createAvatarMediaRouter(storage: AvatarStorage): Router {
     response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     response.status(200).send(image);
   }));
+  router.use(p9ErrorHandler);
   return router;
 }

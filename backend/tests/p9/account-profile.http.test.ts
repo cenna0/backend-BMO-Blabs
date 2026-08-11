@@ -74,6 +74,14 @@ describe("Phase 2B auth HTTP routes", () => {
     }
     expect(ipStatuses).toEqual([400, 400, 429]);
 
+    const limited = await request(byIp.app)
+      .post("/auth/password/recovery/reset")
+      .set("X-Forwarded-For", "203.0.113.4")
+      .set("X-Request-Id", "recovery-limit-1")
+      .send({ recoveryToken: "opaque", newPassword: "new-password-long-enough" });
+    expect(limited.status).toBe(429);
+    expect(limited.headers["x-request-id"]).toBe("recovery-limit-1");
+
     const byEmail = buildApp({ recoveryIpLimit: 20, recoveryEmailLimit: 2 });
     byEmail.recovery.verify.mockRejectedValue(new P9Error("RECOVERY_INVALID", 400, "Recovery verification failed"));
     const emailStatuses: number[] = [];
@@ -94,8 +102,14 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
     const profile = { update: vi.fn().mockResolvedValue({ id: "user-1", username: "person" }) };
     const avatar = { upload: vi.fn().mockResolvedValue({ avatarUrl: "https://api.example.com/media/avatars/key.webp" }) };
     const personalization = {
-      get: vi.fn().mockResolvedValue({ baseStyleTone: "default", warmth: "default" }),
-      update: vi.fn().mockResolvedValue({ baseStyleTone: "default", warmth: "warm" }),
+      get: vi.fn().mockResolvedValue({
+        baseStyleTone: "default", warmth: "default", enthusiasm: "default",
+        headerAndLists: "default", emoji: "default", fastAnswers: false, customInstructions: "",
+      }),
+      update: vi.fn().mockResolvedValue({
+        baseStyleTone: "default", warmth: "warm", enthusiasm: "default",
+        headerAndLists: "default", emoji: "default", fastAnswers: false, customInstructions: "",
+      }),
     };
     const storage = { read: vi.fn().mockResolvedValue(Buffer.from("webp")) };
     const app = express();
@@ -115,6 +129,22 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
     expect(f.personalization.get).toHaveBeenCalledWith("user-1");
     expect((await request(f.app).patch("/settings/personalization").set("Authorization", "Bearer token").send({ warmth: "warm" })).status).toBe(200);
     expect(f.personalization.update).toHaveBeenCalledWith("user-1", { warmth: "warm" }, expect.any(String));
+  });
+
+  it("returns the exact bare seven-field personalization contract", async () => {
+    const f = buildAuthedApp();
+    const expected = {
+      baseStyleTone: "default", warmth: "default", enthusiasm: "default",
+      headerAndLists: "default", emoji: "default", fastAnswers: false, customInstructions: "",
+    };
+    const fetched = await request(f.app).get("/settings/personalization").set("Authorization", "Bearer token");
+    expect(fetched.body).toEqual(expected);
+    expect(Object.keys(fetched.body)).toHaveLength(7);
+
+    const updated = await request(f.app).patch("/settings/personalization")
+      .set("Authorization", "Bearer token").send({ warmth: "warm" });
+    expect(updated.body).toEqual({ ...expected, warmth: "warm" });
+    expect(Object.keys(updated.body)).toHaveLength(7);
   });
 
   it("accepts only multipart field file and enforces upload size before the avatar service", async () => {
@@ -141,5 +171,17 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
     expect(f.storage.read).toHaveBeenCalledWith(key);
     expect((await request(f.app).get("/media/avatars/not-a-uuid.webp")).status).toBe(404);
     expect((await request(f.app).get(`/media/avatars/${key}.png`)).status).toBe(404);
+  });
+
+  it("contains media failures locally and attaches one stable request ID", async () => {
+    const storage = { read: vi.fn().mockRejectedValue(new Error("private filesystem detail")) };
+    const app = express();
+    app.use(createAvatarMediaRouter(storage as any));
+    const key = "4f37e5f8-a53a-4d18-8f9a-7b6e5cb8c003";
+    const response = await request(app).get(`/media/avatars/${key}.webp`).set("X-Request-Id", "media-request-1");
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "INTERNAL_ERROR" });
+    expect(response.headers["x-request-id"]).toBe("media-request-1");
+    expect(JSON.stringify(response.body)).not.toContain("filesystem");
   });
 });

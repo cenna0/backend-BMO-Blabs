@@ -16,6 +16,10 @@ declare global {
 }
 
 export function requestContext(request: Request, response: Response): RequestContext {
+  if (request.p9Context) {
+    response.setHeader("X-Request-Id", request.p9Context.requestId);
+    return request.p9Context;
+  }
   const candidate = request.get("X-Request-Id");
   const requestId = candidate && /^[A-Za-z0-9._:-]{1,128}$/.test(candidate) ? candidate : randomUUID();
   response.setHeader("X-Request-Id", requestId);
@@ -23,6 +27,11 @@ export function requestContext(request: Request, response: Response): RequestCon
   request.p9Context = context;
   return context;
 }
+
+export const ensureRequestContext: RequestHandler = (request, response, next) => {
+  requestContext(request, response);
+  next();
+};
 
 export function requireAuth(accessTokens: AccessTokenService, sessions: SessionService): RequestHandler {
   return async (request, response, next) => {

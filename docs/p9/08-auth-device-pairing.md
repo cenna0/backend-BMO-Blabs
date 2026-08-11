@@ -27,8 +27,11 @@
 - Recovery verification gives unknown email and wrong DOB the same public
   error, uses independent one-hop-proxy-aware IP and normalized-email limits,
   stores only a SHA-256 verifier, and expires at 600 seconds. Reset claims the
-  verifier once inside the credential/session transaction, replaces the
-  Argon2id hash, and revokes every session and refresh token.
+  verifier once after taking the per-user transaction lock and refetching it,
+  replaces the Argon2id hash, and revokes every session and refresh token.
+  Login and refresh take that same lock and refetch authoritative state before
+  credential verification/session issuance or refresh validation/rotation, so
+  a completed reset wins deterministic interleavings.
 - These are source/automated-test facts only. The running private candidate
   remains invitation-era/unmigrated and public production is unchanged.
 

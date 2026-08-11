@@ -125,38 +125,44 @@ describe("self-service registration", () => {
 });
 
 describe("avatar service cleanup", () => {
+  const oldKey = "4f37e5f8-a53a-4d18-8f9a-7b6e5cb8c003";
+  const newKey = "9183fe85-91df-4a5c-a2e4-145a837f443e";
+
   it("removes the prior opaque file only after a successful owner metadata update", async () => {
     const storage = {
-      store: vi.fn().mockResolvedValue({ key: "new-key", contentType: "image/webp", byteSize: 123 }),
+      store: vi.fn().mockResolvedValue({ key: newKey, contentType: "image/webp", byteSize: 123 }),
       delete: vi.fn().mockResolvedValue(undefined),
+      release: vi.fn(),
     };
     const db = {
       $executeRaw: vi.fn(),
       user: {
-        findUnique: vi.fn().mockResolvedValue({ id: "user-1", avatarKey: "old-key" }),
+        findUnique: vi.fn().mockResolvedValue({ id: "user-1", avatarKey: oldKey }),
         update: vi.fn().mockResolvedValue({}),
       },
     };
     const client = { $transaction: (work: any) => work(db) };
     const service = new AvatarService(client as any, storage as any, "https://api.example.com");
     await expect(service.upload("user-1", Buffer.from("image"), "image/png")).resolves.toEqual({
-      avatarUrl: "https://api.example.com/media/avatars/new-key.webp",
+      avatarUrl: `https://api.example.com/media/avatars/${newKey}.webp`,
     });
     expect(db.user.update).toHaveBeenCalledWith({ where: { id: "user-1" }, data: {
-      avatarKey: "new-key", avatarContentType: "image/webp", avatarByteSize: 123,
+      avatarKey: newKey, avatarContentType: "image/webp", avatarByteSize: 123,
     } });
-    expect(storage.delete).toHaveBeenCalledWith("old-key");
+    expect(storage.delete).toHaveBeenCalledWith(oldKey);
+    expect(storage.release).toHaveBeenCalledWith(newKey);
   });
 
   it("removes the newly written file and preserves the prior file when metadata update fails", async () => {
     const storage = {
-      store: vi.fn().mockResolvedValue({ key: "new-key", contentType: "image/webp", byteSize: 123 }),
+      store: vi.fn().mockResolvedValue({ key: newKey, contentType: "image/webp", byteSize: 123 }),
       delete: vi.fn().mockResolvedValue(undefined),
+      release: vi.fn(),
     };
     const db = {
       $executeRaw: vi.fn(),
       user: {
-        findUnique: vi.fn().mockResolvedValue({ id: "user-1", avatarKey: "old-key" }),
+        findUnique: vi.fn().mockResolvedValue({ id: "user-1", avatarKey: oldKey }),
         update: vi.fn().mockRejectedValue(new Error("database unavailable")),
       },
     };
@@ -164,7 +170,75 @@ describe("avatar service cleanup", () => {
     const service = new AvatarService(client as any, storage as any, "https://api.example.com");
     await expect(service.upload("user-1", Buffer.from("image"), "image/png")).rejects.toThrow("database unavailable");
     expect(storage.delete).toHaveBeenCalledTimes(1);
-    expect(storage.delete).toHaveBeenCalledWith("new-key");
+    expect(storage.delete).toHaveBeenCalledWith(newKey);
+    expect(storage.release).toHaveBeenCalledWith(newKey);
+  });
+
+  it("keeps a committed upload successful when deleting the old file fails", async () => {
+    const storage = {
+      store: vi.fn().mockResolvedValue({ key: newKey, contentType: "image/webp", byteSize: 123 }),
+      delete: vi.fn().mockRejectedValue(new Error("unlink failed")),
+      release: vi.fn(),
+    };
+    const db = {
+      $executeRaw: vi.fn(),
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ id: "user-1", avatarKey: oldKey }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+    };
+    const service = new AvatarService({ $transaction: (work: any) => work(db) } as any, storage as any, "https://api.example.com");
+    await expect(service.upload("user-1", Buffer.from("image"), "image/png")).resolves.toEqual({
+      avatarUrl: `https://api.example.com/media/avatars/${newKey}.webp`,
+    });
+    expect(storage.delete).toHaveBeenCalledWith(oldKey);
+    expect(storage.release).toHaveBeenCalledWith(newKey);
+  });
+
+  it("uses database avatar references as the authority for orphan reconciliation", async () => {
+    const findMany = vi.fn().mockResolvedValue([{ avatarKey: oldKey }, { avatarKey: newKey }, { avatarKey: null }]);
+    const reconcile = vi.fn().mockResolvedValue({ removed: 2 });
+    const service = new AvatarService({ user: { findMany } } as any, { reconcile } as any, "https://api.example.com");
+
+    await expect(service.reconcile()).resolves.toEqual({ removed: 2 });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { avatarKey: { not: null } }, select: { avatarKey: true },
+    });
+    expect(reconcile).toHaveBeenCalledWith(new Set([oldKey, newKey]));
+  });
+
+  it("does not take the reconciliation DB snapshot while an upload commit is in flight", async () => {
+    let finishUpdate!: () => void;
+    const updateBlocked = new Promise<void>((resolve) => { finishUpdate = resolve; });
+    const findMany = vi.fn().mockResolvedValue([{ avatarKey: newKey }]);
+    const storage = {
+      store: vi.fn().mockResolvedValue({ key: newKey, contentType: "image/webp", byteSize: 123 }),
+      delete: vi.fn().mockResolvedValue(undefined),
+      release: vi.fn(),
+      reconcile: vi.fn().mockResolvedValue({ removed: 0 }),
+    };
+    const transaction = {
+      $executeRaw: vi.fn(),
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ id: "user-1", avatarKey: oldKey }),
+        update: vi.fn(async () => updateBlocked),
+      },
+    };
+    const service = new AvatarService({
+      $transaction: (work: any) => work(transaction),
+      user: { findMany },
+    } as any, storage as any, "https://api.example.com");
+    const upload = service.upload("user-1", Buffer.from("image"), "image/png");
+    await vi.waitFor(() => expect(transaction.user.update).toHaveBeenCalled());
+
+    const reconciliation = service.reconcile();
+    await Promise.resolve();
+    expect(findMany).not.toHaveBeenCalled();
+
+    finishUpdate();
+    await upload;
+    await expect(reconciliation).resolves.toEqual({ removed: 0 });
+    expect(storage.reconcile).toHaveBeenCalledWith(new Set([newKey]));
   });
 });
 
@@ -176,6 +250,7 @@ describe("DOB recovery service", () => {
     const refreshRevocations: any[] = [];
     const auditEvents: any[] = [];
     const transactionDb = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
       passwordRecovery: {
         findUnique: vi.fn().mockResolvedValue({
           id: "recovery-1", userId: "user-1", usedAt: null,
@@ -199,7 +274,7 @@ describe("DOB recovery service", () => {
     const client = { $transaction: (work: any) => work(transactionDb) };
     return {
       service: new RecoveryService(client as any, repositories as any, { ttlSeconds: 600, maxAttempts: 5 }),
-      created, passwordUpdates, sessionRevocations, refreshRevocations, auditEvents,
+      created, passwordUpdates, sessionRevocations, refreshRevocations, auditEvents, transactionDb,
     };
   }
 
@@ -246,6 +321,10 @@ describe("DOB recovery service", () => {
       reason: { code: "RECOVERY_INVALID" },
     });
     expect(f.passwordUpdates[0].data).toMatchObject({ algorithm: "argon2id" });
+    expect(f.transactionDb.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(f.transactionDb.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      f.transactionDb.passwordRecovery.updateMany.mock.invocationCallOrder[0]!,
+    );
     expect(f.passwordUpdates[0].data.passwordHash).toMatch(/^\$argon2id\$/);
     expect(f.sessionRevocations[0].where).toEqual({ userId: "user-1", revokedAt: null });
     expect(f.refreshRevocations[0].where).toEqual({ session: { userId: "user-1" }, revokedAt: null });

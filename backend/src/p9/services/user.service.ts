@@ -1,4 +1,5 @@
 import type { SafeUser } from "../types.js";
+import { avatarUrl } from "../avatar-key.js";
 
 export interface PublicUserRecord {
   id: string;
@@ -12,13 +13,12 @@ export interface PublicUserRecord {
 }
 
 export function publicUser(user: PublicUserRecord, publicBaseUrl = ""): SafeUser {
-  const baseUrl = publicBaseUrl.replace(/\/$/, "");
   return {
     id: user.id,
     email: user.email,
     displayName: user.displayName,
     username: user.username ?? null,
-    avatarUrl: user.avatarKey ? `${baseUrl}/media/avatars/${user.avatarKey}.webp` : null,
+    avatarUrl: user.avatarKey ? avatarUrl(publicBaseUrl, user.avatarKey) : null,
     createdAt: user.createdAt.toISOString(),
   };
 }

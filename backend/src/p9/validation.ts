@@ -91,11 +91,22 @@ export function parseDateOfBirth(value: unknown, now = new Date()): Date {
     date.getUTCFullYear() !== year ||
     date.getUTCMonth() !== month - 1 ||
     date.getUTCDate() !== day ||
-    text > now.toISOString().slice(0, 10)
+    text > jakartaCalendarDate(now)
   ) {
     throw new z.ZodError([{ code: z.ZodIssueCode.custom, path: [], message: "Invalid date of birth" }]);
   }
   return date;
+}
+
+function jakartaCalendarDate(value: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: P9_CANONICAL_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 export function parseRegistration(value: unknown, now = new Date()) {

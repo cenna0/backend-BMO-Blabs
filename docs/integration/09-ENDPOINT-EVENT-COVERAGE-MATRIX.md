@@ -39,20 +39,20 @@ deployed or enabled there.
 | Method | Path | Status | Availability / gap |
 |---|---|---|---|
 | POST | `/api/v1/auth/register` | `EXISTING_VERIFIED` | Slice 2B source/tests: self-service email/password/DOB; optional invitation compatibility only. Running private candidate remains invitation-era and public production unchanged |
-| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + Slice 2B source tests; canonical `SafeUser` adds username/avatar URL, and optional `clientDeviceId` issuance remains owner-locked |
-| POST | `/api/v1/auth/refresh` | `EXISTING_VERIFIED` | Private candidate; opaque rotating refresh token |
+| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + Slice 2B source tests; lock/refetch/verify/issue is one per-user transaction, canonical `SafeUser` adds validated username/avatar URL, and optional `clientDeviceId` issuance remains owner-locked |
+| POST | `/api/v1/auth/refresh` | `EXISTING_VERIFIED` | Private candidate + source race tests; discover owner, lock, refetch, validate, then rotate with replay-family revocation |
 | POST | `/api/v1/auth/logout` | `EXISTING_VERIFIED` | Private candidate |
 | POST | `/api/v1/auth/logout-all` | `EXISTING_VERIFIED` | Private candidate |
 | GET | `/api/v1/me` | `EXISTING_VERIFIED` | Private candidate legacy shape; Slice 2B source/tests return canonical username/avatar URL without DOB |
-| POST | `/api/v1/auth/password/recovery/verify` | `EXISTING_VERIFIED` | Slice 2B source/tests; generic enumeration-safe failure, independent IP/email limits, 600-second opaque token, SHA-256 verifier only; not deployed |
-| POST | `/api/v1/auth/password/recovery/reset` | `EXISTING_VERIFIED` | Slice 2B source/tests; atomic single use, Argon2id replacement, all-session/refresh revocation; not deployed |
+| POST | `/api/v1/auth/password/recovery/verify` | `EXISTING_VERIFIED` | Slice 2B source/tests; generic enumeration-safe failure, request-ID-bearing independent IP/email limits, Jakarta calendar boundary, 600-second opaque token, SHA-256 verifier only; not deployed |
+| POST | `/api/v1/auth/password/recovery/reset` | `EXISTING_VERIFIED` | Slice 2B source/tests; per-user lock precedes refetch/atomic single use, Argon2id replacement, and all-session/refresh revocation; not deployed |
 | PATCH | `/api/v1/me/profile` | `EXISTING_VERIFIED` | Slice 2B source/tests; bearer-owned strict display-name/normalized-username patch and sanitized conflict |
-| POST | `/api/v1/me/avatar` | `EXISTING_VERIFIED` | Slice 2B source/tests; 5 MiB multipart bound, decode validation, WebP transcode, UUID key and replacement cleanup |
-| GET | `/media/avatars/:opaqueId.webp` | `EXISTING_VERIFIED` | Slice 2B source/tests; exact UUID WebP path, `image/webp`, `nosniff`, immutable cache; no directory listing |
+| POST | `/api/v1/me/avatar` | `EXISTING_VERIFIED` | Slice 2B source/tests; 5 MiB multipart bound, decode validation, WebP transcode, temp-plus-atomic-rename UUID publication, nonfatal old cleanup, and DB-authoritative orphan reconciliation |
+| GET | `/media/avatars/:opaqueId.webp` | `EXISTING_VERIFIED` | Slice 2B source/tests; exact UUID WebP path, `image/webp`, `nosniff`, immutable cache, request context, and local sanitized errors; no directory listing |
 | GET | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
 | PATCH | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B source/tests; owner-scoped safe upsert returns canonical defaults; Hermes context use is later |
-| PATCH | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B source/tests; strict nonempty bounded canonical owner patch; Hermes context use is later |
+| GET | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B exact-body source/tests; owner-scoped safe upsert returns the bare canonical seven-field object; Hermes context use is later |
+| PATCH | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B exact-body source/tests; strict nonempty bounded canonical owner patch returns the bare seven-field object; Hermes context use is later |
 
 ## Pairing and devices
 

@@ -48,12 +48,19 @@ service path; IP and normalized-email counters are independent; the opaque
 token lives for exactly 600 seconds and only its SHA-256 verifier is stored;
 transactional compare-and-set permits one reset while revoking all session and
 refresh families. Audits contain event/user/request identifiers only, never DOB
-or the raw recovery token.
+or the raw recovery token. Reset, login verification/session issuance, and
+refresh validation/rotation serialize through the same per-user transaction
+lock and refetch authoritative credential/token state after acquiring it.
 
 Avatar source limits multipart input to 5 MiB and JPEG/PNG/WebP declarations,
 then verifies decoded metadata, bounds decoded pixels, strips metadata through
-a WebP transcode, and writes a generated UUID key at mode 0600 in the dedicated
-persistent Backend mount. Retrieval accepts only the exact UUID `.webp` path,
-sets `image/webp`, `nosniff`, and immutable caching, and cannot address other
-files. Compose declarations add no listener or public route. The review
-candidate was not recreated and no production storage directory was created.
+a WebP transcode, writes a generated UUID key through a mode-0600 temporary
+file and atomic rename in the dedicated persistent Backend mount, and cleans
+failed publication artifacts. Retrieval accepts only the exact UUID `.webp`
+path, sets `image/webp`, `nosniff`, and immutable caching, and cannot address
+other files. A coordinated database-authoritative reconciler skips referenced
+and in-flight keys and removes only exact orphan UUID WebP files. Public URL
+configuration accepts only a normalized HTTP(S) origin without credentials,
+path, query, or fragment; corrupt stored keys project as null. Compose
+declarations add no listener or public route. The review candidate was not
+recreated and no production storage directory was created.

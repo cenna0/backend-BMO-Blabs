@@ -8,7 +8,7 @@ import { AccessTokenService, SessionService } from "../services/session.service.
 import { UserService } from "../services/user.service.js";
 import { RecoveryService } from "../services/recovery.service.js";
 import { normalizeEmail } from "../validation.js";
-import { asyncP9, currentAuth, requireAuth, requestContext } from "./middleware.js";
+import { asyncP9, currentAuth, ensureRequestContext, requireAuth, requestContext } from "./middleware.js";
 
 interface AuthRouteOptions {
   config: P9Config;
@@ -88,7 +88,7 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
   }));
 
   if (options.recovery) {
-    router.post("/auth/password/recovery/verify", recoveryIpLimiter, recoveryEmailLimiter, asyncP9(async (request, response) => {
+    router.post("/auth/password/recovery/verify", ensureRequestContext, recoveryIpLimiter, recoveryEmailLimiter, asyncP9(async (request, response) => {
       const context = requestContext(request, response);
       const userAgent = request.get("user-agent");
       const result = await options.recovery!.verify(request.body, {
@@ -102,7 +102,7 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
       });
     }));
 
-    router.post("/auth/password/recovery/reset", recoveryIpLimiter, asyncP9(async (request, response) => {
+    router.post("/auth/password/recovery/reset", ensureRequestContext, recoveryIpLimiter, asyncP9(async (request, response) => {
       requestContext(request, response);
       await options.recovery!.reset(request.body);
       response.status(204).send();
