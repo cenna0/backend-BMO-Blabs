@@ -3,12 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 import { checkP9Readiness } from "../../src/p9/index.js";
 
 describe("P9 runtime readiness", () => {
-  it("requires PostgreSQL health and at least one fully finished migration", async () => {
+  const foundation = "20260804110000_p9_1_foundation";
+  const integrityConstraints = "20260804123000_p9_1_integrity_constraints";
+
+  it("accepts every required source migration when each is finished", async () => {
     const repositories = {
       healthCheck: vi.fn().mockResolvedValue(undefined),
       migrationStatus: vi.fn().mockResolvedValue([
-        { name: "foundation", finishedAt: new Date() },
-        { name: "constraints", finishedAt: new Date() },
+        { name: foundation, finishedAt: new Date() },
+        { name: integrityConstraints, finishedAt: new Date() },
+        { name: "older_extra_migration", finishedAt: new Date() },
       ]),
     };
 
@@ -18,9 +22,18 @@ describe("P9 runtime readiness", () => {
   });
 
   it.each([
-    { migrations: [] as Array<{ name: string; finishedAt: Date | null }> },
-    { migrations: [{ name: "foundation", finishedAt: null }] },
-  ])("rejects missing or unfinished migrations without exposing details", async ({ migrations }) => {
+    {
+      label: "latest required migration absent",
+      migrations: [{ name: foundation, finishedAt: new Date() }],
+    },
+    {
+      label: "required migration unfinished",
+      migrations: [
+        { name: foundation, finishedAt: new Date() },
+        { name: integrityConstraints, finishedAt: null },
+      ],
+    },
+  ])("rejects $label without exposing details", async ({ migrations }) => {
     const repositories = {
       healthCheck: vi.fn().mockResolvedValue(undefined),
       migrationStatus: vi.fn().mockResolvedValue(migrations),

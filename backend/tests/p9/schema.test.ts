@@ -1,9 +1,20 @@
 import { readdir, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
+import { P9_REQUIRED_MIGRATIONS } from "../../src/p9/migration-manifest.js";
+
 const schemaPath = new URL("../../prisma/schema.prisma", import.meta.url);
 
 describe("P9.1 Prisma schema", () => {
+  it("keeps the runtime readiness manifest identical to source migration directories", async () => {
+    const migrationDirectory = new URL("../../prisma/migrations/", import.meta.url);
+    const migrationDirectories = (await readdir(migrationDirectory, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+    expect(P9_REQUIRED_MIGRATIONS).toEqual(migrationDirectories);
+  });
+
   it("contains only the eleven P9.1 foundation models", async () => {
     const schema = await readFile(schemaPath, "utf8");
     const models = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1]);

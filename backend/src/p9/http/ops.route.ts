@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { P9Repositories } from "../db/repositories.js";
+import { areRequiredP9MigrationsFinished } from "../migration-manifest.js";
 import { asyncP9 } from "./middleware.js";
 
 export function createOpsRouter(repositories: P9Repositories): Router {
@@ -17,7 +18,7 @@ export function createOpsRouter(repositories: P9Repositories): Router {
     try {
       await repositories.healthCheck();
       const migrations = await repositories.migrationStatus();
-      const ready = migrations.length > 0 && migrations.every((migration) => migration.finishedAt !== null);
+      const ready = areRequiredP9MigrationsFinished(migrations);
       response.status(ready ? 200 : 503).json({ status: ready ? "ok" : "error", database: ready ? "ready" : "migrations_pending", migration_count: migrations.length });
     } catch {
       response.status(503).json({ status: "error", database: "unavailable" });

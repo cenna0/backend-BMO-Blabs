@@ -93,11 +93,14 @@ legacy voice remains connected; callback rejection is contained.
 
 The optional `Session.clientDeviceId` issuance path is source/unit verified with
 transaction/lock ordering and active-owner validation. Integrated readiness now
-requires PostgreSQL health and at least one fully finished migration whenever
-P9 is enabled; a failed/pending database is sanitized as `database: error` with
-HTTP 503, while `/livez` remains dependency-free and P9-disabled response shape
-is unchanged. Public/candidate database acceptance remains pending the Slice 2
-migration/review environment; no public availability is claimed.
+requires PostgreSQL health and every migration in the source manifest to be
+present and finished whenever P9 is enabled; a static test keeps that manifest
+identical to the migration directories. A failed, incomplete, or stalled
+database probe is bounded by the readiness timeout and sanitized as
+`database: error` with HTTP 503, while `/livez` remains dependency-free and the
+P9-disabled response shape is unchanged. Public/candidate database acceptance
+remains pending the Slice 2 migration/review environment; no public availability
+is claimed.
 
 One-hop Express/Supertest coverage verifies that Caddy's rightmost forwarded
 client address owns the auth rate-limit bucket: attacker-controlled earlier
@@ -136,7 +139,7 @@ is liveness evidence and never substitutes for integrated readiness.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 183 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs.
+- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 188 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs.
 - Backend typecheck and build: passed on Node `22.23.1`.
 - Prisma validation: passed. Candidate `/ops/db/livez`, `/readyz`, and `/migrations`: healthy/private.
 - Static/rendered integrated-candidate packaging: passed; PostgreSQL has no host-published port and Backend uses the named Unix-socket volume. The live candidate was not recreated.

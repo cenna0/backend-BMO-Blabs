@@ -82,11 +82,19 @@ export class BackendReadinessService implements BackendReadinessPort {
 
   async #checkDatabase(): Promise<boolean | undefined> {
     if (!this.options.databaseReadiness) return undefined;
-    try {
-      return await this.options.databaseReadiness();
-    } catch {
-      return false;
-    }
+    return await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (ready: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(ready);
+      };
+      const timer = setTimeout(() => finish(false), this.options.timeoutMs);
+      void Promise.resolve()
+        .then(() => this.options.databaseReadiness!())
+        .then(finish, () => finish(false));
+    });
   }
 
   async check(): Promise<BackendReadinessState> {

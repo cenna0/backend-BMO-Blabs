@@ -2,9 +2,9 @@
 
 | Area | Phase 1 evidence | Phase 2 acceptance |
 |---|---|---|
-| Backend tests | Node 22.23.1: 183 passed, 1 skipped DB HTTP suite | Unit + authenticated HTTP integration with disposable Postgres |
+| Backend tests | Node 22.23.1: 188 passed, 1 skipped DB HTTP suite | Unit + authenticated HTTP integration with disposable Postgres |
 | Build/typecheck | Passed on Node 22.23.1 | Repeat on pinned build/runtime |
-| Prisma | Validate passed; candidate two migrations healthy | Empty/repeat/upgrade migration, constraints, backup/restore, no startup migration |
+| Prisma | Validate passed; readiness manifest exactly matches both source migrations and requires each to be finished | Empty/repeat/upgrade migration, constraints, backup/restore, no startup migration |
 | Audio | 103 passed in production audio image | Existing suite + voice regression |
 | Existing device voice | Production contract/runtime inspected | Public fake-device regression plus no raw-WAV/MP3/event drift |
 | Auth/recovery | P9.1 auth source/private candidate exists | Self-service, Argon2id, rotation/replay, DOB enumeration/rate/reuse, logout-all, tenant isolation |

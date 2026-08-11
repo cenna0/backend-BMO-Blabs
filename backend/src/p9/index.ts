@@ -11,6 +11,7 @@ import { UserService } from "./services/user.service.js";
 import { DeviceBindingService, type ApplicationDeviceBinding } from "./services/device-binding.service.js";
 import { createP9Router } from "./http/router.js";
 import type { Router } from "express";
+import { areRequiredP9MigrationsFinished } from "./migration-manifest.js";
 
 export interface P9Runtime {
   router: Router;
@@ -30,7 +31,7 @@ export async function checkP9Readiness(
   try {
     await repositories.healthCheck();
     const migrations = await repositories.migrationStatus();
-    return migrations.length > 0 && migrations.every((migration) => migration.finishedAt !== null);
+    return areRequiredP9MigrationsFinished(migrations);
   } catch {
     return false;
   }

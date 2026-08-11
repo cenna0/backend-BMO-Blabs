@@ -126,4 +126,41 @@ describe("BackendReadinessService", () => {
       databaseReady: false,
     });
   });
+
+  it("bounds a stalled database probe and contains its late rejection", async () => {
+    let rejectDatabase!: (error: Error) => void;
+    const readiness = new BackendReadinessService({
+      hermesBaseUrl: "http://127.0.0.1:8642",
+      audioServiceBaseUrl: "http://127.0.0.1:8001",
+      timeoutMs: 20,
+      fetcher: async (url) => String(url).endsWith("/health")
+        ? Response.json({ status: "ok" })
+        : Response.json({
+          status: "ok",
+          stt_loaded: true,
+          kokoro_loaded: true,
+          rvc_available: true,
+          ffmpeg_available: true,
+        }),
+      databaseReadiness: () => new Promise<boolean>((_resolve, reject) => {
+        rejectDatabase = reject;
+      }),
+    });
+    const startedAt = performance.now();
+
+    const outcome = await Promise.race([
+      readiness.check(),
+      new Promise<"test_timeout">((resolve) => setTimeout(() => resolve("test_timeout"), 150)),
+    ]);
+
+    expect(outcome).toEqual({
+      hermesReady: true,
+      audioReady: true,
+      rvcAvailable: true,
+      databaseReady: false,
+    });
+    expect(performance.now() - startedAt).toBeLessThan(150);
+    rejectDatabase(new Error("late private database detail"));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  });
 });
