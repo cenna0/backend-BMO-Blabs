@@ -3,16 +3,16 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 
 import { createP9Router } from "../../src/p9/http/router.js";
+import { P9_REQUIRED_MIGRATIONS } from "../../src/p9/migration-manifest.js";
 
 const foundation = "20260804110000_p9_1_foundation";
 const integrityConstraints = "20260804123000_p9_1_integrity_constraints";
 
 function appWithOps(
   includeOps: boolean,
-  migrations: Array<{ name: string; finishedAt: Date | null }> = [
-    { name: foundation, finishedAt: new Date() },
-    { name: integrityConstraints, finishedAt: new Date() },
-  ],
+  migrations: Array<{ name: string; finishedAt: Date | null }> = P9_REQUIRED_MIGRATIONS.map(
+    (name) => ({ name, finishedAt: new Date() }),
+  ),
 ) {
   const app = express();
   app.use(createP9Router({
@@ -68,7 +68,7 @@ describe("P9 operational route exposure", () => {
     await request(appWithOps(true)).get("/ops/db/readyz").expect(200).expect({
       status: "ok",
       database: "ready",
-      migration_count: 2,
+      migration_count: P9_REQUIRED_MIGRATIONS.length,
     });
   });
 });

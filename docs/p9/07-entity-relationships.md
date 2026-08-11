@@ -1,4 +1,8 @@
-# Entity Relationships — Frozen Conceptual Model
+# Entity Relationships — Phase 2 Source Foundation
+
+**Evidence tier:** Prisma schema and unapplied migration source only. The running
+candidate and production databases still contain the P9.1 foundation; Slice 2A
+did not apply or deploy this graph.
 
 ```text
 User
@@ -10,14 +14,21 @@ User
 │          ├─ DeviceTelemetryCurrent
 │          └─ DeviceLog
 ├─ UserSettings / PersonalizationSettings
-├─ ChatSession ─ ChatMessage ─ ChatMessageFeedback
-├─ MemoryRecord / MemoryCandidate / MemoryAction / MemoryTopicForget
+├─ ChatSession ─ ChatMessage ─ ChatOperation / ChatMessageFeedback
+├─ MemoryRecord / MemoryCandidate / MemoryAction / MemoryTopicForget / MemorySummary
 ├─ Schedule ─ ScheduleRun
 ├─ ProactiveDelivery ─ DeliveryAttempt
-├─ IntegrationConnection
+├─ IntegrationConnection / OAuthState
 │  ├─ SpotifyCredential / SpotifyAction
 │  └─ WhatsAppNotificationRule / WhatsAppSendRequest / WhatsAppDelivery
-└─ BugReport
+└─ BugReport ─ BugReportAttachment
 ```
 
-Existing P9.1 models are the first two identity/device/settings layers. All later nodes are additive targets. Chat messages may reference source devices and delivery records, but devices do not own user data. Schedules are structured records, not memory. Provider session bytes do not become BMO entities.
+All 11 P9.1 models and their identifiers/constraints are preserved. The 27 later
+models are additive source records. Composite foreign keys enforce the same user
+for nullable chat/schedule/delivery device links, chat messages within sessions,
+delivery attempts within deliveries, memory candidates linked to messages, and
+provider records linked to integration connections. Device-owned telemetry,
+Wi-Fi configuration, and logs inherit ownership through `Device`; devices do not
+own user chat or memory data. Schedules remain structured records, not memory,
+and provider session bytes do not become BMO entities.

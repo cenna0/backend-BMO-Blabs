@@ -41,39 +41,239 @@ enum NotificationBehavior {
   NONE
 }
 
+enum ChatSessionStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ChatMessageKind {
+  TEXT
+  EVENT
+}
+
+enum ChatOperationStatus {
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum ChatFeedbackRating {
+  POSITIVE
+  NEGATIVE
+}
+
+enum MemoryCandidateStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum MemoryActionType {
+  ACCEPT
+  REJECT
+  EDIT
+  DELETE
+  FORGET_TOPIC
+  CLEAR_ALL
+  EXPORT
+  SUMMARY_REGENERATE
+  SUMMARY_FEEDBACK
+}
+
+enum MemorySummaryStatus {
+  READY
+  GENERATING
+  FAILED
+}
+
+enum ScheduleStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  COMPLETED
+}
+
+enum ScheduleRunStatus {
+  DUE
+  CLAIMED
+  SUCCEEDED
+  FAILED
+  MISSED
+  CANCELLED
+}
+
+enum DeliverySource {
+  CHAT
+  SCHEDULE
+  WHATSAPP
+}
+
+enum ProactiveDeliveryStatus {
+  PENDING
+  READY
+  DELIVERING
+  DELIVERED
+  FAILED
+  EXPIRED
+  MISSED
+}
+
+enum DeliveryAttemptStatus {
+  PENDING
+  SENT
+  RECEIVED
+  PLAYED
+  FAILED
+  EXPIRED
+}
+
+enum WifiSecurity {
+  OPEN
+  WPA_PSK
+}
+
+enum WifiConfigurationStatus {
+  PENDING
+  DELIVERED
+  APPLYING
+  CONNECTED
+  FAILED
+  ROLLED_BACK
+  SUPERSEDED
+}
+
+enum DeviceLogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+enum IntegrationProvider {
+  SPOTIFY
+  WHATSAPP
+}
+
+enum IntegrationStatus {
+  DISCONNECTED
+  PENDING
+  CONNECTED
+  ERROR
+}
+
+enum SpotifyActionStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum WhatsAppRuleScope {
+  ALL
+  CONTACT
+  GROUP
+}
+
+enum WhatsAppSendStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  SENDING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum WhatsAppDeliveryDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppDeliveryStatus {
+  RECEIVED
+  QUEUED
+  DELIVERED
+  FAILED
+}
+
+enum BugReportStatus {
+  RECEIVED
+  TRIAGED
+  RESOLVED
+  CLOSED
+}
+
 model User {
-  id                 String             @id @default(uuid()) @db.Uuid
-  email              String             @unique @db.VarChar(320)
-  displayName        String?            @db.VarChar(120)
-  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
-  identities         AuthIdentity[]
-  passwordCredential PasswordCredential?
-  invitations        Invitation[]
-  sessions           Session[]
-  devices            Device[]
-  pairings           DevicePairing[]
-  userSettings       UserSettings?
-  auditEvents        AuditEvent[]
+  id                        String                     @id @default(uuid()) @db.Uuid
+  email                     String                     @unique @db.VarChar(320)
+  displayName               String?                    @db.VarChar(120)
+  dateOfBirth               DateTime?                  @db.Date
+  username                  String?                    @unique @db.VarChar(30)
+  avatarKey                 String?                    @unique @db.VarChar(255)
+  avatarContentType         String?                    @db.VarChar(100)
+  avatarByteSize            Int?
+  createdAt                 DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                   @updatedAt @db.Timestamptz(3)
+  identities                AuthIdentity[]
+  passwordCredential        PasswordCredential?
+  invitations               Invitation[]
+  sessions                  Session[]
+  devices                   Device[]
+  pairings                  DevicePairing[]
+  userSettings              UserSettings?
+  auditEvents               AuditEvent[]
+  passwordRecoveries        PasswordRecovery[]
+  personalizationSettings   PersonalizationSettings?
+  chatSessions              ChatSession[]
+  chatMessages              ChatMessage[]
+  chatOperations            ChatOperation[]
+  chatMessageFeedback       ChatMessageFeedback[]
+  memoryRecords             MemoryRecord[]
+  memoryCandidates          MemoryCandidate[]
+  memoryActions             MemoryAction[]
+  memoryTopicForgets        MemoryTopicForget[]
+  memorySummary             MemorySummary?
+  schedules                 Schedule[]
+  proactiveDeliveries       ProactiveDelivery[]
+  deliveryAttempts          DeliveryAttempt[]
+  integrationConnections    IntegrationConnection[]
+  oauthStates               OAuthState[]
+  spotifyCredential         SpotifyCredential?
+  spotifyActions            SpotifyAction[]
+  whatsAppNotificationRules WhatsAppNotificationRule[]
+  whatsAppSendRequests      WhatsAppSendRequest[]
+  whatsAppDeliveries        WhatsAppDelivery[]
+  bugReports                BugReport[]
 }
 
 model PasswordCredential {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String   @unique @db.Uuid
-  passwordHash String  @db.VarChar(255)
-  algorithm  String   @default("argon2id") @db.VarChar(32)
-  createdAt  DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @unique @db.Uuid
+  passwordHash String   @db.VarChar(255)
+  algorithm    String   @default("argon2id") @db.VarChar(32)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuthIdentity {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String   @db.Uuid
-  provider       String   @db.VarChar(32)
-  providerSubject String  @db.VarChar(255)
-  createdAt      DateTime @default(now()) @db.Timestamptz(3)
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid
+  provider        String   @db.VarChar(32)
+  providerSubject String   @db.VarChar(255)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerSubject])
   @@index([userId])
@@ -108,66 +308,74 @@ model Session {
   clientDevice   Device?        @relation("SessionClientDevice", fields: [clientDeviceId, userId], references: [id, userId], onDelete: Restrict)
   refreshTokens  RefreshToken[]
 
+  @@unique([familyId])
+  @@unique([id, familyId])
   @@index([userId, revokedAt, expiresAt])
   @@index([userId, clientDeviceId])
   @@index([familyId])
-  @@unique([familyId])
-  @@unique([id, familyId])
 }
 
 model RefreshToken {
-  id         String    @id @default(uuid()) @db.Uuid
-  sessionId  String    @db.Uuid
-  tokenHash  String    @unique @db.Char(64)
-  familyId   String    @db.Uuid
-  issuedAt   DateTime  @default(now()) @db.Timestamptz(3)
-  expiresAt  DateTime  @db.Timestamptz(3)
-  usedAt     DateTime? @db.Timestamptz(3)
-  revokedAt  DateTime? @db.Timestamptz(3)
-  session    Session   @relation(fields: [sessionId, familyId], references: [id, familyId], onDelete: Cascade)
+  id        String    @id @default(uuid()) @db.Uuid
+  sessionId String    @db.Uuid
+  tokenHash String    @unique @db.Char(64)
+  familyId  String    @db.Uuid
+  issuedAt  DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  session   Session   @relation(fields: [sessionId, familyId], references: [id, familyId], onDelete: Cascade)
 
   @@index([sessionId, familyId, expiresAt])
   @@index([familyId, usedAt, revokedAt])
 }
 
 model Device {
-  id         String         @id @default(uuid()) @db.Uuid
-  userId     String         @db.Uuid
-  hardwareId String         @unique @db.VarChar(128)
-  name       String         @db.VarChar(120)
-  tokenHash  String         @db.Char(64)
-  status     DeviceStatus   @default(PENDING)
-  pairedAt   DateTime?      @db.Timestamptz(3)
-  revokedAt  DateTime?      @db.Timestamptz(3)
-  lastSeenAt DateTime?      @db.Timestamptz(3)
-  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime       @updatedAt @db.Timestamptz(3)
-  user       User           @relation(fields: [userId], references: [id], onDelete: Restrict)
-  clientSessions Session[]   @relation("SessionClientDevice")
-  pairings   DevicePairing[]
-  settings   DeviceSettings?
-  auditEvents AuditEvent[]
+  id                  String                    @id @default(uuid()) @db.Uuid
+  userId              String                    @db.Uuid
+  hardwareId          String                    @unique @db.VarChar(128)
+  name                String                    @db.VarChar(120)
+  tokenHash           String                    @db.Char(64)
+  status              DeviceStatus              @default(PENDING)
+  pairedAt            DateTime?                 @db.Timestamptz(3)
+  revokedAt           DateTime?                 @db.Timestamptz(3)
+  lastSeenAt          DateTime?                 @db.Timestamptz(3)
+  createdAt           DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                  @updatedAt @db.Timestamptz(3)
+  user                User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  clientSessions      Session[]                 @relation("SessionClientDevice")
+  pairings            DevicePairing[]
+  settings            DeviceSettings?
+  auditEvents         AuditEvent[]
+  chatSessions        ChatSession[]             @relation("ChatSessionDevice")
+  sourceChatMessages  ChatMessage[]             @relation("ChatMessageSourceDevice")
+  targetSchedules     Schedule[]                @relation("ScheduleTargetDevice")
+  proactiveDeliveries ProactiveDelivery[]       @relation("ProactiveDeliveryDevice")
+  deliveryAttempts    DeliveryAttempt[]         @relation("DeliveryAttemptDevice")
+  wifiConfigurations  DeviceWifiConfiguration[]
+  telemetryCurrent    DeviceTelemetryCurrent?
+  logs                DeviceLog[]
 
-  @@index([userId, status])
   @@unique([id, userId])
+  @@index([userId, status])
 }
 
 model DevicePairing {
-  id           String        @id @default(uuid()) @db.Uuid
-  userId       String        @db.Uuid
-  deviceId     String?       @db.Uuid
-  codeHash     String        @db.Char(64)
-  status       PairingStatus @default(ISSUED)
-  expiresAt    DateTime      @db.Timestamptz(3)
-  attemptCount Int           @default(0)
-  maxAttempts  Int           @default(5)
-  lastAttemptAt DateTime?    @db.Timestamptz(3)
-  claimedAt    DateTime?     @db.Timestamptz(3)
-  revokedAt    DateTime?     @db.Timestamptz(3)
-  invalidatedAt DateTime?    @db.Timestamptz(3)
-  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  device       Device?       @relation(fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+  id            String        @id @default(uuid()) @db.Uuid
+  userId        String        @db.Uuid
+  deviceId      String?       @db.Uuid
+  codeHash      String        @db.Char(64)
+  status        PairingStatus @default(ISSUED)
+  expiresAt     DateTime      @db.Timestamptz(3)
+  attemptCount  Int           @default(0)
+  maxAttempts   Int           @default(5)
+  lastAttemptAt DateTime?     @db.Timestamptz(3)
+  claimedAt     DateTime?     @db.Timestamptz(3)
+  revokedAt     DateTime?     @db.Timestamptz(3)
+  invalidatedAt DateTime?     @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device        Device?       @relation(fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
 
   @@index([userId, status, expiresAt])
   @@index([codeHash, status])
@@ -196,6 +404,11 @@ model DeviceSettings {
   voiceProfileId       String               @default("prudence") @db.VarChar(32)
   speechSpeed          Float                @default(1.0)
   enabled              Boolean              @default(true)
+  version              Int                  @default(1)
+  deliveredAt          DateTime?            @db.Timestamptz(3)
+  appliedVersion       Int?
+  appliedAt            DateTime?            @db.Timestamptz(3)
+  lastErrorCode        String?              @db.VarChar(64)
   createdAt            DateTime             @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime             @updatedAt @db.Timestamptz(3)
   device               Device               @relation(fields: [deviceId], references: [id], onDelete: Cascade)
@@ -220,4 +433,535 @@ model AuditEvent {
   @@index([deviceId, createdAt])
   @@index([eventType, createdAt])
   @@index([resourceType, resourceId])
+}
+
+model PasswordRecovery {
+  id                   String    @id @default(uuid()) @db.Uuid
+  userId               String    @db.Uuid
+  tokenVerifier        String    @unique @db.Char(64)
+  expiresAt            DateTime  @db.Timestamptz(3)
+  usedAt               DateTime? @db.Timestamptz(3)
+  attemptCount         Int       @default(0)
+  maxAttempts          Int
+  lastAttemptAt        DateTime? @db.Timestamptz(3)
+  requestIpHash        String?   @db.Char(64)
+  requestUserAgentHash String?   @db.Char(64)
+  requestId            String?   @db.VarChar(128)
+  createdAt            DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime  @updatedAt @db.Timestamptz(3)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt, usedAt])
+}
+
+model PersonalizationSettings {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @unique @db.Uuid
+  baseStyleTone      String   @default("default") @db.VarChar(32)
+  warmth             String   @default("default") @db.VarChar(32)
+  enthusiasm         String   @default("default") @db.VarChar(32)
+  headerAndLists     String   @default("default") @db.VarChar(32)
+  emoji              String   @default("default") @db.VarChar(32)
+  fastAnswers        Boolean  @default(false)
+  customInstructions String   @default("") @db.VarChar(4000)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChatSession {
+  id                String            @id @default(uuid()) @db.Uuid
+  userId            String            @db.Uuid
+  deviceId          String?           @db.Uuid
+  temporary         Boolean           @default(false)
+  title             String?           @db.VarChar(200)
+  status            ChatSessionStatus @default(ACTIVE)
+  lastMessageCursor BigInt?
+  lastMessageAt     DateTime?         @db.Timestamptz(3)
+  expiresAt         DateTime?         @db.Timestamptz(3)
+  deletedAt         DateTime?         @db.Timestamptz(3)
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @db.Timestamptz(3)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device            Device?           @relation("ChatSessionDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+  messages          ChatMessage[]
+
+  @@unique([id, userId])
+  @@index([userId, status, updatedAt])
+  @@index([userId, deviceId])
+}
+
+model ChatMessage {
+  id               String                @id @default(uuid()) @db.Uuid
+  sessionId        String                @db.Uuid
+  userId           String                @db.Uuid
+  sourceDeviceId   String?               @db.Uuid
+  role             ChatMessageRole
+  kind             ChatMessageKind       @default(TEXT)
+  content          String                @db.Text
+  metadata         Json?
+  cursor           BigInt                @default(autoincrement())
+  idempotencyKey   String?               @db.VarChar(128)
+  createdAt        DateTime              @default(now()) @db.Timestamptz(3)
+  deletedAt        DateTime?             @db.Timestamptz(3)
+  session          ChatSession           @relation(fields: [sessionId, userId], references: [id, userId], onDelete: Cascade)
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceDevice     Device?               @relation("ChatMessageSourceDevice", fields: [sourceDeviceId, userId], references: [id, userId], onDelete: Restrict)
+  operations       ChatOperation[]
+  feedback         ChatMessageFeedback[]
+  memoryCandidates MemoryCandidate[]
+
+  @@unique([id, userId])
+  @@unique([sessionId, cursor])
+  @@unique([userId, idempotencyKey])
+  @@index([userId, sessionId, cursor])
+  @@index([userId, sourceDeviceId])
+}
+
+model ChatOperation {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @db.Uuid
+  userMessageId  String              @db.Uuid
+  idempotencyKey String              @db.VarChar(128)
+  status         ChatOperationStatus @default(PROCESSING)
+  errorCode      String?             @db.VarChar(64)
+  startedAt      DateTime            @default(now()) @db.Timestamptz(3)
+  completedAt    DateTime?           @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(3)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userMessage    ChatMessage         @relation(fields: [userMessageId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@unique([userMessageId])
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status, startedAt])
+}
+
+model ChatMessageFeedback {
+  id        String             @id @default(uuid()) @db.Uuid
+  userId    String             @db.Uuid
+  messageId String             @db.Uuid
+  rating    ChatFeedbackRating
+  reason    String?            @db.VarChar(500)
+  createdAt DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime           @updatedAt @db.Timestamptz(3)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   ChatMessage        @relation(fields: [messageId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@unique([userId, messageId])
+}
+
+model MemoryRecord {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @db.Uuid
+  topic             String    @db.VarChar(120)
+  category          String    @db.VarChar(64)
+  normalizedContent String    @db.Text
+  importance        Int
+  source            String    @db.VarChar(64)
+  expiresAt         DateTime? @db.Timestamptz(3)
+  deletedAt         DateTime? @db.Timestamptz(3)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, deletedAt, updatedAt])
+  @@index([userId, topic])
+  @@index([expiresAt])
+}
+
+model MemoryCandidate {
+  id              String                @id @default(uuid()) @db.Uuid
+  userId          String                @db.Uuid
+  sourceMessageId String?               @db.Uuid
+  proposedContent String                @db.Text
+  topic           String?               @db.VarChar(120)
+  policyMetadata  Json?
+  status          MemoryCandidateStatus @default(PENDING)
+  expiresAt       DateTime?             @db.Timestamptz(3)
+  reviewedAt      DateTime?             @db.Timestamptz(3)
+  createdAt       DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(3)
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceMessage   ChatMessage?          @relation(fields: [sourceMessageId, userId], references: [id, userId], onDelete: Restrict)
+
+  @@unique([id, userId])
+  @@index([userId, status, createdAt])
+  @@index([expiresAt])
+}
+
+model MemoryAction {
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @db.Uuid
+  actionType     MemoryActionType
+  resourceType   String           @db.VarChar(32)
+  resourceId     String?          @db.Uuid
+  idempotencyKey String           @db.VarChar(128)
+  metadata       Json?
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, resourceType, resourceId, createdAt])
+}
+
+model MemoryTopicForget {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid
+  normalizedTopic String   @db.VarChar(120)
+  idempotencyKey  String   @db.VarChar(128)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, normalizedTopic, createdAt])
+}
+
+model MemorySummary {
+  id          String              @id @default(uuid()) @db.Uuid
+  userId      String              @unique @db.Uuid
+  content     String?             @db.Text
+  status      MemorySummaryStatus @default(GENERATING)
+  version     Int                 @default(1)
+  feedback    String?             @db.VarChar(500)
+  generatedAt DateTime?           @db.Timestamptz(3)
+  expiresAt   DateTime?           @db.Timestamptz(3)
+  deletedAt   DateTime?           @db.Timestamptz(3)
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Schedule {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @db.Uuid
+  targetDeviceId String?        @db.Uuid
+  status         ScheduleStatus @default(ACTIVE)
+  timezone       String         @default("Asia/Jakarta") @db.VarChar(64)
+  recurrence     Json?
+  payload        Json
+  nextRunAt      DateTime?      @db.Timestamptz(3)
+  version        Int            @default(1)
+  cancelledAt    DateTime?      @db.Timestamptz(3)
+  completedAt    DateTime?      @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetDevice   Device?        @relation("ScheduleTargetDevice", fields: [targetDeviceId, userId], references: [id, userId], onDelete: Restrict)
+  runs           ScheduleRun[]
+
+  @@unique([id, userId])
+  @@index([status, nextRunAt])
+  @@index([userId, status, updatedAt])
+  @@index([userId, targetDeviceId])
+}
+
+model ScheduleRun {
+  id             String            @id @default(uuid()) @db.Uuid
+  scheduleId     String            @db.Uuid
+  dueAt          DateTime          @db.Timestamptz(3)
+  status         ScheduleRunStatus @default(DUE)
+  leaseOwner     String?           @db.VarChar(128)
+  leaseExpiresAt DateTime?         @db.Timestamptz(3)
+  attemptCount   Int               @default(0)
+  retryAt        DateTime?         @db.Timestamptz(3)
+  missedAt       DateTime?         @db.Timestamptz(3)
+  result         Json?
+  errorCode      String?           @db.VarChar(64)
+  startedAt      DateTime?         @db.Timestamptz(3)
+  completedAt    DateTime?         @db.Timestamptz(3)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(3)
+  schedule       Schedule          @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, dueAt])
+  @@index([status, dueAt, leaseExpiresAt])
+  @@index([retryAt])
+}
+
+model ProactiveDelivery {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  userId             String                  @db.Uuid
+  deviceId           String?                 @db.Uuid
+  source             DeliverySource
+  sourceResourceType String                  @db.VarChar(32)
+  sourceResourceId   String                  @db.Uuid
+  idempotencyKey     String                  @db.VarChar(128)
+  status             ProactiveDeliveryStatus @default(PENDING)
+  audioKey           String?                 @db.VarChar(255)
+  audioExpiresAt     DateTime?               @db.Timestamptz(3)
+  attemptCount       Int                     @default(0)
+  errorCode          String?                 @db.VarChar(64)
+  expiresAt          DateTime?               @db.Timestamptz(3)
+  deliveredAt        DateTime?               @db.Timestamptz(3)
+  createdAt          DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                @updatedAt @db.Timestamptz(3)
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device             Device?                 @relation("ProactiveDeliveryDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+  attempts           DeliveryAttempt[]
+
+  @@unique([userId, idempotencyKey])
+  @@unique([id, userId])
+  @@index([status, createdAt])
+  @@index([userId, source, sourceResourceId])
+  @@index([userId, deviceId])
+  @@index([expiresAt])
+}
+
+model DeliveryAttempt {
+  id            String                @id @default(uuid()) @db.Uuid
+  deliveryId    String                @db.Uuid
+  userId        String                @db.Uuid
+  deviceId      String?               @db.Uuid
+  attemptNumber Int
+  status        DeliveryAttemptStatus @default(PENDING)
+  channel       String                @db.VarChar(32)
+  receiptId     String?               @db.VarChar(128)
+  errorCode     String?               @db.VarChar(64)
+  errorDetail   String?               @db.VarChar(500)
+  sentAt        DateTime?             @db.Timestamptz(3)
+  receivedAt    DateTime?             @db.Timestamptz(3)
+  playedAt      DateTime?             @db.Timestamptz(3)
+  createdAt     DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime              @updatedAt @db.Timestamptz(3)
+  delivery      ProactiveDelivery     @relation(fields: [deliveryId, userId], references: [id, userId], onDelete: Cascade)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device        Device?               @relation("DeliveryAttemptDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)
+
+  @@unique([deliveryId, attemptNumber])
+  @@index([userId, status, createdAt])
+  @@index([userId, deviceId])
+}
+
+model DeviceWifiConfiguration {
+  id               String                  @id @default(uuid()) @db.Uuid
+  deviceId         String                  @db.Uuid
+  version          Int
+  ssid             String                  @db.VarChar(32)
+  security         WifiSecurity
+  secretCiphertext String?                 @db.Text
+  secretNonce      String?                 @db.VarChar(128)
+  secretTag        String?                 @db.VarChar(128)
+  secretKeyVersion Int?
+  status           WifiConfigurationStatus @default(PENDING)
+  deliveredAt      DateTime?               @db.Timestamptz(3)
+  applyingAt       DateTime?               @db.Timestamptz(3)
+  connectedAt      DateTime?               @db.Timestamptz(3)
+  failedAt         DateTime?               @db.Timestamptz(3)
+  rolledBackAt     DateTime?               @db.Timestamptz(3)
+  supersededAt     DateTime?               @db.Timestamptz(3)
+  errorCode        String?                 @db.VarChar(64)
+  errorDetail      String?                 @db.VarChar(500)
+  createdAt        DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime                @updatedAt @db.Timestamptz(3)
+  device           Device                  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, version])
+  @@index([deviceId, status, updatedAt])
+}
+
+model DeviceTelemetryCurrent {
+  id               String   @id @default(uuid()) @db.Uuid
+  deviceId         String   @unique @db.Uuid
+  wifiConnected    Boolean  @default(false)
+  wifiRssi         Int?
+  batterySupported Boolean  @default(false)
+  batteryPercent   Int?
+  firmwareVersion  String?  @db.VarChar(64)
+  observedAt       DateTime @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+  device           Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+
+model DeviceLog {
+  id         String         @id @default(uuid()) @db.Uuid
+  deviceId   String         @db.Uuid
+  level      DeviceLogLevel
+  code       String         @db.VarChar(64)
+  message    String         @db.VarChar(1000)
+  metadata   String?        @db.VarChar(2000)
+  observedAt DateTime       @db.Timestamptz(3)
+  expiresAt  DateTime?      @db.Timestamptz(3)
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+  device     Device         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, observedAt])
+  @@index([expiresAt])
+}
+
+model IntegrationConnection {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  userId               String                     @db.Uuid
+  provider             IntegrationProvider
+  status               IntegrationStatus          @default(DISCONNECTED)
+  externalReference    String?                    @db.VarChar(255)
+  scopes               String[]
+  statusMetadata       String?                    @db.VarChar(2000)
+  connectedAt          DateTime?                  @db.Timestamptz(3)
+  disconnectedAt       DateTime?                  @db.Timestamptz(3)
+  createdAt            DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime                   @updatedAt @db.Timestamptz(3)
+  user                 User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spotifyCredential    SpotifyCredential?
+  spotifyActions       SpotifyAction[]
+  whatsAppRules        WhatsAppNotificationRule[]
+  whatsAppSendRequests WhatsAppSendRequest[]
+  whatsAppDeliveries   WhatsAppDelivery[]
+
+  @@unique([userId, provider])
+  @@unique([id, userId])
+  @@index([status, updatedAt])
+}
+
+model OAuthState {
+  id            String              @id @default(uuid()) @db.Uuid
+  userId        String              @db.Uuid
+  provider      IntegrationProvider
+  stateVerifier String              @unique @db.Char(64)
+  redirectUri   String              @db.VarChar(2048)
+  requestId     String?             @db.VarChar(128)
+  expiresAt     DateTime            @db.Timestamptz(3)
+  usedAt        DateTime?           @db.Timestamptz(3)
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider, expiresAt, usedAt])
+}
+
+model SpotifyCredential {
+  id                     String                @id @default(uuid()) @db.Uuid
+  userId                 String                @unique @db.Uuid
+  connectionId           String                @unique @db.Uuid
+  accessTokenCiphertext  String                @db.Text
+  accessTokenNonce       String                @db.VarChar(128)
+  accessTokenTag         String                @db.VarChar(128)
+  refreshTokenCiphertext String?               @db.Text
+  refreshTokenNonce      String?               @db.VarChar(128)
+  refreshTokenTag        String?               @db.VarChar(128)
+  keyVersion             Int
+  expiresAt              DateTime              @db.Timestamptz(3)
+  scopes                 String[]
+  createdAt              DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime              @updatedAt @db.Timestamptz(3)
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection             IntegrationConnection @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@unique([connectionId, userId])
+}
+
+model SpotifyAction {
+  id                    String                @id @default(uuid()) @db.Uuid
+  userId                String                @db.Uuid
+  connectionId          String                @db.Uuid
+  action                String                @db.VarChar(64)
+  payload               Json
+  idempotencyKey        String                @db.VarChar(128)
+  status                SpotifyActionStatus   @default(PENDING_CONFIRMATION)
+  confirmationExpiresAt DateTime?             @db.Timestamptz(3)
+  confirmedAt           DateTime?             @db.Timestamptz(3)
+  resultCode            String?               @db.VarChar(64)
+  resultMetadata        String?               @db.VarChar(2000)
+  errorCode             String?               @db.VarChar(64)
+  createdAt             DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection            IntegrationConnection @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status, createdAt])
+}
+
+model WhatsAppNotificationRule {
+  id              String                @id @default(uuid()) @db.Uuid
+  userId          String                @db.Uuid
+  connectionId    String                @db.Uuid
+  scope           WhatsAppRuleScope
+  opaqueTargetRef String?               @db.VarChar(255)
+  enabled         Boolean               @default(true)
+  speakOnDevice   Boolean               @default(false)
+  ruleMetadata    String?               @db.VarChar(2000)
+  createdAt       DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(3)
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection      IntegrationConnection @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@unique([userId, connectionId, scope, opaqueTargetRef])
+  @@index([userId, enabled, updatedAt])
+}
+
+model WhatsAppSendRequest {
+  id                    String                @id @default(uuid()) @db.Uuid
+  userId                String                @db.Uuid
+  connectionId          String                @db.Uuid
+  opaqueRecipientRef    String                @db.VarChar(255)
+  preview               String                @db.VarChar(1000)
+  idempotencyKey        String                @db.VarChar(128)
+  status                WhatsAppSendStatus    @default(PENDING_CONFIRMATION)
+  confirmationExpiresAt DateTime              @db.Timestamptz(3)
+  confirmedAt           DateTime?             @db.Timestamptz(3)
+  errorCode             String?               @db.VarChar(64)
+  expiresAt             DateTime?             @db.Timestamptz(3)
+  createdAt             DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection            IntegrationConnection @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+  deliveries            WhatsAppDelivery[]
+
+  @@unique([id, userId])
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status, createdAt])
+  @@index([expiresAt])
+}
+
+model WhatsAppDelivery {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  userId             String                    @db.Uuid
+  connectionId       String                    @db.Uuid
+  sendRequestId      String?                   @db.Uuid
+  direction          WhatsAppDeliveryDirection
+  status             WhatsAppDeliveryStatus
+  providerMessageRef String?                   @db.VarChar(255)
+  metadata           String?                   @db.VarChar(2000)
+  errorCode          String?                   @db.VarChar(64)
+  deliveredAt        DateTime?                 @db.Timestamptz(3)
+  expiresAt          DateTime?                 @db.Timestamptz(3)
+  createdAt          DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                  @updatedAt @db.Timestamptz(3)
+  user               User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection         IntegrationConnection     @relation(fields: [connectionId, userId], references: [id, userId], onDelete: Cascade)
+  sendRequest        WhatsAppSendRequest?      @relation(fields: [sendRequestId, userId], references: [id, userId], onDelete: Restrict)
+
+  @@index([userId, status, createdAt])
+  @@index([connectionId, providerMessageRef])
+  @@index([expiresAt])
+}
+
+model BugReport {
+  id          String                @id @default(uuid()) @db.Uuid
+  userId      String                @db.Uuid
+  category    String                @db.VarChar(64)
+  description String                @db.VarChar(4000)
+  context     String?               @db.VarChar(4000)
+  status      BugReportStatus       @default(RECEIVED)
+  createdAt   DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime              @updatedAt @db.Timestamptz(3)
+  resolvedAt  DateTime?             @db.Timestamptz(3)
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments BugReportAttachment[]
+
+  @@index([userId, status, createdAt])
+}
+
+model BugReportAttachment {
+  id          String    @id @default(uuid()) @db.Uuid
+  bugReportId String    @db.Uuid
+  storageKey  String    @unique @db.VarChar(255)
+  contentType String    @db.VarChar(100)
+  byteSize    Int
+  sha256      String    @db.Char(64)
+  expiresAt   DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  bugReport   BugReport @relation(fields: [bugReportId], references: [id], onDelete: Cascade)
+
+  @@index([bugReportId, createdAt])
+  @@index([expiresAt])
 }

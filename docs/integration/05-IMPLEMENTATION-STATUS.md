@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-11
-**Last implementation checkpoint:** 2026-08-11 — Slice 1 source/review-candidate integration
+**Last implementation checkpoint:** 2026-08-11 — Slice 2A additive application data foundation in source
 **Baseline source:** `main` / `d638b20c381c676136c94524a38a1def5d70e565`
 **Documentation branch:** `docs/integration-contract-freeze`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -72,6 +72,7 @@ At audit time the candidate database was approximately 9.3 MB with two active co
 | Six-digit pairing | `EXISTING_VERIFIED` | Source + DB-backed candidate; mobile bearer routes, 10-minute TTL, five attempts; physical pairing not proven |
 | Device CRUD/settings | `EXISTING_VERIFIED` | Source + private candidate; settings are DB-only and do not sync to ESP |
 | P9.1 Prisma foundation | `EXISTING_VERIFIED` | 11 models; two additive migrations; not the target integration schema |
+| Phase 2 application data foundation | `EXISTING_VERIFIED` | Source schema/migration only: 27 additive models (38 total), explicit ownership/idempotency/secret-shape constraints, repository delegates, and migration `20260811190000_phase2_application_foundation`. The migration has not been applied to the running private candidate or public production. |
 | Production P9.1 activation | `READY_TO_IMPLEMENT` | Existing router is disabled on production |
 | Production-shaped P9.1 integration | `EXISTING_VERIFIED` | Source + automated review-runtime packaging: the full Backend runtime registers P9 and existing voice surfaces together. Review Compose keeps Backend on host networking for loopback Hermes/Audio, removes PostgreSQL host publication, and connects Backend to PostgreSQL through a shared Unix-socket volume. The running private candidate has not been recreated and public production remains unchanged. |
 
@@ -116,32 +117,32 @@ is liveness evidence and never substitutes for integrated readiness.
 | Capability | Status | Exact gap / gate |
 |---|---|---|
 | Self-service registration | `READY_TO_IMPLEMENT` | Remove invitation dependency without weakening existing credential handling |
-| DOB password recovery | `READY_TO_IMPLEMENT` | Schema, abuse controls, audit, and routes absent |
-| Profile, username, avatar | `READY_TO_IMPLEMENT` | Target schema/routes absent |
-| Personalization | `READY_TO_IMPLEMENT` | Existing `UserSettings` is narrower |
+| DOB password recovery | `READY_TO_IMPLEMENT` | Nullable DOB and verifier-only bounded recovery storage are source-verified; service abuse controls and routes remain absent |
+| Profile, username, avatar | `READY_TO_IMPLEMENT` | Nullable normalized username and opaque avatar metadata are source-verified; application validation/media/routes remain absent |
+| Personalization | `READY_TO_IMPLEMENT` | One-to-one source model is verified; service/routes remain absent |
 | Mobile realtime `/api/v1/ws` | `READY_TO_IMPLEMENT` | Separate contract absent |
-| Chat/history and Hermes-backed send | `READY_TO_IMPLEMENT` | Durable chat models/routes absent |
-| Memory | `READY_TO_IMPLEMENT` | Models/routes/lifecycle absent |
-| Schedules | `READY_TO_IMPLEMENT` | Models, worker, routes, and delivery state absent |
-| Wi-Fi DB/API/queue | `READY_TO_IMPLEMENT` | Backend data plane absent |
+| Chat/history and Hermes-backed send | `READY_TO_IMPLEMENT` | Durable source models/cursors/idempotency/202-operation state are verified; services/routes/Hermes orchestration remain absent |
+| Memory | `READY_TO_IMPLEMENT` | Durable record/candidate/action/topic-forget/summary source models are verified; gateway/routes/lifecycle runtime remain absent |
+| Schedules | `READY_TO_IMPLEMENT` | Durable schedule/run/delivery source models are verified; worker/routes/runtime remain absent |
+| Wi-Fi DB/API/queue | `READY_TO_IMPLEMENT` | Versioned encrypted desired-state source model is verified; encryption service/API/queue remain absent |
 | Wi-Fi ESP apply/status | `PENDING_PHYSICAL_ESP` | Additive ESP events and physical proof absent; first-boot bootstrap remains a hardware decision |
-| Device logs API/storage | `READY_TO_IMPLEMENT` | Backend ingestion/storage absent |
-| Telemetry/RSSI API/storage | `READY_TO_IMPLEMENT` | Backend ingestion/current state absent |
+| Device logs API/storage | `READY_TO_IMPLEMENT` | Bounded expiring log source model is verified; ingestion/API remain absent |
+| Telemetry/RSSI API/storage | `READY_TO_IMPLEMENT` | Current telemetry source model and battery/RSSI checks are verified; ingestion/API remain absent |
 | Telemetry/settings ESP events | `PENDING_PHYSICAL_ESP` | Firmware handlers/physical proof absent; battery value is nullable |
-| Generic proactive queue/API | `READY_TO_IMPLEMENT` | Backend queue/delivery model absent |
+| Generic proactive queue/API | `READY_TO_IMPLEMENT` | User/device-owned delivery and attempt source models are verified; queue/API runtime remains absent |
 | Generic proactive playback | `PENDING_PHYSICAL_ESP` | Firmware event handling and physical playback proof absent |
-| WhatsApp adapter/catalog | `READY_TO_IMPLEMENT` | BMO API/data contract absent |
+| WhatsApp adapter/catalog | `READY_TO_IMPLEMENT` | Connection/rule/send/delivery source records exist without provider session bytes; adapter/routes remain absent |
 | WhatsApp live provider | `BLOCKED` | Hermes capability exists, but an actual BMO session/API boundary and credentials were not verified |
-| Spotify adapter/catalog | `READY_TO_IMPLEMENT` | BMO API/data contract absent |
+| Spotify adapter/catalog | `READY_TO_IMPLEMENT` | OAuth state, encrypted credential, and action source records exist; adapter/routes remain absent |
 | Spotify live OAuth | `BLOCKED` | Provider application credentials and callback registration not verified |
-| Bug reports | `READY_TO_IMPLEMENT` | Models/routes absent |
+| Bug reports | `READY_TO_IMPLEMENT` | Report/attachment source models exist; storage service and route remain absent |
 | Voice preview | `DEFERRED` | Last-priority optional surface |
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 188 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs.
+- Backend on Node `22.23.1`: 42 files passed, 1 skipped; 193 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs.
 - Backend typecheck and build: passed on Node `22.23.1`.
-- Prisma validation: passed. Candidate `/ops/db/livez`, `/readyz`, and `/migrations`: healthy/private.
+- Prisma validation and generated-client typecheck/build: passed. The source manifest now requires three migrations. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the new migration is not applied there.
 - Static/rendered integrated-candidate packaging: passed; PostgreSQL has no host-published port and Backend uses the named Unix-socket volume. The live candidate was not recreated.
 - Audio Service: 103 tests passed in the production audio image.
 - Documentation verifier: passed before synchronization and must pass again on the final tree.
@@ -154,6 +155,6 @@ is liveness evidence and never substitutes for integrated readiness.
 3. `PENDING_PHYSICAL_ESP`: first-boot Wi-Fi bootstrap, battery sensing capability, additive events, and physical playback require firmware/bench evidence.
 4. Current UFW/nft rules remain unreadable without passworded elevated privileges. Listener, Docker, and Caddy evidence prove no service currently accepts port 5555; firewall-policy inspection remains an operator evidence gap for final public/private sign-off.
 
-## Phase 2 starting point
+## Phase 2 next source slice
 
-Use `04-VPS-IMPLEMENTATION-PLAN.md`. First close the Prisma Studio exposure, confirm drift-free source/runtime, then integrate the existing P9.1 router into the production Backend API candidate path while preserving device voice. Do not start with a production migration or physical-ESP claim.
+Use `04-VPS-IMPLEMENTATION-PLAN.md`. Build account/profile/recovery and personalization services/routes against the reviewed additive source schema, preserving `SafeUser` DOB exclusion and existing P9.1 behavior. Review and execute the new migration only at a separately authorized disposable/candidate gate; do not apply it to the running candidate or production from this source checkpoint.

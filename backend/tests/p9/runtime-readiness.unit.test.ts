@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { checkP9Readiness } from "../../src/p9/index.js";
+import { P9_REQUIRED_MIGRATIONS } from "../../src/p9/migration-manifest.js";
 
 describe("P9 runtime readiness", () => {
   const foundation = "20260804110000_p9_1_foundation";
@@ -10,8 +11,7 @@ describe("P9 runtime readiness", () => {
     const repositories = {
       healthCheck: vi.fn().mockResolvedValue(undefined),
       migrationStatus: vi.fn().mockResolvedValue([
-        { name: foundation, finishedAt: new Date() },
-        { name: integrityConstraints, finishedAt: new Date() },
+        ...P9_REQUIRED_MIGRATIONS.map((name) => ({ name, finishedAt: new Date() })),
         { name: "older_extra_migration", finishedAt: new Date() },
       ]),
     };

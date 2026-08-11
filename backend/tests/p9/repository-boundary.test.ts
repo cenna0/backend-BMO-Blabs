@@ -23,4 +23,40 @@ describe("P9 repository boundary", () => {
     const source = await readSourceDirectory(httpDirectory);
     expect(source).not.toMatch(/from ["'](?:@prisma\/client|\.\.\/.*prisma)/);
   });
+
+  it("exposes focused Phase 2 delegates through the repository boundary", async () => {
+    const repositories = await readFile(new URL("../../src/p9/db/repositories.ts", import.meta.url), "utf8");
+    for (const delegate of [
+      "passwordRecovery",
+      "personalizationSettings",
+      "chatSession",
+      "chatMessage",
+      "chatOperation",
+      "chatMessageFeedback",
+      "memoryRecord",
+      "memoryCandidate",
+      "memoryAction",
+      "memoryTopicForget",
+      "memorySummary",
+      "schedule",
+      "scheduleRun",
+      "proactiveDelivery",
+      "deliveryAttempt",
+      "deviceWifiConfiguration",
+      "deviceTelemetryCurrent",
+      "deviceLog",
+      "integrationConnection",
+      "oAuthState",
+      "spotifyCredential",
+      "spotifyAction",
+      "whatsAppNotificationRule",
+      "whatsAppSendRequest",
+      "whatsAppDelivery",
+      "bugReport",
+      "bugReportAttachment",
+    ]) {
+      expect(repositories).toContain(`get ${delegate}()`);
+      expect(repositories).toContain(`return this.db.${delegate};`);
+    }
+  });
 });

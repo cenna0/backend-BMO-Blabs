@@ -68,4 +68,112 @@ export class P9Repositories {
   get auditEvent() {
     return this.db.auditEvent;
   }
+
+  get passwordRecovery() {
+    return this.db.passwordRecovery;
+  }
+
+  get personalizationSettings() {
+    return this.db.personalizationSettings;
+  }
+
+  get chatSession() {
+    return this.db.chatSession;
+  }
+
+  get chatMessage() {
+    return this.db.chatMessage;
+  }
+
+  get chatOperation() {
+    return this.db.chatOperation;
+  }
+
+  get chatMessageFeedback() {
+    return this.db.chatMessageFeedback;
+  }
+
+  get memoryRecord() {
+    return this.db.memoryRecord;
+  }
+
+  get memoryCandidate() {
+    return this.db.memoryCandidate;
+  }
+
+  get memoryAction() {
+    return this.db.memoryAction;
+  }
+
+  get memoryTopicForget() {
+    return this.db.memoryTopicForget;
+  }
+
+  get memorySummary() {
+    return this.db.memorySummary;
+  }
+
+  get schedule() {
+    return this.db.schedule;
+  }
+
+  get scheduleRun() {
+    return this.db.scheduleRun;
+  }
+
+  get proactiveDelivery() {
+    return this.db.proactiveDelivery;
+  }
+
+  get deliveryAttempt() {
+    return this.db.deliveryAttempt;
+  }
+
+  get deviceWifiConfiguration() {
+    return this.db.deviceWifiConfiguration;
+  }
+
+  get deviceTelemetryCurrent() {
+    return this.db.deviceTelemetryCurrent;
+  }
+
+  get deviceLog() {
+    return this.db.deviceLog;
+  }
+
+  get integrationConnection() {
+    return this.db.integrationConnection;
+  }
+
+  get oAuthState() {
+    return this.db.oAuthState;
+  }
+
+  get spotifyCredential() {
+    return this.db.spotifyCredential;
+  }
+
+  get spotifyAction() {
+    return this.db.spotifyAction;
+  }
+
+  get whatsAppNotificationRule() {
+    return this.db.whatsAppNotificationRule;
+  }
+
+  get whatsAppSendRequest() {
+    return this.db.whatsAppSendRequest;
+  }
+
+  get whatsAppDelivery() {
+    return this.db.whatsAppDelivery;
+  }
+
+  get bugReport() {
+    return this.db.bugReport;
+  }
+
+  get bugReportAttachment() {
+    return this.db.bugReportAttachment;
+  }
 }

@@ -3,6 +3,12 @@
 **Frozen:** 2026-08-11
 **Rule:** Status uses `08-DOCS-MAINTENANCE-PROTOCOL.md`; availability is independent from implementation status.
 
+Slice 2A adds the durable source schema behind the target routes below. It does
+not register any route or event, so their `READY_TO_IMPLEMENT` and
+`PENDING_PHYSICAL_ESP` states do not change. Migration
+`20260811190000_phase2_application_foundation` is source-verified only and has
+not been applied to the running candidate or production.
+
 ## Runtime and existing voice surfaces
 
 | Method/surface | Path/event | Status | Availability / evidence |
@@ -33,15 +39,15 @@ deployed or enabled there.
 | POST | `/api/v1/auth/logout` | `EXISTING_VERIFIED` | Private candidate |
 | POST | `/api/v1/auth/logout-all` | `EXISTING_VERIFIED` | Private candidate |
 | GET | `/api/v1/me` | `EXISTING_VERIFIED` | Private candidate; extended profile fields absent |
-| POST | `/api/v1/auth/password/recovery/verify` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/auth/password/recovery/reset` | `READY_TO_IMPLEMENT` | Not registered |
-| PATCH | `/api/v1/me/profile` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/me/avatar` | `READY_TO_IMPLEMENT` | Not registered |
+| POST | `/api/v1/auth/password/recovery/verify` | `READY_TO_IMPLEMENT` | Not registered; verifier-only recovery storage exists in source schema only |
+| POST | `/api/v1/auth/password/recovery/reset` | `READY_TO_IMPLEMENT` | Not registered; source schema does not imply runtime abuse controls |
+| PATCH | `/api/v1/me/profile` | `READY_TO_IMPLEMENT` | Not registered; nullable DOB/username/avatar metadata exist in source schema only |
+| POST | `/api/v1/me/avatar` | `READY_TO_IMPLEMENT` | Not registered; opaque media metadata exists in source schema only |
 | GET | `/media/avatars/:opaqueId.webp` | `READY_TO_IMPLEMENT` | Not registered; opaque public media identifier target |
 | GET | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
 | PATCH | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/settings/personalization` | `READY_TO_IMPLEMENT` | Not registered |
-| PATCH | `/api/v1/settings/personalization` | `READY_TO_IMPLEMENT` | Not registered |
+| GET | `/api/v1/settings/personalization` | `READY_TO_IMPLEMENT` | Not registered; one-to-one source model exists |
+| PATCH | `/api/v1/settings/personalization` | `READY_TO_IMPLEMENT` | Not registered; service validation remains absent |
 
 ## Pairing and devices
 

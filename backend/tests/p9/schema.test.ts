@@ -4,8 +4,13 @@ import { describe, expect, it } from "vitest";
 import { P9_REQUIRED_MIGRATIONS } from "../../src/p9/migration-manifest.js";
 
 const schemaPath = new URL("../../prisma/schema.prisma", import.meta.url);
+const phase2MigrationName = "20260811190000_phase2_application_foundation";
+const phase2MigrationPath = new URL(
+  `../../prisma/migrations/${phase2MigrationName}/migration.sql`,
+  import.meta.url,
+);
 
-describe("P9.1 Prisma schema", () => {
+describe("P9 Prisma schema", () => {
   it("keeps the runtime readiness manifest identical to source migration directories", async () => {
     const migrationDirectory = new URL("../../prisma/migrations/", import.meta.url);
     const migrationDirectories = (await readdir(migrationDirectory, { withFileTypes: true }))
@@ -15,7 +20,7 @@ describe("P9.1 Prisma schema", () => {
     expect(P9_REQUIRED_MIGRATIONS).toEqual(migrationDirectories);
   });
 
-  it("contains only the eleven P9.1 foundation models", async () => {
+  it("preserves P9.1 and declares the exact Phase 2 application foundation models", async () => {
     const schema = await readFile(schemaPath, "utf8");
     const models = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)].map((match) => match[1]);
     expect(models).toEqual([
@@ -30,8 +35,34 @@ describe("P9.1 Prisma schema", () => {
       "UserSettings",
       "DeviceSettings",
       "AuditEvent",
+      "PasswordRecovery",
+      "PersonalizationSettings",
+      "ChatSession",
+      "ChatMessage",
+      "ChatOperation",
+      "ChatMessageFeedback",
+      "MemoryRecord",
+      "MemoryCandidate",
+      "MemoryAction",
+      "MemoryTopicForget",
+      "MemorySummary",
+      "Schedule",
+      "ScheduleRun",
+      "ProactiveDelivery",
+      "DeliveryAttempt",
+      "DeviceWifiConfiguration",
+      "DeviceTelemetryCurrent",
+      "DeviceLog",
+      "IntegrationConnection",
+      "OAuthState",
+      "SpotifyCredential",
+      "SpotifyAction",
+      "WhatsAppNotificationRule",
+      "WhatsAppSendRequest",
+      "WhatsAppDelivery",
+      "BugReport",
+      "BugReportAttachment",
     ]);
-    expect(schema).not.toMatch(/model\s+(Chat|Memory|Schedule|Spotify|WhatsApp)/);
   });
 
   it("declares secret-safe uniqueness and ownership constraints", async () => {
@@ -78,5 +109,66 @@ describe("P9.1 Prisma schema", () => {
     expect(migrationSql).toContain("DevicePairing_device_owner_fkey");
     expect(migrationSql).toContain("UserSettings_timezone_ck");
     expect(migrationSql).toContain("DeviceSettings_voice_bounds_ck");
+  });
+
+  it("adds profile and recovery data without exposing plaintext verifiers", async () => {
+    const schema = await readFile(schemaPath, "utf8");
+    expect(schema).toMatch(/dateOfBirth\s+DateTime\?\s+@db\.Date/);
+    expect(schema).toMatch(/username\s+String\?\s+@unique\s+@db\.VarChar\(30\)/);
+    expect(schema).toMatch(/avatarKey\s+String\?\s+@unique/);
+    expect(schema).toMatch(/model PasswordRecovery[\s\S]*tokenVerifier\s+String\s+@unique\s+@db\.Char\(64\)/);
+    expect(schema).toMatch(/model PasswordRecovery[\s\S]*attemptCount\s+Int\s+@default\(0\)/);
+    expect(schema).not.toMatch(/^\s*(?:password|accessToken|refreshToken)\s+String/m);
+  });
+
+  it("declares user-scoped chat cursors, idempotency, operations, and owner-safe device links", async () => {
+    const schema = await readFile(schemaPath, "utf8");
+    expect(schema).toMatch(/cursor\s+BigInt\s+@default\(autoincrement\(\)\)/);
+    expect(schema).toContain("@@unique([sessionId, cursor])");
+    expect(schema).toContain("@@unique([userId, idempotencyKey])");
+    expect(schema).toMatch(/model ChatOperation[\s\S]*status\s+ChatOperationStatus/);
+    expect(schema).toMatch(/model ChatMessageFeedback[\s\S]*@@unique\(\[userId, messageId\]\)/);
+    expect(schema).toContain(
+      '@relation("ChatSessionDevice", fields: [deviceId, userId], references: [id, userId], onDelete: Restrict)',
+    );
+    expect(schema).toContain(
+      "delivery      ProactiveDelivery     @relation(fields: [deliveryId, userId], references: [id, userId], onDelete: Cascade)",
+    );
+  });
+
+  it("declares memory, schedule, delivery, device, integration, and support durability boundaries", async () => {
+    const schema = await readFile(schemaPath, "utf8");
+    expect(schema).toMatch(/enum ScheduleStatus[\s\S]*ACTIVE[\s\S]*PAUSED[\s\S]*CANCELLED[\s\S]*COMPLETED/);
+    expect(schema).toMatch(/enum DeliverySource[\s\S]*CHAT[\s\S]*SCHEDULE[\s\S]*WHATSAPP/);
+    expect(schema).toMatch(/enum WifiSecurity[\s\S]*OPEN[\s\S]*WPA_PSK/);
+    expect(schema).toMatch(/enum WifiConfigurationStatus[\s\S]*SUPERSEDED/);
+    expect(schema).toMatch(/model MemorySummary[\s\S]*userId\s+String\s+@unique/);
+    expect(schema).toMatch(/model Schedule[\s\S]*timezone\s+String\s+@default\("Asia\/Jakarta"\)/);
+    expect(schema).toMatch(/model ScheduleRun[\s\S]*@@unique\(\[scheduleId, dueAt\]\)/);
+    expect(schema).toMatch(/model DeviceTelemetryCurrent[\s\S]*deviceId\s+String\s+@unique/);
+    expect(schema).toMatch(/model DeviceLog[\s\S]*@@index\(\[expiresAt\]\)/);
+    expect(schema).toMatch(/model OAuthState[\s\S]*stateVerifier\s+String\s+@unique\s+@db\.Char\(64\)/);
+    expect(schema).toMatch(/model SpotifyCredential[\s\S]*accessTokenCiphertext[\s\S]*refreshTokenCiphertext/);
+    expect(schema).toMatch(/model PasswordRecovery[\s\S]*requestId\s+String\?\s+@db\.VarChar\(128\)/);
+    expect(schema).toMatch(/model DeviceLog[\s\S]*metadata\s+String\?\s+@db\.VarChar\(2000\)/);
+    expect(schema).toMatch(/model SpotifyAction[\s\S]*resultCode\s+String\?[\s\S]*resultMetadata\s+String\?/);
+    expect(schema).toMatch(/model WhatsAppDelivery[\s\S]*metadata\s+String\?\s+@db\.VarChar\(2000\)/);
+    expect(schema).toMatch(/model BugReport[\s\S]*context\s+String\?\s+@db\.VarChar\(4000\)/);
+    expect(schema).not.toMatch(/requestMetadata\s+Json|providerResult\s+Json|model DeviceLog[\s\S]*metadata\s+Json/);
+    expect(schema).not.toMatch(/providerSession/);
+    expect(schema).toMatch(/model BugReportAttachment/);
+  });
+
+  it("ships one additive, non-destructive Phase 2 migration with critical checks", async () => {
+    const migrationSql = await readFile(phase2MigrationPath, "utf8");
+    expect(migrationSql).not.toMatch(/^\s*(?:DROP|TRUNCATE|DELETE)\b/im);
+    expect(migrationSql).toMatch(/ALTER TABLE "User"[\s\S]*ADD COLUMN\s+"dateOfBirth" DATE/);
+    expect(migrationSql).toContain("User_username_normalized_ck");
+    expect(migrationSql).toContain("PasswordRecovery_attempt_bounds_ck");
+    expect(migrationSql).toContain("ChatSession_device_owner_fkey");
+    expect(migrationSql).toContain("DeliveryAttempt_delivery_owner_fkey");
+    expect(migrationSql).toContain("DeviceWifiConfiguration_secret_shape_ck");
+    expect(migrationSql).toContain("DeviceTelemetryCurrent_battery_ck");
+    expect(migrationSql).toContain("DeviceSettings_delivery_version_ck");
   });
 });
