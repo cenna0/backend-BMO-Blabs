@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { PrismaClient } from "../../generated/prisma/client.js";
-import { hashPassword, verifyPassword } from "../crypto.js";
+import { hashPassword, sha256Hex, verifyPassword } from "../crypto.js";
 import { withP9Transaction } from "../db/client.js";
 import { P9Repositories } from "../db/repositories.js";
 import { P9Error } from "../errors.js";
@@ -117,25 +117,20 @@ export class AuthService {
       where: { email },
       select: { id: true },
     });
-    if (!discoveredUser) {
-      await verifyPassword(await dummyPasswordHash, parsed.password);
-      await new AuditService(this.options.repositories).record({
-        eventType: "LOGIN_FAILED",
-        outcome: "failure",
-        actorType: "anonymous",
-        resourceType: "session",
-        ...(requestId === undefined ? {} : { context: { requestId } }),
-        metadata: { email },
-      }).catch(() => undefined);
-      throw new P9Error("AUTHENTICATION_FAILED", 401, "Authentication failed");
-    }
     const result = await withP9Transaction(this.options.client, async (transaction) => {
       const repositories = new P9Repositories(transaction);
-      await repositories.lockUser(discoveredUser.id);
-      const user = await repositories.user.findUnique({
-        where: { id: discoveredUser.id },
+      await repositories.lockUser(discoveredUser?.id ?? `login-miss:${sha256Hex(email)}`);
+      let user = await repositories.user.findUnique({
+        where: { email },
         include: { passwordCredential: true },
       });
+      if (user && user.id !== discoveredUser?.id) {
+        await repositories.lockUser(user.id);
+        user = await repositories.user.findUnique({
+          where: { id: user.id },
+          include: { passwordCredential: true },
+        });
+      }
       const passwordHash = user?.passwordCredential?.passwordHash ?? (await dummyPasswordHash);
       const valid = await verifyPassword(passwordHash, parsed.password);
       if (!user || !user.passwordCredential || !valid) return null;

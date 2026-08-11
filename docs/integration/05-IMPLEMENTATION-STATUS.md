@@ -117,9 +117,14 @@ optional legacy invitation consumption and operator tooling. Registration
 strictly normalizes email, requires a valid non-future calendar DOB, preserves
 Argon2id/session issuance, and returns `username`/`avatarUrl` without DOB. The
 DOB future boundary uses the fixed `Asia/Jakarta` calendar day. Login discovers
-the account, takes the per-user advisory lock, refetches the credential, then
-verifies and issues the session in one transaction, preventing an old-password
-verification from issuing after a completed reset.
+the account, enters one transaction, takes either the real per-user advisory
+lock or a namespaced stable SHA-256-derived dummy lock for a miss, performs an
+authoritative post-lock lookup, then performs exactly one Argon2 verification.
+If registration appears between discovery and that lookup, login takes the new
+real-user lock and refetches the current credential before verification and
+session issuance. This keeps known-invalid and unknown work shapes comparable
+while preventing an old-password verification from issuing after a completed
+reset.
 Profile updates bind only to bearer ownership, normalize username to the
 database-enforced lowercase form, sanitize uniqueness conflicts, and prevent
 mass assignment.
@@ -182,7 +187,7 @@ is deliberately deferred to a later slice.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 47 files passed, 1 skipped; 239 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs and was not run. Slice 2B focused account/profile/recovery/avatar/personalization and review-race coverage is included in those totals.
+- Backend on Node `22.23.1`: 48 files passed, 1 skipped; 241 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs and was not run. Slice 2B focused account/profile/recovery/avatar/personalization, login-enumeration work-shape, and review-race coverage is included in those totals.
 - Backend typecheck and build: passed on Node `22.23.1`.
 - Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. On disposable PostgreSQL, an empty three-migration deploy passed, repeat deploy reported no pending migrations, and a populated two-to-three migration upgrade preserved seeded rows in all 11 P9.1 models. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints, and the repeated database-to-schema diff returned `No difference detected`. Transaction-rolled-back positive/negative probes also verified avatar, Wi-Fi AEAD, battery, device-log expiry, provider-subtype, Spotify refresh-secret, and WhatsApp rule constraints. The disposable databases and review images were removed after verification. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the running `bmo` database still has only the two P9.1 migrations.
 - Static/rendered packaging: 13 tests passed, 1 unrelated packaging test skipped. PostgreSQL has no host-published port, Backend uses the named Unix-socket volume, and avatar storage uses a separate writable named volume without adding public routing. Fresh production Backend and P9 review-candidate image builds passed; no container was started and the live candidate was not recreated.

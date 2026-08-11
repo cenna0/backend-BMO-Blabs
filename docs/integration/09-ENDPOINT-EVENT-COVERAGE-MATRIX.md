@@ -39,7 +39,7 @@ deployed or enabled there.
 | Method | Path | Status | Availability / gap |
 |---|---|---|---|
 | POST | `/api/v1/auth/register` | `EXISTING_VERIFIED` | Slice 2B source/tests: self-service email/password/DOB; optional invitation compatibility only. Running private candidate remains invitation-era and public production unchanged |
-| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + Slice 2B source tests; lock/refetch/verify/issue is one per-user transaction, canonical `SafeUser` adds validated username/avatar URL, and optional `clientDeviceId` issuance remains owner-locked |
+| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + Slice 2B source tests; every valid normalized email uses discovery, one transaction, real-or-stable-dummy lock, authoritative lookup, and one Argon2 verify; registration-between-lookups re-locks/refetches the real user before issue |
 | POST | `/api/v1/auth/refresh` | `EXISTING_VERIFIED` | Private candidate + source race tests; discover owner, lock, refetch, validate, then rotate with replay-family revocation |
 | POST | `/api/v1/auth/logout` | `EXISTING_VERIFIED` | Private candidate |
 | POST | `/api/v1/auth/logout-all` | `EXISTING_VERIFIED` | Private candidate |

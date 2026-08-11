@@ -51,6 +51,10 @@ refresh families. Audits contain event/user/request identifiers only, never DOB
 or the raw recovery token. Reset, login verification/session issuance, and
 refresh validation/rotation serialize through the same per-user transaction
 lock and refetch authoritative credential/token state after acquiring it.
+Valid-email login misses use a namespaced stable SHA-256-derived dummy advisory
+lock inside the same transaction and perform the same authoritative lookup and
+single Argon2 verification as known-invalid accounts. A user appearing between
+discovery and lookup is real-user locked and refetched before verification.
 
 Avatar source limits multipart input to 5 MiB and JPEG/PNG/WebP declarations,
 then verifies decoded metadata, bounds decoded pixels, strips metadata through
