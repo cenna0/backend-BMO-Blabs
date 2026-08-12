@@ -177,6 +177,12 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     }
     if (p9) {
       try {
+        const resumed = await p9.resumePendingChat();
+        if (resumed > 0) logger.info({ resumed_operations: resumed }, "resumed pending chat operations");
+      } catch (error) {
+        logger.warn({ err: error }, "pending chat recovery deferred to next maintenance interval");
+      }
+      try {
         const cleanup = await p9.reconcileAvatars();
         if (cleanup.removed > 0) {
           logger.info({ removed_files: cleanup.removed }, "removed orphan avatar files");

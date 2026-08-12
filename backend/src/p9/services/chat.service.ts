@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import { ChatFeedbackRating } from "../../generated/prisma/enums.js";
 import type { HermesGenerateClient } from "../../services/hermes.client.js";
@@ -39,13 +41,14 @@ export interface ChatFeedbackInput {
 }
 
 interface QueueReservation {
-  commit(job: () => Promise<void>): void;
+  commit(key: string, job: () => Promise<void>): void;
   release(): void;
 }
 
-class BoundedChatQueue {
-  readonly #waiting: Array<() => Promise<void>> = [];
+export class BoundedChatQueue {
+  readonly #waiting: Array<{ key: string; job: () => Promise<void> }> = [];
   readonly #idleWaiters = new Set<() => void>();
+  readonly #activeKeys = new Set<string>();
   #active = 0;
   #reserved = 0;
   #closed = false;
@@ -59,11 +62,11 @@ class BoundedChatQueue {
     this.#reserved += 1;
     let consumed = false;
     return {
-      commit: (job) => {
+      commit: (key, job) => {
         if (consumed) throw new Error("chat queue reservation already consumed");
         consumed = true;
         this.#reserved -= 1;
-        this.#waiting.push(job);
+        this.#waiting.push({ key, job });
         this.#drain();
       },
       release: () => {
@@ -87,11 +90,15 @@ class BoundedChatQueue {
 
   #drain(): void {
     while (this.#active < this.maxConcurrent) {
-      const job = this.#waiting.shift();
-      if (!job) break;
+      const index = this.#waiting.findIndex(({ key }) => !this.#activeKeys.has(key));
+      if (index < 0) break;
+      const [entry] = this.#waiting.splice(index, 1);
+      if (!entry) break;
       this.#active += 1;
-      void job().catch(() => undefined).finally(() => {
+      this.#activeKeys.add(entry.key);
+      void entry.job().catch(() => undefined).finally(() => {
         this.#active -= 1;
+        this.#activeKeys.delete(entry.key);
         this.#drain();
         this.#resolveIdle();
       });
@@ -102,6 +109,25 @@ class BoundedChatQueue {
     if (this.#active !== 0 || this.#waiting.length !== 0 || this.#reserved !== 0) return;
     for (const resolve of this.#idleWaiters) resolve();
     this.#idleWaiters.clear();
+  }
+}
+
+class KeyedChatQueue {
+  readonly #tails = new Map<string, Promise<void>>();
+
+  async run<T>(key: string, work: () => Promise<T>): Promise<T> {
+    const previous = this.#tails.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => { release = resolve; });
+    const tail = previous.catch(() => undefined).then(() => current);
+    this.#tails.set(key, tail);
+    await previous.catch(() => undefined);
+    try {
+      return await work();
+    } finally {
+      release();
+      if (this.#tails.get(key) === tail) this.#tails.delete(key);
+    }
   }
 }
 
@@ -126,7 +152,7 @@ interface AcceptedMessage {
   };
 }
 
-interface ChatJob {
+export interface ChatJob {
   userId: string;
   sessionId: string;
   userMessageId: string;
@@ -176,6 +202,8 @@ export class ChatService {
   readonly #transaction: <T>(work: (repositories: P9Repositories) => Promise<T>) => Promise<T>;
   readonly #memory: ChatMemoryContextProvider;
   readonly #queue: BoundedChatQueue;
+  readonly #sessionQueue = new KeyedChatQueue();
+  readonly #activeControllers = new Map<string, AbortController>();
 
   constructor(private readonly options: ChatServiceOptions) {
     if (!options.transaction && !options.client) throw new Error("ChatService requires a transaction boundary");
@@ -281,7 +309,10 @@ export class ChatService {
           } satisfies ChatJob,
         };
       });
-      if (accepted.job) reservation.commit(() => this.#process(accepted.job!));
+      if (accepted.job) reservation.commit(
+        `${accepted.job.userId}:${accepted.job.sessionId}`,
+        () => this.processAcceptedOperation(accepted.job!),
+      );
       else reservation.release();
       return accepted.response;
     } catch (error) {
@@ -291,7 +322,7 @@ export class ChatService {
   }
 
   async deleteSession(userId: string, sessionId: string, requestId?: string): Promise<void> {
-    await this.#transaction(async (repositories) => {
+    const cancelledOperationIds = await this.#transaction(async (repositories) => {
       await repositories.lockUser(userId);
       await this.#requireOwnedSession(repositories, userId, sessionId);
       const now = await repositories.databaseNow();
@@ -300,6 +331,10 @@ export class ChatService {
         data: { status: "DELETED", deletedAt: now },
       });
       if (updated.count !== 1) throw new P9Error("OWNERSHIP_DENIED", 404, "Chat session not found");
+      const processing = await repositories.chatOperation.findMany({
+        where: { userId, userMessage: { sessionId }, status: "PROCESSING" },
+        select: { id: true },
+      });
       await repositories.chatMessage.updateMany({
         where: { sessionId, userId, deletedAt: null }, data: { deletedAt: now },
       });
@@ -312,7 +347,9 @@ export class ChatService {
         resourceType: "chat_session", resourceId: sessionId, userId,
         ...(requestId === undefined ? {} : { context: { requestId } }),
       });
+      return processing.map((operation) => operation.id);
     });
+    for (const operationId of cancelledOperationIds) this.#activeControllers.get(operationId)?.abort();
   }
 
   async setFeedback(userId: string, messageId: string, input: ChatFeedbackInput, requestId?: string) {
@@ -342,24 +379,36 @@ export class ChatService {
   }
 
   async resumePending(): Promise<number> {
-    const pending = await this.options.repositories.chatOperation.findMany({
-      where: { status: "PROCESSING", userMessage: { deletedAt: null, session: { status: "ACTIVE", deletedAt: null } } },
-      include: { userMessage: true }, orderBy: { startedAt: "asc" }, take: 64,
-    });
     let resumed = 0;
-    for (const operation of pending) {
-      const reservation = this.#queue.reserve();
-      if (!reservation) break;
-      reservation.commit(() => this.#process({
-        userId: operation.userId,
-        sessionId: operation.userMessage.sessionId,
-        userMessageId: operation.userMessageId,
-        operationId: operation.id,
-        text: operation.userMessage.content,
-      }));
-      resumed += 1;
+    while (true) {
+      const leaseCutoff = new Date(Date.now() - this.options.hardTimeoutMs - 30_000);
+      const pending = await this.options.repositories.chatOperation.findMany({
+        where: {
+          status: "PROCESSING",
+          OR: [{ errorCode: null }, { errorCode: { startsWith: "LEASE:" }, updatedAt: { lt: leaseCutoff } }],
+          userMessage: { deletedAt: null, session: { status: "ACTIVE", deletedAt: null } },
+        },
+        include: { userMessage: true }, orderBy: [{ startedAt: "asc" }, { id: "asc" }], take: 64,
+      });
+      if (pending.length === 0) return resumed;
+      for (const operation of pending) {
+        let reservation = this.#queue.reserve();
+        if (!reservation) {
+          await this.#queue.waitForIdle();
+          reservation = this.#queue.reserve();
+        }
+        if (!reservation) return resumed;
+        reservation.commit(`${operation.userId}:${operation.userMessage.sessionId}`, () => this.processAcceptedOperation({
+          userId: operation.userId,
+          sessionId: operation.userMessage.sessionId,
+          userMessageId: operation.userMessageId,
+          operationId: operation.id,
+          text: operation.userMessage.content,
+        }));
+        resumed += 1;
+      }
+      await this.#queue.waitForIdle();
     }
-    return resumed;
   }
 
   waitForIdle(): Promise<void> {
@@ -370,21 +419,33 @@ export class ChatService {
     return this.#queue.close();
   }
 
+  processAcceptedOperation(job: ChatJob): Promise<void> {
+    return this.#sessionQueue.run(`${job.userId}:${job.sessionId}`, () => this.#process(job));
+  }
+
   async #process(job: ChatJob): Promise<void> {
+    const leaseToken = `LEASE:${randomUUID()}`;
+    let claimed = false;
+    let controller: AbortController | undefined;
     try {
+      claimed = await this.#claim(job, leaseToken);
+      if (!claimed) return;
+      const activeController = new AbortController();
+      controller = activeController;
+      this.#activeControllers.set(job.operationId, activeController);
       this.#emit(job.userId, { event: "chat_thinking", sessionId: job.sessionId, messageId: job.userMessageId });
       const prompt = await this.#buildContext(job);
-      const controller = new AbortController();
+      if (!await this.#ownsLiveLease(job, leaseToken)) return;
       let rejectDeadline!: (error: Error) => void;
       const deadline = new Promise<never>((_resolve, reject) => { rejectDeadline = reject; });
       const timer = setTimeout(() => {
-        controller.abort();
+        activeController.abort();
         rejectDeadline(new Error("Hermes hard deadline exceeded"));
       }, this.options.hardTimeoutMs);
       let raw: string;
       try {
         raw = await Promise.race([
-          this.options.hermes.generate(prompt, controller.signal, {
+          this.options.hermes.generate(prompt, activeController.signal, {
             conversation: `chat:${job.userId}:${job.sessionId}`,
           }),
           deadline,
@@ -396,7 +457,7 @@ export class ChatService {
       const assistant = await this.#transaction(async (repositories) => {
         await repositories.lockUser(job.userId);
         const operation = await repositories.chatOperation.findFirst({
-          where: { id: job.operationId, userId: job.userId, status: "PROCESSING" }, select: { id: true },
+          where: { id: job.operationId, userId: job.userId, status: "PROCESSING", errorCode: leaseToken }, select: { id: true },
         });
         const session = await repositories.chatSession.findFirst({
           where: { id: job.sessionId, userId: job.userId, status: "ACTIVE", deletedAt: null }, select: { id: true },
@@ -410,7 +471,7 @@ export class ChatService {
         });
         const completedAt = await repositories.databaseNow();
         await repositories.chatOperation.updateMany({
-          where: { id: job.operationId, userId: job.userId, status: "PROCESSING" },
+          where: { id: job.operationId, userId: job.userId, status: "PROCESSING", errorCode: leaseToken },
           data: { status: "SUCCEEDED", errorCode: null, completedAt },
         });
         await repositories.chatSession.update({
@@ -425,17 +486,56 @@ export class ChatService {
         });
       }
     } catch {
-      await this.#recordFailure(job);
+      if (claimed) await this.#recordFailure(job, leaseToken);
+    } finally {
+      this.#activeControllers.delete(job.operationId);
     }
   }
 
-  async #recordFailure(job: ChatJob): Promise<void> {
+  async #claim(job: ChatJob, leaseToken: string): Promise<boolean> {
+    return this.#transaction(async (repositories) => {
+      await repositories.lockUser(job.userId);
+      const session = await repositories.chatSession.findFirst({
+        where: { id: job.sessionId, userId: job.userId, status: "ACTIVE", deletedAt: null },
+        select: { id: true },
+      });
+      if (!session) return false;
+      const leaseCutoff = new Date(Date.now() - this.options.hardTimeoutMs - 30_000);
+      const claimed = await repositories.chatOperation.updateMany({
+        where: {
+          id: job.operationId,
+          userId: job.userId,
+          status: "PROCESSING",
+          userMessage: { deletedAt: null, session: { status: "ACTIVE", deletedAt: null } },
+          OR: [{ errorCode: null }, { errorCode: { startsWith: "LEASE:" }, updatedAt: { lt: leaseCutoff } }],
+        },
+        data: { errorCode: leaseToken },
+      });
+      return claimed.count === 1;
+    });
+  }
+
+  async #ownsLiveLease(job: ChatJob, leaseToken: string): Promise<boolean> {
+    const operation = await this.options.repositories.chatOperation.findFirst({
+      where: {
+        id: job.operationId,
+        userId: job.userId,
+        status: "PROCESSING",
+        errorCode: leaseToken,
+        userMessage: { deletedAt: null, session: { status: "ACTIVE", deletedAt: null } },
+      },
+      select: { id: true },
+    });
+    return operation !== null;
+  }
+
+  async #recordFailure(job: ChatJob, leaseToken: string): Promise<void> {
     try {
       await this.#transaction(async (repositories) => {
         await repositories.lockUser(job.userId);
         const now = await repositories.databaseNow();
         const updated = await repositories.chatOperation.updateMany({
-          where: { id: job.operationId, userId: job.userId, status: "PROCESSING" },
+          where: { id: job.operationId, userId: job.userId, status: "PROCESSING", errorCode: leaseToken },
           data: { status: "FAILED", errorCode: "HERMES_FAILED", completedAt: now },
         });
         if (updated.count !== 1) return;
@@ -512,7 +612,7 @@ export class ChatService {
       },
       assistant: {
         status: operationStatus(operation.status), operationId: operation.id,
-        ...(operation.errorCode ? { errorCode: operation.errorCode } : {}),
+        ...(operation.status !== "PROCESSING" && operation.errorCode ? { errorCode: operation.errorCode } : {}),
       },
     };
   }

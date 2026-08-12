@@ -36,6 +36,7 @@ export interface P9Runtime {
     expiresAt: Date;
   } | { kind: "expired" } | null>;
   checkReadiness(): Promise<boolean>;
+  resumePendingChat(): Promise<number>;
   waitForChatIdle(): Promise<void>;
   close(): Promise<void>;
 }
@@ -124,6 +125,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     authenticateMobileSocket: (accessToken) =>
       authenticateMobileAccessToken(accessTokens, sessions, accessToken),
     checkReadiness: () => checkP9Readiness(repositories),
+    resumePendingChat: () => chat.resumePending(),
     waitForChatIdle: () => chat.waitForIdle(),
     close: async () => {
       await chat.close();

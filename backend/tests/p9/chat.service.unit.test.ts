@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { P9Error } from "../../src/p9/errors.js";
-import { ChatService } from "../../src/p9/services/chat.service.js";
+import { BoundedChatQueue, ChatService } from "../../src/p9/services/chat.service.js";
 
 const userId = "00000000-0000-4000-8000-000000000001";
 const otherUserId = "00000000-0000-4000-8000-000000000002";
@@ -11,6 +11,12 @@ const userMessageId = "00000000-0000-4000-8000-000000000030";
 const assistantMessageId = "00000000-0000-4000-8000-000000000040";
 const key = "00000000-0000-4000-8000-000000000050";
 const now = new Date("2026-08-12T08:00:00.000Z");
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
 
 function fixture() {
   const state = {
@@ -106,6 +112,25 @@ function fixture() {
 }
 
 describe("chat service durable orchestration", () => {
+  it("does not let one blocked session consume global slots needed by another session", async () => {
+    const queue = new BoundedChatQueue(2, 4);
+    const first = deferred<void>();
+    const started: string[] = [];
+    const reserve = (key: string, label: string, work: () => Promise<void>) => {
+      const reservation = queue.reserve();
+      expect(reservation).not.toBeNull();
+      reservation!.commit(key, async () => { started.push(label); await work(); });
+    };
+
+    reserve("session-a", "a1", () => first.promise);
+    reserve("session-a", "a2", async () => undefined);
+    reserve("session-b", "b1", async () => undefined);
+    await vi.waitFor(() => expect(started).toEqual(["a1", "b1"]));
+    first.resolve();
+    await queue.waitForIdle();
+    expect(started).toEqual(["a1", "b1", "a2"]);
+  });
+
   it("persists once under a concurrent idempotency race and invokes Hermes once", async () => {
     const f = fixture();
     const input = { idempotencyKey: key, text: "Hello BMO", speakOnDevice: false };
@@ -136,6 +161,127 @@ describe("chat service durable orchestration", () => {
       event: "chat_message", sessionId,
       message: { id: assistantMessageId, sender: "assistant", text: "Hi!", createdAt: expect.any(String) },
     });
+  });
+
+  it("serializes provider work for one user/session in message order", async () => {
+    const f = fixture();
+    const first = deferred<string>();
+    let active = 0;
+    let maxActive = 0;
+    const calls: string[] = [];
+    f.hermes.generate.mockImplementation(async (prompt: string) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      calls.push(prompt);
+      try {
+        if (calls.length === 1) return await first.promise;
+        return "Second answer.";
+      } finally { active -= 1; }
+    });
+    const operationTwo = "00000000-0000-4000-8000-000000000021";
+    const leases = new Map<string, string>();
+    f.repositories.chatOperation.updateMany.mockImplementation(async ({ where, data }: any) => {
+      if (typeof data.errorCode === "string" && data.errorCode.startsWith("LEASE:")) {
+        if (leases.has(where.id)) return { count: 0 };
+        leases.set(where.id, data.errorCode);
+        return { count: 1 };
+      }
+      return { count: leases.get(where.id) === where.errorCode ? 1 : 0 };
+    });
+    f.repositories.chatOperation.findFirst.mockImplementation(async ({ where }: any) =>
+      leases.get(where.id) === where.errorCode ? { id: where.id } : null);
+
+    const runFirst = f.service.processAcceptedOperation({
+      userId, sessionId, userMessageId, operationId, text: "First",
+    });
+    const runSecond = f.service.processAcceptedOperation({
+      userId, sessionId,
+      userMessageId: "00000000-0000-4000-8000-000000000031",
+      operationId: operationTwo,
+      text: "Second",
+    });
+    await new Promise<void>((resolve) => { setTimeout(resolve, 20); });
+    expect(f.hermes.generate).toHaveBeenCalledTimes(1);
+    first.resolve("First answer.");
+    await Promise.all([runFirst, runSecond]);
+
+    expect(f.hermes.generate).toHaveBeenCalledTimes(2);
+    expect(maxActive).toBe(1);
+    expect(f.repositories.chatOperation.updateMany.mock.calls[0]?.[0]?.where.id).toBe(operationId);
+    expect(f.repositories.chatOperation.updateMany.mock.calls.some((call: any[]) => call[0]?.where?.id === operationTwo)).toBe(true);
+  });
+
+  it("claims a durable operation before provider work so overlapping workers invoke Hermes once", async () => {
+    const f = fixture();
+    const provider = deferred<string>();
+    f.hermes.generate.mockReturnValue(provider.promise);
+    let lease: string | null = null;
+    f.repositories.chatOperation.updateMany.mockImplementation(async ({ data }: any) => {
+      if (typeof data.errorCode === "string" && data.errorCode.startsWith("LEASE:") && lease === null) {
+        lease = data.errorCode;
+        return { count: 1 };
+      }
+      if (typeof data.errorCode === "string" && data.errorCode.startsWith("LEASE:")) return { count: 0 };
+      return { count: 1 };
+    });
+    f.repositories.chatOperation.findFirst.mockImplementation(async ({ where }: any) =>
+      where.errorCode === lease ? { id: operationId } : null);
+    const job = {
+      userId, sessionId, userMessageId, operationId, text: "Hello",
+    };
+    const secondService = new ChatService({
+      repositories: f.repositories,
+      transaction: async (work) => work(f.repositories),
+      hermes: f.hermes,
+      mobileEvents: f.mobileEvents,
+      memoryContext: f.memoryContext,
+      hardTimeoutMs: 1_000,
+    });
+
+    const firstWorker = f.service.processAcceptedOperation(job);
+    await vi.waitFor(() => expect(f.hermes.generate).toHaveBeenCalledTimes(1));
+    await secondService.processAcceptedOperation(job);
+    provider.resolve("Only answer.");
+    await firstWorker;
+
+    expect(f.hermes.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks durable cancellation before queued provider work", async () => {
+    const f = fixture();
+    const blocker = deferred<string>();
+    f.hermes.generate.mockImplementationOnce(() => blocker.promise).mockResolvedValue("Must not send deleted text");
+    await f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: key, text: "blocker", speakOnDevice: false,
+    });
+    await f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: "00000000-0000-4000-8000-000000000051", text: "deleted secret", speakOnDevice: false,
+    });
+    f.state.session.status = "DELETED";
+    blocker.resolve("Done");
+    await f.service.waitForIdle();
+
+    expect(f.hermes.generate).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(f.hermes.generate.mock.calls)).not.toContain("deleted secret");
+  });
+
+  it("drains more than one recovery page and exposes transient resume failures for retry", async () => {
+    const f = fixture();
+    const operations = Array.from({ length: 70 }, (_, index) => ({
+      id: `operation-${index}`, userId, userMessageId: `message-${index}`,
+      userMessage: { sessionId, content: `message ${index}` },
+    }));
+    f.repositories.chatOperation.findMany
+      .mockResolvedValueOnce(operations.slice(0, 64))
+      .mockResolvedValueOnce(operations.slice(64))
+      .mockResolvedValueOnce([]);
+    f.service.processAcceptedOperation = vi.fn().mockResolvedValue(undefined) as any;
+
+    expect(await f.service.resumePending()).toBe(70);
+    expect(f.repositories.chatOperation.findMany).toHaveBeenCalledTimes(3);
+
+    f.repositories.chatOperation.findMany.mockRejectedValueOnce(new Error("transient database error"));
+    await expect(f.service.resumePending()).rejects.toThrow("transient database error");
   });
 
   it("builds bounded server-owned personalization/history/empty-memory context without infrastructure secrets", async () => {

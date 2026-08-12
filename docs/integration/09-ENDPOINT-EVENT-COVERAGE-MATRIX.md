@@ -90,7 +90,7 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | GET | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Source/test tier; bearer-owner scope, bounded deterministic ordering; not candidate/public deployed |
 | POST | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Source/test tier; strict `{temporary}` and server-derived owner |
 | GET | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Source/test tier; owned active session, positive signed-64-bit cursor, bounded stable ascending pagination |
-| POST | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Source/test tier; durable 202 user message/operation, transactional per-user UUID idempotency and conflict rejection, bounded Hermes queue; `speakOnDevice:true` is explicitly unavailable until generic proactive delivery exists |
+| POST | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Source/test tier; durable 202 user message/operation, transactional per-user UUID idempotency and conflict rejection, globally bounded/per-session ordered work, atomic durable cross-worker lease, repeated startup/maintenance recovery, and delete preflight/abort; `speakOnDevice:true` is explicitly unavailable until generic proactive delivery exists |
 | DELETE | `/api/v1/chat/sessions/:sessionId` | `EXISTING_VERIFIED` | Source/test tier; owner-scoped soft deletion and cancellation of processing operations; no invented purge period |
 | POST | `/api/v1/chat/messages/:messageId/feedback` | `EXISTING_VERIFIED` | Source/test tier; owner-scoped assistant-only bounded feedback upsert |
 | WSS | `/api/v1/ws` | `EXISTING_VERIFIED` | Source/test tier; exact separate mobile upgrade path when P9 is enabled; candidate/public production unchanged |

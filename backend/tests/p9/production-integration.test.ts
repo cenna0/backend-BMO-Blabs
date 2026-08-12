@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 import {
@@ -52,5 +52,23 @@ describe("production-shaped P9 integration", () => {
     expect(compose).toContain("P9_POSTGRES_SOCKET_DIR: /var/run/postgresql");
     expect(compose.match(/source: p9_postgres_socket/g)).toHaveLength(2);
     expect(compose.match(/target: \/var\/run\/postgresql/g)).toHaveLength(2);
+  });
+
+  it("retries transient pending-chat recovery from periodic maintenance", async () => {
+    const runtime = await startTestRuntime(true, {
+      P9_ENABLED: "true",
+      DATABASE_URL: "postgresql://bmo:password@127.0.0.1:1/bmo",
+      P9_JWT_SECRET: "j".repeat(32),
+      P9_PAIRING_PEPPER: "p".repeat(32),
+    });
+    runtimes.push(runtime);
+    const resume = vi.spyOn(runtime.backend.p9!, "resumePendingChat")
+      .mockRejectedValueOnce(new Error("transient database failure"))
+      .mockResolvedValueOnce(0);
+
+    await expect(runtime.backend.runMaintenance()).resolves.toBeUndefined();
+    await expect(runtime.backend.runMaintenance()).resolves.toBeUndefined();
+
+    expect(resume).toHaveBeenCalledTimes(2);
   });
 });

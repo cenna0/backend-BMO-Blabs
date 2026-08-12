@@ -14,8 +14,20 @@ strict bodies, a per-user transactional advisory lock, and the existing
 `(userId, idempotencyKey)` constraints. A first request persists its user
 message and `PROCESSING` operation before HTTP 202; same-input retries return
 that operation, while reuse for different text/session/device is a conflict.
-The worker queue is bounded, reserves capacity before the durable accept, and
-recovers bounded `PROCESSING` operations at startup.
+The worker scheduler is bounded globally, serializes each user/session key in
+message order without blocking unrelated session keys, and reserves capacity
+before durable acceptance.
+
+Before reading context or invoking Hermes, every worker atomically claims the
+durable operation with a short-lived `LEASE:<uuid>` marker stored in the
+existing `errorCode` field. Only `PROCESSING` rows without a lease, or with a
+lease older than the hard timeout plus grace, may be claimed. Completion and
+failure transitions require the exact lease, so overlapping processes cannot
+make duplicate provider calls. Recovery drains repeated 64-row pages at
+startup and during periodic maintenance; a transient query failure stays
+observable and is retried on the next maintenance interval. Session deletion
+cancels durable operations, aborts active in-process calls, and queued workers
+must pass a session/operation preflight before any context/provider call.
 
 Hermes remains an internal dependency. Backend builds a bounded JSON context
 from the seven canonical personalization fields, an explicit empty

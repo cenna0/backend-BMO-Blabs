@@ -175,6 +175,7 @@ abstract class BaseHermesClient {
     const timer = setTimeout(() => controller.abort(), this.options.hardTimeoutMs);
     const abortFromParent = () => controller.abort();
     parentSignal?.addEventListener("abort", abortFromParent, { once: true });
+    if (parentSignal?.aborted) controller.abort();
     const softTimer =
       this.options.softTimeoutMs && this.options.softTimeoutMs < this.options.hardTimeoutMs
         ? setTimeout(() => {
