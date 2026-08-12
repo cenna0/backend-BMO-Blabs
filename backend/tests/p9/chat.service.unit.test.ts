@@ -373,13 +373,46 @@ describe("chat service durable orchestration", () => {
       .mockResolvedValueOnce(operations.slice(0, 64))
       .mockResolvedValueOnce(operations.slice(64))
       .mockResolvedValueOnce([]);
-    f.service.processAcceptedOperation = vi.fn().mockResolvedValue(undefined) as any;
+    f.repositories.claimChatOperation.mockResolvedValue(true);
 
     expect(await f.service.resumePending()).toBe(70);
     expect(f.repositories.chatOperation.findMany).toHaveBeenCalledTimes(3);
 
     f.repositories.chatOperation.findMany.mockRejectedValueOnce(new Error("transient database error"));
     await expect(f.service.resumePending()).rejects.toThrow("transient database error");
+  });
+
+  it("stops a blocked recovery page, progresses an unrelated head, and coalesces overlapping recovery", async () => {
+    const f = fixture();
+    const blockedSession = sessionId;
+    const unrelatedSession = "00000000-0000-4000-8000-000000000099";
+    const blockedUpper = {
+      id: "00000000-0000-4000-8000-000000000061", userId, userMessageId: "m-upper",
+      userMessage: { sessionId: blockedSession, content: "upper blocked" },
+    };
+    const unrelatedHead = {
+      id: "00000000-0000-4000-8000-000000000062", userId, userMessageId: "m-other",
+      userMessage: { sessionId: unrelatedSession, content: "other head" },
+    };
+    f.repositories.chatOperation.findMany.mockResolvedValue([blockedUpper, unrelatedHead]);
+    let unrelatedClaimed = false;
+    f.repositories.claimChatOperation.mockImplementation(async ({ operationId: candidate }: any) => {
+      if (candidate !== unrelatedHead.id || unrelatedClaimed) return false;
+      unrelatedClaimed = true;
+      return true;
+    });
+    f.hermes.generate.mockResolvedValue("Other answer");
+
+    const firstRecovery = f.service.resumePending();
+    const overlapping = f.service.resumePending();
+    expect(overlapping).toBe(firstRecovery);
+    await expect(firstRecovery).resolves.toBe(1);
+
+    expect(f.repositories.chatOperation.findMany).toHaveBeenCalledTimes(2);
+    expect(f.repositories.claimChatOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: blockedUpper.id }));
+    expect(f.repositories.claimChatOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: unrelatedHead.id }));
+    expect(f.hermes.generate).toHaveBeenCalledTimes(1);
+    expect(String(f.hermes.generate.mock.calls[0]?.[2]?.conversation)).toContain(unrelatedSession);
   });
 
   it("builds bounded server-owned personalization/history/empty-memory context without infrastructure secrets", async () => {

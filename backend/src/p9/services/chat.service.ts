@@ -204,6 +204,7 @@ export class ChatService {
   readonly #queue: BoundedChatQueue;
   readonly #sessionQueue = new KeyedChatQueue();
   readonly #activeControllers = new Map<string, AbortController>();
+  #recoveryFlight: Promise<number> | null = null;
 
   constructor(private readonly options: ChatServiceOptions) {
     if (!options.transaction && !options.client) throw new Error("ChatService requires a transaction boundary");
@@ -378,7 +379,17 @@ export class ChatService {
     });
   }
 
-  async resumePending(): Promise<number> {
+  resumePending(): Promise<number> {
+    if (this.#recoveryFlight) return this.#recoveryFlight;
+    const flight = this.#resumePendingOnce();
+    this.#recoveryFlight = flight;
+    void flight.finally(() => {
+      if (this.#recoveryFlight === flight) this.#recoveryFlight = null;
+    }).catch(() => undefined);
+    return flight;
+  }
+
+  async #resumePendingOnce(): Promise<number> {
     let resumed = 0;
     while (true) {
       const databaseNow = await this.options.repositories.databaseNow();
@@ -392,22 +403,20 @@ export class ChatService {
         include: { userMessage: true }, orderBy: [{ startedAt: "asc" }, { id: "asc" }], take: 64,
       });
       if (pending.length === 0) return resumed;
+      let pageProgress = 0;
       for (const operation of pending) {
-        let reservation = this.#queue.reserve();
-        if (!reservation) {
-          await this.#queue.waitForIdle();
-          reservation = this.#queue.reserve();
-        }
-        if (!reservation) return resumed;
-        reservation.commit(`${operation.userId}:${operation.userMessage.sessionId}`, () => this.processAcceptedOperation({
+        const claimed = await this.#prepareRecoveredOperation({
           userId: operation.userId,
           sessionId: operation.userMessage.sessionId,
           userMessageId: operation.userMessageId,
           operationId: operation.id,
           text: operation.userMessage.content,
-        }));
+        });
+        if (!claimed) continue;
+        pageProgress += 1;
         resumed += 1;
       }
+      if (pageProgress === 0) return resumed;
       await this.#queue.waitForIdle();
     }
   }
@@ -424,13 +433,33 @@ export class ChatService {
     return this.#sessionQueue.run(`${job.userId}:${job.sessionId}`, () => this.#process(job));
   }
 
+  async #prepareRecoveredOperation(job: ChatJob): Promise<boolean> {
+    const leaseToken = `LEASE:${randomUUID()}`;
+    if (!await this.#claim(job, leaseToken)) return false;
+    let reservation = this.#queue.reserve();
+    if (!reservation) {
+      await this.#queue.waitForIdle();
+      reservation = this.#queue.reserve();
+    }
+    if (!reservation) {
+      await this.#releaseLease(job, leaseToken);
+      return false;
+    }
+    reservation.commit(`${job.userId}:${job.sessionId}`, () =>
+      this.#sessionQueue.run(`${job.userId}:${job.sessionId}`, () => this.#processClaimed(job, leaseToken)));
+    return true;
+  }
+
   async #process(job: ChatJob): Promise<void> {
     const leaseToken = `LEASE:${randomUUID()}`;
-    let claimed = false;
+    const claimed = await this.#claim(job, leaseToken);
+    if (!claimed) return;
+    await this.#processClaimed(job, leaseToken);
+  }
+
+  async #processClaimed(job: ChatJob, leaseToken: string): Promise<void> {
     let controller: AbortController | undefined;
     try {
-      claimed = await this.#claim(job, leaseToken);
-      if (!claimed) return;
       const activeController = new AbortController();
       controller = activeController;
       this.#activeControllers.set(job.operationId, activeController);
@@ -487,10 +516,17 @@ export class ChatService {
         });
       }
     } catch {
-      if (claimed) await this.#recordFailure(job, leaseToken);
+      await this.#recordFailure(job, leaseToken);
     } finally {
       this.#activeControllers.delete(job.operationId);
     }
+  }
+
+  async #releaseLease(job: ChatJob, leaseToken: string): Promise<void> {
+    await this.options.repositories.chatOperation.updateMany({
+      where: { id: job.operationId, userId: job.userId, status: "PROCESSING", errorCode: leaseToken },
+      data: { errorCode: null },
+    });
   }
 
   async #claim(job: ChatJob, leaseToken: string): Promise<boolean> {

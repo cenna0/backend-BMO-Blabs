@@ -28,9 +28,13 @@ renews its exact lease with the DB clock after context assembly and immediately
 before Hermes; a failed renewal stops without provider work. Completion and
 failure transitions also require the exact lease.
 
-Recovery launches only after the HTTP listener binds, then drains repeated
-64-row pages without making startup wait for the backlog. Periodic maintenance
-continues the same recovery and retries transient query failures. Session
+Recovery launches only after the HTTP listener binds, then scans repeated
+bounded 64-row pages without making startup wait for the backlog. Each row is
+counted only after an atomic durable claim. A page with zero claims returns and
+defers blocked ordering work instead of hot-looping; claim failures for one
+session do not prevent unrelated session heads in the scan from progressing.
+Startup and maintenance calls share one process-local recovery flight, while
+periodic maintenance retries transient query failures. Session
 deletion cancels durable operations, aborts active in-process calls, and queued
 workers must pass session/operation lease renewal before any provider call.
 
