@@ -33,6 +33,7 @@ function fixture() {
     databaseNow: vi.fn().mockResolvedValue(now),
     claimChatOperation: vi.fn().mockResolvedValue(true),
     renewChatOperationLease: vi.fn().mockResolvedValue(true),
+    findClaimableChatOperations: vi.fn(),
     chatSession: {
       findFirst: vi.fn(async ({ where }: any) =>
         where.id === state.session.id && where.userId === state.session.userId &&
@@ -373,12 +374,17 @@ describe("chat service durable orchestration", () => {
       .mockResolvedValueOnce(operations.slice(0, 64))
       .mockResolvedValueOnce(operations.slice(64))
       .mockResolvedValueOnce([]);
+    f.repositories.findClaimableChatOperations
+      .mockResolvedValueOnce(operations.slice(0, 64))
+      .mockResolvedValueOnce(operations.slice(64))
+      .mockResolvedValueOnce([]);
     f.repositories.claimChatOperation.mockResolvedValue(true);
 
     expect(await f.service.resumePending()).toBe(70);
-    expect(f.repositories.chatOperation.findMany).toHaveBeenCalledTimes(3);
+    expect(f.repositories.findClaimableChatOperations).toHaveBeenCalledTimes(3);
 
     f.repositories.chatOperation.findMany.mockRejectedValueOnce(new Error("transient database error"));
+    f.repositories.findClaimableChatOperations.mockRejectedValueOnce(new Error("transient database error"));
     await expect(f.service.resumePending()).rejects.toThrow("transient database error");
   });
 
@@ -394,7 +400,7 @@ describe("chat service durable orchestration", () => {
       id: "00000000-0000-4000-8000-000000000062", userId, userMessageId: "m-other",
       userMessage: { sessionId: unrelatedSession, content: "other head" },
     };
-    f.repositories.chatOperation.findMany.mockResolvedValue([blockedUpper, unrelatedHead]);
+    f.repositories.findClaimableChatOperations.mockResolvedValue([blockedUpper, unrelatedHead]);
     let unrelatedClaimed = false;
     f.repositories.claimChatOperation.mockImplementation(async ({ operationId: candidate }: any) => {
       if (candidate !== unrelatedHead.id || unrelatedClaimed) return false;
@@ -408,11 +414,32 @@ describe("chat service durable orchestration", () => {
     expect(overlapping).toBe(firstRecovery);
     await expect(firstRecovery).resolves.toBe(1);
 
-    expect(f.repositories.chatOperation.findMany).toHaveBeenCalledTimes(2);
+    expect(f.repositories.findClaimableChatOperations).toHaveBeenCalledTimes(2);
     expect(f.repositories.claimChatOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: blockedUpper.id }));
     expect(f.repositories.claimChatOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: unrelatedHead.id }));
     expect(f.hermes.generate).toHaveBeenCalledTimes(1);
     expect(String(f.hermes.generate.mock.calls[0]?.[2]?.conversation)).toContain(unrelatedSession);
+  });
+
+  it("discovers an unrelated claimable head beyond sixty-four blocked upper rows", async () => {
+    const f = fixture();
+    const unrelatedSession = "00000000-0000-4000-8000-000000000099";
+    const unrelatedHead = {
+      id: "00000000-0000-4000-8000-000000000099", userId, userMessageId: "m-other",
+      userMessage: { sessionId: unrelatedSession, content: "other head" },
+    };
+    f.repositories.findClaimableChatOperations = vi.fn()
+      .mockResolvedValueOnce([unrelatedHead])
+      .mockResolvedValueOnce([]);
+    f.repositories.claimChatOperation.mockResolvedValue(true);
+    f.hermes.generate.mockResolvedValue("Other answer");
+
+    await expect(f.service.resumePending()).resolves.toBe(1);
+
+    expect(f.repositories.findClaimableChatOperations).toHaveBeenCalledWith(expect.objectContaining({ limit: 64 }));
+    expect(f.repositories.chatOperation.findMany).not.toHaveBeenCalled();
+    expect(f.repositories.claimChatOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: unrelatedHead.id }));
+    expect(f.hermes.generate).toHaveBeenCalledTimes(1);
   });
 
   it("builds bounded server-owned personalization/history/empty-memory context without infrastructure secrets", async () => {

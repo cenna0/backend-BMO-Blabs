@@ -99,6 +99,61 @@ export class P9Repositories {
     return rows.length === 1;
   }
 
+  async findClaimableChatOperations(input: { leaseTtlMs: number; limit: number }): Promise<Array<{
+    id: string;
+    userId: string;
+    userMessageId: string;
+    userMessage: { sessionId: string; content: string };
+  }>> {
+    const leaseSeconds = input.leaseTtlMs / 1_000;
+    const rows = await this.db.$queryRaw<Array<{
+      id: string;
+      userId: string;
+      userMessageId: string;
+      sessionId: string;
+      content: string;
+    }>>`
+      SELECT operation.id,
+             operation."userId" AS "userId",
+             operation."userMessageId" AS "userMessageId",
+             message."sessionId" AS "sessionId",
+             message.content
+      FROM "ChatOperation" AS operation
+      JOIN "ChatMessage" AS message ON message.id = operation."userMessageId"
+      JOIN "ChatSession" AS session ON session.id = message."sessionId"
+                                    AND session."userId" = operation."userId"
+      WHERE operation.status = 'PROCESSING'
+        AND message."deletedAt" IS NULL
+        AND session.status = 'ACTIVE'
+        AND session."deletedAt" IS NULL
+        AND (
+          operation."errorCode" IS NULL
+          OR (
+            operation."errorCode" LIKE 'LEASE:%'
+            AND operation."updatedAt" < clock_timestamp() - (${leaseSeconds} * interval '1 second')
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "ChatOperation" AS prior
+          JOIN "ChatMessage" AS prior_message ON prior_message.id = prior."userMessageId"
+          WHERE prior."userId" = operation."userId"
+            AND prior.status = 'PROCESSING'
+            AND prior_message."sessionId" = message."sessionId"
+            AND prior_message."deletedAt" IS NULL
+            AND prior_message.cursor < message.cursor
+        )
+      ORDER BY operation."startedAt" ASC, operation.id ASC
+      LIMIT ${input.limit}
+    `;
+    return rows.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      userMessageId: row.userMessageId,
+      userMessage: { sessionId: row.sessionId, content: row.content },
+    }));
+  }
+
   async migrationStatus(): Promise<Array<{ name: string; finishedAt: Date | null }>> {
     const rows = await this.db.$queryRaw<Array<{ migration_name: string; finished_at: Date | null }>>`
       SELECT migration_name, finished_at

@@ -392,15 +392,9 @@ export class ChatService {
   async #resumePendingOnce(): Promise<number> {
     let resumed = 0;
     while (true) {
-      const databaseNow = await this.options.repositories.databaseNow();
-      const leaseCutoff = new Date(databaseNow.getTime() - this.#leaseTtlMs());
-      const pending = await this.options.repositories.chatOperation.findMany({
-        where: {
-          status: "PROCESSING",
-          OR: [{ errorCode: null }, { errorCode: { startsWith: "LEASE:" }, updatedAt: { lt: leaseCutoff } }],
-          userMessage: { deletedAt: null, session: { status: "ACTIVE", deletedAt: null } },
-        },
-        include: { userMessage: true }, orderBy: [{ startedAt: "asc" }, { id: "asc" }], take: 64,
+      const pending = await this.options.repositories.findClaimableChatOperations({
+        leaseTtlMs: this.#leaseTtlMs(),
+        limit: 64,
       });
       if (pending.length === 0) return resumed;
       let pageProgress = 0;

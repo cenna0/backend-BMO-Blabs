@@ -29,7 +29,10 @@ before Hermes; a failed renewal stops without provider work. Completion and
 failure transitions also require the exact lease.
 
 Recovery launches only after the HTTP listener binds, then scans repeated
-bounded 64-row pages without making startup wait for the backlog. Each row is
+bounded 64-row pages without making startup wait for the backlog. PostgreSQL
+applies the lower-cursor `NOT EXISTS` session-head predicate before `LIMIT`, so
+64 or more blocked upper rows cannot hide an unrelated claimable session head.
+Each returned row is
 counted only after an atomic durable claim. A page with zero claims returns and
 defers blocked ordering work instead of hot-looping; claim failures for one
 session do not prevent unrelated session heads in the scan from progressing.
