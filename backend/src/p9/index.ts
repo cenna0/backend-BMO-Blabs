@@ -37,6 +37,7 @@ export interface P9Runtime {
   } | { kind: "expired" } | null>;
   checkReadiness(): Promise<boolean>;
   resumePendingChat(): Promise<number>;
+  launchPendingChatRecovery(onError?: (error: unknown) => void): void;
   waitForChatIdle(): Promise<void>;
   close(): Promise<void>;
 }
@@ -113,11 +114,6 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     mediaRouter: createAvatarMediaRouter(avatarStorage),
     initialize: async () => {
       await avatarStorage.initialize();
-      try {
-        await chat.resumePending();
-      } catch {
-        // Readiness remains the authority when PostgreSQL is unavailable.
-      }
     },
     reconcileAvatars: () => avatars.reconcile(),
     resolveDeviceBinding: (hardwareId, deviceToken) => deviceBinding.resolve(hardwareId, deviceToken),
@@ -126,6 +122,9 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
       authenticateMobileAccessToken(accessTokens, sessions, accessToken),
     checkReadiness: () => checkP9Readiness(repositories),
     resumePendingChat: () => chat.resumePending(),
+    launchPendingChatRecovery: (onError) => {
+      void chat.resumePending().catch((error) => onError?.(error));
+    },
     waitForChatIdle: () => chat.waitForIdle(),
     close: async () => {
       await chat.close();

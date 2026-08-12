@@ -19,6 +19,86 @@ export class P9Repositories {
     return now;
   }
 
+  async claimChatOperation(input: {
+    operationId: string;
+    userId: string;
+    sessionId: string;
+    leaseToken: string;
+    leaseTtlMs: number;
+  }): Promise<boolean> {
+    const leaseSeconds = input.leaseTtlMs / 1_000;
+    const rows = await this.db.$queryRaw<Array<{ id: string }>>`
+      UPDATE "ChatOperation" AS candidate
+      SET "errorCode" = ${input.leaseToken}, "updatedAt" = clock_timestamp()
+      FROM "ChatMessage" AS candidate_message, "ChatSession" AS candidate_session
+      WHERE candidate.id = ${input.operationId}::uuid
+        AND candidate."userId" = ${input.userId}::uuid
+        AND candidate.status = 'PROCESSING'
+        AND candidate."userMessageId" = candidate_message.id
+        AND candidate_message."sessionId" = ${input.sessionId}::uuid
+        AND candidate_message."deletedAt" IS NULL
+        AND candidate_session.id = candidate_message."sessionId"
+        AND candidate_session."userId" = candidate."userId"
+        AND candidate_session.status = 'ACTIVE'
+        AND candidate_session."deletedAt" IS NULL
+        AND (
+          candidate."errorCode" IS NULL
+          OR (
+            candidate."errorCode" LIKE 'LEASE:%'
+            AND candidate."updatedAt" < clock_timestamp() - (${leaseSeconds} * interval '1 second')
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "ChatOperation" AS prior
+          JOIN "ChatMessage" AS prior_message ON prior_message.id = prior."userMessageId"
+          WHERE prior."userId" = candidate."userId"
+            AND prior.status = 'PROCESSING'
+            AND prior_message."sessionId" = candidate_message."sessionId"
+            AND prior_message."deletedAt" IS NULL
+            AND prior_message.cursor < candidate_message.cursor
+        )
+      RETURNING candidate.id
+    `;
+    return rows.length === 1;
+  }
+
+  async renewChatOperationLease(input: {
+    operationId: string;
+    userId: string;
+    sessionId: string;
+    leaseToken: string;
+  }): Promise<boolean> {
+    const rows = await this.db.$queryRaw<Array<{ id: string }>>`
+      UPDATE "ChatOperation" AS candidate
+      SET "updatedAt" = clock_timestamp()
+      FROM "ChatMessage" AS candidate_message, "ChatSession" AS candidate_session
+      WHERE candidate.id = ${input.operationId}::uuid
+        AND candidate."userId" = ${input.userId}::uuid
+        AND candidate.status = 'PROCESSING'
+        AND candidate."errorCode" = ${input.leaseToken}
+        AND candidate."userMessageId" = candidate_message.id
+        AND candidate_message."sessionId" = ${input.sessionId}::uuid
+        AND candidate_message."deletedAt" IS NULL
+        AND candidate_session.id = candidate_message."sessionId"
+        AND candidate_session."userId" = candidate."userId"
+        AND candidate_session.status = 'ACTIVE'
+        AND candidate_session."deletedAt" IS NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "ChatOperation" AS prior
+          JOIN "ChatMessage" AS prior_message ON prior_message.id = prior."userMessageId"
+          WHERE prior."userId" = candidate."userId"
+            AND prior.status = 'PROCESSING'
+            AND prior_message."sessionId" = candidate_message."sessionId"
+            AND prior_message."deletedAt" IS NULL
+            AND prior_message.cursor < candidate_message.cursor
+        )
+      RETURNING candidate.id
+    `;
+    return rows.length === 1;
+  }
+
   async migrationStatus(): Promise<Array<{ name: string; finishedAt: Date | null }>> {
     const rows = await this.db.$queryRaw<Array<{ migration_name: string; finished_at: Date | null }>>`
       SELECT migration_name, finished_at

@@ -20,14 +20,19 @@ before durable acceptance.
 
 Before reading context or invoking Hermes, every worker atomically claims the
 durable operation with a short-lived `LEASE:<uuid>` marker stored in the
-existing `errorCode` field. Only `PROCESSING` rows without a lease, or with a
-lease older than the hard timeout plus grace, may be claimed. Completion and
-failure transitions require the exact lease, so overlapping processes cannot
-make duplicate provider calls. Recovery drains repeated 64-row pages at
-startup and during periodic maintenance; a transient query failure stays
-observable and is retried on the next maintenance interval. Session deletion
-cancels durable operations, aborts active in-process calls, and queued workers
-must pass a session/operation preflight before any context/provider call.
+existing `errorCode` field. The PostgreSQL claim uses `clock_timestamp()` and
+succeeds only when no lower-cursor `PROCESSING` operation exists for that
+user/session. This gives the server-owned Hermes conversation durable ordering
+across Backend processes while unrelated sessions remain concurrent. A worker
+renews its exact lease with the DB clock after context assembly and immediately
+before Hermes; a failed renewal stops without provider work. Completion and
+failure transitions also require the exact lease.
+
+Recovery launches only after the HTTP listener binds, then drains repeated
+64-row pages without making startup wait for the backlog. Periodic maintenance
+continues the same recovery and retries transient query failures. Session
+deletion cancels durable operations, aborts active in-process calls, and queued
+workers must pass session/operation lease renewal before any provider call.
 
 Hermes remains an internal dependency. Backend builds a bounded JSON context
 from the seven canonical personalization fields, an explicit empty

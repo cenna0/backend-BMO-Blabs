@@ -381,7 +381,8 @@ export class ChatService {
   async resumePending(): Promise<number> {
     let resumed = 0;
     while (true) {
-      const leaseCutoff = new Date(Date.now() - this.options.hardTimeoutMs - 30_000);
+      const databaseNow = await this.options.repositories.databaseNow();
+      const leaseCutoff = new Date(databaseNow.getTime() - this.#leaseTtlMs());
       const pending = await this.options.repositories.chatOperation.findMany({
         where: {
           status: "PROCESSING",
@@ -435,7 +436,7 @@ export class ChatService {
       this.#activeControllers.set(job.operationId, activeController);
       this.#emit(job.userId, { event: "chat_thinking", sessionId: job.sessionId, messageId: job.userMessageId });
       const prompt = await this.#buildContext(job);
-      if (!await this.#ownsLiveLease(job, leaseToken)) return;
+      if (!await this.#renewLease(job, leaseToken)) return;
       let rejectDeadline!: (error: Error) => void;
       const deadline = new Promise<never>((_resolve, reject) => { rejectDeadline = reject; });
       const timer = setTimeout(() => {
@@ -495,38 +496,31 @@ export class ChatService {
   async #claim(job: ChatJob, leaseToken: string): Promise<boolean> {
     return this.#transaction(async (repositories) => {
       await repositories.lockUser(job.userId);
-      const session = await repositories.chatSession.findFirst({
-        where: { id: job.sessionId, userId: job.userId, status: "ACTIVE", deletedAt: null },
-        select: { id: true },
+      return repositories.claimChatOperation({
+        operationId: job.operationId,
+        userId: job.userId,
+        sessionId: job.sessionId,
+        leaseToken,
+        leaseTtlMs: this.#leaseTtlMs(),
       });
-      if (!session) return false;
-      const leaseCutoff = new Date(Date.now() - this.options.hardTimeoutMs - 30_000);
-      const claimed = await repositories.chatOperation.updateMany({
-        where: {
-          id: job.operationId,
-          userId: job.userId,
-          status: "PROCESSING",
-          userMessage: { deletedAt: null, session: { status: "ACTIVE", deletedAt: null } },
-          OR: [{ errorCode: null }, { errorCode: { startsWith: "LEASE:" }, updatedAt: { lt: leaseCutoff } }],
-        },
-        data: { errorCode: leaseToken },
-      });
-      return claimed.count === 1;
     });
   }
 
-  async #ownsLiveLease(job: ChatJob, leaseToken: string): Promise<boolean> {
-    const operation = await this.options.repositories.chatOperation.findFirst({
-      where: {
-        id: job.operationId,
+  async #renewLease(job: ChatJob, leaseToken: string): Promise<boolean> {
+    return this.#transaction(async (repositories) => {
+      await repositories.lockUser(job.userId);
+      await repositories.databaseNow();
+      return repositories.renewChatOperationLease({
+        operationId: job.operationId,
         userId: job.userId,
-        status: "PROCESSING",
-        errorCode: leaseToken,
-        userMessage: { deletedAt: null, session: { status: "ACTIVE", deletedAt: null } },
-      },
-      select: { id: true },
+        sessionId: job.sessionId,
+        leaseToken,
+      });
     });
-    return operation !== null;
+  }
+
+  #leaseTtlMs(): number {
+    return this.options.hardTimeoutMs + 30_000;
   }
 
   async #recordFailure(job: ChatJob, leaseToken: string): Promise<void> {

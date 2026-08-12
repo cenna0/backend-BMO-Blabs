@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
+import express from "express";
 
 import {
   connectDevice,
@@ -70,5 +72,26 @@ describe("production-shaped P9 integration", () => {
     await expect(runtime.backend.runMaintenance()).resolves.toBeUndefined();
 
     expect(resume).toHaveBeenCalledTimes(2);
+  });
+
+  it("binds the listener without awaiting a blocked startup chat backlog", async () => {
+    const blocked = new Promise<number>(() => undefined);
+    const p9 = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      resumePendingChat: vi.fn().mockReturnValue(blocked),
+      launchPendingChatRecovery: vi.fn(function (this: typeof p9) { void this.resumePendingChat(); }),
+    };
+    const app = express();
+    app.get("/livez", (_request, response) => response.json({ status: "ok" }));
+    const server = createServer(app);
+
+    await p9.initialize();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    p9.launchPendingChatRecovery();
+    const address = server.address();
+    expect(address && typeof address !== "string").toBe(true);
+    await request(app).get("/livez").expect(200);
+    expect(p9.resumePendingChat).toHaveBeenCalledOnce();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   });
 });

@@ -235,6 +235,9 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
       });
       const address = httpServer.address();
       if (!address || typeof address === "string") throw new Error("backend failed to bind TCP port");
+      p9?.launchPendingChatRecovery((error) => {
+        logger.warn({ err: error }, "startup chat recovery deferred to maintenance");
+      });
       const configured = new URL(config.PUBLIC_BASE_URL);
       if (configured.port === "0") {
         configured.port = String(address.port);

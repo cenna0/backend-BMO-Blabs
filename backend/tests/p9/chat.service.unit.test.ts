@@ -31,6 +31,8 @@ function fixture() {
   const repositories: any = {
     lockUser: vi.fn().mockResolvedValue(undefined),
     databaseNow: vi.fn().mockResolvedValue(now),
+    claimChatOperation: vi.fn().mockResolvedValue(true),
+    renewChatOperationLease: vi.fn().mockResolvedValue(true),
     chatSession: {
       findFirst: vi.fn(async ({ where }: any) =>
         where.id === state.session.id && where.userId === state.session.userId &&
@@ -207,8 +209,8 @@ describe("chat service durable orchestration", () => {
 
     expect(f.hermes.generate).toHaveBeenCalledTimes(2);
     expect(maxActive).toBe(1);
-    expect(f.repositories.chatOperation.updateMany.mock.calls[0]?.[0]?.where.id).toBe(operationId);
-    expect(f.repositories.chatOperation.updateMany.mock.calls.some((call: any[]) => call[0]?.where?.id === operationTwo)).toBe(true);
+    expect(f.repositories.claimChatOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId }));
+    expect(f.repositories.claimChatOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: operationTwo }));
   });
 
   it("claims a durable operation before provider work so overlapping workers invoke Hermes once", async () => {
@@ -216,16 +218,12 @@ describe("chat service durable orchestration", () => {
     const provider = deferred<string>();
     f.hermes.generate.mockReturnValue(provider.promise);
     let lease: string | null = null;
-    f.repositories.chatOperation.updateMany.mockImplementation(async ({ data }: any) => {
-      if (typeof data.errorCode === "string" && data.errorCode.startsWith("LEASE:") && lease === null) {
-        lease = data.errorCode;
-        return { count: 1 };
-      }
-      if (typeof data.errorCode === "string" && data.errorCode.startsWith("LEASE:")) return { count: 0 };
-      return { count: 1 };
+    f.repositories.claimChatOperation.mockImplementation(async ({ leaseToken }: any) => {
+      if (lease !== null) return false;
+      lease = leaseToken;
+      return true;
     });
-    f.repositories.chatOperation.findFirst.mockImplementation(async ({ where }: any) =>
-      where.errorCode === lease ? { id: operationId } : null);
+    f.repositories.renewChatOperationLease.mockImplementation(async ({ leaseToken }: any) => leaseToken === lease);
     const job = {
       userId, sessionId, userMessageId, operationId, text: "Hello",
     };
@@ -247,6 +245,88 @@ describe("chat service durable orchestration", () => {
     expect(f.hermes.generate).toHaveBeenCalledTimes(1);
   });
 
+  it("orders one session durably across service instances while allowing another session concurrently", async () => {
+    const f = fixture();
+    const first = deferred<string>();
+    const other = deferred<string>();
+    const lowerOperation = operationId;
+    const upperOperation = "00000000-0000-4000-8000-000000000021";
+    const otherSession = "00000000-0000-4000-8000-000000000011";
+    const otherOperation = "00000000-0000-4000-8000-000000000022";
+    let lowerProcessing = true;
+    let active = 0;
+    let maxActive = 0;
+    f.repositories.claimChatOperation.mockImplementation(async ({ operationId: candidate }: any) => {
+      if (candidate === upperOperation && lowerProcessing) return false;
+      return true;
+    });
+    f.repositories.chatOperation.updateMany.mockImplementation(async ({ where, data }: any) => {
+      if (data.status === "SUCCEEDED") lowerProcessing = false;
+      return { count: 1 };
+    });
+    f.hermes.generate.mockImplementation(async (_prompt: string, _signal: AbortSignal, options: any) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      try {
+        if (options.conversation.endsWith(sessionId)) return await first.promise;
+        return await other.promise;
+      } finally { active -= 1; }
+    });
+    const secondService = new ChatService({
+      repositories: f.repositories, transaction: async (work) => work(f.repositories),
+      hermes: f.hermes, mobileEvents: f.mobileEvents, memoryContext: f.memoryContext,
+      hardTimeoutMs: 1_000, maxConcurrent: 2,
+    });
+
+    const lower = f.service.processAcceptedOperation({ userId, sessionId, userMessageId, operationId: lowerOperation, text: "lower" });
+    await vi.waitFor(() => expect(f.hermes.generate).toHaveBeenCalledTimes(1));
+    await secondService.processAcceptedOperation({ userId, sessionId, userMessageId: "m-upper", operationId: upperOperation, text: "upper" });
+    expect(f.hermes.generate).toHaveBeenCalledTimes(1);
+    const different = secondService.processAcceptedOperation({ userId, sessionId: otherSession, userMessageId: "m-other", operationId: otherOperation, text: "other" });
+    await vi.waitFor(() => expect(f.hermes.generate).toHaveBeenCalledTimes(2));
+    expect(maxActive).toBe(2);
+    other.resolve("Other answer");
+    first.resolve("First answer");
+    await Promise.all([lower, different]);
+
+    lowerProcessing = false;
+    f.hermes.generate.mockResolvedValueOnce("Upper answer");
+    await secondService.processAcceptedOperation({ userId, sessionId, userMessageId: "m-upper", operationId: upperOperation, text: "upper" });
+    expect(f.hermes.generate).toHaveBeenCalledTimes(3);
+  });
+
+  it("renews with the database clock after slow context so a stale takeover cannot overlap Hermes", async () => {
+    const f = fixture();
+    const slowContext = deferred<readonly string[]>();
+    f.memoryContext.search.mockImplementationOnce(() => slowContext.promise).mockResolvedValue([]);
+    let currentLease = "";
+    let firstLease = "";
+    f.repositories.claimChatOperation.mockImplementation(async ({ leaseToken }: any) => {
+      if (!firstLease) firstLease = leaseToken;
+      currentLease = leaseToken;
+      return true;
+    });
+    f.repositories.renewChatOperationLease.mockImplementation(async ({ leaseToken }: any) => leaseToken === currentLease);
+    const secondService = new ChatService({
+      repositories: f.repositories, transaction: async (work) => work(f.repositories),
+      hermes: f.hermes, mobileEvents: f.mobileEvents, memoryContext: f.memoryContext,
+      hardTimeoutMs: 1_000,
+    });
+    const job = { userId, sessionId, userMessageId, operationId, text: "slow context" };
+
+    const slowWorker = f.service.processAcceptedOperation(job);
+    await vi.waitFor(() => expect(firstLease).not.toBe(""));
+    const takeoverWorker = secondService.processAcceptedOperation(job);
+    await vi.waitFor(() => expect(currentLease).not.toBe(firstLease));
+    await takeoverWorker;
+    slowContext.resolve([]);
+    await slowWorker;
+
+    expect(f.hermes.generate).toHaveBeenCalledTimes(1);
+    expect(f.repositories.renewChatOperationLease).toHaveBeenCalledTimes(2);
+    expect(f.repositories.databaseNow).toHaveBeenCalled();
+  });
+
   it("checks durable cancellation before queued provider work", async () => {
     const f = fixture();
     const blocker = deferred<string>();
@@ -258,11 +338,29 @@ describe("chat service durable orchestration", () => {
       idempotencyKey: "00000000-0000-4000-8000-000000000051", text: "deleted secret", speakOnDevice: false,
     });
     f.state.session.status = "DELETED";
+    f.repositories.renewChatOperationLease.mockResolvedValueOnce(false);
     blocker.resolve("Done");
     await f.service.waitForIdle();
 
     expect(f.hermes.generate).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(f.hermes.generate.mock.calls)).not.toContain("deleted secret");
+    expect(JSON.stringify(f.hermes.generate.mock.calls.slice(1))).not.toContain("deleted secret");
+  });
+
+  it("aborts active Hermes work on deletion and persists no assistant or completion event", async () => {
+    const f = fixture();
+    let providerSignal: AbortSignal | undefined;
+    f.hermes.generate.mockImplementation((_prompt: string, signal: AbortSignal) => {
+      providerSignal = signal;
+      return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
+    });
+    const running = f.service.processAcceptedOperation({ userId, sessionId, userMessageId, operationId, text: "delete me" });
+    await vi.waitFor(() => expect(providerSignal).toBeDefined());
+    await f.service.deleteSession(userId, sessionId, "delete-active");
+    await running;
+
+    expect(providerSignal?.aborted).toBe(true);
+    expect(f.state.messages.filter((message) => message.role === "ASSISTANT")).toHaveLength(0);
+    expect(f.mobileEvents.sendToUser).not.toHaveBeenCalledWith(userId, expect.objectContaining({ event: "chat_message" }));
   });
 
   it("drains more than one recovery page and exposes transient resume failures for retry", async () => {
