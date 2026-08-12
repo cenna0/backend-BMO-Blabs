@@ -27,6 +27,7 @@ function appWithOps(
     profile: {} as never,
     avatars: {} as never,
     personalization: {} as never,
+    chat: {} as never,
     accessTokens: {} as never,
     repositories: {
       healthCheck: async () => undefined,

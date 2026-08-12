@@ -21,7 +21,7 @@ export class HermesClientError extends Error {
 }
 
 export interface HermesGenerateClient {
-  generate(input: string, signal?: AbortSignal): Promise<string>;
+  generate(input: string, signal?: AbortSignal, options?: { conversation?: string }): Promise<string>;
 }
 
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
@@ -222,12 +222,12 @@ export class HermesResponsesClient extends BaseHermesClient implements HermesGen
     super({ ...options, fetcher: options.fetcher ?? fetch });
   }
 
-  async generate(input: string, signal?: AbortSignal): Promise<string> {
+  async generate(input: string, signal?: AbortSignal, requestOptions?: { conversation?: string }): Promise<string> {
     const payload = await this.postJson(endpoint(this.options.baseUrl, "/v1/responses"), {
       model: this.options.model,
       instructions: BMO_RUNTIME_INSTRUCTIONS,
       input,
-      conversation: this.options.conversation,
+      conversation: requestOptions?.conversation ?? this.options.conversation,
       store: true,
       stream: false,
       truncation: "auto",
@@ -241,14 +241,14 @@ export class HermesChatCompletionsClient extends BaseHermesClient implements Her
     super({ ...options, fetcher: options.fetcher ?? fetch });
   }
 
-  async generate(input: string, signal?: AbortSignal): Promise<string> {
+  async generate(input: string, signal?: AbortSignal, requestOptions?: { conversation?: string }): Promise<string> {
     const payload = await this.postJson(endpoint(this.options.baseUrl, "/v1/chat/completions"), {
       model: this.options.model,
       messages: [
         { role: "system", content: BMO_RUNTIME_INSTRUCTIONS },
         { role: "user", content: input },
       ],
-      conversation: this.options.conversation,
+      conversation: requestOptions?.conversation ?? this.options.conversation,
       stream: false,
     }, signal);
     return this.finalize(parseChatCompletionsText(payload));

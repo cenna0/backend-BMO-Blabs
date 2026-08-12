@@ -94,6 +94,26 @@ describe("Hermes clients", () => {
     expect(fetcher).toHaveBeenCalledOnce();
   });
 
+  it("accepts a server-owned per-chat conversation without changing the default voice conversation", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const client = new HermesResponsesClient({
+      baseUrl: "http://127.0.0.1:8642",
+      apiKey: "test-hermes-key",
+      model: "hermes-agent",
+      conversation: "voice-bmo-001",
+      hardTimeoutMs: 1_000,
+      fetcher: async (_url, init) => {
+        bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return new Response(JSON.stringify(completedFixture), { status: 200 });
+      },
+    });
+
+    await client.generate("mobile", undefined, { conversation: "chat-user-session" });
+    await client.generate("voice");
+
+    expect(bodies.map((body) => body.conversation)).toEqual(["chat-user-session", "voice-bmo-001"]);
+  });
+
   it("maps non-2xx, invalid JSON, provider error output, and timeout to HERMES_FAILED", async () => {
     const non2xx = new HermesResponsesClient({
       baseUrl: "http://local",

@@ -20,6 +20,8 @@ import { AvatarService } from "./services/avatar.service.js";
 import type { AvatarReconciliationResult } from "./services/avatar.service.js";
 import { createAvatarMediaRouter } from "./http/profile.route.js";
 import { authenticateMobileAccessToken } from "./websocket/mobile-auth.js";
+import { ChatService, type MobileEventPublisher } from "./services/chat.service.js";
+import type { HermesGenerateClient } from "../services/hermes.client.js";
 
 export interface P9Runtime {
   router: Router;
@@ -34,12 +36,24 @@ export interface P9Runtime {
     expiresAt: Date;
   } | { kind: "expired" } | null>;
   checkReadiness(): Promise<boolean>;
+  waitForChatIdle(): Promise<void>;
   close(): Promise<void>;
 }
 
 export interface P9RuntimeOptions {
   includeOps?: boolean;
+  hermes?: HermesGenerateClient;
+  mobileEvents?: MobileEventPublisher;
+  chatHardTimeoutMs?: number;
 }
+
+const unavailableHermes: HermesGenerateClient = {
+  async generate(): Promise<string> {
+    throw new Error("Hermes client is unavailable");
+  },
+};
+
+const noMobileEvents: MobileEventPublisher = { sendToUser: () => 0 };
 
 export async function checkP9Readiness(
   repositories: Pick<P9Repositories, "healthCheck" | "migrationStatus">,
@@ -86,17 +100,33 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     batchSize: config.avatarGcBatchSize,
   });
   const deviceBinding = new DeviceBindingService(repositories);
+  const chat = new ChatService({
+    client,
+    repositories,
+    hermes: options.hermes ?? unavailableHermes,
+    mobileEvents: options.mobileEvents ?? noMobileEvents,
+    hardTimeoutMs: options.chatHardTimeoutMs ?? 180_000,
+  });
   return {
-    router: createP9Router({ auth, sessions, users, devices, pairing, settings, recovery, profile, avatars, personalization, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
+    router: createP9Router({ auth, sessions, users, devices, pairing, settings, recovery, profile, avatars, personalization, chat, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
     mediaRouter: createAvatarMediaRouter(avatarStorage),
-    initialize: () => avatarStorage.initialize(),
+    initialize: async () => {
+      await avatarStorage.initialize();
+      try {
+        await chat.resumePending();
+      } catch {
+        // Readiness remains the authority when PostgreSQL is unavailable.
+      }
+    },
     reconcileAvatars: () => avatars.reconcile(),
     resolveDeviceBinding: (hardwareId, deviceToken) => deviceBinding.resolve(hardwareId, deviceToken),
     authorizeDeviceBinding: (binding) => deviceBinding.isActive(binding),
     authenticateMobileSocket: (accessToken) =>
       authenticateMobileAccessToken(accessTokens, sessions, accessToken),
     checkReadiness: () => checkP9Readiness(repositories),
+    waitForChatIdle: () => chat.waitForIdle(),
     close: async () => {
+      await chat.close();
       await avatarStorage.close();
       await disconnectP9Client(client);
     },

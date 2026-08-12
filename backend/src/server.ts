@@ -48,7 +48,21 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   const tempAudio = new TempAudioService(config.TEMP_AUDIO_DIR, config.TEMP_AUDIO_TTL_SECONDS);
   let publicBaseUrl = config.PUBLIC_BASE_URL.replace(/\/$/, "");
   let cleanupInterval: NodeJS.Timeout | undefined;
-  const p9: P9Runtime | undefined = config.p9.enabled ? createP9Runtime(config.p9) : undefined;
+  const hermes = new HermesResponsesClient({
+    baseUrl: config.HERMES_API_URL,
+    apiKey: config.HERMES_API_KEY,
+    model: config.HERMES_MODEL,
+    conversation: config.HERMES_CONVERSATION,
+    softTimeoutMs: config.HERMES_SOFT_TIMEOUT_MS,
+    hardTimeoutMs: config.HERMES_HARD_TIMEOUT_MS,
+    logger,
+  });
+  let mobileSockets: MobileWebSocketServer | undefined;
+  const p9: P9Runtime | undefined = config.p9.enabled ? createP9Runtime(config.p9, {
+    hermes,
+    mobileEvents: { sendToUser: (userId, event) => mobileSockets?.sendToUser(userId, event) ?? 0 },
+    chatHardTimeoutMs: config.HERMES_HARD_TIMEOUT_MS,
+  }) : undefined;
 
   const removeOutput = async (deviceId: string, requestId: string, failed: boolean) => {
     const record = requestStore.get(requestId);
@@ -88,7 +102,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     onPlaybackDone: (deviceId, requestId) => removeOutput(deviceId, requestId, false),
     onPlaybackFailed: (deviceId, requestId) => removeOutput(deviceId, requestId, true),
   });
-  const mobileSockets = p9 === undefined ? undefined : new MobileWebSocketServer({
+  mobileSockets = p9 === undefined ? undefined : new MobileWebSocketServer({
     httpServer,
     authenticate: (accessToken) => p9.authenticateMobileSocket(accessToken),
   });
@@ -110,15 +124,6 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     internalToken: config.INTERNAL_SERVICE_TOKEN,
     sttTimeoutMs: config.AUDIO_SERVICE_STT_TIMEOUT_MS,
     ttsTimeoutMs: config.AUDIO_SERVICE_TTS_TIMEOUT_MS,
-  });
-  const hermes = new HermesResponsesClient({
-    baseUrl: config.HERMES_API_URL,
-    apiKey: config.HERMES_API_KEY,
-    model: config.HERMES_MODEL,
-    conversation: config.HERMES_CONVERSATION,
-    softTimeoutMs: config.HERMES_SOFT_TIMEOUT_MS,
-    hardTimeoutMs: config.HERMES_HARD_TIMEOUT_MS,
-    logger,
   });
   const readiness = new BackendReadinessService({
     hermesBaseUrl: config.HERMES_API_URL,

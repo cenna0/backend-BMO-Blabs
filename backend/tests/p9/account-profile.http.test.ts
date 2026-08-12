@@ -122,6 +122,7 @@ describe("P9 request envelope", () => {
       profile: {},
       avatars: {},
       personalization: {},
+      chat: {},
       accessTokens: {},
       repositories: {},
     } as any));

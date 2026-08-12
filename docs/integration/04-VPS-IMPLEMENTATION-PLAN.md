@@ -52,6 +52,12 @@ activation remains separately gated.
 
 Implement durable chat/history/idempotency, Hermes invocation, memory lifecycle, schedule/run/delivery state, and generic proactive-delivery queue. A backend queue result is not physical playback proof.
 
+Source checkpoint 2026-08-12: the chat/history/idempotency and internal Hermes
+orchestration portion is `EXISTING_VERIFIED` in source and automated tests.
+Memory remains an explicit empty gateway, schedules/proactive delivery remain
+`READY_TO_IMPLEMENT`, and the running candidate/public production were not
+changed.
+
 ### Slice 6 — device configuration plane
 
 Implement DB/API ownership for Wi-Fi configuration, telemetry/RSSI, device logs, and device settings. Additive device events are defined in `02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`; physical handlers and acceptance remain `PENDING_PHYSICAL_ESP`.

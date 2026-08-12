@@ -16,6 +16,12 @@ multipart and image-processing admission. The running private candidate was not 
 and still has only the two P9.1 migrations; public production remains
 unchanged.
 
+Slice 5A registers the six frozen chat REST routes in the production-shaped
+source runtime and supplies the existing typed mobile chat event producers.
+It is source/test verified only: the running candidate was not migrated or
+recreated, Caddy/public routing was not changed, and physical proactive speech
+remains pending the generic delivery slice and ESP evidence.
+
 ## Runtime and existing voice surfaces
 
 | Method/surface | Path/event | Status | Availability / evidence |
@@ -53,8 +59,8 @@ deployed or enabled there.
 | GET | `/media/avatars/:opaqueId.webp` | `EXISTING_VERIFIED` | Slice 2B source/tests; exact UUID WebP path, `image/webp`, `nosniff`, immutable cache, request context, and local sanitized errors; no directory listing |
 | GET | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
 | PATCH | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B exact-body source/tests; owner-scoped safe upsert returns the bare canonical seven-field object; Hermes context use is later |
-| PATCH | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B exact-body source/tests; strict nonempty bounded canonical owner patch returns the bare seven-field object; Hermes context use is later |
+| GET | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B exact-body source/tests; owner-scoped safe upsert returns the bare canonical seven-field object; Slice 5A consumes it in bounded server-built Hermes chat context |
+| PATCH | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B exact-body source/tests; strict nonempty bounded canonical owner patch returns the bare seven-field object; Slice 5A consumes it in bounded server-built Hermes chat context |
 
 ## Pairing and devices
 
@@ -81,17 +87,17 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Method/surface | Path/event | Status | Availability / gap |
 |---|---|---|---|
-| GET | `/api/v1/chat/sessions` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/chat/sessions` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/chat/sessions/:sessionId/messages` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/chat/sessions/:sessionId/messages` | `READY_TO_IMPLEMENT` | Not registered; target 202 + idempotency |
-| DELETE | `/api/v1/chat/sessions/:sessionId` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/chat/messages/:messageId/feedback` | `READY_TO_IMPLEMENT` | Not registered |
+| GET | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Source/test tier; bearer-owner scope, bounded deterministic ordering; not candidate/public deployed |
+| POST | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Source/test tier; strict `{temporary}` and server-derived owner |
+| GET | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Source/test tier; owned active session, positive signed-64-bit cursor, bounded stable ascending pagination |
+| POST | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Source/test tier; durable 202 user message/operation, transactional per-user UUID idempotency and conflict rejection, bounded Hermes queue; `speakOnDevice:true` is explicitly unavailable until generic proactive delivery exists |
+| DELETE | `/api/v1/chat/sessions/:sessionId` | `EXISTING_VERIFIED` | Source/test tier; owner-scoped soft deletion and cancellation of processing operations; no invented purge period |
+| POST | `/api/v1/chat/messages/:messageId/feedback` | `EXISTING_VERIFIED` | Source/test tier; owner-scoped assistant-only bounded feedback upsert |
 | WSS | `/api/v1/ws` | `EXISTING_VERIFIED` | Source/test tier; exact separate mobile upgrade path when P9 is enabled; candidate/public production unchanged |
 | Mobile -> Backend | `authenticate` | `EXISTING_VERIFIED` | Source/test tier; strict `{event,accessToken}` within five seconds, no URL-query token or client identity |
 | Backend -> Mobile | `authenticated` | `EXISTING_VERIFIED` | Source/test tier; verified token plus active server session supplies `userId`; expiry closes 4410 |
-| Backend -> Mobile | `chat_thinking` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; chat producer remains `READY_TO_IMPLEMENT` |
-| Backend -> Mobile | `chat_message` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; nested assistant message producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `chat_thinking` | `EXISTING_VERIFIED` | Typed bounded schema plus Slice 5A best-effort per-user producer after durable acceptance; history remains recovery authority |
+| Backend -> Mobile | `chat_message` | `EXISTING_VERIFIED` | Typed bounded schema plus Slice 5A per-user producer after sanitized assistant persistence; no token stream |
 | Backend -> Mobile | `device_status` | `EXISTING_VERIFIED` | Typed nullable battery/RSSI schema + per-user fanout source/test; status producer remains `READY_TO_IMPLEMENT` |
 | Backend -> Mobile | `voice_processing_status` | `EXISTING_VERIFIED` | Typed sanitized schema + per-user fanout source/test; no audio URL/stream; producer remains `READY_TO_IMPLEMENT` |
 | Backend -> Mobile | `wifi_configuration_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; Wi-Fi lifecycle producer remains `READY_TO_IMPLEMENT` |
