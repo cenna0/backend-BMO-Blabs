@@ -14,6 +14,7 @@ import {
   createAvatarUploadAdmissionMiddleware,
   releaseAvatarUploadAdmission,
   retainAvatarUploadAdmission,
+  isAvatarUploadTimedOut,
   type AvatarUploadAdmission,
 } from "./avatar-upload-admission.js";
 import { asyncP9, currentAuth, ensureRequestContext, p9ErrorHandler, requireAuth } from "./middleware.js";
@@ -24,6 +25,7 @@ export interface AvatarUploadControls {
   windowMs: number;
   userLimit: number;
   ipLimit: number;
+  receiveTimeoutMs?: number;
   admission?: AvatarUploadAdmission;
 }
 
@@ -63,9 +65,11 @@ export function createProfileRouter(
   });
   const admitAvatarUpload = createAvatarUploadAdmissionMiddleware(
     uploadControls.admission ?? avatarUploadAdmission,
+    uploadControls.receiveTimeoutMs,
   );
   const parseAvatar: RequestHandler = (request, response, next) => {
     upload.single("file")(request, response, (error) => {
+      if (isAvatarUploadTimedOut(request)) return;
       if (error) {
         response.status(400).json({ error: "INVALID_INPUT" });
         return;

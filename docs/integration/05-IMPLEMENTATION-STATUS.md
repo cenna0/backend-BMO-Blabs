@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-11
-**Last implementation checkpoint:** 2026-08-11 — Slice 2B account/profile/recovery/avatar and personalization source candidate, final recovery/avatar hardening
+**Last implementation checkpoint:** 2026-08-12 — Slice 2B account/profile/recovery/avatar and personalization source candidate, fair bounded multipart admission hardening
 **Baseline source:** `main` / `d638b20c381c676136c94524a38a1def5d70e565`
 **Documentation branch:** `docs/integration-contract-freeze`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -148,11 +148,14 @@ Recovery limiter responses receive the same idempotent request context and
 
 Avatar upload applies independent authenticated-user and proxy-aware IP rate
 limits, then globally admits at most two active and four waiting multipart
-bodies before Multer can buffer the bounded 5 MiB JPEG/PNG/WebP input. A lease
-released on an early parser/transport failure transfers to operation ownership
-after successful parsing and remains held until the avatar handler settles,
-even if the client disconnects. Sharp processing independently admits two
-active and four waiting jobs, rejects images beyond 8 million decoded pixels,
+bodies before Multer can buffer the bounded 5 MiB JPEG/PNG/WebP input. Admission
+also enforces one active/two waiting leases per owner and proxy-normalized IP,
+dispatches eligible waiters without allowing a new request to bypass them, and
+expires queued or pre-parse requests after a bounded 30-second receive deadline
+with a sanitized 408. A lease released on an early parser/transport failure
+transfers to operation ownership after successful parsing and remains held until
+the avatar handler settles, even if the client disconnects. Sharp processing
+independently admits two active and four waiting jobs, rejects images beyond 8 million decoded pixels,
 4096 pixels per dimension, a 4:1 aspect ratio, or one page, and re-encodes to a
 stripped WebP. Storage generates a UUID key and serves only the exact opaque
 `.webp` path with `nosniff` and immutable caching. It requires an absolute,
@@ -176,8 +179,8 @@ is deliberately deferred to a later slice.
 | Capability | Status | Exact gap / gate |
 |---|---|---|
 | Self-service registration | `EXISTING_VERIFIED` | Source + automated route/service tests; optional legacy invitation compatibility retained; running candidate/public production unchanged |
-| DOB password recovery | `EXISTING_VERIFIED` | Source + automated enumeration/rate/TTL/hash/epoch/reuse/revocation and lock-aware concurrent issuance/reset tests; weak MVP factor and not deployed |
-| Profile, username, avatar | `EXISTING_VERIFIED` | Source + automated independent-rate/pre-Multer admission/disconnect-lifetime/image-bound/media/storage/DB-authoritative reconciliation tests; persistent mounts declared but not created/deployed |
+| DOB password recovery | `EXISTING_VERIFIED` | Source + automated enumeration/rate/TTL/hash/epoch/reuse/revocation and lock-aware concurrent issuance tests plus deterministic reset/revocation races; weak MVP factor and not deployed |
+| Profile, username, avatar | `EXISTING_VERIFIED` | Source + automated independent-rate/fair pre-Multer admission/30-second receive deadline/disconnect-lifetime/image-bound/media/storage/DB-authoritative reconciliation tests; persistent mounts declared but not created/deployed |
 | Personalization | `EXISTING_VERIFIED` | Source + exact bare seven-field response/defaults/strict patch/owner tests; Hermes context integration remains `READY_TO_IMPLEMENT` in a later slice |
 | Mobile realtime `/api/v1/ws` | `READY_TO_IMPLEMENT` | Separate contract absent |
 | Chat/history and Hermes-backed send | `READY_TO_IMPLEMENT` | Durable source models/cursors/idempotency/202-operation state are verified; services/routes/Hermes orchestration remain absent |
@@ -199,7 +202,7 @@ is deliberately deferred to a later slice.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 52 files passed, 1 skipped; 265 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs and was not run. Slice 2B focused account/profile/recovery/avatar/personalization, login-enumeration work-shape, bounded multipart/image-processing admission, and lock-aware recovery/race coverage is included in those totals.
+- Backend on Node `22.23.2`: 52 files passed, 1 skipped; 271 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs and was not run. Slice 2B focused account/profile/recovery/avatar/personalization, login-enumeration work-shape, fair deadline-bounded multipart/image-processing admission, and lock-aware recovery/race coverage is included in those totals.
 - Backend typecheck and build: passed on Node `22.23.1`.
 - Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. On disposable PostgreSQL, an empty three-migration deploy passed, repeat deploy reported no pending migrations, and a populated two-to-three migration upgrade preserved seeded rows in all 11 P9.1 models. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints, and the repeated database-to-schema diff returned `No difference detected`. Transaction-rolled-back positive/negative probes also verified avatar, Wi-Fi AEAD, battery, device-log expiry, provider-subtype, Spotify refresh-secret, and WhatsApp rule constraints. The disposable databases and review images were removed after verification. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the running `bmo` database still has only the two P9.1 migrations.
 - Static/rendered packaging: 13 tests passed, 1 unrelated packaging test skipped. PostgreSQL has no host-published port, Backend uses the named Unix-socket volume, and avatar storage uses a separate writable named volume without adding public routing. Fresh production Backend and P9 review-candidate image builds passed; ephemeral command-only probes verified application UID/GID `1000:1000` and avatar-directory ownership/mode `1000:1000`/`0700`. No service container was started and the live candidate was not recreated.

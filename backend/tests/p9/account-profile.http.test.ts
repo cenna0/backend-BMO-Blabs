@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { parseP9Config } from "../../src/p9/config.js";
 import { P9Error } from "../../src/p9/errors.js";
 import { createAuthRouter } from "../../src/p9/http/auth.route.js";
-import { BoundedAvatarUploadAdmission } from "../../src/p9/http/avatar-upload-admission.js";
+import { BoundedAvatarUploadAdmission, type AvatarUploadAdmission } from "../../src/p9/http/avatar-upload-admission.js";
 import { p9ErrorHandler } from "../../src/p9/http/middleware.js";
 import { createAvatarMediaRouter, createProfileRouter } from "../../src/p9/http/profile.route.js";
 import { createPersonalizationRouter } from "../../src/p9/http/personalization.route.js";
@@ -155,7 +155,7 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
   function buildAuthedApp(
     maxBytes = 5 * 1024 * 1024,
     uploadRate = { userLimit: 10, ipLimit: 20 },
-    admission?: { acquire(signal?: AbortSignal): Promise<{ release(): void }> },
+    admission?: AvatarUploadAdmission,
   ) {
     const accessTokens = { verify: vi.fn(async (token: string) => ({
       sub: token.startsWith("user-") ? token : "user-1",
@@ -264,8 +264,8 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
   });
 
   it("rejects admission overload before Multer MIME validation or file buffering", async () => {
-    const admission = new BoundedAvatarUploadAdmission(1, 0);
-    const held = await admission.acquire();
+    const admission = new BoundedAvatarUploadAdmission({ maxActive: 1, maxWaiters: 0, maxActivePerOwner: 1, maxWaitersPerOwner: 0, maxActivePerIp: 1, maxWaitersPerIp: 0 });
+    const held = await admission.acquire({ ownerKey: "held-owner", ipKey: "held-ip" });
     const f = buildAuthedApp(5 * 1024 * 1024, { userLimit: 20, ipLimit: 20 }, admission);
 
     const response = await request(f.app).post("/me/avatar")
@@ -283,7 +283,7 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
   });
 
   it("admits only a bounded number of multipart bodies before Multer", async () => {
-    const admission = new BoundedAvatarUploadAdmission(1, 1);
+    const admission = new BoundedAvatarUploadAdmission({ maxActive: 1, maxWaiters: 1, maxActivePerOwner: 1, maxWaitersPerOwner: 1, maxActivePerIp: 1, maxWaitersPerIp: 1 });
     const firstUpload = deferred<{ avatarUrl: string }>();
     const f = buildAuthedApp(5 * 1024 * 1024, { userLimit: 20, ipLimit: 20 }, admission);
     f.avatar.upload
@@ -311,7 +311,7 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
   });
 
   it("releases multipart admission after success, Multer rejection, and service failure", async () => {
-    const admission = new BoundedAvatarUploadAdmission(1, 0);
+    const admission = new BoundedAvatarUploadAdmission({ maxActive: 1, maxWaiters: 0, maxActivePerOwner: 1, maxWaitersPerOwner: 0, maxActivePerIp: 1, maxWaitersPerIp: 0 });
     const f = buildAuthedApp(100, { userLimit: 20, ipLimit: 20 }, admission);
     const upload = (contentType = "image/png") => request(f.app).post("/me/avatar")
       .set("Authorization", "Bearer token")
@@ -327,7 +327,7 @@ describe("Phase 2B authenticated profile/settings/media routes", () => {
   });
 
   it("retains admission after client disconnect until buffer-backed avatar work settles", async () => {
-    const admission = new BoundedAvatarUploadAdmission(1, 0);
+    const admission = new BoundedAvatarUploadAdmission({ maxActive: 1, maxWaiters: 0, maxActivePerOwner: 1, maxWaitersPerOwner: 0, maxActivePerIp: 1, maxWaitersPerIp: 0 });
     const firstUpload = deferred<{ avatarUrl: string }>();
     const f = buildAuthedApp(5 * 1024 * 1024, { userLimit: 20, ipLimit: 20 }, admission);
     f.avatar.upload

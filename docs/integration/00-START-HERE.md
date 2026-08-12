@@ -7,7 +7,7 @@
 
 **Current source checkpoint:** Phase 2 Slice 2B account/profile/recovery/avatar
 and personalization is source/test verified, including serialized recovery
-epochs and bounded avatar multipart/image-processing admission. This does not
+epochs and fair deadline-bounded avatar multipart/image-processing admission. This does not
 alter the frozen Phase 1 runtime facts below: the running private candidate is
 still invitation-era/unmigrated and public production is unchanged.
 

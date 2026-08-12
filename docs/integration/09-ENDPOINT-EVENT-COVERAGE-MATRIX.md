@@ -11,8 +11,8 @@ not been applied to the running candidate or production.
 
 Slice 2B registers the account/profile/recovery/avatar and personalization
 surfaces in source and verifies them with automated route/service/storage
-tests, including serialized recovery epochs and bounded avatar multipart and
-image-processing admission. The running private candidate was not recreated
+tests, including serialized recovery epochs and fair deadline-bounded avatar
+multipart and image-processing admission. The running private candidate was not recreated
 and still has only the two P9.1 migrations; public production remains
 unchanged.
 
@@ -49,7 +49,7 @@ deployed or enabled there.
 | POST | `/api/v1/auth/password/recovery/verify` | `EXISTING_VERIFIED` | Slice 2B source/tests; generic enumeration-safe failure, request-ID-bearing independent IP/email limits, Jakarta calendar boundary, per-user serialized replacement epochs using a post-lock DB clock, 600-second opaque token, and SHA-256 verifier only; not deployed |
 | POST | `/api/v1/auth/password/recovery/reset` | `EXISTING_VERIFIED` | Slice 2B source/tests; per-user lock and post-lock DB clock precede refetch/atomic single use, sibling-epoch invalidation, Argon2id replacement, and transactional all-session/refresh revocation; not deployed |
 | PATCH | `/api/v1/me/profile` | `EXISTING_VERIFIED` | Slice 2B source/tests; bearer-owned strict display-name/normalized-username patch and sanitized conflict |
-| POST | `/api/v1/me/avatar` | `EXISTING_VERIFIED` | Slice 2B source/tests; independent user/IP limits, global 2-active/4-waiting admission before 5 MiB Multer buffering with post-parse leases retained through processing despite disconnect, separate 2-active/4-waiting Sharp admission, 8 MP/4096 px/4:1/single-page decode bounds, WebP transcode, hardened runtime-owned storage, temp-plus-atomic-rename UUID publication, nonfatal old cleanup, and aged bounded paginated DB-rechecked orphan reconciliation |
+| POST | `/api/v1/me/avatar` | `EXISTING_VERIFIED` | Slice 2B source/tests; independent user/IP limits, global 2-active/4-waiting admission before 5 MiB Multer buffering, one-owner/IP active/waiting fairness, bounded 30-second pre-parse receive deadline with sanitized 408, post-parse leases retained through processing despite disconnect, separate 2-active/4-waiting Sharp admission, 8 MP/4096 px/4:1/single-page decode bounds, WebP transcode, hardened runtime-owned storage, temp-plus-atomic-rename UUID publication, nonfatal old cleanup, and aged bounded paginated DB-rechecked orphan reconciliation |
 | GET | `/media/avatars/:opaqueId.webp` | `EXISTING_VERIFIED` | Slice 2B source/tests; exact UUID WebP path, `image/webp`, `nosniff`, immutable cache, request context, and local sanitized errors; no directory listing |
 | GET | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
 | PATCH | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |

@@ -11,6 +11,8 @@ const booleanString = z
 const optionalPositiveInt = (fallback: number) =>
   z.coerce.number().int().positive().default(fallback);
 
+const avatarUploadReceiveTimeout = z.coerce.number().int().min(1_000).max(120_000).default(30_000);
+
 const publicBaseUrlSchema = z.string().transform((value, context) => {
   let url: URL;
   try {
@@ -65,6 +67,7 @@ const rawSchema = z.object({
   P9_POSTGRES_MAX_CONNECTIONS: optionalPositiveInt(20),
   PUBLIC_BASE_URL: publicBaseUrlSchema.default("http://127.0.0.1:3000"),
   AVATAR_STORAGE_DIR: avatarStoragePathSchema.default("/opt/bmo/data/avatars"),
+  AVATAR_UPLOAD_RECEIVE_TIMEOUT_MS: avatarUploadReceiveTimeout,
 });
 
 const strongSecret = (name: string, value: string | undefined): string => {
@@ -95,6 +98,7 @@ export interface P9Config {
   avatarUploadWindowMs: 900_000;
   avatarUploadUserLimit: 10;
   avatarUploadIpLimit: 20;
+  avatarUploadReceiveTimeoutMs: number;
   avatarGcIntervalMs: 3_600_000;
   avatarGcGraceMs: 86_400_000;
   avatarGcScanLimit: 200;
@@ -130,6 +134,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       avatarUploadWindowMs: 900_000,
       avatarUploadUserLimit: 10,
       avatarUploadIpLimit: 20,
+      avatarUploadReceiveTimeoutMs: parsed.AVATAR_UPLOAD_RECEIVE_TIMEOUT_MS,
       avatarGcIntervalMs: 3_600_000,
       avatarGcGraceMs: 86_400_000,
       avatarGcScanLimit: 200,
@@ -163,6 +168,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     avatarUploadWindowMs: 900_000,
     avatarUploadUserLimit: 10,
     avatarUploadIpLimit: 20,
+    avatarUploadReceiveTimeoutMs: parsed.AVATAR_UPLOAD_RECEIVE_TIMEOUT_MS,
     avatarGcIntervalMs: 3_600_000,
     avatarGcGraceMs: 86_400_000,
     avatarGcScanLimit: 200,

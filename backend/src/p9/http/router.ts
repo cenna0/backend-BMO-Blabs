@@ -63,6 +63,7 @@ export function createP9Router(services: P9RouterServices): Router {
       windowMs: services.config.avatarUploadWindowMs,
       userLimit: services.config.avatarUploadUserLimit,
       ipLimit: services.config.avatarUploadIpLimit,
+      receiveTimeoutMs: services.config.avatarUploadReceiveTimeoutMs,
     },
   ));
   router.use(createPersonalizationRouter(services.personalization, services.accessTokens, services.sessions));

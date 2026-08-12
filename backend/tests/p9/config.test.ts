@@ -54,6 +54,7 @@ describe("P9 configuration", () => {
       avatarUploadWindowMs: 15 * 60 * 1000,
       avatarUploadUserLimit: 10,
       avatarUploadIpLimit: 20,
+      avatarUploadReceiveTimeoutMs: 30_000,
       avatarGcIntervalMs: 60 * 60 * 1000,
       avatarGcGraceMs: 24 * 60 * 60 * 1000,
       avatarGcScanLimit: 200,
@@ -72,6 +73,14 @@ describe("P9 configuration", () => {
     }
     expect(parseP9Config({ ...enabled, AVATAR_STORAGE_DIR: "/srv/bmo/avatars/" }).avatarStorageDir)
       .toBe("/srv/bmo/avatars");
+  });
+
+  it("bounds the multipart receive timeout", () => {
+    expect(parseP9Config({ ...enabled, AVATAR_UPLOAD_RECEIVE_TIMEOUT_MS: "60000" }).avatarUploadReceiveTimeoutMs)
+      .toBe(60_000);
+    for (const value of ["999", "120001", "not-a-number"]) {
+      expect(() => parseP9Config({ ...enabled, AVATAR_UPLOAD_RECEIVE_TIMEOUT_MS: value })).toThrow();
+    }
   });
 
   it("accepts explicit public avatar storage configuration without exposing it as a route", () => {
