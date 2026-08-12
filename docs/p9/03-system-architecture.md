@@ -20,6 +20,15 @@ ESP32 --WSS /ws + HTTP raw WAV/MP3--> Caddy --> Backend API service
 - ESP owns local Wi-Fi application, recording, playback, display, and firmware behavior. The VPS owns desired state and delivery records.
 - Mobile realtime and device WSS are independent contracts.
 
+The Phase 2 source now enforces this independence with exact upgrade routing:
+device `/ws` retains its v1.0.5 authentication/events while mobile
+`/api/v1/ws` accepts only a post-open access-token authentication event. The
+mobile transport derives user/session identity from the verified JWT plus an
+active PostgreSQL session, closes at token expiry, uses native ping/pong, and
+exposes typed per-user event fanout. It does not transport microphone/audio or
+token-by-token Hermes output. This is source/test evidence only; the running
+candidate and public production image were not changed.
+
 ## Frozen flows
 
 ### Pairing and identity

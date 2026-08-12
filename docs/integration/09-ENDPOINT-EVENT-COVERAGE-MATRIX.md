@@ -87,18 +87,18 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | POST | `/api/v1/chat/sessions/:sessionId/messages` | `READY_TO_IMPLEMENT` | Not registered; target 202 + idempotency |
 | DELETE | `/api/v1/chat/sessions/:sessionId` | `READY_TO_IMPLEMENT` | Not registered |
 | POST | `/api/v1/chat/messages/:messageId/feedback` | `READY_TO_IMPLEMENT` | Not registered |
-| WSS | `/api/v1/ws` | `READY_TO_IMPLEMENT` | Separate mobile socket; not registered/public |
-| Mobile -> Backend | `authenticate` | `READY_TO_IMPLEMENT` | Target uses `accessToken` after open |
-| Backend -> Mobile | `authenticated` | `READY_TO_IMPLEMENT` | Target event |
-| Backend -> Mobile | `chat_thinking` | `READY_TO_IMPLEMENT` | Target event |
-| Backend -> Mobile | `chat_message` | `READY_TO_IMPLEMENT` | Target event uses `messageId` |
-| Backend -> Mobile | `device_status` | `READY_TO_IMPLEMENT` | Target event |
-| Backend -> Mobile | `voice_processing_status` | `READY_TO_IMPLEMENT` | Sanitized status, no audio streaming |
-| Backend -> Mobile | `wifi_configuration_status` | `READY_TO_IMPLEMENT` | Target event |
-| Backend -> Mobile | `proactive_delivery_status` | `READY_TO_IMPLEMENT` | Target event |
-| Backend -> Mobile | `schedule_status` | `READY_TO_IMPLEMENT` | Target event |
-| Backend -> Mobile | `integration_status` | `READY_TO_IMPLEMENT` | Target event |
-| Backend -> Mobile | `notification` | `READY_TO_IMPLEMENT` | Target event |
+| WSS | `/api/v1/ws` | `EXISTING_VERIFIED` | Source/test tier; exact separate mobile upgrade path when P9 is enabled; candidate/public production unchanged |
+| Mobile -> Backend | `authenticate` | `EXISTING_VERIFIED` | Source/test tier; strict `{event,accessToken}` within five seconds, no URL-query token or client identity |
+| Backend -> Mobile | `authenticated` | `EXISTING_VERIFIED` | Source/test tier; verified token plus active server session supplies `userId`; expiry closes 4410 |
+| Backend -> Mobile | `chat_thinking` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; chat producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `chat_message` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; nested assistant message producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `device_status` | `EXISTING_VERIFIED` | Typed nullable battery/RSSI schema + per-user fanout source/test; status producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `voice_processing_status` | `EXISTING_VERIFIED` | Typed sanitized schema + per-user fanout source/test; no audio URL/stream; producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `wifi_configuration_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; Wi-Fi lifecycle producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `proactive_delivery_status` | `EXISTING_VERIFIED` | Typed generic CHAT/SCHEDULE/WHATSAPP schema + per-user fanout source/test; producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; scheduler producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; adapter producers remain `READY_TO_IMPLEMENT`/externally blocked for live acceptance |
+| Backend -> Mobile | `notification` | `EXISTING_VERIFIED` | Typed bounded GENERIC schema + per-user fanout source/test; feature producer remains `READY_TO_IMPLEMENT` |
 
 ## Memory and schedules
 

@@ -19,6 +19,7 @@ import { AvatarStorage } from "./services/avatar-storage.service.js";
 import { AvatarService } from "./services/avatar.service.js";
 import type { AvatarReconciliationResult } from "./services/avatar.service.js";
 import { createAvatarMediaRouter } from "./http/profile.route.js";
+import { authenticateMobileAccessToken } from "./websocket/mobile-auth.js";
 
 export interface P9Runtime {
   router: Router;
@@ -27,6 +28,11 @@ export interface P9Runtime {
   reconcileAvatars(): Promise<AvatarReconciliationResult>;
   resolveDeviceBinding(hardwareId: string, deviceToken: string): Promise<ApplicationDeviceBinding | null>;
   authorizeDeviceBinding(binding: ApplicationDeviceBinding): Promise<boolean>;
+  authenticateMobileSocket(accessToken: string): Promise<{
+    userId: string;
+    sessionId: string;
+    expiresAt: Date;
+  } | { kind: "expired" } | null>;
   checkReadiness(): Promise<boolean>;
   close(): Promise<void>;
 }
@@ -87,6 +93,8 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     reconcileAvatars: () => avatars.reconcile(),
     resolveDeviceBinding: (hardwareId, deviceToken) => deviceBinding.resolve(hardwareId, deviceToken),
     authorizeDeviceBinding: (binding) => deviceBinding.isActive(binding),
+    authenticateMobileSocket: (accessToken) =>
+      authenticateMobileAccessToken(accessTokens, sessions, accessToken),
     checkReadiness: () => checkP9Readiness(repositories),
     close: async () => {
       await avatarStorage.close();

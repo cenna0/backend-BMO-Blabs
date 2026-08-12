@@ -1,4 +1,5 @@
-import type { Server } from "node:http";
+import type { IncomingMessage, Server } from "node:http";
+import type { Duplex } from "node:stream";
 import { setImmediate } from "node:timers";
 import WebSocket, { WebSocketServer } from "ws";
 
@@ -7,6 +8,7 @@ import { deviceTokenMatches } from "../utils/device-auth.js";
 import type { DeviceRegistry } from "./device-registry.js";
 import { inboundEventSchema, type InboundEvent, type OutboundEvent } from "./events.js";
 import type { ApplicationDeviceBinding } from "../p9/services/device-binding.service.js";
+import { claimWebSocketUpgrade, rejectUnclaimedWebSocketUpgrade } from "./upgrade-router.js";
 
 function rawDataToBuffer(data: WebSocket.RawData): Buffer {
   if (Array.isArray(data)) return Buffer.concat(data);
@@ -48,6 +50,7 @@ export class DeviceWebSocketServer {
   readonly #server: WebSocketServer;
   readonly #states = new WeakMap<WebSocket, SocketState>();
   readonly #heartbeat: NodeJS.Timeout;
+  readonly #upgradeHandler: (request: IncomingMessage, socket: Duplex, head: Buffer) => void;
   readonly #heartbeatStats = {
     pingCount: 0,
     pongCount: 0,
@@ -56,11 +59,28 @@ export class DeviceWebSocketServer {
 
   constructor(private readonly options: DeviceWebSocketServerOptions) {
     this.#server = new WebSocketServer({
-      server: options.httpServer,
-      path: "/ws",
+      noServer: true,
       maxPayload: options.maxMessageBytes,
     });
     this.#server.on("connection", (socket) => this.#handleConnection(socket));
+    this.#upgradeHandler = (request, socket, head) => {
+      let pathname: string;
+      try {
+        pathname = new URL(request.url ?? "", "http://localhost").pathname;
+      } catch {
+        rejectUnclaimedWebSocketUpgrade(socket);
+        return;
+      }
+      if (pathname !== "/ws") {
+        rejectUnclaimedWebSocketUpgrade(socket);
+        return;
+      }
+      claimWebSocketUpgrade(socket);
+      this.#server.handleUpgrade(request, socket, head, (webSocket) => {
+        this.#server.emit("connection", webSocket, request);
+      });
+    };
+    options.httpServer.on("upgrade", this.#upgradeHandler);
     this.#heartbeat = setInterval(() => this.#heartbeatTick(), options.heartbeatIntervalMs);
     this.#heartbeat.unref();
   }
@@ -109,6 +129,7 @@ export class DeviceWebSocketServer {
 
   async close(): Promise<void> {
     clearInterval(this.#heartbeat);
+    this.options.httpServer.off("upgrade", this.#upgradeHandler);
     for (const client of this.#server.clients) {
       client.terminate();
     }

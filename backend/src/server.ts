@@ -6,6 +6,7 @@ import { pino, type Logger } from "pino";
 
 import { parseEnv, type BackendConfig } from "./config/env.js";
 import { createP9Runtime, type P9Runtime } from "./p9/index.js";
+import { MobileWebSocketServer } from "./p9/websocket/mobile-websocket.server.js";
 import { RequestStore } from "./domain/request-store.js";
 import { createAudioRouter } from "./http/audio.route.js";
 import { createHealthRouter } from "./http/health.route.js";
@@ -25,6 +26,7 @@ export interface BackendRuntime {
   httpServer: Server;
   requestStore: RequestStore;
   sockets: DeviceWebSocketServer;
+  mobileSockets?: MobileWebSocketServer;
   tempAudio: TempAudioService;
   p9?: P9Runtime;
   runMaintenance(): Promise<void>;
@@ -86,6 +88,10 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     onPlaybackDone: (deviceId, requestId) => removeOutput(deviceId, requestId, false),
     onPlaybackFailed: (deviceId, requestId) => removeOutput(deviceId, requestId, true),
   });
+  const mobileSockets = p9 === undefined ? undefined : new MobileWebSocketServer({
+    httpServer,
+    authenticate: (accessToken) => p9.authenticateMobileSocket(accessToken),
+  });
   let hardwareTest: HardwareTestService | undefined;
   if (config.HARDWARE_TEST_MODE) {
     const fixturePath = config.HARDWARE_TEST_MP3_PATH;
@@ -126,6 +132,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     tempAudio,
     requestStore,
     sockets,
+    ...(mobileSockets === undefined ? {} : { mobileSockets }),
     logger,
     audioService,
     hermes,
@@ -239,8 +246,9 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
         clearInterval(cleanupInterval);
         cleanupInterval = undefined;
       }
-      if (p9) await p9.close();
+      if (mobileSockets) await mobileSockets.close();
       await sockets.close();
+      if (p9) await p9.close();
       if (httpServer.listening) {
         await new Promise<void>((resolve, reject) => {
           httpServer.close((error) => (error ? reject(error) : resolve()));
