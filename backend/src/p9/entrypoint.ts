@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 
+function loadSecretFromFile(valueName: string, fileName: string, emptyMessage: string): void {
+  if (process.env[valueName] || !process.env[fileName]) return;
+  const value = readFileSync(process.env[fileName]!, "utf8").trim();
+  if (!value) throw new Error(emptyMessage);
+  process.env[valueName] = value;
+}
+
 function loadDatabaseUrlFromSecret(): void {
   if (process.env.DATABASE_URL || !process.env.P9_DATABASE_PASSWORD_FILE) return;
   const password = readFileSync(process.env.P9_DATABASE_PASSWORD_FILE, "utf8").trim();
@@ -17,6 +24,8 @@ function loadDatabaseUrlFromSecret(): void {
   process.env.DATABASE_URL = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(database)}`;
 }
 
+loadSecretFromFile("P9_WIFI_ENCRYPTION_KEY", "P9_WIFI_ENCRYPTION_KEY_FILE", "P9 Wi-Fi encryption secret is empty");
+loadSecretFromFile("P9_PROVIDER_ENCRYPTION_KEY", "P9_PROVIDER_ENCRYPTION_KEY_FILE", "P9 provider encryption secret is empty");
 loadDatabaseUrlFromSecret();
 const setgid = process.setgid;
 const setuid = process.setuid;
