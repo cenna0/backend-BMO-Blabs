@@ -831,6 +831,13 @@ Create/update schedule uses the current mobile requirement vocabulary:
 
 Backend normalizes this into its scheduler model and server-enforces `Asia/Jakarta`.
 
+The source implementation maps the bounded presentation periods to local clock
+times as `Morning=09:00`, `Afternoon=13:00`, and `Evening=18:00`. Mutation
+requests include the current positive `version`; stale PATCH/pause/resume/delete
+requests fail with `409 CONFLICT`. `MOBILE` occurrences are durable delivery
+intents without a fabricated device ID; the device-scoped
+`proactive_delivery_status` event is emitted only for `DEVICE` delivery rows.
+
 Durable schedule status is:
 
 ```text

@@ -105,8 +105,8 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | Backend -> Mobile | `device_status` | `EXISTING_VERIFIED` | Typed nullable battery/RSSI schema + per-user fanout source/test; status producer remains `READY_TO_IMPLEMENT` |
 | Backend -> Mobile | `voice_processing_status` | `EXISTING_VERIFIED` | Typed sanitized schema + per-user fanout source/test; no audio URL/stream; producer remains `READY_TO_IMPLEMENT` |
 | Backend -> Mobile | `wifi_configuration_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; Wi-Fi lifecycle producer remains `READY_TO_IMPLEMENT` |
-| Backend -> Mobile | `proactive_delivery_status` | `EXISTING_VERIFIED` | Typed generic CHAT/SCHEDULE/WHATSAPP schema + per-user fanout source/test; producer remains `READY_TO_IMPLEMENT` |
-| Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; scheduler producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `proactive_delivery_status` | `EXISTING_VERIFIED` | Typed generic CHAT/SCHEDULE/WHATSAPP schema + per-user fanout and generic device-delivery lifecycle producer source/test; physical sender/playback remains `PENDING_PHYSICAL_ESP`; device-less MOBILE intents do not fabricate this device-scoped event |
+| Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user schedule lifecycle/one-shot completion producer source/test; not candidate/public deployed |
 | Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; adapter producers remain `READY_TO_IMPLEMENT`/externally blocked for live acceptance |
 | Backend -> Mobile | `notification` | `EXISTING_VERIFIED` | Typed bounded GENERIC schema + per-user fanout source/test; feature producer remains `READY_TO_IMPLEMENT` |
 
@@ -122,11 +122,11 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | POST | `/api/v1/memories/forget-topic`, `.../clear-all`, `.../export` | `EXISTING_VERIFIED` | Source/test tier; suppression includes pending candidates/summary as applicable; JSON export excludes deleted/expired memory and non-pending candidates |
 | GET | `/api/v1/memory/summary` | `EXISTING_VERIFIED` | Source/test tier; active/unexpired owner summary or explicit null |
 | POST | `/api/v1/memory/summary/regenerate`, `.../feedback` | `EXISTING_VERIFIED` | Source/test tier; durable `generating` boundary reports memory-record source and `not_configured` runtime; no invented Hermes summary provider |
-| GET/POST | `/api/v1/schedules` | `READY_TO_IMPLEMENT` | Not registered |
-| GET/PATCH | `/api/v1/schedules/:id` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/schedules/:id/pause`, `.../resume` | `READY_TO_IMPLEMENT` | Not registered |
-| DELETE | `/api/v1/schedules/:id` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/schedule-runs` | `READY_TO_IMPLEMENT` | Not registered |
+| GET/POST | `/api/v1/schedules` | `EXISTING_VERIFIED` | Source/test; owner-derived strict create and deterministic bounded listing; not candidate/public deployed |
+| GET/PATCH | `/api/v1/schedules/:id` | `EXISTING_VERIFIED` | Source/test; owner-safe lookup and required optimistic `version` conflict boundary |
+| POST | `/api/v1/schedules/:id/pause`, `.../resume` | `EXISTING_VERIFIED` | Source/test; lifecycle transitions require the current positive version |
+| DELETE | `/api/v1/schedules/:id` | `EXISTING_VERIFIED` | Source/test; durable CANCELLED transition, no silent purge |
+| GET | `/api/v1/schedule-runs` | `EXISTING_VERIFIED` | Source/test; owner-scoped schedule filter and deterministic dueAt/id cursor |
 
 ## Integrations, plugins, and support
 

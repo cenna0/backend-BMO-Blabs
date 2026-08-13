@@ -19,6 +19,135 @@ export class P9Repositories {
     return now;
   }
 
+  async materializeDueScheduleRuns(input: { limit: number; missedAfterMs: number }): Promise<Array<{
+    id: string; scheduleId: string; dueAt: Date; userId: string; targetDeviceId: string | null; recurrence: unknown; payload: unknown;
+  }>> {
+    const missedSeconds = input.missedAfterMs / 1_000;
+    return this.db.$queryRaw`
+      WITH candidates AS (
+        SELECT schedule.id, schedule."userId", schedule."targetDeviceId", schedule.recurrence,
+               schedule.payload, schedule."nextRunAt"
+        FROM "Schedule" AS schedule
+        WHERE schedule.status = 'ACTIVE'
+          AND schedule."nextRunAt" IS NOT NULL
+          AND schedule."nextRunAt" <= clock_timestamp()
+          AND schedule."nextRunAt" > clock_timestamp() - (${missedSeconds} * interval '1 second')
+        ORDER BY schedule."nextRunAt" ASC, schedule.id ASC
+        LIMIT ${input.limit}
+        FOR UPDATE SKIP LOCKED
+      ), inserted AS (
+        INSERT INTO "ScheduleRun" (id, "scheduleId", "dueAt", status, "createdAt", "updatedAt")
+        SELECT gen_random_uuid(), candidate.id, candidate."nextRunAt", 'DUE', clock_timestamp(), clock_timestamp()
+        FROM candidates AS candidate
+        ON CONFLICT ("scheduleId", "dueAt") DO UPDATE SET "updatedAt" = "ScheduleRun"."updatedAt"
+        RETURNING id, "scheduleId", "dueAt"
+      )
+      SELECT inserted.id, inserted."scheduleId", inserted."dueAt", candidate."userId",
+             candidate."targetDeviceId", candidate.recurrence, candidate.payload
+      FROM inserted JOIN candidates AS candidate ON candidate.id = inserted."scheduleId"
+      ORDER BY inserted."dueAt" ASC, inserted.id ASC
+    `;
+  }
+
+  async materializeMissedScheduleRuns(input: { limit: number; missedAfterMs: number }): Promise<Array<{
+    id: string; scheduleId: string; dueAt: Date; userId: string; recurrence: unknown;
+  }>> {
+    const missedSeconds = input.missedAfterMs / 1_000;
+    return this.db.$queryRaw`
+      WITH candidates AS (
+        SELECT schedule.id, schedule."userId", schedule.recurrence, schedule."nextRunAt"
+        FROM "Schedule" AS schedule
+        WHERE schedule.status = 'ACTIVE'
+          AND schedule."nextRunAt" <= clock_timestamp() - (${missedSeconds} * interval '1 second')
+        ORDER BY schedule."nextRunAt" ASC, schedule.id ASC
+        LIMIT ${input.limit}
+        FOR UPDATE SKIP LOCKED
+      ), missed AS (
+        INSERT INTO "ScheduleRun" (id, "scheduleId", "dueAt", status, "missedAt", "errorCode", "createdAt", "updatedAt")
+        SELECT gen_random_uuid(), candidate.id, candidate."nextRunAt", 'MISSED', clock_timestamp(), 'DELIVERY_DEADLINE_EXCEEDED', clock_timestamp(), clock_timestamp()
+        FROM candidates AS candidate
+        ON CONFLICT ("scheduleId", "dueAt") DO UPDATE
+          SET status = CASE WHEN "ScheduleRun".status IN ('DUE', 'CLAIMED', 'FAILED') THEN 'MISSED' ELSE "ScheduleRun".status END,
+              "missedAt" = CASE WHEN "ScheduleRun".status IN ('DUE', 'CLAIMED', 'FAILED') THEN clock_timestamp() ELSE "ScheduleRun"."missedAt" END,
+              "leaseOwner" = NULL, "leaseExpiresAt" = NULL, "updatedAt" = clock_timestamp()
+        RETURNING id, "scheduleId", "dueAt"
+      )
+      SELECT missed.id, missed."scheduleId", missed."dueAt", candidate."userId", candidate.recurrence
+      FROM missed JOIN candidates AS candidate ON candidate.id = missed."scheduleId"
+      ORDER BY missed."dueAt" ASC, missed.id ASC
+    `;
+  }
+
+  async claimScheduleRuns(input: { workerId: string; limit: number; leaseMs: number }): Promise<Array<Record<string, unknown>>> {
+    const leaseSeconds = input.leaseMs / 1_000;
+    return this.db.$queryRaw`
+      WITH candidates AS (
+        SELECT run.id
+        FROM "ScheduleRun" AS run
+        JOIN "Schedule" AS schedule ON schedule.id = run."scheduleId"
+        WHERE schedule.status = 'ACTIVE'
+          AND run."dueAt" <= clock_timestamp()
+          AND (
+            (run.status = 'DUE' AND (run."retryAt" IS NULL OR run."retryAt" <= clock_timestamp()))
+            OR (run.status = 'CLAIMED' AND run."leaseExpiresAt" <= clock_timestamp())
+            OR (run.status = 'FAILED' AND run."retryAt" <= clock_timestamp())
+          )
+        ORDER BY run."dueAt" ASC, run.id ASC
+        LIMIT ${input.limit}
+        FOR UPDATE OF run SKIP LOCKED
+      )
+      , claimed AS (
+      UPDATE "ScheduleRun" AS run
+      SET status = 'CLAIMED', "leaseOwner" = ${input.workerId},
+          "leaseExpiresAt" = clock_timestamp() + (${leaseSeconds} * interval '1 second'),
+          "attemptCount" = run."attemptCount" + 1, "startedAt" = COALESCE(run."startedAt", clock_timestamp()),
+          "updatedAt" = clock_timestamp()
+      FROM candidates
+      WHERE run.id = candidates.id
+      RETURNING run.*
+      )
+      SELECT claimed.*, schedule."userId", schedule."targetDeviceId", schedule.recurrence, schedule.payload
+      FROM claimed JOIN "Schedule" AS schedule ON schedule.id = claimed."scheduleId"
+      ORDER BY claimed."dueAt" ASC, claimed.id ASC
+    `;
+  }
+
+  async finishScheduleRun(input: { runId: string; workerId: string; status: "SUCCEEDED" | "FAILED"; errorCode?: string; retryAt?: Date }): Promise<boolean> {
+    const rows = await this.db.$queryRaw<Array<{ id: string }>>`
+      UPDATE "ScheduleRun"
+      SET status = ${input.status}::"ScheduleRunStatus", "leaseOwner" = NULL, "leaseExpiresAt" = NULL,
+          "completedAt" = CASE WHEN ${input.status} = 'SUCCEEDED' THEN clock_timestamp() ELSE NULL END,
+          "errorCode" = ${input.errorCode ?? null}, "retryAt" = ${input.retryAt ?? null}, "updatedAt" = clock_timestamp()
+      WHERE id = ${input.runId}::uuid AND status = 'CLAIMED' AND "leaseOwner" = ${input.workerId}
+      RETURNING id
+    `;
+    return rows.length === 1;
+  }
+
+  async claimProactiveDelivery(input: { deliveryId: string }): Promise<Array<Record<string, unknown>>> {
+    return this.db.$queryRaw`
+      WITH candidate AS (
+        SELECT delivery.id
+        FROM "ProactiveDelivery" AS delivery
+        WHERE delivery.id = ${input.deliveryId}::uuid
+          AND delivery.status = 'PENDING'
+          AND (delivery."expiresAt" IS NULL OR delivery."expiresAt" > clock_timestamp())
+          AND NOT EXISTS (
+            SELECT 1 FROM "ProactiveDelivery" AS active
+            WHERE active."deviceId" = delivery."deviceId"
+              AND active.status IN ('READY', 'DELIVERING')
+          )
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE "ProactiveDelivery" AS delivery
+      SET status = 'DELIVERING', "attemptCount" = delivery."attemptCount" + 1,
+          "errorCode" = NULL, "updatedAt" = clock_timestamp()
+      FROM candidate
+      WHERE delivery.id = candidate.id
+      RETURNING delivery.*
+    `;
+  }
+
   async searchActiveMemories(input: { userId: string; terms: string[]; limit: number }): Promise<string[]> {
     const rows = await this.db.$queryRaw<Array<{ normalizedContent: string }>>`
       SELECT memory."normalizedContent"

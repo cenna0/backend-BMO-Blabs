@@ -262,6 +262,12 @@ Backend must be able to make BMO speak without a preceding ESP32 voice request.
 
 Backend owns queueing.
 
+Source/test status: Backend now persists and arbitrates all `CHAT`, `SCHEDULE`,
+and `WHATSAPP` intents through the same delivery/attempt service with database
+idempotency, expiry, per-device exclusion, and a user-voice-busy boundary. No
+physical sender is installed and this does not implement any Section 5.2/5.4
+device event. Physical status remains `PENDING_PHYSICAL_ESP`.
+
 Arbitration is locked for this release:
 
 1. an already-running physical playback is never interrupted;

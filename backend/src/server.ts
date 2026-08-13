@@ -177,6 +177,11 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     }
     if (p9) {
       try {
+        await p9.runScheduler();
+      } catch (error) {
+        logger.warn({ err: error }, "scheduler/proactive delivery deferred to next maintenance interval");
+      }
+      try {
         const resumed = await p9.resumePendingChat();
         if (resumed > 0) logger.info({ resumed_operations: resumed }, "resumed pending chat operations");
       } catch (error) {

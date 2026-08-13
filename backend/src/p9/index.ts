@@ -23,6 +23,8 @@ import { authenticateMobileAccessToken } from "./websocket/mobile-auth.js";
 import { ChatService, type MobileEventPublisher } from "./services/chat.service.js";
 import { PostgresMemoryGateway } from "./services/memory-gateway.service.js";
 import { MemoryService } from "./services/memory.service.js";
+import { ScheduleService } from "./services/schedule.service.js";
+import { ProactiveDeliveryService } from "./services/proactive-delivery.service.js";
 import type { HermesGenerateClient } from "../services/hermes.client.js";
 
 export interface P9Runtime {
@@ -41,6 +43,7 @@ export interface P9Runtime {
   resumePendingChat(): Promise<number>;
   launchPendingChatRecovery(onError?: (error: unknown) => void): void;
   waitForChatIdle(): Promise<void>;
+  runScheduler(): Promise<{ materialized: number; claimed: number; pendingPhysical: number }>;
   close(): Promise<void>;
 }
 
@@ -106,6 +109,8 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   const deviceBinding = new DeviceBindingService(repositories);
   const memoryGateway = new PostgresMemoryGateway(repositories);
   const memory = new MemoryService({ client, repositories });
+  const proactive = new ProactiveDeliveryService({ repositories, mobileEvents: options.mobileEvents ?? noMobileEvents });
+  const schedule = new ScheduleService({ client, repositories, mobileEvents: options.mobileEvents ?? noMobileEvents });
   const chat = new ChatService({
     client,
     repositories,
@@ -115,7 +120,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     memoryContext: memoryGateway,
   });
   return {
-    router: createP9Router({ auth, sessions, users, devices, pairing, settings, recovery, profile, avatars, personalization, chat, memory, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
+    router: createP9Router({ auth, sessions, users, devices, pairing, settings, recovery, profile, avatars, personalization, chat, memory, schedule, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
     mediaRouter: createAvatarMediaRouter(avatarStorage),
     initialize: async () => {
       await avatarStorage.initialize();
@@ -131,6 +136,27 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
       void chat.resumePending().catch((error) => onError?.(error));
     },
     waitForChatIdle: () => chat.waitForIdle(),
+    runScheduler: async () => {
+      const workerId = `scheduler:${process.pid}`;
+      const missed = await repositories.materializeMissedScheduleRuns({ limit: 100, missedAfterMs: 300_000 });
+      for (const occurrence of missed) await schedule.advanceOccurrence(occurrence.scheduleId, occurrence.dueAt, occurrence.recurrence as any);
+      const occurrences = await repositories.materializeDueScheduleRuns({ limit: 100, missedAfterMs: 300_000 });
+      const claimed = await repositories.claimScheduleRuns({ workerId, limit: 100, leaseMs: 30_000 });
+      for (const run of claimed as any[]) {
+        const targets = Array.isArray(run.payload?.deliveryTargets) ? run.payload.deliveryTargets : [];
+        try {
+          if (targets.includes("DEVICE") && run.targetDeviceId) await proactive.enqueue({ userId: run.userId, deviceId: run.targetDeviceId, source: "SCHEDULE", sourceResourceType: "schedule_run", sourceResourceId: run.id, idempotencyKey: `schedule:${run.scheduleId}:${run.dueAt.toISOString()}:DEVICE`, expiresAt: new Date(run.dueAt.getTime() + 300_000) });
+          if (targets.includes("MOBILE")) await proactive.enqueue({ userId: run.userId, source: "SCHEDULE", sourceResourceType: "schedule_run", sourceResourceId: run.id, idempotencyKey: `schedule:${run.scheduleId}:${run.dueAt.toISOString()}:MOBILE`, expiresAt: new Date(run.dueAt.getTime() + 300_000) });
+          await schedule.advanceOccurrence(run.scheduleId, run.dueAt, run.recurrence);
+          await repositories.finishScheduleRun({ runId: run.id, workerId, status: "SUCCEEDED" });
+        } catch {
+          const databaseNow = await repositories.databaseNow();
+          await repositories.finishScheduleRun({ runId: run.id, workerId, status: "FAILED", errorCode: "DELIVERY_ENQUEUE_FAILED", retryAt: new Date(databaseNow.getTime() + 30_000) });
+        }
+      }
+      const worker = await proactive.processOnce();
+      return { materialized: occurrences.length + missed.length, claimed: claimed.length, pendingPhysical: worker.pendingPhysical };
+    },
     close: async () => {
       await chat.close();
       await avatarStorage.close();
