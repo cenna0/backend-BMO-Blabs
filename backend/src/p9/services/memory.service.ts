@@ -176,10 +176,11 @@ export class MemoryService {
         return this.#ownedMemory(repositories, userId, metadata.memoryId);
       }
       const candidate = await this.#ownedPendingCandidate(repositories, userId, candidateId);
-      if (candidate.topic) await this.#assertTopicNotForgotten(repositories, userId, candidate.topic);
+      const effectiveTopic = candidate.topic ?? "general";
+      await this.#assertTopicNotForgotten(repositories, userId, effectiveTopic);
       const now = await repositories.databaseNow();
       const memory = await repositories.memoryRecord.create({ data: {
-        userId, topic: candidate.topic ?? "general", category: input.category ?? "general",
+        userId, topic: effectiveTopic, category: input.category ?? "general",
         normalizedContent: candidate.proposedContent, importance: input.importance ?? 50,
         source: "candidate", expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
       } });
@@ -220,7 +221,17 @@ export class MemoryService {
       }
       const now = await repositories.databaseNow();
       const forgotten = await repositories.memoryRecord.updateMany({ where: { userId, deletedAt: null, topic: { equals: normalizedTopic, mode: "insensitive" } }, data: { deletedAt: now } });
-      const rejected = await repositories.memoryCandidate.updateMany({ where: { userId, status: "PENDING", topic: { equals: normalizedTopic, mode: "insensitive" } }, data: { status: "REJECTED", reviewedAt: now } });
+      const candidateTopic = { equals: normalizedTopic, mode: "insensitive" as const };
+      const rejected = await repositories.memoryCandidate.updateMany({
+        where: {
+          userId,
+          status: "PENDING",
+          ...(normalizedTopic === "general"
+            ? { OR: [{ topic: candidateTopic }, { topic: null }] }
+            : { topic: candidateTopic }),
+        },
+        data: { status: "REJECTED", reviewedAt: now },
+      });
       await repositories.memoryTopicForget.create({ data: { userId, normalizedTopic, idempotencyKey: input.idempotencyKey } });
       const result = { forgotten: forgotten.count, rejectedCandidates: rejected.count, topic: normalizedTopic };
       await repositories.memoryAction.create({ data: { userId, actionType: "FORGET_TOPIC", resourceType: "memory_topic", resourceId: null, idempotencyKey: input.idempotencyKey, metadata: result } });

@@ -167,6 +167,18 @@ describe("memory lifecycle service", () => {
     expect(f.repositories.memoryRecord.create).not.toHaveBeenCalled();
   });
 
+  it("does not accept a null-topic candidate after general was forgotten", async () => {
+    const f = fixture();
+    f.repositories.memoryCandidate.findFirst.mockResolvedValue(candidateRow({ topic: null }));
+    f.repositories.memoryTopicForget.findMany.mockResolvedValue([{ normalizedTopic: "general" }]);
+    await expect(f.service.acceptCandidate(userId, candidateId, { idempotencyKey: key }))
+      .rejects.toMatchObject({ code: "CONFLICT", status: 409 });
+    expect(f.repositories.memoryTopicForget.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId, normalizedTopic: "general" },
+    }));
+    expect(f.repositories.memoryRecord.create).not.toHaveBeenCalled();
+  });
+
   it("does not edit a memory into a previously forgotten topic", async () => {
     const f = fixture();
     f.repositories.memoryRecord.findFirst.mockResolvedValue(memoryRow());
@@ -202,6 +214,24 @@ describe("memory lifecycle service", () => {
     await expect(f.service.clearAll(userId, { idempotencyKey: "clear-key" }, "request-7"))
       .resolves.toEqual({ cleared: 2, rejectedCandidates: 1, summaryDeleted: false });
     expect(f.repositories.memorySummary.updateMany).toHaveBeenCalledWith({ where: { userId, deletedAt: null }, data: { deletedAt: now } });
+  });
+
+  it("forgetting general rejects both explicit-general and null-topic pending candidates", async () => {
+    const f = fixture();
+    f.repositories.memoryRecord.updateMany.mockResolvedValue({ count: 0 });
+    f.repositories.memoryCandidate.updateMany.mockResolvedValue({ count: 2 });
+    f.repositories.memoryTopicForget.create.mockResolvedValue({ id: "forget" });
+
+    await expect(f.service.forgetTopic(userId, { idempotencyKey: key, topic: "general" }))
+      .resolves.toEqual({ forgotten: 0, rejectedCandidates: 2, topic: "general" });
+    expect(f.repositories.memoryCandidate.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId,
+        status: "PENDING",
+        OR: [{ topic: { equals: "general", mode: "insensitive" } }, { topic: null }],
+      },
+      data: { status: "REJECTED", reviewedAt: now },
+    });
   });
 
   it("exports only active unexpired content plus action metadata and audits the export", async () => {
