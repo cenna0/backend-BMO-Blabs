@@ -6,25 +6,52 @@
 Slice 2A adds the durable source schema behind the target routes below.
 Subsequent Phase 2 source slices register the application routes and event
 boundaries described in this matrix. Migration
-`20260811190000_phase2_application_foundation` is source-verified only and has
-not been applied to the running candidate or production.
+`20260811190000_phase2_application_foundation` is applied to the isolated
+Phase 2.5 candidate only; it has not been applied to production.
+
+## Phase 2.5 candidate acceptance evidence
+
+The private candidate was recreated from
+`adeebca58719db4386f62330026f6c3b46a91bbe`, an explicitly recorded protected-
+secret startup fix on requested source `437e48a70227220d1a40ad539ff09b307ef0c1ea`.
+Candidate Backend is `bmo-p9-1-backend-1` on `127.0.0.1:3010`, Node `22.23.1`,
+with candidate PostgreSQL `bmo-p9-1-postgres-1` on a private network and no
+published database port. Public Caddy and production Backend were unchanged.
+
+The live candidate acceptance harness passed `42/42` assertions. It covered the
+registered REST surfaces for self-service auth, DOB recovery, profile,
+personalization, pairing, devices, Wi-Fi, chat/history/idempotency, memory,
+schedules, plugin catalog, and provider boundaries, plus ownership isolation,
+validation, and secret-safe projections. It also passed mobile `/api/v1/ws`
+authentication/timeout/path isolation and physical `/ws` authentication plus
+server-side telemetry/log ingestion with a synthetic bound device.
+
+The Node 22 full suite passed 72 files and 401 tests, with one pre-existing
+authenticated database HTTP test skipped. Candidate chat operations and Hermes
+responses persisted, and the schedule worker recorded the expected expired
+occurrence as `MISSED`. Candidate voice regression completed whole-WAV upload,
+STT, Hermes, Piper, MP3 storage, `audio_ready`, and playback lifecycle through
+the fake-device boundary. These are private candidate results, not production
+availability or physical ESP evidence.
 
 Slice 2B registers the account/profile/recovery/avatar and personalization
 surfaces in source and verifies them with automated route/service/storage
 tests, including serialized recovery epochs and fair deadline-bounded avatar
-multipart and image-processing admission. The running private candidate was not recreated
-and still has only the two P9.1 migrations; public production remains
-unchanged.
+multipart and image-processing admission. The Phase 2.5 private candidate
+acceptance additionally exercised the live auth/profile/personalization path;
+public production remains unchanged.
 
 Slice 5A registers the six frozen chat REST routes in the production-shaped
 source runtime and supplies the existing typed mobile chat event producers.
-It is source/test verified only: the running candidate was not migrated or
-recreated, Caddy/public routing was not changed, and physical proactive speech
-remains pending the generic delivery slice and ESP evidence.
+The Phase 2.5 private candidate exercised chat submission, idempotency,
+history, Hermes persistence, and the separate mobile WebSocket; Caddy/public
+routing was not changed, and physical proactive speech remains pending the
+generic delivery slice and ESP evidence.
 
 The memory slice registers all 15 frozen memory/settings/summary routes and
-injects bounded active owner memory into chat. It is source/test verified only;
-the running candidate and public production were not migrated or recreated.
+injects bounded active owner memory into chat. The Phase 2.5 private candidate
+exercised the owner-scoped memory/settings read path; public production remains
+unchanged.
 
 The device additions slice registers owner-scoped Wi-Fi metadata/configuration,
 device log, and telemetry routes in the production-shaped source runtime. Wi-Fi
@@ -32,9 +59,12 @@ passwords use protected AES-256-GCM configuration and never appear in read
 responses or logs. Existing voice events remain unchanged; additive device
 events and physical behavior remain `PENDING_PHYSICAL_ESP`.
 
-Scheduler/proactive, device additions, and provider/support slices are source/test
-verified only. No candidate or public production migration, recreation, or
-activation occurred.
+Scheduler/proactive, device additions, and provider/support slices have
+candidate evidence where noted above and remain source/test verified for
+surfaces not exercised by the live harness. No production migration, recreation,
+or activation occurred. WhatsApp/Spotify live actions remain
+`BLOCKED_EXTERNAL_SECRET`; physical additive events remain
+`PENDING_PHYSICAL_ESP`.
 
 ## Runtime and existing voice surfaces
 
@@ -53,10 +83,9 @@ activation occurred.
 
 ## Auth, profile, and settings
 
-Existing P9.1 rows below are source- and private-candidate-verified. Slice 1 also
-packages them with the full Backend voice runtime in a production-shaped review
-candidate, but public production still returns 404 because it has not been
-deployed or enabled there.
+Existing P9.1 rows below are source- and private-candidate-verified. The Phase
+2.5 candidate packages them with the full Backend voice runtime; public
+production remains unchanged and still returns 404 for routes not enabled there.
 
 | Method | Path | Status | Availability / gap |
 |---|---|---|---|
@@ -103,13 +132,13 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Method/surface | Path/event | Status | Availability / gap |
 |---|---|---|---|
-| GET | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Source/test tier; bearer-owner scope, bounded deterministic ordering; not candidate/public deployed |
-| POST | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Source/test tier; strict `{temporary}` and server-derived owner |
-| GET | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Source/test tier; owned active session, positive signed-64-bit cursor, bounded stable ascending pagination |
-| POST | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Source/test tier; durable 202 user message/operation, transactional per-user UUID idempotency and conflict rejection, globally bounded scheduling, PostgreSQL lower-cursor session ordering across runtimes, DB-clock lease renewal immediately before Hermes, claimable-session-head discovery before recovery `LIMIT`, non-blocking single-flight recovery with durable-claim progress/zero-progress deferral, and delete abort/persistence guard; `speakOnDevice:true` is explicitly unavailable until generic proactive delivery exists |
-| DELETE | `/api/v1/chat/sessions/:sessionId` | `EXISTING_VERIFIED` | Source/test tier; owner-scoped soft deletion and cancellation of processing operations; no invented purge period |
-| POST | `/api/v1/chat/messages/:messageId/feedback` | `EXISTING_VERIFIED` | Source/test tier; owner-scoped assistant-only bounded feedback upsert |
-| WSS | `/api/v1/ws` | `EXISTING_VERIFIED` | Source/test tier; exact separate mobile upgrade path when P9 is enabled; candidate/public production unchanged |
+| GET | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Private candidate plus source tests; bearer-owner scope and bounded deterministic ordering; public production unchanged |
+| POST | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Private candidate plus source tests; strict `{temporary}` and server-derived owner |
+| GET | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Private candidate plus source tests; owned active session, positive signed-64-bit cursor, bounded stable ascending pagination |
+| POST | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Private candidate plus source tests; durable 202 user message/operation, transactional per-user UUID idempotency and conflict rejection, bounded scheduling, DB-clock lease renewal before Hermes, and delete abort/persistence guard; `speakOnDevice:false` accepted live, while physical proactive delivery remains pending |
+| DELETE | `/api/v1/chat/sessions/:sessionId` | `EXISTING_VERIFIED` | Source tests; owner-scoped soft deletion and cancellation of processing operations; no invented purge period |
+| POST | `/api/v1/chat/messages/:messageId/feedback` | `EXISTING_VERIFIED` | Source tests; owner-scoped assistant-only bounded feedback upsert |
+| WSS | `/api/v1/ws` | `EXISTING_VERIFIED` | Private candidate plus source tests; exact separate mobile upgrade path with authentication timeout and path isolation; public production unchanged |
 | Mobile -> Backend | `authenticate` | `EXISTING_VERIFIED` | Source/test tier; strict `{event,accessToken}` within five seconds, no URL-query token or client identity |
 | Backend -> Mobile | `authenticated` | `EXISTING_VERIFIED` | Source/test tier; verified token plus active server session supplies `userId`; expiry closes 4410 |
 | Backend -> Mobile | `chat_thinking` | `EXISTING_VERIFIED` | Typed bounded schema plus Slice 5A best-effort per-user producer after durable acceptance; history remains recovery authority |
@@ -118,7 +147,7 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | Backend -> Mobile | `voice_processing_status` | `EXISTING_VERIFIED` | Typed sanitized schema + per-user fanout source/test; no audio URL/stream; producer remains `READY_TO_IMPLEMENT` |
 | Backend -> Mobile | `wifi_configuration_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; device additive lifecycle remains physical pending |
 | Backend -> Mobile | `proactive_delivery_status` | `EXISTING_VERIFIED` | Typed generic CHAT/SCHEDULE/WHATSAPP schema + per-user fanout and generic device-delivery lifecycle producer source/test; physical sender/playback remains `PENDING_PHYSICAL_ESP`; device-less MOBILE intents do not fabricate this device-scoped event |
-| Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user schedule lifecycle/one-shot completion producer source/test; not candidate/public deployed |
+| Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user schedule lifecycle/one-shot completion producer source/test; candidate worker expiry path accepted, public production unchanged |
 | Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; adapter producers remain `READY_TO_IMPLEMENT`/externally blocked for live acceptance |
 | Backend -> Mobile | `notification` | `EXISTING_VERIFIED` | Typed bounded GENERIC schema + per-user fanout source/test; feature producer remains `READY_TO_IMPLEMENT` |
 
@@ -126,16 +155,16 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Methods | Path family | Status | Availability / gap |
 |---|---|---|---|
-| GET/PATCH | `/api/v1/settings/memory` | `EXISTING_VERIFIED` | Source/test tier; exact `{automaticMemoryCandidates}` body and bearer-derived owner; not candidate/public deployed |
-| GET | `/api/v1/memories`, `/api/v1/memories/:id` | `EXISTING_VERIFIED` | Source/test tier; deterministic opaque cursor, bounded pages, active/unexpired owner rows only |
+| GET/PATCH | `/api/v1/settings/memory` | `EXISTING_VERIFIED` | Private candidate read plus source tests; exact `{automaticMemoryCandidates}` body and bearer-derived owner; public production unchanged |
+| GET | `/api/v1/memories`, `/api/v1/memories/:id` | `EXISTING_VERIFIED` | Private candidate read plus source tests; deterministic opaque cursor, bounded pages, active/unexpired owner rows only |
 | PATCH/DELETE | `/api/v1/memories/:id` | `EXISTING_VERIFIED` | Source/test tier; strict bounded patch, owner-safe soft delete, idempotent audited actions |
 | GET | `/api/v1/memory-candidates` | `EXISTING_VERIFIED` | Source/test tier; bounded deterministic pending/unexpired owner candidates only |
 | POST | `/api/v1/memory-candidates/:id/accept`, `.../reject` | `EXISTING_VERIFIED` | Source/test tier; transaction-locked owner scope and payload-aware idempotent replay/conflict behavior |
 | POST | `/api/v1/memories/forget-topic`, `.../clear-all`, `.../export` | `EXISTING_VERIFIED` | Source/test tier; suppression includes pending candidates/summary as applicable; JSON export excludes deleted/expired memory and non-pending candidates |
 | GET | `/api/v1/memory/summary` | `EXISTING_VERIFIED` | Source/test tier; active/unexpired owner summary or explicit null |
 | POST | `/api/v1/memory/summary/regenerate`, `.../feedback` | `EXISTING_VERIFIED` | Source/test tier; durable `generating` boundary reports memory-record source and `not_configured` runtime; no invented Hermes summary provider |
-| GET/POST | `/api/v1/schedules` | `EXISTING_VERIFIED` | Source/test; owner-derived strict create and deterministic bounded listing; not candidate/public deployed |
-| GET/PATCH | `/api/v1/schedules/:id` | `EXISTING_VERIFIED` | Source/test; owner-safe lookup and required optimistic `version` conflict boundary |
+| GET/POST | `/api/v1/schedules` | `EXISTING_VERIFIED` | Private candidate plus source tests; owner-derived strict create and deterministic bounded listing; public production unchanged |
+| GET/PATCH | `/api/v1/schedules/:id` | `EXISTING_VERIFIED` | Private candidate plus source tests; owner-safe lookup and required optimistic `version` conflict boundary |
 | POST | `/api/v1/schedules/:id/pause`, `.../resume` | `EXISTING_VERIFIED` | Source/test; lifecycle transitions require the current positive version |
 | DELETE | `/api/v1/schedules/:id` | `EXISTING_VERIFIED` | Source/test; durable CANCELLED transition, no silent purge |
 | GET | `/api/v1/schedule-runs` | `EXISTING_VERIFIED` | Source/test; owner-scoped schedule filter and deterministic dueAt/id cursor |

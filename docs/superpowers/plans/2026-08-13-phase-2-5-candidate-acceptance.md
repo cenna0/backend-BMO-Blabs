@@ -12,28 +12,28 @@
 
 ### Gate 1: Baseline and source/runtime inventory
 
-- [ ] Read canonical integration docs and confirm branch/SHA/worktree.
-- [ ] Inventory production and candidate services, listeners, dependencies, secrets by metadata only, and Caddy routes.
+- [x] Read canonical integration docs and confirm branch/SHA/worktree.
+- [x] Inventory production and candidate services, listeners, dependencies, secrets by metadata only, and Caddy routes.
 
 ### Gate 2: Build and Prisma remediation
 
-- [ ] Verify Prisma Studio exposure is closed.
-- [ ] Trace ownership of generated/build artifacts before any targeted ownership repair.
-- [ ] Run Node 22 build, typecheck, Prisma validate, and Prisma generate on the candidate source path.
+- [x] Verify Prisma Studio exposure is closed.
+- [x] Trace ownership of generated/build artifacts before any targeted ownership repair.
+- [x] Run Node 22 build, typecheck, Prisma validate, and Prisma generate on the candidate source path.
 
 ### Gate 3: Candidate database safety
 
-- [ ] Prove candidate database identity is not production and capture baseline schema/counts.
-- [ ] Create a candidate backup and restore it into an isolated disposable target.
-- [ ] Apply the Phase 2 migration exactly once to the candidate and verify schema/data preservation.
+- [x] Prove candidate database identity is not production and capture baseline schema/counts.
+- [x] Create a candidate backup and restore it into an isolated disposable target.
+- [x] Apply the Phase 2 migration exactly once to the candidate and verify schema/data preservation.
 
 ### Gate 4: Candidate runtime and acceptance
 
-- [ ] Build/recreate candidate-only runtime with protected candidate secrets and no production port overlap.
-- [ ] Verify health/readiness and run registered-route, REST, mobile WebSocket, device WebSocket, voice, Hermes, Wi-Fi, schedule, proactive, and provider-boundary acceptance.
+- [x] Build/recreate candidate-only runtime with protected candidate secrets and no production port overlap.
+- [x] Verify health/readiness and run registered-route, REST, mobile WebSocket, device WebSocket, voice, Hermes, Wi-Fi, schedule, proactive, and provider-boundary acceptance.
 
 ### Gate 5: Documentation and promotion handoff
 
-- [ ] Inspect Caddy promotion diff without activation.
-- [ ] Update status/coverage evidence, verify production health, document rollback and exact promotion steps.
-- [ ] Verify commit, final SHA, remote status, and clean worktree before reporting the verdict.
+- [x] Inspect Caddy promotion diff without activation.
+- [x] Update status/coverage evidence, verify production health, document rollback and exact promotion steps.
+- [x] Verify commit, final SHA, remote status, and clean worktree before reporting the verdict.

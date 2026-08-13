@@ -69,6 +69,17 @@ Verified current boundaries:
 
 Exact route, schema, runtime, test, and blocker evidence is in `05-IMPLEMENTATION-STATUS.md`.
 
+### Phase 2.5 current override — 2026-08-13
+
+The freeze facts above describe the Phase 1/Phase 2 entry baseline. The isolated
+Phase 2.5 candidate has since been recreated from the recorded candidate SHA,
+the additive migration has been applied only to its private PostgreSQL, and
+the core candidate acceptance gate has passed. Candidate Backend remains
+separate from production on `127.0.0.1:3010`; production migration, Backend
+replacement, and Caddy activation were not performed. See the current evidence
+and blockers in `05-IMPLEMENTATION-STATUS.md` and route/event results in
+`09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`.
+
 ## 3. Approved Phase 2 scope
 
 The following target scope is frozen and must not be re-inferred from older UI or architecture drafts:

@@ -21,9 +21,14 @@ At freeze SHA `d638b20c381c676136c94524a38a1def5d70e565`:
 
 Slice 2B source now implements the account/profile/recovery/avatar and
 personalization routes in sections 2, 3, and 5. This is source and automated
-review-candidate evidence only: the running private `bmo` candidate still has
-the invitation-era image and only the two P9.1 migrations, while public
-production remains unchanged.
+review-candidate evidence plus Phase 2.5 private candidate acceptance: the
+candidate now runs the migrated Phase 2 image on its isolated DB, while public
+production remains unchanged. The live-provider and physical-ESP limitations
+remain as recorded in the matrix.
+
+The earlier freeze wording in this section is historical entry-state evidence.
+The current candidate identity, migration, runtime, and acceptance result are
+authoritative in `05-IMPLEMENTATION-STATUS.md`.
 
 `EXISTING_VERIFIED` in the matrix means verified at the stated availability tier; it does not imply public availability.
 

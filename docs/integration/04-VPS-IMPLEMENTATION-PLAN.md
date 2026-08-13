@@ -4,6 +4,17 @@
 **Applies after:** Phase 1 documentation commit
 **Phase 1 rule:** This plan is documentation only. It authorizes no deployment, runtime change, or production migration.
 
+## Phase 2.5 execution addendum — 2026-08-13
+
+The frozen handoff below describes the entry baseline and remains historical.
+Phase 2.5 has now completed candidate-only deployment and acceptance: the
+additive migration is applied to the isolated review PostgreSQL, the candidate
+Backend is healthy on `127.0.0.1:3010`, and the core acceptance gate passed.
+Production migration, production Backend replacement, active Caddy changes,
+provider credential provisioning, and physical ESP acceptance remain separate
+gates and were not performed. The exact evidence and promotion plan are in
+`05-IMPLEMENTATION-STATUS.md`.
+
 ## Baseline Phase 2 must preserve
 
 - Production serves the verified physical-device voice path: device WSS `/ws`, whole raw WAV by HTTP, MP3 by HTTP.
@@ -39,8 +50,8 @@ Implement self-service registration, DOB-based password recovery with abuse cont
 
 Source checkpoint 2026-08-11: the account/profile/recovery/avatar and
 personalization portion is `EXISTING_VERIFIED` in source and automated tests.
-The running private candidate was not recreated or migrated, and public
-activation remains separately gated.
+Phase 2.5 additionally verified the private candidate; public activation
+remains separately gated.
 
 ### Slice 4 — identity bridge and mobile realtime
 
@@ -54,9 +65,8 @@ Implement durable chat/history/idempotency, Hermes invocation, memory lifecycle,
 
 Source checkpoint 2026-08-12: the chat/history/idempotency and internal Hermes
 orchestration portion is `EXISTING_VERIFIED` in source and automated tests.
-Memory remains an explicit empty gateway, schedules/proactive delivery remain
-`READY_TO_IMPLEMENT`, and the running candidate/public production were not
-changed.
+Phase 2.5 additionally verified candidate chat/Hermes persistence and schedule
+expiry behavior; public production was not changed.
 
 ### Slice 6 — device configuration plane
 

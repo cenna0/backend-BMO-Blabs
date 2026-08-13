@@ -1,10 +1,83 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-11
-**Last implementation checkpoint:** 2026-08-12 — memory lifecycle/API and bounded PostgreSQL chat-memory context source slice
+**Last implementation checkpoint:** 2026-08-13 — Phase 2.5 candidate runtime deployment and acceptance
 **Baseline source:** `main` / `d638b20c381c676136c94524a38a1def5d70e565`
 **Documentation branch:** `docs/integration-contract-freeze`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
+
+## Phase 2.5 candidate acceptance (current)
+
+**Acceptance date:** 2026-08-13
+**Scope:** candidate/review runtime only. No production migration, Backend replacement,
+or active Caddy change was performed.
+**Requested source:** `feat/vps-mobile-device-integration` /
+`437e48a70227220d1a40ad539ff09b307ef0c1ea`
+**Candidate source:** `adeebca58719db4386f62330026f6c3b46a91bbe` (targeted protected-secret
+startup fix on top of the requested source)
+**Candidate image:** `bmo-phase25-candidate:adeebca58719db4386f62330026f6c3b46a91bbe`
+(`sha256:eaa0a7a162e7cf926ddb6ac3022449671a69dae25dc94a1ab618aa3b274abecb`)
+
+For this section, the explicit acceptance labels map to the maintenance protocol:
+`SOURCE_VERIFIED` = `EXISTING_VERIFIED` in source, `CANDIDATE_VERIFIED` =
+`EXISTING_VERIFIED` in the private candidate, `PRODUCTION_VERIFIED` =
+`EXISTING_VERIFIED` in production, `BLOCKED_EXTERNAL_SECRET` and
+`BLOCKED_OPERATOR` = named `BLOCKED` gates. These labels do not imply public
+availability.
+
+| Gate | Status | Evidence |
+|---|---|---|
+| Source and candidate identity | `CANDIDATE_VERIFIED` | Candidate Backend `bmo-p9-1-backend-1`, Node `22.23.1`, host bind `127.0.0.1:3010`, image digest above; candidate PostgreSQL `bmo-p9-1-postgres-1` on private `bmo-p9-1_p9_private` with no host port. Production Backend remained `bmo-production-backend-1` on `127.0.0.1:3000`. |
+| Prisma Studio exposure | `CANDIDATE_VERIFIED` | No `*:5555` listener, Docker publication, or active Caddy route. UFW/nftables rule inspection requires passworded elevation and remains `BLOCKED_OPERATOR`; no workaround was used. |
+| Build and generated client | `CANDIDATE_VERIFIED` | Targeted ownership repair enabled normal in-place candidate-path operation. Node `22.23.1` `npm run prisma:generate`, `npm run build`, `npm run typecheck`, and `npm run prisma:validate` passed. |
+| Candidate backup/restore | `CANDIDATE_VERIFIED` | Encrypted backup `/tmp/bmo-p9-1-validation-20260804/backups/p9-daily-20260813T063419Z.dump.gpg`, mode `0600`, SHA-256 `ced83d0be911af85eb532cbf9c2bff8f67d219d6f31a1c7b53249da78a4d3525`; restored to disposable `phase25_restore_20260813`. PostgreSQL 16.14, 12 public tables, two baseline migrations, and User/Device/Session/DevicePairing counts `50/12/74/31` matched. |
+| Candidate migration | `CANDIDATE_VERIFIED` | `20260811190000_phase2_application_foundation` applied once to the candidate DB; repeat deploy reported no pending migrations. Three finished migrations, 39 public tables, and the pre-existing P9.1 counts remained intact. No production DB was used. |
+| Candidate health | `CANDIDATE_VERIFIED` | `/livez` 200; `/readyz` 200 with Backend, Hermes, Audio, and database `ok`; optional RVC remained unavailable as documented. No crash/restart loop. |
+| Core REST and WebSocket acceptance | `CANDIDATE_VERIFIED` | Live candidate harness: `42 passed, 0 failed`, covering auth/session/DOB recovery/profile/personalization/pairing/devices/Wi-Fi/chat/history/idempotency/memory/schedules/plugins/provider boundaries, mobile `/api/v1/ws`, physical `/ws`, ownership, validation, and additive telemetry/log ingestion. Registered routes were enumerated against `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`. |
+| Backend tests and voice regression | `CANDIDATE_VERIFIED` | Node `22.23.1` full suite: 72 files passed, 401 tests passed, one pre-existing DB HTTP test skipped. Candidate fake-ESP whole-WAV flow completed through STT, Hermes, Piper, MP3 storage, `audio_ready`, and playback lifecycle; candidate remained healthy. |
+| Chat/Hermes and proactive server lifecycle | `CANDIDATE_VERIFIED` | Candidate chat operations/messages persisted and Hermes responses were stored; `speakOnDevice=false` was accepted without device audio. Schedule worker expiry guard produced one durable `MISSED` run for a forced expired occurrence; generic proactive queue/unit coverage passed. |
+| Wi-Fi server security/lifecycle | `CANDIDATE_VERIFIED` | Candidate-only AES-256-GCM protected key file was mode `0600`, stable across restart, and never logged/returned. Password-bearing and open-network writes/read projection passed; physical apply/rollback remains hardware-gated. |
+| WhatsApp live provider | `BLOCKED_EXTERNAL_SECRET` | Hermes live session/API credentials are not provisioned or verified; candidate boundary failed closed/sanitized as specified. |
+| Spotify live provider | `BLOCKED_EXTERNAL_SECRET` | Client credentials, callback registration, and provider encryption secret are not provisioned or verified; candidate boundary returned sanitized `503`. |
+| Physical ESP acceptance | `PENDING_PHYSICAL_ESP` | Fake-device server acceptance passed for additive event handling. Firmware, real Wi-Fi application/rollback, telemetry/log emission, settings acknowledgement, and physical proactive playback remain unverified. |
+| Firewall policy inspection | `BLOCKED_OPERATOR` | `ufw status verbose` and `nft list ruleset` require passworded elevated access. Service/listener/Docker/Caddy checks independently show no port 5555 exposure. |
+
+### Candidate rollback and production promotion boundary
+
+Candidate rollback is limited to the review project: stop/recreate
+`bmo-p9-1-backend-1` with the previous candidate image and candidate env, and
+restore only the candidate PostgreSQL from the encrypted artifact to a fresh
+isolated database if data rollback is required. Do not restore over production.
+
+Production promotion is a separate operator-authorized change. It requires a
+fresh production identity check and backup/restore gate, immutable image built
+from the final SHA, production-only migration with exact-once verification, a
+validated Caddy config, controlled production Backend recreation, and post-change
+health/REST/mobile-WS/device-WS/voice/observability checks. The required Caddy
+change is an explicit `/api/v1/ws` matcher proxied to `127.0.0.1:3000` before
+the existing broad API proxy; Caddy's normal WebSocket upgrade handling is
+sufficient. Preserve `/ws`, `/api/v1/voice`, `/audio/*`, and public health
+denial. No Caddy change is active from this acceptance.
+
+Proposed production Caddy change, to be validated and activated only during the
+separately authorized promotion:
+
+```diff
+ api.personalbmo.web.id {
+     encode zstd gzip
+     ...
+     @internal_probes path /livez /livez/* /readyz /readyz/*
+     respond @internal_probes 404
++    @mobile_ws path /api/v1/ws
++    reverse_proxy @mobile_ws 127.0.0.1:3000
+     reverse_proxy 127.0.0.1:3000
+ }
+```
+
+The existing broad proxy already preserves the legacy `/ws`, voice, and audio
+paths. The explicit matcher documents and verifies the mobile WebSocket path;
+no public route is added for Hermes, Audio, PostgreSQL, or port `5555`, and no
+manual upgrade headers are required by Caddy.
 
 ## Status vocabulary
 
@@ -33,7 +106,7 @@
 |---|---|---|
 | Production voice Backend API | `EXISTING_VERIFIED` | Healthy immutable container; loopback `127.0.0.1:3000`; public `/health` and device WSS/voice/audio paths |
 | P9.1 Backend API | `EXISTING_VERIFIED` | Private candidate container only; not routed by public Caddy |
-| PostgreSQL | `EXISTING_VERIFIED` | PostgreSQL 16.14, private candidate network, 11 application tables plus migration table; two P9.1 migrations finished |
+| PostgreSQL | `EXISTING_VERIFIED` | PostgreSQL 16.14, private candidate network, 39 public application tables plus migration table; three migrations finished in the Phase 2.5 candidate |
 | Hermes | `EXISTING_VERIFIED` | Host systemd service, loopback `127.0.0.1:8642`, gateway `0.20.0`; `/v1/responses` is the Backend boundary |
 | Audio Service | `EXISTING_VERIFIED` | Healthy container on loopback `127.0.0.1:8001`; readiness degraded only because optional RVC is disabled |
 | Caddy | `EXISTING_VERIFIED` | `api.personalbmo.web.id` -> `127.0.0.1:3000`; public `/livez` and `/readyz` deliberately return 404 |
@@ -50,7 +123,7 @@ Host: Ubuntu 24.04, kernel `6.8.0-124`, 4 vCPU, 7.8 GiB RAM, no swap. Docker `29
 | Production Backend | `127.0.0.1:3000` | `bmo-production-backend-1`, read-only, healthy, restart `unless-stopped`; digest starts `e981751498` |
 | Production Audio | `127.0.0.1:8001` | `bmo-production-audio-1`, read-only, healthy; digest starts `62ad9a` |
 | Hermes | `127.0.0.1:8642` | host `hermes-gateway.service`, user `hermes`, version `0.20.0` |
-| P9.1 Backend | internal candidate network, container port `3010` | `bmo-p9-1-backend-1`, read-only, healthy, Node `22.23.1`, no public Caddy route |
+| P9.1 Backend | host bind `127.0.0.1:3010` | `bmo-p9-1-backend-1`, read-only, healthy, Node `22.23.1`, no public Caddy route; Phase 2.5 candidate image is recorded above |
 | PostgreSQL | internal candidate network, no published port | `bmo-p9-1-postgres-1`, PostgreSQL `16.14`, persistent bind, healthy |
 | Caddy | public `80/443` -> production Backend | active admin config routes `api.personalbmo.web.id` to loopback; `/livez` and `/readyz` are denied publicly |
 | Monitoring | declared Beszel/relay services | hub, agent, and Telegram relay healthy |
@@ -61,20 +134,25 @@ Audio readiness is `degraded` only because optional RVC is disabled: FastAPI `0.
 
 ### Candidate database snapshot
 
-At audit time the candidate database was approximately 9.3 MB with two active connections and aggregate counts of 50 users, 12 devices, 31 pairing records, and 74 sessions. These counts are diagnostic evidence only, may drift after the freeze, and do not imply public/production data ownership.
+The Phase 2.5 candidate database retained the baseline aggregate counts of 50
+users, 12 devices, 31 pairing records, and 74 sessions through backup, isolated
+restore, and migration. The live acceptance harness then created three users,
+two devices, six sessions, and three pairing records; the final diagnostic
+counts were 53/14/80/34. These counts are diagnostic evidence only and do not
+imply public/production data ownership.
 
 ## Existing source and availability
 
 | Capability | Status | Availability / limitation |
 |---|---|---|
 | Device WSS `/ws`, raw whole WAV HTTP, MP3 HTTP | `EXISTING_VERIFIED` | Production/public contract |
-| Account auth register/login/refresh/logout/logout-all/me | `EXISTING_VERIFIED` | Slice 2B source/tests provide self-service DOB registration and canonical `SafeUser`; the running private candidate remains on the invitation-era image and public production remains unchanged |
+| Account auth register/login/refresh/logout/logout-all/me | `EXISTING_VERIFIED` | Phase 2.5 private candidate plus Slice 2B source/tests provide self-service DOB registration and canonical `SafeUser`; public production remains unchanged |
 | Six-digit pairing | `EXISTING_VERIFIED` | Source + DB-backed candidate; mobile bearer routes, 10-minute TTL, five attempts; physical pairing not proven |
 | Device CRUD/settings | `EXISTING_VERIFIED` | Source + private candidate; settings are DB-only and do not sync to ESP |
 | P9.1 Prisma foundation | `EXISTING_VERIFIED` | 11 models; two additive migrations; not the target integration schema |
-| Phase 2 application data foundation | `EXISTING_VERIFIED` | Source schema plus disposable PostgreSQL evidence: 27 additive models (38 total), explicit ownership/idempotency/secret-shape constraints, provider-subtype connection integrity, required bounded device-log expiry, repository delegates, and migration `20260811190000_phase2_application_foundation`. Empty three-migration deploy, repeat deploy with no pending migration, and populated two-to-three migration upgrade all passed. The migration has not been applied to the running private `bmo` candidate or public production. |
+| Phase 2 application data foundation | `EXISTING_VERIFIED` | Source schema plus Phase 2.5 candidate evidence: 27 additive models (38 total), explicit ownership/idempotency/secret-shape constraints, provider-subtype connection integrity, required bounded device-log expiry, repository delegates, and migration `20260811190000_phase2_application_foundation`. Candidate populated upgrade and exact-once repeat deploy passed; production remains unchanged. |
 | Production P9.1 activation | `READY_TO_IMPLEMENT` | Existing router is disabled on production |
-| Production-shaped P9.1 integration | `EXISTING_VERIFIED` | Source + automated review-runtime packaging: the full Backend runtime registers P9 and existing voice surfaces together. Review Compose keeps Backend on host networking for loopback Hermes/Audio, removes PostgreSQL host publication, and connects Backend to PostgreSQL through a shared Unix-socket volume. The running private candidate has not been recreated and public production remains unchanged. |
+| Production-shaped P9.1 integration | `EXISTING_VERIFIED` | Phase 2.5 candidate: full Backend runtime registers P9 and existing voice surfaces together on host networking for loopback Hermes/Audio; PostgreSQL has no host publication. Candidate uses the migrated review DB on `127.0.0.1:3010`; public production remains unchanged. |
 
 Session issuance now accepts an optional `clientDeviceId` only after querying an
 active `Device` owned by the authenticated user. Pre-pairing sessions remain
@@ -92,16 +170,16 @@ user, hardware ID, and `ACTIVE` status, and clears a revoked or stale binding.
 A missing/mismatched row emits the safe `DEVICE_NOT_BOUND` diagnostic while
 legacy voice remains connected; callback rejection is contained.
 
-The optional `Session.clientDeviceId` issuance path is source/unit verified with
+The optional `Session.clientDeviceId` issuance path is source/unit and candidate
+verified with
 transaction/lock ordering and active-owner validation. Integrated readiness now
 requires PostgreSQL health and every migration in the source manifest to be
 present and finished whenever P9 is enabled; a static test keeps that manifest
 identical to the migration directories. A failed, incomplete, or stalled
 database probe is bounded by the readiness timeout and sanitized as
 `database: error` with HTTP 503, while `/livez` remains dependency-free and the
-P9-disabled response shape is unchanged. The disposable database gate passed;
-running private-candidate and public-production acceptance remain pending, and
-no public availability is claimed.
+P9-disabled response shape is unchanged. The disposable database gate and Phase
+2.5 candidate acceptance passed; public availability is not claimed.
 
 One-hop Express/Supertest coverage verifies that Caddy's rightmost forwarded
 client address owns the auth rate-limit bucket: attacker-controlled earlier
@@ -178,20 +256,20 @@ is deliberately deferred to a later slice.
 
 | Capability | Status | Exact gap / gate |
 |---|---|---|
-| Self-service registration | `EXISTING_VERIFIED` | Source + automated route/service tests; optional legacy invitation compatibility retained; running candidate/public production unchanged |
+| Self-service registration | `EXISTING_VERIFIED` | Source + automated route/service tests plus Phase 2.5 private candidate; optional legacy invitation compatibility retained; public production unchanged |
 | DOB password recovery | `EXISTING_VERIFIED` | Source + automated enumeration/rate/TTL/hash/epoch/reuse/revocation and lock-aware concurrent issuance tests plus deterministic reset/revocation races; weak MVP factor and not deployed |
 | Profile, username, avatar | `EXISTING_VERIFIED` | Source + automated independent-rate/fair pre-Multer admission/30-second receive deadline/disconnect-lifetime/image-bound/media/storage/DB-authoritative reconciliation tests; persistent mounts declared but not created/deployed |
 | Personalization | `EXISTING_VERIFIED` | Source + exact bare seven-field response/defaults/strict patch/owner tests; the chat slice now consumes all seven bounded fields in server-built Hermes context |
-| Mobile realtime `/api/v1/ws` | `EXISTING_VERIFIED` | Source + automated transport/auth/session/path/payload/expiry/heartbeat/fanout tests; enabled only with the P9 runtime and not deployed to candidate/public production |
-| Chat/history and Hermes-backed send | `EXISTING_VERIFIED` | Source/test tier: six owner-scoped REST routes, deterministic cursor history, transactional user-scoped idempotency, durable 202 operations, globally bounded local scheduling plus DB-enforced lower-cursor session ordering across runtimes, atomic DB-clock leases renewed immediately before Hermes, post-listen bounded recovery whose SQL selects claimable session heads before `LIMIT`, counts durable claims, stops on zero-progress pages, advances unrelated session heads beyond 64+ blocked upper rows, and coalesces overlapping startup/maintenance calls, delete preflight/active abort and cancellation-guarded persistence, server-built personalization + explicit empty-memory + recent-history context, isolated per-user/session internal Hermes conversation, sanitized assistant/error persistence, and per-user `chat_thinking`/`chat_message` fanout. Not migrated/deployed to the running candidate or public production |
-| Memory | `EXISTING_VERIFIED` | Source/test tier: all 15 frozen bearer-owner routes, strict bounded bodies, deterministic cursors, active-record retrieval, candidate accept/reject replay, edit/delete/forget/clear/export privacy behavior, audited request IDs, and durable provider-free summary status/feedback. Chat consumes at most eight relevant active owner memories and creates no candidates. Not migrated/deployed to the running candidate or public production |
-| Schedules | `EXISTING_VERIFIED` | Source/test tier: eight bearer-owner REST routes, strict bounded mobile vocabulary, Jakarta period normalization, deterministic cursors, optimistic version conflicts, owned device targets, DB-clock unique occurrence/missed-run creation, atomic leases/retries, recurrence advance, one-shot completion, audit request IDs, and typed `schedule_status`; not migrated/deployed to candidate/public production |
-| Wi-Fi DB/API/queue | `EXISTING_VERIFIED` | Source/test tier: owner-scoped versioned latest-write-wins desired state, AES-256-GCM secret at rest via protected `P9_WIFI_ENCRYPTION_KEY_FILE`, open networks, reconnect delivery, delete metadata, and sanitized status projection; no candidate/public migration or deployment |
+| Mobile realtime `/api/v1/ws` | `EXISTING_VERIFIED` | Source tests plus Phase 2.5 private candidate: separate transport/auth/session/path/payload/expiry/heartbeat/fanout contract; public production unchanged |
+| Chat/history and Hermes-backed send | `EXISTING_VERIFIED` | Source tests plus Phase 2.5 private candidate: owner-scoped REST routes, deterministic history, idempotent durable 202 operations, bounded Hermes scheduling/context, sanitized persistence, and `chat_thinking`/`chat_message` fanout; public production unchanged |
+| Memory | `EXISTING_VERIFIED` | Source tests plus Phase 2.5 private candidate read/settings acceptance: bearer-owner routes, bounded records, privacy operations, and bounded chat context; public production unchanged |
+| Schedules | `EXISTING_VERIFIED` | Source tests plus Phase 2.5 private candidate CRUD and worker expiry acceptance: strict owner scope, versioning, DB-clock occurrence/missed-run behavior, and typed lifecycle; physical delivery remains pending |
+| Wi-Fi DB/API/queue | `EXISTING_VERIFIED` | Source tests plus Phase 2.5 private candidate: owner-scoped latest-write-wins state, AES-256-GCM secret at rest via protected `P9_WIFI_ENCRYPTION_KEY_FILE`, open networks, sanitized status projection, and fake-device server lifecycle; physical apply remains pending |
 | Wi-Fi ESP apply/status | `PENDING_PHYSICAL_ESP` | Additive ESP events and physical proof absent; first-boot bootstrap remains a hardware decision |
 | Device logs API/storage | `EXISTING_VERIFIED` | Source/test tier: bound-device additive ingestion, allowlisted metadata/redaction, 7-day expiry, per-device rate limit, and owner-scoped read API; physical emission remains pending |
 | Telemetry/RSSI API/storage | `EXISTING_VERIFIED` | Source/test tier: bound-device current upsert/read, RSSI bounds, nullable capability-gated battery, and sanitized additive ingestion; physical emission remains pending |
 | Telemetry/settings ESP events | `PENDING_PHYSICAL_ESP` | Firmware handlers/physical proof absent; battery value is nullable |
-| Generic proactive queue/API | `EXISTING_VERIFIED` | Source/test tier: one durable CHAT/SCHEDULE/WHATSAPP enqueue/worker path, user-scoped idempotency including create races, five-minute expiry, per-device arbitration, optional user-voice-busy sender boundary, durable MOBILE intents, and typed device-scoped status production. Runtime has no physical sender; device delivery stays pending |
+| Generic proactive queue/API | `EXISTING_VERIFIED` | Source tests plus Phase 2.5 private candidate schedule expiry and delivery-state acceptance: one durable CHAT/SCHEDULE/WHATSAPP enqueue/worker path, idempotency, expiry, arbitration, durable MOBILE intents, and typed device-scoped status production. Runtime has no physical sender; device delivery stays pending |
 | Generic proactive playback | `PENDING_PHYSICAL_ESP` | Firmware event handling and physical playback proof absent |
 | WhatsApp adapter/catalog | `EXISTING_VERIFIED` | Source/test tier: owner-scoped connect/status/QR/confirm/disconnect, strict notification rules, short-lived send preview/confirm/idempotency, safe plugin status, and fail-closed Hermes boundary; no session bytes/provider payloads stored |
 | WhatsApp live provider | `BLOCKED_EXTERNAL_SECRET` | Hermes capability exists, but actual BMO session/API boundary and provider credentials are not verified; routes return a sanitized blocked result where provider action is required |
@@ -202,16 +280,18 @@ is deliberately deferred to a later slice.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 72 files passed; 400 tests passed, 1 skipped. Coverage includes account/profile/recovery/avatar, mobile realtime, chat/Hermes, memory, schedules/proactive delivery, device additions, provider boundaries, plugin catalog, bug reports, and existing voice/device regressions. Disposable authenticated database HTTP acceptance was not enabled.
-- Backend typecheck passed on Node `22.23.2`; isolated archive/out-of-tree build
-  passed. In-place build remains blocked only by ownership of existing runtime
-  `backend/dist` files (the source tree itself is unchanged by that check).
-- Integration/support source coverage: focused boundary/HTTP tests passed on pinned Node 22; an isolated full suite reported 72 files/400 passed/1 skipped. Live WhatsApp/Spotify provider calls stay `BLOCKED_EXTERNAL_SECRET`.
-- Build evidence: typecheck passed; Prisma validate passed; isolated archive Prisma generate and out-of-tree TypeScript build passed. In-place `npm run build` and Prisma generate were not writable because existing `backend/dist` and generated-client files are owned by another runtime user.
-- Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. On disposable PostgreSQL, an empty three-migration deploy passed, repeat deploy reported no pending migrations, and a populated two-to-three migration upgrade preserved seeded rows in all 11 P9.1 models. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints, and the repeated database-to-schema diff returned `No difference detected`. Transaction-rolled-back positive/negative probes also verified avatar, Wi-Fi AEAD, battery, device-log expiry, provider-subtype, Spotify refresh-secret, and WhatsApp rule constraints. The disposable databases and review images were removed after verification. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the running `bmo` database still has only the two P9.1 migrations.
-- Static/rendered packaging: 13 tests passed, 1 unrelated packaging test skipped. PostgreSQL has no host-published port, Backend uses the named Unix-socket volume, and avatar storage uses a separate writable named volume without adding public routing. Fresh production Backend and P9 review-candidate image builds passed; ephemeral command-only probes verified application UID/GID `1000:1000` and avatar-directory ownership/mode `1000:1000`/`0700`. No service container was started and the live candidate was not recreated.
+- Backend on Node `22.23.1`: 72 files passed; 401 tests passed, 1 skipped. Coverage includes account/profile/recovery/avatar, mobile realtime, chat/Hermes, memory, schedules/proactive delivery, device additions, provider boundaries, plugin catalog, bug reports, and existing voice/device regressions. The one skipped test is the pre-existing authenticated database HTTP test; live candidate HTTP acceptance was enabled separately.
+- Backend typecheck, Prisma generate/validate, and in-place build passed on the
+  repaired candidate path under Node `22.23.1`. The targeted ownership repair
+  covered only `backend/dist` and `backend/src/generated/prisma`; no broad tree
+  permission change was made.
+- Integration/support source coverage: focused boundary/HTTP tests passed on pinned Node 22; the candidate harness reported 42/42 assertions passed. Live WhatsApp/Spotify provider calls stay `BLOCKED_EXTERNAL_SECRET`.
+- Build evidence: candidate Docker build, in-place Prisma generate, TypeScript
+  build, typecheck, and Prisma validate passed after the targeted ownership fix.
+- Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. Historical disposable PostgreSQL evidence covered empty deploy, repeat deploy, and populated two-to-three migration upgrade with P9.1 row preservation. Phase 2.5 then applied the third migration to the isolated candidate and rechecked readiness/schema state. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints, and the repeated database-to-schema diff returned `No difference detected`. Transaction-rolled-back positive/negative probes also verified avatar, Wi-Fi AEAD, battery, device-log expiry, provider-subtype, Spotify refresh-secret, and WhatsApp rule constraints.
+- Static/rendered packaging: 13 tests passed, 1 unrelated packaging test skipped. PostgreSQL has no host-published port, Backend uses the named Unix-socket volume, and avatar storage uses a separate writable named volume without adding public routing. The Phase 2.5 candidate image ran with application UID/GID `1000:1000` and protected candidate secrets loaded before privilege drop.
 - Audio Service: 103 tests passed in the production audio image.
-- Documentation verifier: 4 regression tests passed and the direct verifier returned `PASS` on the synchronized tree.
+- Documentation verifier: 4 regression tests passed and the direct verifier returned `PASS` before this Phase 2.5 evidence update; it will be rerun after synchronization.
 - Production dependency audit: 0 vulnerabilities at `high` or above (and 0 total after the pinned `nanoid` override); Multer `2.2.0` and Sharp `0.35.3` are exact lockfile dependencies.
 - A host-Node test attempt failed with `ERR_IPC_CHANNEL_CLOSED`; this is an environment mismatch, not a test regression.
 
@@ -222,11 +302,9 @@ is deliberately deferred to a later slice.
 3. `PENDING_PHYSICAL_ESP`: first-boot Wi-Fi bootstrap, battery sensing capability, additive events, and physical playback require firmware/bench evidence.
 4. Current UFW/nft rules remain unreadable without passworded elevated privileges. Listener, Docker, and Caddy evidence prove no service currently accepts port 5555; firewall-policy inspection remains an operator evidence gap for final public/private sign-off.
 
-## Phase 2 next acceptance gate
+## Phase 2.5 completion state
 
-Use `04-VPS-IMPLEMENTATION-PLAN.md` for the remaining acceptance sequence. The
-approved Phase 2 application scope is source/test implemented through device
-additions, provider boundaries, plugin catalog, and bug reports. The additive
-migration remains unapplied to the running candidate and production; candidate
-recreation, migration execution, public activation, provider configuration,
-and physical ESP work all require separate authorization/evidence.
+The core candidate acceptance gate passed. The next boundary is production
+promotion under separate explicit operator authorization. The additive migration
+is applied only to the review candidate. Public activation, provider
+configuration, and physical ESP work remain separately gated.
