@@ -9,6 +9,7 @@ services:
       SPOTIFY_CLIENT_ID_FILE: /run/secrets/spotify_client_id
       SPOTIFY_CLIENT_SECRET_FILE: /run/secrets/spotify_client_secret
       SPOTIFY_CALLBACK_URL: https://api.personalbmo.web.id/api/v1/integrations/spotify/callback
+      WHATSAPP_BRIDGE_URL: http://127.0.0.1:3001
     secrets:
       - provider_encryption_key
       - spotify_client_id

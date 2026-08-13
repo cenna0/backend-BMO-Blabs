@@ -67,6 +67,7 @@ const rawSchema = z.object({
   SPOTIFY_CLIENT_ID: z.string().min(1).optional(),
   SPOTIFY_CLIENT_SECRET: z.string().min(1).optional(),
   SPOTIFY_CALLBACK_URL: z.string().url().optional(),
+  WHATSAPP_BRIDGE_URL: z.string().url().default("http://127.0.0.1:3001"),
   P9_TIMEZONE: z.string().default(P9_CANONICAL_TIMEZONE),
   P9_PRISMA_POOL_SIZE: optionalPositiveInt(5),
   P9_POSTGRES_MAX_CONNECTIONS: optionalPositiveInt(20),
@@ -93,6 +94,7 @@ export interface P9Config {
   spotifyClientId?: string | undefined;
   spotifyClientSecret?: string | undefined;
   spotifyCallbackUrl?: string | undefined;
+  whatsappBridgeUrl: string;
   canonicalTimezone: typeof P9_CANONICAL_TIMEZONE;
   accessTokenTtlSeconds: 900;
   refreshTokenTtlSeconds: 2_592_000;
@@ -139,6 +141,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       spotifyClientId: undefined,
       spotifyClientSecret: undefined,
       spotifyCallbackUrl: undefined,
+      whatsappBridgeUrl: parsed.WHATSAPP_BRIDGE_URL,
       prismaPoolSize: parsed.P9_PRISMA_POOL_SIZE,
       postgresMaxConnections: parsed.P9_POSTGRES_MAX_CONNECTIONS,
       loginWindowMs: 900_000,
@@ -175,6 +178,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     ...(parsed.SPOTIFY_CLIENT_ID === undefined ? {} : { spotifyClientId: parsed.SPOTIFY_CLIENT_ID }),
     ...(parsed.SPOTIFY_CLIENT_SECRET === undefined ? {} : { spotifyClientSecret: parsed.SPOTIFY_CLIENT_SECRET }),
     ...(parsed.SPOTIFY_CALLBACK_URL === undefined ? {} : { spotifyCallbackUrl: parsed.SPOTIFY_CALLBACK_URL }),
+    whatsappBridgeUrl: parsed.WHATSAPP_BRIDGE_URL,
     canonicalTimezone: P9_CANONICAL_TIMEZONE,
     accessTokenTtlSeconds: 900,
     refreshTokenTtlSeconds: 2_592_000,

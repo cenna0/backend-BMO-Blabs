@@ -31,6 +31,7 @@ import { IntegrationService } from "./services/integration.service.js";
 import { BugReportService } from "./services/bug-report.service.js";
 import type { HermesGenerateClient } from "../services/hermes.client.js";
 import { SpotifyApiClient } from "./providers/spotify.client.js";
+import { HermesWhatsAppBridgeClient } from "./providers/hermes-whatsapp.client.js";
 
 export interface P9Runtime {
   router: Router;
@@ -49,6 +50,7 @@ export interface P9Runtime {
   launchPendingChatRecovery(onError?: (error: unknown) => void): void;
   waitForChatIdle(): Promise<void>;
   runScheduler(): Promise<{ materialized: number; claimed: number; pendingPhysical: number }>;
+  pollWhatsApp(): Promise<{ processed: number; queued: number }>;
   deviceAdditions: DeviceAdditionsService;
   settings: SettingsService;
   close(): Promise<void>;
@@ -123,6 +125,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   const spotify = config.spotifyClientId && config.spotifyClientSecret
     ? new SpotifyApiClient({ clientId: config.spotifyClientId, clientSecret: config.spotifyClientSecret })
     : undefined;
+  const whatsApp = new HermesWhatsAppBridgeClient({ baseUrl: config.whatsappBridgeUrl });
   const integrations = new IntegrationService({
     client,
     repositories,
@@ -132,6 +135,17 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     ...(config.spotifyClientSecret === undefined ? {} : { spotifyClientSecret: config.spotifyClientSecret }),
     ...(config.spotifyCallbackUrl === undefined ? {} : { spotifyCallbackUrl: config.spotifyCallbackUrl }),
     ...(spotify === undefined ? {} : { spotify }),
+    whatsApp,
+    whatsAppInbound: async (input) => {
+      await proactive.enqueue({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        source: "WHATSAPP",
+        sourceResourceType: "whatsapp_delivery",
+        sourceResourceId: input.deliveryId,
+        idempotencyKey: `whatsapp:${input.deliveryId}`,
+      });
+    },
   });
   const bugReports = new BugReportService({ client, repositories, storageDir: config.bugReportStorageDir });
   const chat = new ChatService({
@@ -154,6 +168,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     authenticateMobileSocket: (accessToken) =>
       authenticateMobileAccessToken(accessTokens, sessions, accessToken),
     checkReadiness: () => checkP9Readiness(repositories),
+    pollWhatsApp: () => integrations.pollWhatsApp(),
     resumePendingChat: () => chat.resumePending(),
     launchPendingChatRecovery: (onError) => {
       void chat.resumePending().catch((error) => onError?.(error));

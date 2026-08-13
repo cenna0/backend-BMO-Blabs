@@ -15,7 +15,7 @@
 | Scheduler is structured data; proactive delivery is generic | Frozen target |
 | Wi-Fi desired state is encrypted in DB; ESP applies it | Frozen target / physical pending |
 | Spotify uses server-side Authorization Code and Backend-owned tokens/actions | Frozen target / live blocked |
-| Hermes owns WhatsApp session; Backend owns BMO policy/audit | Frozen target / exact live boundary blocked |
+| Hermes owns WhatsApp session; Backend owns BMO policy/audit | Frozen target / bridge contract source-verified, live session blocked |
 | Additive migrations; no Phase 1 production migration | Frozen |
 | Provider/physical capability is not acceptance evidence | Frozen |
 

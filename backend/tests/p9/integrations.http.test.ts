@@ -14,6 +14,7 @@ function fixture() {
   const integration = {
     connectWhatsApp: vi.fn().mockResolvedValue({ connection: { provider: "whatsapp", status: "PENDING" }, blocked: true }),
     connection: vi.fn().mockResolvedValue({ provider: "whatsapp", status: "DISCONNECTED", scopes: [] }),
+    whatsappConnection: vi.fn().mockResolvedValue({ provider: "whatsapp", status: "DISCONNECTED", scopes: [] }),
     whatsappQr: vi.fn().mockResolvedValue({ qr: null, expiresAt: null, status: "DISCONNECTED" }),
     confirmWhatsApp: vi.fn().mockResolvedValue({ provider: "whatsapp", status: "CONNECTED" }),
     disconnectWhatsApp: vi.fn().mockResolvedValue(undefined),

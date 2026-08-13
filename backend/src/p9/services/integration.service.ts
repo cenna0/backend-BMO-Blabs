@@ -7,6 +7,8 @@ import { P9Error } from "../errors.js";
 import { decryptProviderToken, encryptProviderToken } from "../integrations.crypto.js";
 import { parseSpotifyAction, parseWhatsAppRulesPatch } from "../integrations.validation.js";
 import { SpotifyProviderError, type SpotifySearchType } from "../providers/spotify.client.js";
+import type { HermesWhatsAppMessage } from "../providers/hermes-whatsapp.client.js";
+import { HermesWhatsAppProviderError } from "../providers/hermes-whatsapp.client.js";
 
 const OAUTH_TTL_MS = 10 * 60_000;
 const CONFIRMATION_TTL_MS = 5 * 60_000;
@@ -21,7 +23,9 @@ function publicConnection(row: any, provider: "whatsapp" | "spotify"): PublicCon
 }
 
 export interface HermesWhatsAppBoundary {
-  connect?(userId: string): Promise<{ externalReference?: string }>;
+  connect?(userId: string): Promise<{ externalReference?: string; status?: string }>;
+  status?(): Promise<{ status: string; queueLength: number; uptime: number | null; scriptHash: string | null; sendReadReceipts: boolean | null }>;
+  poll?(): Promise<HermesWhatsAppMessage[]>;
   qr?(userId: string): Promise<{ qr: string | null; expiresAt: Date | null }>;
   confirmScanned?(userId: string): Promise<void>;
   disconnect?(userId: string): Promise<void>;
@@ -47,6 +51,7 @@ export class IntegrationService {
     spotifyClientSecret?: string;
     spotifyCallbackUrl?: string;
     whatsApp?: HermesWhatsAppBoundary;
+    whatsAppInbound?: (input: { userId: string; deliveryId: string; deviceId: string; text: string }) => Promise<void>;
     spotify?: SpotifyProviderBoundary;
   }) {}
 
@@ -56,11 +61,36 @@ export class IntegrationService {
   }
 
   async connectWhatsApp(userId: string, requestId?: string): Promise<{ connection: PublicConnection; blocked: boolean }> {
+    await this.#assertWhatsAppBindingAvailable(userId);
     const result = await this.#upsertConnection(userId, IntegrationProvider.WHATSAPP, requestId);
     if (!this.options.whatsApp?.connect) return { connection: publicConnection(result, "whatsapp"), blocked: true };
-    const external = await this.options.whatsApp.connect(userId);
-    const updated = await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: IntegrationStatus.PENDING, externalReference: external.externalReference ?? null } });
-    return { connection: publicConnection(updated, "whatsapp"), blocked: false };
+    try {
+      const external = await this.options.whatsApp.connect(userId);
+      const connected = external.status === "connected";
+      const updated = await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: connected ? IntegrationStatus.CONNECTED : IntegrationStatus.PENDING, ...(connected ? { connectedAt: new Date() } : {}), externalReference: external.externalReference ?? null } });
+      return { connection: publicConnection(updated, "whatsapp"), blocked: !connected };
+    } catch {
+      await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: IntegrationStatus.ERROR } });
+      throw new P9Error("SERVICE_UNAVAILABLE", 503, "WhatsApp provider is unavailable");
+    }
+  }
+
+  async whatsappConnection(userId: string): Promise<PublicConnection> {
+    const row = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
+    if (!row || row.status === IntegrationStatus.DISCONNECTED || !this.options.whatsApp?.status) return publicConnection(row ?? { status: IntegrationStatus.DISCONNECTED, scopes: [] }, "whatsapp");
+    try {
+      const status = await this.options.whatsApp.status();
+      if (status.status !== "connected" && row.status === IntegrationStatus.CONNECTED) {
+        const updated = await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status: IntegrationStatus.ERROR } });
+        return publicConnection(updated, "whatsapp");
+      }
+    } catch {
+      if (row.status === IntegrationStatus.CONNECTED) {
+        const updated = await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status: IntegrationStatus.ERROR } });
+        return publicConnection(updated, "whatsapp");
+      }
+    }
+    return publicConnection(row, "whatsapp");
   }
 
   async whatsappQr(userId: string): Promise<{ qr: string | null; expiresAt: string | null; status: string }> {
@@ -72,7 +102,13 @@ export class IntegrationService {
 
   async confirmWhatsApp(userId: string, requestId?: string): Promise<PublicConnection> {
     if (!this.options.whatsApp?.confirmScanned) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "WhatsApp provider is not configured");
-    await this.options.whatsApp.confirmScanned(userId);
+    await this.#assertWhatsAppBindingAvailable(userId);
+    try {
+      await this.options.whatsApp.confirmScanned(userId);
+    } catch (error) {
+      if (error instanceof HermesWhatsAppProviderError && error.code === "NOT_CONNECTED") throw new P9Error("CONFLICT", 409, "WhatsApp is not connected");
+      throw new P9Error("SERVICE_UNAVAILABLE", 503, "WhatsApp provider is unavailable");
+    }
     const row = await this.#setStatus(userId, IntegrationProvider.WHATSAPP, IntegrationStatus.CONNECTED, requestId);
     return publicConnection(row, "whatsapp");
   }
@@ -80,6 +116,39 @@ export class IntegrationService {
   async disconnectWhatsApp(userId: string, requestId?: string): Promise<void> {
     await this.options.whatsApp?.disconnect?.(userId);
     await this.#setStatus(userId, IntegrationProvider.WHATSAPP, IntegrationStatus.DISCONNECTED, requestId);
+  }
+
+  async pollWhatsApp(): Promise<{ processed: number; queued: number }> {
+    if (!this.options.whatsApp?.poll) return { processed: 0, queued: 0 };
+    const messages = await this.options.whatsApp.poll();
+    let processed = 0;
+    let queued = 0;
+    for (const message of messages) {
+      const owners = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP, status: IntegrationStatus.CONNECTED }, select: { id: true, userId: true } });
+      if (owners.length !== 1) continue;
+      const owner = owners[0];
+      if (!owner) continue;
+      const duplicate = await this.options.repositories.whatsAppDelivery.findFirst({ where: { provider: IntegrationProvider.WHATSAPP, connectionId: owner.id, providerMessageRef: message.messageId } });
+      if (duplicate) continue;
+      const delivery = await this.options.repositories.whatsAppDelivery.create({ data: {
+        userId: owner.userId,
+        connectionId: owner.id,
+        provider: IntegrationProvider.WHATSAPP,
+        direction: "INBOUND",
+        status: "RECEIVED",
+        providerMessageRef: message.messageId,
+        metadata: JSON.stringify({ chatId: message.chatId, senderId: message.senderId, isGroup: message.isGroup, bodyLength: message.body.length }),
+      } });
+      processed += 1;
+      const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId: owner.userId, connectionId: owner.id, provider: IntegrationProvider.WHATSAPP, enabled: true } });
+      const shouldSpeak = rules.some((rule: any) => rule.speakOnDevice === true && (rule.scope === "ALL" || (rule.scope === "GROUP" && message.isGroup && rule.opaqueTargetRef === message.chatId) || (rule.scope === "CONTACT" && rule.opaqueTargetRef === message.senderId)));
+      if (!shouldSpeak || !this.options.whatsAppInbound) continue;
+      const device = await this.options.repositories.device.findFirst({ where: { userId: owner.userId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, select: { id: true } });
+      if (!device) continue;
+      await this.options.whatsAppInbound({ userId: owner.userId, deliveryId: delivery.id, deviceId: device.id, text: message.body });
+      queued += 1;
+    }
+    return { processed, queued };
   }
 
   async whatsappRules(userId: string): Promise<unknown[]> {
@@ -109,7 +178,7 @@ export class IntegrationService {
   }
 
   async whatsappPreview(userId: string, input: { recipientRef: string; message: string; idempotencyKey: string }, requestId?: string): Promise<unknown> {
-    const connection = await this.#ensureConnection(userId, IntegrationProvider.WHATSAPP);
+    const connection = await this.#requireConnectedWhatsAppOwner(userId);
     const now = await this.options.repositories.databaseNow();
     const existing = await this.options.repositories.whatsAppSendRequest.findUnique({ where: { userId_idempotencyKey: { userId, idempotencyKey: input.idempotencyKey } } });
     if (existing) return this.#publicSend(existing);
@@ -127,6 +196,7 @@ export class IntegrationService {
     if (!row) throw new P9Error("OWNERSHIP_DENIED", 404, "Send request not found");
     const now = await this.options.repositories.databaseNow();
     if (row.confirmationExpiresAt <= now || row.status === WhatsAppSendStatus.EXPIRED) throw new P9Error("CONFLICT", 409, "Send confirmation expired");
+    await this.#requireConnectedWhatsAppOwner(userId);
     if (!this.options.whatsApp?.send) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "WhatsApp provider is not configured");
     const claimed = await this.options.repositories.whatsAppSendRequest.updateMany({ where: { id: row.id, userId, status: WhatsAppSendStatus.PENDING_CONFIRMATION, confirmationExpiresAt: { gt: now } }, data: { status: WhatsAppSendStatus.SENDING, confirmedAt: now } });
     if (claimed.count !== 1) {
@@ -323,6 +393,16 @@ export class IntegrationService {
   }
 
   async #getConnection(userId: string, provider: IntegrationProvider): Promise<any | null> { return this.options.repositories.integrationConnection.findUnique({ where: { userId_provider: { userId, provider } } }); }
+  async #assertWhatsAppBindingAvailable(userId: string): Promise<void> {
+    const rows = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP }, select: { userId: true } });
+    if (rows.some((row: any) => row.userId !== userId)) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp connection is not available");
+  }
+  async #requireConnectedWhatsAppOwner(userId: string): Promise<any> {
+    const connection = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
+    const owners = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP, status: IntegrationStatus.CONNECTED }, select: { id: true, userId: true } });
+    if (!connection || connection.status !== IntegrationStatus.CONNECTED || owners.length !== 1 || owners[0]?.userId !== userId || owners[0]?.id !== connection.id) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp connection is not available");
+    return connection;
+  }
   async #ensureConnection(userId: string, provider: IntegrationProvider): Promise<any> { const current = await this.#getConnection(userId, provider); if (current) return current; return this.options.repositories.integrationConnection.create({ data: { userId, provider, scopes: [], status: IntegrationStatus.DISCONNECTED } }); }
   async #upsertConnection(userId: string, provider: IntegrationProvider, requestId?: string): Promise<any> { const row = await this.#ensureConnection(userId, provider); await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status: IntegrationStatus.PENDING, disconnectedAt: null } }); await this.#audit(this.options.repositories, userId, `${provider.toLowerCase()}.connect`, "integration", row.id, requestId); return this.options.repositories.integrationConnection.findUniqueOrThrow({ where: { id: row.id } }); }
   async #setStatus(userId: string, provider: IntegrationProvider, status: IntegrationStatus, requestId?: string): Promise<any> { const row = await this.#ensureConnection(userId, provider); const updated = await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status, ...(status === IntegrationStatus.CONNECTED ? { connectedAt: new Date(), disconnectedAt: null } : { disconnectedAt: new Date() }) } }); await this.#audit(this.options.repositories, userId, `${provider.toLowerCase()}.status`, "integration", row.id, requestId); return updated; }

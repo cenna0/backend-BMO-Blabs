@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-11
-**Last implementation checkpoint:** 2026-08-13 — Phase 2.5 candidate runtime deployment and acceptance
+**Last implementation checkpoint:** 2026-08-13 — Phase 2.6 candidate provider implementation
 **Baseline source:** `main` / `d638b20c381c676136c94524a38a1def5d70e565`
 **Documentation branch:** `docs/integration-contract-freeze`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -19,9 +19,10 @@ Caddy mutation, or provider secret was performed.
 | Spotify encrypted persistence/refresh | `SOURCE_VERIFIED` | Existing AES-256-GCM credential envelope is used; expiry-aware refresh preserves an omitted refresh token and retries one provider 401. Unit tests verify ciphertext-only persistence and owner isolation. |
 | Spotify live candidate acceptance | `BLOCKED_EXTERNAL_SECRET` | Client ID/secret, provider encryption key, exact callback registration, and an authorized Spotify account/device are not provisioned. |
 | Spotify callback exposure | `BLOCKED_OPERATOR` | Exact single-path diff is prepared at `ops/caddy/phase26-spotify-candidate-callback.patch` but has not been applied to active Caddy. Candidate remains loopback at `127.0.0.1:3010`. |
-| Hermes WhatsApp runtime boundary | `BLOCKED_OPERATOR` | Official docs identify the Baileys bridge and `hermes whatsapp`, but the installed Hermes tree is owned by `hermes` and protected from this account. No unsupported adapter was invented. |
-| WhatsApp concrete live adapter | `BLOCKED_OPERATOR` | Requires exact installed Hermes send/status/receive/session boundary inspection before implementation; QR pairing remains a later operator action. |
-| Generic WhatsApp proactive speech | `PENDING_PHYSICAL_ESP` | Existing generic `WHATSAPP` queue is source/test verified; no real WhatsApp inbound producer or physical ESP playback evidence exists yet. |
+| Hermes WhatsApp runtime boundary | `SOURCE_VERIFIED` | Installed CLI/runtime inspection plus Hermes 0.20.0 upstream source verified the loopback `/health`, destructive `/messages`, and `/send` bridge boundary. Protected Hermes session/configuration was not read or changed; no live bridge/session exists yet. |
+| WhatsApp concrete adapter | `SOURCE_VERIFIED` | Candidate `HermesWhatsAppBridgeClient` implements bounded health, receive, send, loopback enforcement, JID validation, and sanitized errors; focused WhatsApp tests pass. Live session acceptance remains `BLOCKED_OPERATOR`. |
+| WhatsApp ownership/inbound producer | `SOURCE_VERIFIED` | Candidate poller requires exactly one connected owner, deduplicates provider message IDs, stores only routing metadata/body length, applies exact contact/group rules, and invokes the owner boundary. Live event acceptance remains `BLOCKED_OPERATOR`. |
+| Generic WhatsApp proactive speech | `PENDING_PHYSICAL_ESP` | A real inbound event can create the generic `WHATSAPP` proactive-delivery job when an enabled rule and active device match; physical synthesis/playback evidence is absent. |
 
 ## Historical Phase 2.5 candidate acceptance
 
@@ -291,8 +292,8 @@ is deliberately deferred to a later slice.
 | Telemetry/settings ESP events | `PENDING_PHYSICAL_ESP` | Firmware handlers/physical proof absent; battery value is nullable |
 | Generic proactive queue/API | `EXISTING_VERIFIED` | Source tests plus Phase 2.5 private candidate schedule expiry and delivery-state acceptance: one durable CHAT/SCHEDULE/WHATSAPP enqueue/worker path, idempotency, expiry, arbitration, durable MOBILE intents, and typed device-scoped status production. Runtime has no physical sender; device delivery stays pending |
 | Generic proactive playback | `PENDING_PHYSICAL_ESP` | Firmware event handling and physical playback proof absent |
-| WhatsApp adapter/catalog | `BLOCKED_OPERATOR` | Existing owner-scoped contract remains fail-closed, but a concrete Hermes adapter and incoming-event producer require protected installed-runtime inspection; no session bytes/provider payloads stored |
-| WhatsApp live provider | `BLOCKED_OPERATOR` | Hermes capability is documented, but actual installed send/status/receive/session boundary and provider session are not verified; routes return a sanitized blocked result where provider action is required |
+| WhatsApp adapter/catalog | `SOURCE_VERIFIED` | Concrete loopback Hermes bridge adapter, owner-scoped poller, JID send boundary, metadata-only inbound persistence, and generic proactive enqueue are implemented and tested; live session remains operator-gated |
+| WhatsApp live provider | `BLOCKED_OPERATOR` | Candidate bridge must be configured on loopback port 3001 and the Hermes WhatsApp session must be paired by QR; no session bytes/provider payloads are stored |
 | Spotify adapter/catalog | `SOURCE_VERIFIED` | Concrete server-side Authorization Code client, exact callback URI, single-use OAuthState, encrypted token boundary, refresh lifecycle, normalized search/device/playback/action surfaces, and safe plugin status; tokens never enter mobile |
 | Spotify live OAuth | `BLOCKED_EXTERNAL_SECRET` | Spotify application credentials, protected provider-key secret, and callback registration are not proven |
 | Bug reports | `EXISTING_VERIFIED` | Source/test tier: authenticated multipart route, bounded description/context, max five image attachments, mode-0600 opaque storage keys, SHA-256 metadata, PostgreSQL receipt, and cleanup on transaction failure |
@@ -305,7 +306,7 @@ is deliberately deferred to a later slice.
   repaired candidate path under Node `22.23.1`. The targeted ownership repair
   covered only `backend/dist` and `backend/src/generated/prisma`; no broad tree
   permission change was made.
-- Integration/support source coverage: focused boundary/HTTP tests passed on pinned Node 22; the candidate harness reported 42/42 assertions passed. Spotify live calls stay `BLOCKED_EXTERNAL_SECRET`; WhatsApp runtime adapter work stays `BLOCKED_OPERATOR` pending protected Hermes inspection.
+- Integration/support source coverage: focused boundary/HTTP tests passed on pinned Node 22; the candidate harness reported 42/42 assertions passed. Spotify live calls stay `BLOCKED_EXTERNAL_SECRET`; WhatsApp source adapter/poller is verified while live bridge/session acceptance stays `BLOCKED_OPERATOR`.
 - Build evidence: candidate Docker build, in-place Prisma generate, TypeScript
   build, typecheck, and Prisma validate passed after the targeted ownership fix.
 - Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. Historical disposable PostgreSQL evidence covered empty deploy, repeat deploy, and populated two-to-three migration upgrade with P9.1 row preservation. Phase 2.5 then applied the third migration to the isolated candidate and rechecked readiness/schema state. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints, and the repeated database-to-schema diff returned `No difference detected`. Transaction-rolled-back positive/negative probes also verified avatar, Wi-Fi AEAD, battery, device-log expiry, provider-subtype, Spotify refresh-secret, and WhatsApp rule constraints.
@@ -317,7 +318,7 @@ is deliberately deferred to a later slice.
 
 ## Current blockers
 
-1. `BLOCKED_OPERATOR`: installed Hermes runtime/configuration is protected; exact WhatsApp send/status/receive/session API and the real inbound producer cannot be verified from this account.
+1. `BLOCKED_OPERATOR`: candidate Hermes bridge configuration on loopback port 3001 and physical WhatsApp QR pairing are required; no session or bridge listener is currently available.
 2. `BLOCKED_EXTERNAL_SECRET`: Spotify application credentials, protected provider encryption secret, and callback registration are not proven.
 3. `PENDING_PHYSICAL_ESP`: first-boot Wi-Fi bootstrap, battery sensing capability, additive events, and physical playback require firmware/bench evidence.
 4. Current UFW/nft rules remain unreadable without passworded elevated privileges. Listener, Docker, and Caddy evidence prove no service currently accepts port 5555; firewall-policy inspection remains an operator evidence gap for final public/private sign-off.

@@ -44,6 +44,7 @@ describe("P9 configuration", () => {
       spotifyClientId: undefined,
       spotifyClientSecret: undefined,
       spotifyCallbackUrl: undefined,
+      whatsappBridgeUrl: "http://127.0.0.1:3001",
       canonicalTimezone: "Asia/Jakarta",
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 2_592_000,

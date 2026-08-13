@@ -16,7 +16,7 @@ export function createIntegrationRouter(integration: IntegrationService, accessT
   const authenticated = requireAuth(accessTokens, sessions);
 
   router.post("/integrations/whatsapp/connect", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); response.status(202).json(await integration.connectWhatsApp(auth.userId, auth.context.requestId)); }));
-  router.get("/integrations/whatsapp/status", authenticated, asyncP9(async (request, response) => { response.json(await integration.connection(currentAuth(request).userId, "WHATSAPP" as any)); }));
+  router.get("/integrations/whatsapp/status", authenticated, asyncP9(async (request, response) => { response.json(await integration.whatsappConnection(currentAuth(request).userId)); }));
   router.get("/integrations/whatsapp/qr", authenticated, asyncP9(async (request, response) => { response.json(await integration.whatsappQr(currentAuth(request).userId)); }));
   router.post("/integrations/whatsapp/confirm-scanned", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); response.json({ connection: await integration.confirmWhatsApp(auth.userId, auth.context.requestId) }); }));
   router.post("/integrations/whatsapp/disconnect", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); await integration.disconnectWhatsApp(auth.userId, auth.context.requestId); response.status(204).end(); }));

@@ -63,7 +63,7 @@ Scheduler/proactive, device additions, and provider/support slices have
 candidate evidence where noted above and remain source/test verified for
 surfaces not exercised by the live harness. No production migration, recreation,
 or activation occurred. Spotify live actions remain
-`BLOCKED_EXTERNAL_SECRET`; WhatsApp runtime actions remain
+`BLOCKED_EXTERNAL_SECRET`; WhatsApp live runtime actions remain
 `BLOCKED_OPERATOR`; physical additive events remain
 `PENDING_PHYSICAL_ESP`.
 
@@ -149,7 +149,7 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | Backend -> Mobile | `wifi_configuration_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; device additive lifecycle remains physical pending |
 | Backend -> Mobile | `proactive_delivery_status` | `EXISTING_VERIFIED` | Typed generic CHAT/SCHEDULE/WHATSAPP schema + per-user fanout and generic device-delivery lifecycle producer source/test; physical sender/playback remains `PENDING_PHYSICAL_ESP`; device-less MOBILE intents do not fabricate this device-scoped event |
 | Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user schedule lifecycle/one-shot completion producer source/test; candidate worker expiry path accepted, public production unchanged |
-| Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; Spotify adapter is `SOURCE_VERIFIED`, while the concrete WhatsApp producer remains `BLOCKED_OPERATOR` |
+| Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; WhatsApp bridge adapter/poller is source-verified while live session acceptance remains `BLOCKED_OPERATOR`; Spotify live credentials remain blocked |
 | Backend -> Mobile | `notification` | `EXISTING_VERIFIED` | Typed bounded GENERIC schema + per-user fanout source/test; feature producer remains `READY_TO_IMPLEMENT` |
 
 ## Memory and schedules
@@ -174,11 +174,11 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Methods | Path | Status | Availability / gate |
 |---|---|---|---|
-| POST/GET | `/api/v1/integrations/whatsapp/connect`, `.../status` | `BLOCKED_OPERATOR` | Owner-scoped contract is source-verified; concrete Hermes status/session boundary remains protected and unverified |
+| POST/GET | `/api/v1/integrations/whatsapp/connect`, `.../status` | `SOURCE_VERIFIED` | Owner-scoped routes call the verified loopback Hermes health boundary; live bridge/session is not present on candidate |
 | GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `BLOCKED_OPERATOR` | Fail-closed route exists; exact installed Hermes pairing boundary and QR producer require protected inspection |
 | POST | `/api/v1/integrations/whatsapp/disconnect` | `SOURCE_VERIFIED` | Source/test owner-scoped boundary; live Hermes session operation remains blocked |
 | GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `SOURCE_VERIFIED` | Strict target shape and authenticated owner scope |
-| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `BLOCKED_OPERATOR` | Bounded preview/confirmation/idempotency is source-verified; exact Hermes outbound send boundary is unverified |
+| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `SOURCE_VERIFIED` | Bounded preview/confirmation/idempotency calls verified Hermes `POST /send`; live send remains operator-gated and requires a provider JID |
 | POST | `/api/v1/integrations/spotify/connect` | `SOURCE_VERIFIED` | Server-side Authorization Code state route; live credentials/callback `BLOCKED_EXTERNAL_SECRET` |
 | GET | `/api/v1/integrations/spotify/callback` | `SOURCE_VERIFIED` | Exact configured redirect and single-use state; tokens stay server-side |
 | GET | `/api/v1/integrations/spotify/status` | `SOURCE_VERIFIED` | Normalized owner-scoped state only |

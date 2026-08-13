@@ -1,8 +1,8 @@
 # Hermes ↔ Backend Action-Intent Schema
 
 **Status:** `SOURCE_VERIFIED` for validation/provider action payloads; Hermes
-tool binding remains `BLOCKED_OPERATOR` until the installed runtime boundary is
-inspected.
+tool binding remains `BLOCKED_OPERATOR` until the installed Hermes intent/tool
+transport is exposed and verified.
 
 Hermes proposes; Backend authenticates, authorizes, validates, confirms, and
 executes. The action schema is versioned and discriminated so unsupported

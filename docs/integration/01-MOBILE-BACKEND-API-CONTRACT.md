@@ -896,6 +896,13 @@ POST /api/v1/integrations/whatsapp/send-confirm
 
 If incoming WhatsApp notification is configured to speak on BMO, Backend creates generic proactive delivery with source `WHATSAPP`.
 
+The candidate adapter uses only the verified Hermes 0.20.0 loopback bridge:
+`GET /health`, destructive `GET /messages`, and `POST /send`. Hermes owns the
+session and QR flow; the candidate bridge URL is loopback-only and configured as
+`http://127.0.0.1:3001`. Outbound `recipientRef` must be a validated WhatsApp
+JID. A single global Hermes identity is bound to exactly one connected BMO owner;
+ambiguous or foreign-owner operations fail closed.
+
 Do not implement Telegram/SMS plugins.
 
 ---

@@ -188,6 +188,11 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     }
     if (p9) {
       try {
+        await p9.pollWhatsApp();
+      } catch (error) {
+        logger.warn({ err: error }, "WhatsApp polling deferred to next maintenance interval");
+      }
+      try {
         await p9.runScheduler();
       } catch (error) {
         logger.warn({ err: error }, "scheduler/proactive delivery deferred to next maintenance interval");
