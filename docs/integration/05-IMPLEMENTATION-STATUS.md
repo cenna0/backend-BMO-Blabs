@@ -220,11 +220,11 @@ is deliberately deferred to a later slice.
 3. `PENDING_PHYSICAL_ESP`: first-boot Wi-Fi bootstrap, battery sensing capability, additive events, and physical playback require firmware/bench evidence.
 4. Current UFW/nft rules remain unreadable without passworded elevated privileges. Listener, Docker, and Caddy evidence prove no service currently accepts port 5555; firewall-policy inspection remains an operator evidence gap for final public/private sign-off.
 
-## Phase 2 next source slice
+## Phase 2 next acceptance gate
 
-Use `04-VPS-IMPLEMENTATION-PLAN.md`. The approved Phase 2 application scope is
-source/test implemented through device additions, provider boundaries, plugin
-catalog, and bug reports. Slice 2A remains unapplied to the running candidate
-and production; candidate recreation, migration execution, public activation,
-provider configuration, and physical ESP work all require separate
-authorization/evidence.
+Use `04-VPS-IMPLEMENTATION-PLAN.md` for the remaining acceptance sequence. The
+approved Phase 2 application scope is source/test implemented through device
+additions, provider boundaries, plugin catalog, and bug reports. The additive
+migration remains unapplied to the running candidate and production; candidate
+recreation, migration execution, public activation, provider configuration,
+and physical ESP work all require separate authorization/evidence.
