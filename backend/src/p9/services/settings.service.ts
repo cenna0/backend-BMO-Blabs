@@ -46,10 +46,16 @@ export function publicDeviceSettings(settings: {
 }
 
 export class SettingsService {
+  #deviceSettingsChanged?: (userId: string, deviceId: string) => void | Promise<void>;
+
   constructor(
     private readonly client: PrismaClient,
     private readonly repositories: P9Repositories,
   ) {}
+
+  setDeviceSettingsChanged(handler: (userId: string, deviceId: string) => void | Promise<void>): void {
+    this.#deviceSettingsChanged = handler;
+  }
 
   async getUserSettings(userId: string) {
     const settings = await this.repositories.userSettings.findUnique({ where: { userId } });
@@ -97,7 +103,7 @@ export class SettingsService {
   async updateDeviceSettings(userId: string, deviceId: string, input: unknown, requestId?: string) {
     if (!isUuid(deviceId)) throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
     const parsed = parseDeviceSettings(input);
-    return withP9Transaction(this.client, async (transaction) => {
+    const result = await withP9Transaction(this.client, async (transaction) => {
       const repositories = new P9Repositories(transaction);
       await repositories.lockUser(userId);
       const device = await repositories.device.findFirst({ where: { id: deviceId, userId, status: "ACTIVE" }, include: { settings: true } });
@@ -141,7 +147,10 @@ export class SettingsService {
         ...(requestId === undefined ? {} : { context: { requestId } }),
         metadata: { count: Object.keys(parsed).length },
       });
-      return publicDeviceSettings(updated);
+      const result = publicDeviceSettings(updated);
+      return result;
     });
+    void this.#deviceSettingsChanged?.(userId, deviceId);
+    return result;
   }
 }

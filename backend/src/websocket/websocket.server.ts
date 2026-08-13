@@ -44,6 +44,10 @@ export interface DeviceWebSocketServerOptions {
   ) => Promise<ApplicationDeviceBinding | null>;
   authorizeApplicationDevice?: (binding: ApplicationDeviceBinding) => Promise<boolean>;
   onDeviceNotBound?: (deviceId: string) => void | Promise<void>;
+  additiveHandlers?: {
+    onEvent: (binding: ApplicationDeviceBinding, event: Exclude<InboundEvent, { event: "authenticate" | "audio_playback_done" | "audio_playback_failed" }>) => void | Promise<void>;
+    onAuthenticated: (binding: ApplicationDeviceBinding) => void | Promise<void>;
+  };
 }
 
 export class DeviceWebSocketServer {
@@ -56,8 +60,10 @@ export class DeviceWebSocketServer {
     pongCount: 0,
     terminatedCount: 0,
   };
+  #additiveHandlers: DeviceWebSocketServerOptions["additiveHandlers"];
 
   constructor(private readonly options: DeviceWebSocketServerOptions) {
+    this.#additiveHandlers = options.additiveHandlers;
     this.#server = new WebSocketServer({
       noServer: true,
       maxPayload: options.maxMessageBytes,
@@ -83,6 +89,10 @@ export class DeviceWebSocketServer {
     options.httpServer.on("upgrade", this.#upgradeHandler);
     this.#heartbeat = setInterval(() => this.#heartbeatTick(), options.heartbeatIntervalMs);
     this.#heartbeat.unref();
+  }
+
+  setAdditiveHandlers(handlers: NonNullable<DeviceWebSocketServerOptions["additiveHandlers"]>): void {
+    this.#additiveHandlers = handlers;
   }
 
   isAuthenticated(deviceId: string, socket?: WebSocket): boolean {
@@ -121,6 +131,12 @@ export class DeviceWebSocketServer {
       code,
       recoverable: true,
     });
+  }
+
+  async sendAdditiveEvent(deviceId: string, event: OutboundEvent): Promise<boolean> {
+    const binding = await this.authorizeApplicationBinding(deviceId);
+    if (!binding) return false;
+    return this.#sendToDevice(deviceId, event);
   }
 
   getHeartbeatStats(): { pingCount: number; pongCount: number; terminatedCount: number } {
@@ -273,7 +289,10 @@ export class DeviceWebSocketServer {
   ): Promise<void> {
     try {
       const binding = await this.options.resolveApplicationDevice?.(deviceId, deviceToken);
-      if (binding && this.options.registry.setApplicationBinding(deviceId, socket, binding)) return;
+      if (binding && this.options.registry.setApplicationBinding(deviceId, socket, binding)) {
+        await this.#additiveHandlers?.onAuthenticated(binding);
+        return;
+      }
     } catch {
       // Binding failure must not regress a valid legacy voice connection.
     }
@@ -290,8 +309,11 @@ export class DeviceWebSocketServer {
     if (!state.deviceId || event.event === "authenticate") return;
     if (event.event === "audio_playback_done") {
       await this.options.onPlaybackDone?.(state.deviceId, event.request_id);
-    } else {
+    } else if (event.event === "audio_playback_failed") {
       await this.options.onPlaybackFailed?.(state.deviceId, event.request_id, event.reason);
+    } else {
+      const binding = await this.authorizeApplicationBinding(state.deviceId);
+      if (binding) await this.#additiveHandlers?.onEvent(binding, event);
     }
   }
 
