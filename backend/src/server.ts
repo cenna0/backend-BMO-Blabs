@@ -20,6 +20,7 @@ import { TempAudioService } from "./services/temp-audio.service.js";
 import { VoicePipelineService } from "./services/voice-pipeline.service.js";
 import { DeviceRegistry } from "./websocket/device-registry.js";
 import { DeviceWebSocketServer } from "./websocket/websocket.server.js";
+import { readFileSync } from "node:fs";
 
 export interface BackendRuntime {
   app: Express;
@@ -102,6 +103,16 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     onPlaybackDone: (deviceId, requestId) => removeOutput(deviceId, requestId, false),
     onPlaybackFailed: (deviceId, requestId) => removeOutput(deviceId, requestId, true),
   });
+  if (p9) {
+    p9.settings.setDeviceSettingsChanged((userId, deviceId) => p9.deviceAdditions.syncSettings(userId, deviceId));
+    p9.deviceAdditions.setDeviceEventSender({
+      sendToDevice: (deviceId, event) => sockets.sendAdditiveEvent(deviceId, event),
+    });
+    sockets.setAdditiveHandlers({
+      onEvent: (binding, event) => p9.deviceAdditions.handleDeviceEvent(binding, event),
+      onAuthenticated: (binding) => p9.deviceAdditions.sendCurrentState(binding),
+    });
+  }
   mobileSockets = p9 === undefined ? undefined : new MobileWebSocketServer({
     httpServer,
     authenticate: (accessToken) => p9.authenticateMobileSocket(accessToken),
@@ -277,7 +288,23 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
   };
 }
 
+function loadP9WifiEncryptionSecret(): void {
+  if (process.env.P9_WIFI_ENCRYPTION_KEY || !process.env.P9_WIFI_ENCRYPTION_KEY_FILE) return;
+  const key = readFileSync(process.env.P9_WIFI_ENCRYPTION_KEY_FILE, "utf8").trim();
+  if (!key) throw new Error("P9 Wi-Fi encryption secret is empty");
+  process.env.P9_WIFI_ENCRYPTION_KEY = key;
+}
+
+function loadP9ProviderEncryptionSecret(): void {
+  if (process.env.P9_PROVIDER_ENCRYPTION_KEY || !process.env.P9_PROVIDER_ENCRYPTION_KEY_FILE) return;
+  const key = readFileSync(process.env.P9_PROVIDER_ENCRYPTION_KEY_FILE, "utf8").trim();
+  if (!key) throw new Error("P9 provider encryption secret is empty");
+  process.env.P9_PROVIDER_ENCRYPTION_KEY = key;
+}
+
 async function run(): Promise<void> {
+  loadP9WifiEncryptionSecret();
+  loadP9ProviderEncryptionSecret();
   const runtime = createBackendRuntime(parseEnv(process.env));
   await runtime.start();
   const shutdown = async () => {

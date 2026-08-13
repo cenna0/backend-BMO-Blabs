@@ -9,7 +9,8 @@ export type P9ErrorCode =
   | "DATABASE_UNAVAILABLE"
   | "SERVICE_UNAVAILABLE"
   | "CONFLICT"
-  | "RECOVERY_INVALID";
+  | "RECOVERY_INVALID"
+  | "BLOCKED_EXTERNAL_SECRET";
 
 export class P9Error extends Error {
   readonly code: P9ErrorCode;

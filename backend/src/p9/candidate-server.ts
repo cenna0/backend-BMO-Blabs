@@ -14,6 +14,16 @@ function loadDatabaseUrlFromSecret(): void {
 }
 
 loadDatabaseUrlFromSecret();
+if (!process.env.P9_WIFI_ENCRYPTION_KEY && process.env.P9_WIFI_ENCRYPTION_KEY_FILE) {
+  const key = readFileSync(process.env.P9_WIFI_ENCRYPTION_KEY_FILE, "utf8").trim();
+  if (!key) throw new Error("P9 Wi-Fi encryption secret is empty");
+  process.env.P9_WIFI_ENCRYPTION_KEY = key;
+}
+if (!process.env.P9_PROVIDER_ENCRYPTION_KEY && process.env.P9_PROVIDER_ENCRYPTION_KEY_FILE) {
+  const key = readFileSync(process.env.P9_PROVIDER_ENCRYPTION_KEY_FILE, "utf8").trim();
+  if (!key) throw new Error("P9 provider encryption secret is empty");
+  process.env.P9_PROVIDER_ENCRYPTION_KEY = key;
+}
 const config = parseP9Config(process.env);
 if (!config.enabled) throw new Error("P9 candidate requires P9_ENABLED=true");
 

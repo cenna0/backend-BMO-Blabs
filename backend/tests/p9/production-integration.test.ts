@@ -25,6 +25,7 @@ describe("production-shaped P9 integration", () => {
       DATABASE_URL: "postgresql://bmo:password@127.0.0.1:1/bmo",
       P9_JWT_SECRET: "j".repeat(32),
       P9_PAIRING_PEPPER: "p".repeat(32),
+      P9_WIFI_ENCRYPTION_KEY: "w".repeat(32),
     });
     runtimes.push(runtime);
 
@@ -63,6 +64,7 @@ describe("production-shaped P9 integration", () => {
       DATABASE_URL: "postgresql://bmo:password@127.0.0.1:1/bmo",
       P9_JWT_SECRET: "j".repeat(32),
       P9_PAIRING_PEPPER: "p".repeat(32),
+      P9_WIFI_ENCRYPTION_KEY: "w".repeat(32),
     });
     runtimes.push(runtime);
     const resume = vi.spyOn(runtime.backend.p9!, "resumePendingChat")

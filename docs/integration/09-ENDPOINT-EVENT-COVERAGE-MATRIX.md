@@ -26,6 +26,12 @@ The memory slice registers all 15 frozen memory/settings/summary routes and
 injects bounded active owner memory into chat. It is source/test verified only;
 the running candidate and public production were not migrated or recreated.
 
+The device additions slice registers owner-scoped Wi-Fi metadata/configuration,
+device log, and telemetry routes in the production-shaped source runtime. Wi-Fi
+passwords use protected AES-256-GCM configuration and never appear in read
+responses or logs. Existing voice events remain unchanged; additive device
+events and physical behavior remain `PENDING_PHYSICAL_ESP`.
+
 ## Runtime and existing voice surfaces
 
 | Method/surface | Path/event | Status | Availability / evidence |
@@ -83,9 +89,11 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | GET | `/api/v1/settings/devices/:deviceId` | `EXISTING_VERIFIED` | Private candidate; canonical settings read |
 | PATCH | `/api/v1/settings/devices/:deviceId` | `EXISTING_VERIFIED` | Private candidate; canonical settings write |
 | GET | `/api/v1/devices/:deviceId/status` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/devices/:deviceId/wifi` | `READY_TO_IMPLEMENT` | Not registered; never return password |
-| PUT | `/api/v1/devices/:deviceId/wifi` | `READY_TO_IMPLEMENT` | Not registered; encrypt secret at rest |
-| DELETE | `/api/v1/devices/:deviceId/wifi` | `READY_TO_IMPLEMENT` | Not registered |
+| GET | `/api/v1/devices/:deviceId/wifi` | `EXISTING_VERIFIED` | Owner-scoped metadata only; plaintext/ciphertext never returned |
+| PUT | `/api/v1/devices/:deviceId/wifi` | `EXISTING_VERIFIED` | Owner-scoped latest-write-wins AES-256-GCM desired state; physical apply pending |
+| DELETE | `/api/v1/devices/:deviceId/wifi` | `EXISTING_VERIFIED` | Deletes Backend metadata only; does not factory-reset device |
+| GET | `/api/v1/devices/:deviceId/logs` | `EXISTING_VERIFIED` | Owner-scoped bounded sanitized seven-day log read |
+| GET | `/api/v1/devices/:deviceId/telemetry` | `EXISTING_VERIFIED` | Owner-scoped current RSSI/nullable battery read |
 
 ## Chat and mobile realtime
 
@@ -104,7 +112,7 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | Backend -> Mobile | `chat_message` | `EXISTING_VERIFIED` | Typed bounded schema plus Slice 5A per-user producer after sanitized assistant persistence; no token stream |
 | Backend -> Mobile | `device_status` | `EXISTING_VERIFIED` | Typed nullable battery/RSSI schema + per-user fanout source/test; status producer remains `READY_TO_IMPLEMENT` |
 | Backend -> Mobile | `voice_processing_status` | `EXISTING_VERIFIED` | Typed sanitized schema + per-user fanout source/test; no audio URL/stream; producer remains `READY_TO_IMPLEMENT` |
-| Backend -> Mobile | `wifi_configuration_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; Wi-Fi lifecycle producer remains `READY_TO_IMPLEMENT` |
+| Backend -> Mobile | `wifi_configuration_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; device additive lifecycle remains physical pending |
 | Backend -> Mobile | `proactive_delivery_status` | `EXISTING_VERIFIED` | Typed generic CHAT/SCHEDULE/WHATSAPP schema + per-user fanout and generic device-delivery lifecycle producer source/test; physical sender/playback remains `PENDING_PHYSICAL_ESP`; device-less MOBILE intents do not fabricate this device-scoped event |
 | Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user schedule lifecycle/one-shot completion producer source/test; not candidate/public deployed |
 | Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; adapter producers remain `READY_TO_IMPLEMENT`/externally blocked for live acceptance |
@@ -132,19 +140,19 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Methods | Path | Status | Availability / gate |
 |---|---|---|---|
-| POST/GET | `/api/v1/integrations/whatsapp/connect`, `.../status` | `READY_TO_IMPLEMENT` | Not registered; live acceptance `BLOCKED` by unverified BMO session |
-| GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `READY_TO_IMPLEMENT` | Not registered; exact Hermes boundary must be proven |
-| POST | `/api/v1/integrations/whatsapp/disconnect` | `READY_TO_IMPLEMENT` | Not registered |
-| GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/integrations/spotify/connect` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/integrations/spotify/callback` | `READY_TO_IMPLEMENT` | Not registered; server-side state/callback target |
-| GET | `/api/v1/integrations/spotify/status` | `READY_TO_IMPLEMENT` | Not registered; live OAuth `BLOCKED` by provider config |
-| POST | `/api/v1/integrations/spotify/disconnect` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/integrations/spotify/devices`, `.../playback` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/integrations/spotify/actions` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/plugins` | `READY_TO_IMPLEMENT` | Not registered; frozen catalog is WhatsApp + Spotify only |
-| POST | `/api/v1/support/bug-reports` | `READY_TO_IMPLEMENT` | Not registered |
+| POST/GET | `/api/v1/integrations/whatsapp/connect`, `.../status` | `EXISTING_VERIFIED` | Source/test; owner-scoped metadata boundary; live provider `BLOCKED_EXTERNAL_SECRET` |
+| GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `EXISTING_VERIFIED` | Source/test; provider interaction fail-closed until exact Hermes boundary is proven |
+| POST | `/api/v1/integrations/whatsapp/disconnect` | `EXISTING_VERIFIED` | Source/test; owner-scoped provider boundary |
+| GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `EXISTING_VERIFIED` | Source/test; strict target shape and owner scope |
+| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `EXISTING_VERIFIED` | Source/test; bounded preview, five-minute confirmation, idempotency; live send blocked externally |
+| POST | `/api/v1/integrations/spotify/connect` | `EXISTING_VERIFIED` | Source/test; server-side Authorization Code state route; live credentials/callback `BLOCKED_EXTERNAL_SECRET` |
+| GET | `/api/v1/integrations/spotify/callback` | `EXISTING_VERIFIED` | Source/test; exact redirect and single-use state; tokens stay server-side |
+| GET | `/api/v1/integrations/spotify/status` | `EXISTING_VERIFIED` | Source/test; normalized state only |
+| POST | `/api/v1/integrations/spotify/disconnect` | `EXISTING_VERIFIED` | Source/test; owner-scoped credential removal |
+| GET | `/api/v1/integrations/spotify/devices`, `.../playback` | `EXISTING_VERIFIED` | Source/test; normalized provider boundary; no active device result is safe |
+| POST | `/api/v1/integrations/spotify/actions` | `EXISTING_VERIFIED` | Source/test; allowlisted action/idempotency/confirmation boundary; provider live blocked externally |
+| GET | `/api/v1/plugins` | `EXISTING_VERIFIED` | Source/test; exactly WhatsApp + Spotify safe status catalog |
+| POST | `/api/v1/support/bug-reports` | `EXISTING_VERIFIED` | Source/test; bounded authenticated multipart, max five images, opaque persistent keys |
 | POST | `/api/v1/voice/preview` | `DEFERRED` | Not registered; last-priority optional surface |
 
 ## Existing device `/ws` events

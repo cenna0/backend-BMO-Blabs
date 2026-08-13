@@ -25,6 +25,10 @@ import { PostgresMemoryGateway } from "./services/memory-gateway.service.js";
 import { MemoryService } from "./services/memory.service.js";
 import { ScheduleService } from "./services/schedule.service.js";
 import { ProactiveDeliveryService } from "./services/proactive-delivery.service.js";
+import { DeviceAdditionsService } from "./services/device-additions.service.js";
+import { decodeWifiEncryptionKey } from "./device-additions.crypto.js";
+import { IntegrationService } from "./services/integration.service.js";
+import { BugReportService } from "./services/bug-report.service.js";
 import type { HermesGenerateClient } from "../services/hermes.client.js";
 
 export interface P9Runtime {
@@ -44,6 +48,8 @@ export interface P9Runtime {
   launchPendingChatRecovery(onError?: (error: unknown) => void): void;
   waitForChatIdle(): Promise<void>;
   runScheduler(): Promise<{ materialized: number; claimed: number; pendingPhysical: number }>;
+  deviceAdditions: DeviceAdditionsService;
+  settings: SettingsService;
   close(): Promise<void>;
 }
 
@@ -110,7 +116,11 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   const memoryGateway = new PostgresMemoryGateway(repositories);
   const memory = new MemoryService({ client, repositories });
   const proactive = new ProactiveDeliveryService({ client, repositories, mobileEvents: options.mobileEvents ?? noMobileEvents });
+  if (!config.wifiEncryptionKey) throw new Error("P9 runtime requires P9_WIFI_ENCRYPTION_KEY");
+  const deviceAdditions = new DeviceAdditionsService({ client, repositories, encryptionKey: decodeWifiEncryptionKey(config.wifiEncryptionKey), deviceEvents: { sendToDevice: () => false } });
   const schedule = new ScheduleService({ client, repositories, mobileEvents: options.mobileEvents ?? noMobileEvents });
+  const integrations = new IntegrationService({ client, repositories, publicBaseUrl: config.publicBaseUrl, ...(config.providerEncryptionKey === undefined ? {} : { providerEncryptionKey: config.providerEncryptionKey }) });
+  const bugReports = new BugReportService({ client, repositories, storageDir: config.bugReportStorageDir });
   const chat = new ChatService({
     client,
     repositories,
@@ -120,7 +130,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     memoryContext: memoryGateway,
   });
   return {
-    router: createP9Router({ auth, sessions, users, devices, pairing, settings, recovery, profile, avatars, personalization, chat, memory, schedule, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
+    router: createP9Router({ auth, sessions, users, devices, pairing, settings, recovery, profile, avatars, personalization, chat, memory, schedule, integrations, bugReports, deviceAdditions, accessTokens, repositories, config, includeOps: options.includeOps ?? false }),
     mediaRouter: createAvatarMediaRouter(avatarStorage),
     initialize: async () => {
       await avatarStorage.initialize();
@@ -157,6 +167,8 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
       const worker = await proactive.processOnce();
       return { materialized: occurrences.length + missed.length, claimed: claimed.length, pendingPhysical: worker.pendingPhysical };
     },
+    deviceAdditions,
+    settings,
     close: async () => {
       await chat.close();
       await avatarStorage.close();

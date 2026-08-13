@@ -16,6 +16,7 @@ const enabledConfig = parseP9Config({
   DATABASE_URL: "postgresql://bmo:password@127.0.0.1:5432/bmo",
   P9_JWT_SECRET: "j".repeat(32),
   P9_PAIRING_PEPPER: "p".repeat(32),
+  P9_WIFI_ENCRYPTION_KEY: "w".repeat(32),
   PUBLIC_BASE_URL: "https://api.example.com",
   AVATAR_STORAGE_DIR: "/tmp/test-avatars",
 });

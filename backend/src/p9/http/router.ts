@@ -1,4 +1,5 @@
 import express, { Router } from "express";
+import multer from "multer";
 
 import type { P9Config } from "../config.js";
 import type { P9Repositories } from "../db/repositories.js";
@@ -26,6 +27,11 @@ import { createPersonalizationRouter } from "./personalization.route.js";
 import { createChatRouter } from "./chat.route.js";
 import { createMemoryRouter } from "./memory.route.js";
 import { createScheduleRouter } from "./schedule.route.js";
+import { createIntegrationRouter, createSupportRouter } from "./integration.route.js";
+import type { IntegrationService } from "../services/integration.service.js";
+import type { BugReportService } from "../services/bug-report.service.js";
+import { createDeviceAdditionsRouter } from "./device-additions.route.js";
+import type { DeviceAdditionsService } from "../services/device-additions.service.js";
 
 export interface P9RouterServices {
   auth: AuthService;
@@ -44,6 +50,9 @@ export interface P9RouterServices {
   chat: ChatService;
   memory: MemoryService;
   schedule: ScheduleService;
+  integrations: IntegrationService;
+  bugReports: BugReportService;
+  deviceAdditions: DeviceAdditionsService;
   includeOps?: boolean;
 }
 
@@ -61,6 +70,7 @@ export function createP9Router(services: P9RouterServices): Router {
   }));
   router.use(createPairingRouter(services.pairing, services.accessTokens, services.sessions, services.config));
   router.use(createDeviceRouter(services.devices, services.settings, services.accessTokens, services.sessions));
+  router.use(createDeviceAdditionsRouter(services.deviceAdditions, services.accessTokens, services.sessions));
   router.use(createSettingsRouter(services.settings, services.accessTokens, services.sessions));
   router.use(createProfileRouter(
     services.profile,
@@ -79,6 +89,9 @@ export function createP9Router(services: P9RouterServices): Router {
   router.use(createChatRouter(services.chat, services.accessTokens, services.sessions));
   router.use(createMemoryRouter(services.memory, services.accessTokens, services.sessions));
   router.use(createScheduleRouter(services.schedule, services.accessTokens, services.sessions));
+  router.use(createIntegrationRouter(services.integrations, services.accessTokens, services.sessions));
+  const bugUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 5, fields: 3 } }).array("screenshots", 5);
+  router.use(createSupportRouter(services.bugReports, services.accessTokens, services.sessions, bugUpload));
   if (services.includeOps === true) router.use(createOpsRouter(services.repositories));
   router.use(p9ErrorHandler);
   return router;

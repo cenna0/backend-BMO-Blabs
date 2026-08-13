@@ -62,11 +62,14 @@ const rawSchema = z.object({
   DATABASE_URL: z.string().url().optional(),
   P9_JWT_SECRET: z.string().optional(),
   P9_PAIRING_PEPPER: z.string().optional(),
+  P9_WIFI_ENCRYPTION_KEY: z.string().optional(),
+  P9_PROVIDER_ENCRYPTION_KEY: z.string().optional(),
   P9_TIMEZONE: z.string().default(P9_CANONICAL_TIMEZONE),
   P9_PRISMA_POOL_SIZE: optionalPositiveInt(5),
   P9_POSTGRES_MAX_CONNECTIONS: optionalPositiveInt(20),
   PUBLIC_BASE_URL: publicBaseUrlSchema.default("http://127.0.0.1:3000"),
   AVATAR_STORAGE_DIR: avatarStoragePathSchema.default("/opt/bmo/data/avatars"),
+  BUG_REPORT_STORAGE_DIR: avatarStoragePathSchema.default("/opt/bmo/data/bug-reports"),
   AVATAR_UPLOAD_RECEIVE_TIMEOUT_MS: avatarUploadReceiveTimeout,
 });
 
@@ -82,6 +85,8 @@ export interface P9Config {
   databaseUrl?: string;
   jwtSecret?: string;
   pairingPepper?: string;
+  wifiEncryptionKey?: string | undefined;
+  providerEncryptionKey?: string | undefined;
   canonicalTimezone: typeof P9_CANONICAL_TIMEZONE;
   accessTokenTtlSeconds: 900;
   refreshTokenTtlSeconds: 2_592_000;
@@ -94,6 +99,7 @@ export interface P9Config {
   pairingLimit: 10;
   publicBaseUrl: string;
   avatarStorageDir: string;
+  bugReportStorageDir: string;
   avatarMaxBytes: 5_242_880;
   avatarUploadWindowMs: 900_000;
   avatarUploadUserLimit: 10;
@@ -122,6 +128,8 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 2_592_000,
       pairingTtlSeconds: 600,
+      wifiEncryptionKey: undefined,
+      providerEncryptionKey: undefined,
       prismaPoolSize: parsed.P9_PRISMA_POOL_SIZE,
       postgresMaxConnections: parsed.P9_POSTGRES_MAX_CONNECTIONS,
       loginWindowMs: 900_000,
@@ -130,6 +138,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       pairingLimit: 10,
       publicBaseUrl: parsed.PUBLIC_BASE_URL,
       avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
+      bugReportStorageDir: parsed.BUG_REPORT_STORAGE_DIR,
       avatarMaxBytes: 5_242_880,
       avatarUploadWindowMs: 900_000,
       avatarUploadUserLimit: 10,
@@ -152,6 +161,8 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     databaseUrl: parsed.DATABASE_URL ?? (() => { throw new Error("DATABASE_URL is required when P9 is enabled"); })(),
     jwtSecret: strongSecret("P9_JWT_SECRET", parsed.P9_JWT_SECRET),
     pairingPepper: strongSecret("P9_PAIRING_PEPPER", parsed.P9_PAIRING_PEPPER),
+    wifiEncryptionKey: strongSecret("P9_WIFI_ENCRYPTION_KEY", parsed.P9_WIFI_ENCRYPTION_KEY),
+    providerEncryptionKey: parsed.P9_PROVIDER_ENCRYPTION_KEY,
     canonicalTimezone: P9_CANONICAL_TIMEZONE,
     accessTokenTtlSeconds: 900,
     refreshTokenTtlSeconds: 2_592_000,
@@ -164,6 +175,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     pairingLimit: 10,
     publicBaseUrl: parsed.PUBLIC_BASE_URL,
     avatarStorageDir: parsed.AVATAR_STORAGE_DIR,
+    bugReportStorageDir: parsed.BUG_REPORT_STORAGE_DIR,
     avatarMaxBytes: 5_242_880,
     avatarUploadWindowMs: 900_000,
     avatarUploadUserLimit: 10,

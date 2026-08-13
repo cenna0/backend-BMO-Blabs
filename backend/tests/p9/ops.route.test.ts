@@ -30,6 +30,9 @@ function appWithOps(
     chat: {} as never,
     memory: {} as never,
     schedule: {} as never,
+    integrations: {} as never,
+    bugReports: {} as never,
+    deviceAdditions: {} as never,
     accessTokens: {} as never,
     repositories: {
       healthCheck: async () => undefined,

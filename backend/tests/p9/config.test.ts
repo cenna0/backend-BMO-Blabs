@@ -7,6 +7,7 @@ const enabled = {
   DATABASE_URL: "postgresql://bmo:password@127.0.0.1:5432/bmo",
   P9_JWT_SECRET: "a".repeat(32),
   P9_PAIRING_PEPPER: "b".repeat(32),
+  P9_WIFI_ENCRYPTION_KEY: "c".repeat(32),
 };
 
 describe("P9 configuration", () => {
@@ -38,6 +39,8 @@ describe("P9 configuration", () => {
       databaseUrl: enabled.DATABASE_URL,
       jwtSecret: enabled.P9_JWT_SECRET,
       pairingPepper: enabled.P9_PAIRING_PEPPER,
+      wifiEncryptionKey: enabled.P9_WIFI_ENCRYPTION_KEY,
+      providerEncryptionKey: undefined,
       canonicalTimezone: "Asia/Jakarta",
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 2_592_000,
@@ -50,6 +53,7 @@ describe("P9 configuration", () => {
       pairingLimit: 10,
       publicBaseUrl: "http://127.0.0.1:3000",
       avatarStorageDir: "/opt/bmo/data/avatars",
+      bugReportStorageDir: "/opt/bmo/data/bug-reports",
       avatarMaxBytes: 5 * 1024 * 1024,
       avatarUploadWindowMs: 15 * 60 * 1000,
       avatarUploadUserLimit: 10,
