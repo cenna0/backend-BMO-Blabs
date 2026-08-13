@@ -5,13 +5,14 @@
 **Phase:** Phase 1 — VPS Audit + Documentation Freeze
 **Implementation authority:** none; Phase 2 starts only from the checkpoint in `docs/NEXT-ACTION.md`.
 
-**Current source checkpoint:** Phase 2 Slice 2B account/profile/recovery/avatar
-and personalization plus the separate mobile realtime `/api/v1/ws` transport
-are source/test verified, including serialized recovery epochs, fair deadline-
-bounded avatar multipart/image-processing admission, server-derived mobile
-identity, access-token expiry closure, heartbeat, and typed per-user fanout. This does not
-alter the frozen Phase 1 runtime facts below: the running private candidate is
-still invitation-era/unmigrated and public production is unchanged.
+**Current source checkpoint:** Phase 2 account/profile/recovery/avatar,
+personalization, mobile realtime `/api/v1/ws`, chat/Hermes, memory,
+scheduler/proactive delivery, device data-plane additions, provider integration
+boundaries, plugin catalog, and bug reports are source/test verified. Physical
+ESP behavior remains `PENDING_PHYSICAL_ESP`; live WhatsApp/Spotify capability is
+`BLOCKED_EXTERNAL_SECRET`. This does not alter the frozen Phase 1 runtime facts
+below: the running private candidate is still invitation-era/unmigrated and
+public production is unchanged.
 
 ## 1. Terminology and authority
 
@@ -60,7 +61,7 @@ Verified current boundaries:
 - current repository contains the implemented P9.1 invitation-auth, session, six-digit pairing, device, and settings source;
 - a private P9.1 candidate and PostgreSQL 16.14 run on an internal Docker network with two applied migrations and no host-published port;
 - the P9.1 candidate is not the production Backend API service;
-- mobile `WSS /api/v1/ws` is `EXISTING_VERIFIED` at source/test tier only; chat/history, memory, scheduler, integration adapters, Wi-Fi DB/API, telemetry/log storage, proactive queue, plugins, and bug reports remain `READY_TO_IMPLEMENT`; Slice 2B account/profile/recovery/avatar and personalization are also `EXISTING_VERIFIED` at source/test tier only;
+- mobile `WSS /api/v1/ws` and the Phase 2 application surfaces are `EXISTING_VERIFIED` at source/test tier only; the running candidate remains unmigrated and public production is unchanged;
 - the existing device identity remains runtime `DEVICE_ID`/`DEVICE_TOKEN`; Slice 1 resolves an optional active P9.1 application row after legacy authentication and revalidates it before any owner-specific use;
 - Hermes 0.20.0 is healthy on loopback; Audio Service is healthy/degraded only because RVC is intentionally disabled; Caddy exposes the public API through port 443;
 - physical ESP32 acceptance and every new additive firmware capability remain unverified.
