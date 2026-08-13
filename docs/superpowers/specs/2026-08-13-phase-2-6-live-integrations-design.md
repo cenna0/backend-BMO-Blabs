@@ -27,11 +27,15 @@ AES-256-GCM token envelopes, expiry-aware refresh, one bounded retry after a
 search, natural-language resolution inputs, playback/context selection, device
 transfer, pause/resume/skip, seek, volume, shuffle, and repeat.
 
-The WhatsApp implementation may only use a local Hermes interface proven from
-the installed runtime. The Hermes documentation's `hermes whatsapp` command
-and Baileys session are not treated as an HTTP API. If the installed runtime
-does not expose a supported local bridge boundary readable by the operator,
-implementation stops at the protected-access gate rather than guessing.
+The WhatsApp implementation uses the installed Hermes 0.20.0 Baileys bridge
+unchanged as a transport-only process. `hermes-gateway.service` keeps
+`WHATSAPP_ENABLED=false`; a separate `bmo-whatsapp-bridge.service` binds the
+official bridge to loopback `127.0.0.1:3001` with the paired session at
+`/home/hermes/.hermes/whatsapp/session` and `--mode bot`. BMO Backend is the
+sole `GET /messages` consumer. The Backend requires a protected exact sender
+allowlist and unconditionally drops `isGroup === true` before any owner lookup,
+persistence, notification, Hermes reasoning, or proactive delivery. The
+Hermes gateway's group-policy variable is not treated as enforcement.
 
 ## Spotify capability contract
 

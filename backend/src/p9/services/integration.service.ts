@@ -124,6 +124,9 @@ export class IntegrationService {
     let processed = 0;
     let queued = 0;
     for (const message of messages) {
+      // This is the authoritative BMO group boundary. It must run before owner lookup,
+      // duplicate lookup, persistence, notification evaluation, or proactive delivery.
+      if (message.isGroup === true) continue;
       const owners = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP, status: IntegrationStatus.CONNECTED }, select: { id: true, userId: true } });
       if (owners.length !== 1) continue;
       const owner = owners[0];

@@ -1,0 +1,62 @@
+#!/bin/sh
+set -eu
+
+HERMES_HOME=/home/hermes/.hermes
+ENV_FILE="$HERMES_HOME/.env"
+NODE_BIN="$HERMES_HOME/node/bin/node"
+SESSION_DIR="$HERMES_HOME/whatsapp/session"
+
+read_env_value() {
+  key="$1"
+  awk -v key="$key" '
+    /^[[:space:]]*#/ { next }
+    {
+      line = $0
+      sub(/^[[:space:]]*/, "", line)
+      prefix = key "="
+      if (index(line, prefix) != 1) next
+      value = substr(line, length(prefix) + 1)
+      sub(/\r$/, "", value)
+      if (length(value) >= 2 && substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") value = substr(value, 2, length(value) - 2)
+      if (length(value) >= 2 && substr(value, 1, 1) == "'" && substr(value, length(value), 1) == "'") value = substr(value, 2, length(value) - 2)
+      print value
+      exit
+    }
+  ' "$ENV_FILE"
+}
+
+[ -r "$ENV_FILE" ] || exit 78
+[ -x "$NODE_BIN" ] || exit 78
+[ -d "$SESSION_DIR" ] || exit 78
+
+enabled="$(read_env_value WHATSAPP_ENABLED || true)"
+mode="$(read_env_value WHATSAPP_MODE || true)"
+allowed="$(read_env_value WHATSAPP_ALLOWED_USERS || true)"
+[ "$enabled" = "false" ] || exit 78
+[ "$mode" = "bot" ] || exit 78
+[ -n "$allowed" ] || exit 78
+case "$allowed" in
+  *[[:space:]]*|*\**|*,,*|,*|*,) exit 78 ;;
+esac
+
+install_bridge="$HERMES_HOME/hermes-agent/scripts/whatsapp-bridge/bridge.js"
+mirror_bridge="$HERMES_HOME/scripts/whatsapp-bridge/bridge.js"
+bridge_script=""
+if [ -f "$install_bridge" ] && [ -w "$(dirname "$install_bridge")" ]; then
+  bridge_script="$install_bridge"
+elif [ -f "$mirror_bridge" ]; then
+  bridge_script="$mirror_bridge"
+elif [ -f "$install_bridge" ]; then
+  bridge_script="$install_bridge"
+fi
+[ -n "$bridge_script" ] || exit 78
+
+export HOME="$HERMES_HOME"
+export HERMES_HOME
+export WHATSAPP_MODE=bot
+export WHATSAPP_ALLOWED_USERS="$allowed"
+export WHATSAPP_DM_POLICY=allowlist
+export WHATSAPP_GROUP_POLICY=disabled
+export WHATSAPP_SEND_READ_RECEIPTS=false
+
+exec "$NODE_BIN" "$bridge_script" --port 3001 --session "$SESSION_DIR" --mode bot

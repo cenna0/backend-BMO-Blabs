@@ -1,0 +1,37 @@
+[Unit]
+Description=BMO WhatsApp transport-only Hermes Baileys bridge
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+WorkingDirectory=/home/hermes/.hermes
+ExecStart=/usr/local/libexec/bmo-whatsapp-bridge-launcher
+Restart=on-failure
+RestartSec=10s
+RestartPreventExitStatus=78
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+UMask=0077
+Environment=HOME=/home/hermes
+Environment=HERMES_HOME=/home/hermes/.hermes
+Environment=PATH=/home/hermes/.hermes/node/bin:/usr/bin:/bin
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+# Official bridge startup output includes the allowlist. Health is read from
+# loopback /health and crash state from systemd; no bridge output is retained.
+StandardOutput=null
+StandardError=null

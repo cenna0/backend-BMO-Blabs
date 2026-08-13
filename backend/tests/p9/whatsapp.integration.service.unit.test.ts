@@ -106,28 +106,29 @@ describe("WhatsApp IntegrationService", () => {
     expect(f.inbound).not.toHaveBeenCalled();
   });
 
-  it("requires a group notification rule to name the exact provider chat", async () => {
+  it("drops an allowlisted sender's group message before persistence, rules, Hermes, or proactive delivery", async () => {
     const f = fixture();
     f.repositories.whatsAppDelivery.findFirst.mockResolvedValue(null);
     f.repositories.whatsAppNotificationRule.findMany.mockResolvedValue([
-      { scope: "GROUP", opaqueTargetRef: "other@g.us", enabled: true, speakOnDevice: true },
+      { scope: "ALL", opaqueTargetRef: null, enabled: true, speakOnDevice: true },
     ]);
     f.whatsApp.poll.mockResolvedValue([
       { messageId: "group-1", chatId: "team@g.us", senderId: "123@s.whatsapp.net", body: "hello group", isGroup: true },
     ]);
 
-    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 1, queued: 0 });
+    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 0, queued: 0 });
+    expect(f.repositories.integrationConnection.findMany).not.toHaveBeenCalled();
+    expect(f.repositories.whatsAppDelivery.findFirst).not.toHaveBeenCalled();
+    expect(f.repositories.whatsAppDelivery.create).not.toHaveBeenCalled();
+    expect(f.repositories.whatsAppNotificationRule.findMany).not.toHaveBeenCalled();
+    expect(f.repositories.device.findFirst).not.toHaveBeenCalled();
     expect(f.inbound).not.toHaveBeenCalled();
 
-    f.repositories.whatsAppDelivery.findFirst.mockResolvedValue(null);
-    f.repositories.whatsAppNotificationRule.findMany.mockResolvedValue([
-      { scope: "GROUP", opaqueTargetRef: "team@g.us", enabled: true, speakOnDevice: true },
-    ]);
     f.whatsApp.poll.mockResolvedValue([
       { messageId: "group-2", chatId: "team@g.us", senderId: "123@s.whatsapp.net", body: "hello group", isGroup: true },
     ]);
-    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 1, queued: 1 });
-    expect(f.inbound).toHaveBeenCalledWith({ userId: userA, deliveryId: deliveryA, deviceId: deviceA, text: "hello group" });
+    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 0, queued: 0 });
+    expect(f.inbound).not.toHaveBeenCalled();
   });
 
   it("does not claim a proactive job when the owner has no active device", async () => {

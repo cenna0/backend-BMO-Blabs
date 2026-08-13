@@ -13,6 +13,16 @@ const optionalPositiveInt = (fallback: number) =>
 
 const avatarUploadReceiveTimeout = z.coerce.number().int().min(1_000).max(120_000).default(30_000);
 
+const whatsappAllowedUsers = z.string().optional().transform((value, context) => {
+  if (value === undefined || value.trim() === "") return [];
+  const entries = value.split(",").map((entry) => entry.trim());
+  if (entries.some((entry) => entry.length === 0 || entry.length > 255 || entry === "*" || entry.includes("*") || /\s/u.test(entry) || !/^\+?[A-Za-z0-9._:-]+(?:@(?:s\.whatsapp\.net|lid))?$/u.test(entry))) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "WHATSAPP_ALLOWED_USERS must contain non-wildcard exact sender IDs" });
+    return z.NEVER;
+  }
+  return [...new Set(entries)];
+});
+
 const publicBaseUrlSchema = z.string().transform((value, context) => {
   let url: URL;
   try {
@@ -68,6 +78,7 @@ const rawSchema = z.object({
   SPOTIFY_CLIENT_SECRET: z.string().min(1).optional(),
   SPOTIFY_CALLBACK_URL: z.string().url().optional(),
   WHATSAPP_BRIDGE_URL: z.string().url().default("http://127.0.0.1:3001"),
+  WHATSAPP_ALLOWED_USERS: whatsappAllowedUsers,
   P9_TIMEZONE: z.string().default(P9_CANONICAL_TIMEZONE),
   P9_PRISMA_POOL_SIZE: optionalPositiveInt(5),
   P9_POSTGRES_MAX_CONNECTIONS: optionalPositiveInt(20),
@@ -95,6 +106,7 @@ export interface P9Config {
   spotifyClientSecret?: string | undefined;
   spotifyCallbackUrl?: string | undefined;
   whatsappBridgeUrl: string;
+  whatsAppAllowedUsers: string[];
   canonicalTimezone: typeof P9_CANONICAL_TIMEZONE;
   accessTokenTtlSeconds: 900;
   refreshTokenTtlSeconds: 2_592_000;
@@ -142,6 +154,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       spotifyClientSecret: undefined,
       spotifyCallbackUrl: undefined,
       whatsappBridgeUrl: parsed.WHATSAPP_BRIDGE_URL,
+      whatsAppAllowedUsers: parsed.WHATSAPP_ALLOWED_USERS,
       prismaPoolSize: parsed.P9_PRISMA_POOL_SIZE,
       postgresMaxConnections: parsed.P9_POSTGRES_MAX_CONNECTIONS,
       loginWindowMs: 900_000,
@@ -179,6 +192,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     ...(parsed.SPOTIFY_CLIENT_SECRET === undefined ? {} : { spotifyClientSecret: parsed.SPOTIFY_CLIENT_SECRET }),
     ...(parsed.SPOTIFY_CALLBACK_URL === undefined ? {} : { spotifyCallbackUrl: parsed.SPOTIFY_CALLBACK_URL }),
     whatsappBridgeUrl: parsed.WHATSAPP_BRIDGE_URL,
+    whatsAppAllowedUsers: parsed.WHATSAPP_ALLOWED_USERS,
     canonicalTimezone: P9_CANONICAL_TIMEZONE,
     accessTokenTtlSeconds: 900,
     refreshTokenTtlSeconds: 2_592_000,

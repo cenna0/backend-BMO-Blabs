@@ -903,6 +903,16 @@ session and QR flow; the candidate bridge URL is loopback-only and configured as
 JID. A single global Hermes identity is bound to exactly one connected BMO owner;
 ambiguous or foreign-owner operations fail closed.
 
+For the dedicated transport-only candidate design, `hermes-gateway.service`
+keeps `WHATSAPP_ENABLED=false` and does not consume this queue. A separate
+repository unit launches the unchanged official Baileys `bridge.js` as
+`hermes` with `--port 3001 --session /home/hermes/.hermes/whatsapp/session
+--mode bot`. BMO Backend is the only `GET /messages` consumer. It rejects
+unauthorized DMs using a protected exact sender allowlist and drops every event
+with `isGroup === true` before owner lookup, persistence, notification rules,
+Hermes reasoning, or generic proactive delivery. `WHATSAPP_GROUP_POLICY` is not
+the enforcement layer for this design.
+
 Do not implement Telegram/SMS plugins.
 
 ---

@@ -125,7 +125,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   const spotify = config.spotifyClientId && config.spotifyClientSecret
     ? new SpotifyApiClient({ clientId: config.spotifyClientId, clientSecret: config.spotifyClientSecret })
     : undefined;
-  const whatsApp = new HermesWhatsAppBridgeClient({ baseUrl: config.whatsappBridgeUrl });
+  const whatsApp = new HermesWhatsAppBridgeClient({ baseUrl: config.whatsappBridgeUrl, allowedSenderIds: config.whatsAppAllowedUsers });
   const integrations = new IntegrationService({
     client,
     repositories,

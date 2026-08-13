@@ -175,10 +175,10 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | Methods | Path | Status | Availability / gate |
 |---|---|---|---|
 | POST/GET | `/api/v1/integrations/whatsapp/connect`, `.../status` | `SOURCE_VERIFIED` | Owner-scoped routes call the verified loopback Hermes health boundary; live bridge/session is not present on candidate |
-| GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `BLOCKED_OPERATOR` | Fail-closed route exists; exact installed Hermes pairing boundary and QR producer require protected inspection |
+| GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `BLOCKED_OPERATOR` | Fail-closed route exists; dedicated official bridge unit is prepared but not installed/started, and QR pairing requires protected operator action |
 | POST | `/api/v1/integrations/whatsapp/disconnect` | `SOURCE_VERIFIED` | Source/test owner-scoped boundary; live Hermes session operation remains blocked |
 | GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `SOURCE_VERIFIED` | Strict target shape and authenticated owner scope |
-| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `SOURCE_VERIFIED` | Bounded preview/confirmation/idempotency calls verified Hermes `POST /send`; live send remains operator-gated and requires a provider JID |
+| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `SOURCE_VERIFIED` | Bounded preview/confirmation/idempotency calls verified Hermes `POST /send`; live send remains operator-gated and requires a protected provider recipient reference |
 | POST | `/api/v1/integrations/spotify/connect` | `SOURCE_VERIFIED` | Server-side Authorization Code state route; live credentials/callback `BLOCKED_EXTERNAL_SECRET` |
 | GET | `/api/v1/integrations/spotify/callback` | `SOURCE_VERIFIED` | Exact configured redirect and single-use state; tokens stay server-side |
 | GET | `/api/v1/integrations/spotify/status` | `SOURCE_VERIFIED` | Normalized owner-scoped state only |

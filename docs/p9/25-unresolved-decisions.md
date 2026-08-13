@@ -5,7 +5,7 @@ These do not change approved scope; they block only the named acceptance or requ
 | Gate/decision | State | Owner / required evidence |
 |---|---|---|
 | Host firewall policy visibility | `BLOCKED` for final topology sign-off | Operations: provide privileged UFW/nft evidence; Phase 2 already stopped Prisma Studio and verified no listener, Docker publication, or Caddy route on 5555 |
-| Actual Hermes WhatsApp API/session/persistence/version | `SOURCE_VERIFIED` for Hermes 0.20.0 loopback bridge contract; live session remains `BLOCKED_OPERATOR` | Hermes/operations: configure candidate bridge on loopback 3001, complete QR pairing, and return sanitized status/restart evidence; never share session bytes |
+| Actual Hermes WhatsApp API/session/persistence/version | `SOURCE_VERIFIED` for Hermes 0.20.0 loopback bridge contract; live session remains `BLOCKED_OPERATOR` | Operations: review/install the separate transport unit, provision protected exact sender IDs, complete QR pairing, and return sanitized status/restart evidence; never share session bytes |
 | Spotify app credentials and callback registration | `BLOCKED` | Provider/operator: exact registered URI and secret availability |
 | First-boot Wi-Fi bootstrap | `PENDING_PHYSICAL_ESP` | Hardware product/firmware decision and bench evidence |
 | Battery sensing capability | `PENDING_PHYSICAL_ESP` | Hardware measurement evidence; backend remains nullable |

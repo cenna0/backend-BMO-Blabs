@@ -45,6 +45,7 @@ describe("P9 configuration", () => {
       spotifyClientSecret: undefined,
       spotifyCallbackUrl: undefined,
       whatsappBridgeUrl: "http://127.0.0.1:3001",
+      whatsAppAllowedUsers: [],
       canonicalTimezone: "Asia/Jakarta",
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 2_592_000,
@@ -73,6 +74,14 @@ describe("P9 configuration", () => {
       recoveryIpLimit: 5,
       recoveryEmailLimit: 3,
     });
+  });
+
+  it("parses exact WhatsApp sender IDs and rejects wildcard access", () => {
+    expect(parseP9Config({ ...enabled, WHATSAPP_ALLOWED_USERS: "62812, +62813, 62814@s.whatsapp.net" }).whatsAppAllowedUsers)
+      .toEqual(["62812", "+62813", "62814@s.whatsapp.net"]);
+    for (const value of ["*", "62812,*", "62812,,62814", "sender/a"]) {
+      expect(() => parseP9Config({ ...enabled, WHATSAPP_ALLOWED_USERS: value })).toThrow(/WHATSAPP_ALLOWED_USERS/);
+    }
   });
 
   it("rejects avatar storage paths that are relative, root, traversal-normalized, or padded", () => {

@@ -24,6 +24,7 @@
 | INT-044 | Current pairing claim is a mobile-bearer call with pairing ID, code, hardware ID, name, and out-of-band device credential. The ESP does not claim through `/ws`. | Matches registered source behavior. |
 | INT-045 | Schedule durable lifecycle is `ACTIVE/PAUSED/CANCELLED/COMPLETED`; UI labels such as `MONITORING` and `WEEKLY` are presentation labels. | Avoid state-model ambiguity. |
 | INT-046 | A WhatsApp-capable Hermes release is not proof that a BMO WhatsApp session is configured. | Live acceptance stays blocked pending evidence. |
+| INT-050 | Dedicated WhatsApp transport runs the unchanged Hermes Baileys bridge separately from `hermes-gateway.service`; BMO alone consumes `/messages`, owns exact sender authorization, and drops all groups before side effects. | Prevent destructive queue races and unrestricted inbound Hermes access. |
 | INT-047 | Prisma Studio on `*:5555` is a security blocker and is not part of declared production architecture. | Close before Phase 2/deploy. |
 | INT-048 | `docs/product/BMO-BY-BLABS-PRD-v1.4.0.md` is the current integration PRD; v1.2.4 remains the locked historical product baseline. | Keeps verifier-protected history intact. |
 
