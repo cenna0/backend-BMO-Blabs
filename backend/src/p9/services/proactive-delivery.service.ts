@@ -1,5 +1,7 @@
-import type { DeliverySource } from "../../generated/prisma/client.js";
+import type { DeliverySource, PrismaClient } from "../../generated/prisma/client.js";
+import { withP9Transaction } from "../db/client.js";
 import type { P9Repositories } from "../db/repositories.js";
+import { P9Repositories as Repositories } from "../db/repositories.js";
 import { P9Error } from "../errors.js";
 import type { MobileOutboundEvent } from "../websocket/mobile-events.js";
 
@@ -14,6 +16,7 @@ export interface ProactiveDeviceSender {
 }
 
 interface MobileEvents { sendToUser(userId: string, event: MobileOutboundEvent): number }
+type Transaction = <T>(work: (repositories: P9Repositories) => Promise<T>) => Promise<T>;
 
 export interface EnqueueProactiveDelivery {
   userId: string;
@@ -26,7 +29,18 @@ export interface EnqueueProactiveDelivery {
 }
 
 export class ProactiveDeliveryService {
-  constructor(private readonly options: { repositories: P9Repositories; mobileEvents: MobileEvents; sender?: ProactiveDeviceSender }) {}
+  readonly #transaction: Transaction;
+
+  constructor(private readonly options: {
+    repositories: P9Repositories;
+    mobileEvents: MobileEvents;
+    sender?: ProactiveDeviceSender;
+    client?: PrismaClient;
+    transaction?: Transaction;
+  }) {
+    if (!options.transaction && !options.client) throw new Error("ProactiveDeliveryService requires a transaction boundary");
+    this.#transaction = options.transaction ?? ((work) => withP9Transaction(options.client!, async (transaction) => work(new Repositories(transaction))));
+  }
 
   async enqueue(input: EnqueueProactiveDelivery): Promise<any> {
     const existing = await this.options.repositories.proactiveDelivery.findUnique({ where: { userId_idempotencyKey: { userId: input.userId, idempotencyKey: input.idempotencyKey } } });
@@ -80,7 +94,11 @@ export class ProactiveDeliveryService {
     for (const delivery of pending) {
       if (!delivery.deviceId || devices.has(delivery.deviceId) || await this.options.sender.isUserVoiceBusy(delivery.deviceId)) { pendingPhysical += 1; continue; }
       devices.add(delivery.deviceId);
-      const claimedRows: any[] = await this.options.repositories.claimProactiveDelivery({ deliveryId: delivery.id });
+      const claimedRows: any[] = await this.#transaction(async (repositories) => {
+        const lockedDeviceId = await repositories.lockProactiveDeliveryDevice({ deliveryId: delivery.id });
+        if (!lockedDeviceId) return [];
+        return repositories.claimProactiveDelivery({ deliveryId: delivery.id });
+      });
       const claimedDelivery = claimedRows[0];
       if (!claimedDelivery) continue;
       claimed += 1;

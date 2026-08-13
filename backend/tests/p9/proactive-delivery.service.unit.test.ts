@@ -15,6 +15,7 @@ function fixture(sender?: any) {
       delivery = { ...delivery, status: "DELIVERING", attemptCount: delivery.attemptCount + 1, errorCode: null };
       return [delivery];
     }),
+    lockProactiveDeliveryDevice: vi.fn(async () => delivery?.deviceId ?? null),
     device: { findFirst: vi.fn().mockResolvedValue({ id: deviceId }) },
     proactiveDelivery: {
       findUnique: vi.fn(async () => delivery),
@@ -37,7 +38,7 @@ function fixture(sender?: any) {
     deliveryAttempt: { create: vi.fn().mockResolvedValue({}) },
   };
   const mobileEvents = { sendToUser: vi.fn() };
-  return { service: new ProactiveDeliveryService({ repositories, mobileEvents, ...(sender ? { sender } : {}) }), repositories, mobileEvents, get delivery() { return delivery; } };
+  return { service: new ProactiveDeliveryService({ repositories, mobileEvents, transaction: (work) => work(repositories), ...(sender ? { sender } : {}) }), repositories, mobileEvents, get delivery() { return delivery; } };
 }
 
 describe("generic proactive delivery", () => {
@@ -90,4 +91,97 @@ describe("generic proactive delivery", () => {
     f.repositories.proactiveDelivery.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "race", userId, deviceId, source: "CHAT", sourceResourceId: resourceId });
     await expect(f.service.enqueue({ userId, deviceId, source: "CHAT", sourceResourceType: "chat", sourceResourceId: resourceId, idempotencyKey: "race:key" })).resolves.toMatchObject({ id: "race" });
   });
+
+  it("serializes two workers claiming different pending rows for the same device", async () => {
+    const race = concurrentClaimFixture([deviceId, deviceId]);
+    const [left, right] = await Promise.all([race.left.processOnce(), race.right.processOnce()]);
+    expect(left.claimed + right.claimed).toBe(1);
+    expect(race.offered).toHaveLength(1);
+  });
+
+  it("allows two workers to offer deliveries for different devices concurrently", async () => {
+    const race = concurrentClaimFixture([
+      deviceId,
+      "00000000-0000-4000-8000-000000000005",
+    ]);
+    const [left, right] = await Promise.all([race.left.processOnce(), race.right.processOnce()]);
+    expect(left.claimed + right.claimed).toBe(2);
+    expect(race.maxConcurrentOffers()).toBe(2);
+  });
 });
+
+function concurrentClaimFixture(deviceIds: string[]) {
+  const now = new Date("2026-08-13T00:00:00.000Z");
+  const deliveries = deviceIds.map((claimedDeviceId, index) => ({
+    id: `00000000-0000-4000-8000-${String(index + 10).padStart(12, "0")}`,
+    userId,
+    deviceId: claimedDeviceId,
+    source: "SCHEDULE" as const,
+    status: "PENDING",
+    attemptCount: 0,
+    errorCode: null,
+    expiresAt: new Date(now.getTime() + 300_000),
+    createdAt: new Date(now.getTime() + index),
+  }));
+  const lockTails = new Map<string, Promise<void>>();
+  const offered: string[] = [];
+  let activeOffers = 0;
+  let maximumOffers = 0;
+
+  const transaction = async <T>(work: (transactionRepositories: any) => Promise<T>): Promise<T> => {
+    let release: (() => void) | undefined;
+    const transactionRepositories = {
+      lockProactiveDeliveryDevice: async ({ deliveryId }: { deliveryId: string }) => {
+        const delivery = deliveries.find((candidate) => candidate.id === deliveryId)!;
+        const prior = lockTails.get(delivery.deviceId) ?? Promise.resolve();
+        let unlock!: () => void;
+        const tail = new Promise<void>((resolve) => { unlock = resolve; });
+        lockTails.set(delivery.deviceId, prior.then(() => tail));
+        await prior;
+        release = unlock;
+        return delivery.deviceId;
+      },
+      claimProactiveDelivery: async ({ deliveryId }: { deliveryId: string }) => {
+        const delivery = deliveries.find((candidate) => candidate.id === deliveryId)!;
+        const activeSibling = deliveries.some((candidate) => candidate.id !== delivery.id && candidate.deviceId === delivery.deviceId && candidate.status === "DELIVERING");
+        if (delivery.status !== "PENDING" || activeSibling) return [];
+        delivery.status = "DELIVERING";
+        delivery.attemptCount += 1;
+        return [delivery];
+      },
+    };
+    try { return await work(transactionRepositories); } finally { release?.(); }
+  };
+
+  const sender = {
+    isUserVoiceBusy: vi.fn().mockResolvedValue(false),
+    offer: vi.fn(async (delivery: { id: string }) => {
+      offered.push(delivery.id);
+      activeOffers += 1;
+      maximumOffers = Math.max(maximumOffers, activeOffers);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      activeOffers -= 1;
+      return { status: "accepted" as const };
+    }),
+  };
+  const create = (reverse: boolean) => {
+    const repositories: any = {
+      databaseNow: vi.fn().mockResolvedValue(now),
+      proactiveDelivery: {
+        findMany: vi.fn(async ({ where }: any) => {
+          if (where.expiresAt?.lte) return [];
+          const pending = deliveries.filter((delivery) => delivery.status === "PENDING");
+          return reverse ? pending.reverse() : pending;
+        }),
+        update: vi.fn(async ({ where, data }: any) => {
+          const delivery = deliveries.find((candidate) => candidate.id === where.id)!;
+          Object.assign(delivery, data);
+          return delivery;
+        }),
+      },
+      deliveryAttempt: { create: vi.fn().mockResolvedValue({}) },
+    };
+    return new ProactiveDeliveryService({ repositories, mobileEvents: { sendToUser: vi.fn() }, sender, transaction });
+  };
+  return { left: create(false), right: create(true), offered, maxConcurrentOffers: () => maximumOffers };
+}

@@ -32,6 +32,17 @@ describe("schedule due-run PostgreSQL boundary", () => {
     expect(sql).toContain("clock_timestamp()");
   });
 
+  it("takes a transaction-scoped namespaced advisory lock for device arbitration", async () => {
+    const query = vi.fn().mockResolvedValue([{ deviceId: "00000000-0000-4000-8000-000000000002" }]);
+    const repositories = new P9Repositories({ $queryRaw: query } as any);
+    await expect(repositories.lockProactiveDeliveryDevice({
+      deliveryId: "00000000-0000-4000-8000-000000000001",
+    })).resolves.toBe("00000000-0000-4000-8000-000000000002");
+    const sql = String(query.mock.calls[0]?.[0]?.join(""));
+    expect(sql).toContain("pg_advisory_xact_lock");
+    expect(sql).toContain("proactive-device:");
+  });
+
   it("materializes overdue occurrences as missed with a terminal deadline code", async () => {
     const query = vi.fn().mockResolvedValue([{ id: "run" }]);
     const repositories = new P9Repositories({ $queryRaw: query } as any);

@@ -148,6 +148,17 @@ export class P9Repositories {
     `;
   }
 
+  async lockProactiveDeliveryDevice(input: { deliveryId: string }): Promise<string | null> {
+    const rows = await this.db.$queryRaw<Array<{ deviceId: string }>>`
+      SELECT delivery."deviceId" AS "deviceId",
+             pg_advisory_xact_lock(hashtextextended('proactive-device:' || delivery."deviceId"::text, 0))
+      FROM "ProactiveDelivery" AS delivery
+      WHERE delivery.id = ${input.deliveryId}::uuid
+        AND delivery."deviceId" IS NOT NULL
+    `;
+    return rows[0]?.deviceId ?? null;
+  }
+
   async searchActiveMemories(input: { userId: string; terms: string[]; limit: number }): Promise<string[]> {
     const rows = await this.db.$queryRaw<Array<{ normalizedContent: string }>>`
       SELECT memory."normalizedContent"

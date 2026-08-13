@@ -109,7 +109,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   const deviceBinding = new DeviceBindingService(repositories);
   const memoryGateway = new PostgresMemoryGateway(repositories);
   const memory = new MemoryService({ client, repositories });
-  const proactive = new ProactiveDeliveryService({ repositories, mobileEvents: options.mobileEvents ?? noMobileEvents });
+  const proactive = new ProactiveDeliveryService({ client, repositories, mobileEvents: options.mobileEvents ?? noMobileEvents });
   const schedule = new ScheduleService({ client, repositories, mobileEvents: options.mobileEvents ?? noMobileEvents });
   const chat = new ChatService({
     client,
