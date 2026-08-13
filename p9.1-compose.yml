@@ -66,13 +66,16 @@ services:
       P9_POSTGRES_SOCKET_DIR: /var/run/postgresql
       P9_JWT_SECRET: ${P9_JWT_SECRET:?Set P9_JWT_SECRET outside Git}
       P9_PAIRING_PEPPER: ${P9_PAIRING_PEPPER:?Set P9_PAIRING_PEPPER outside Git}
+      P9_WIFI_ENCRYPTION_KEY_FILE: /run/secrets/wifi_encryption_key
       AVATAR_STORAGE_DIR: /opt/bmo/data/avatars
+      BUG_REPORT_STORAGE_DIR: /opt/bmo/data/bug-reports
     depends_on:
       postgres:
         condition: service_healthy
     network_mode: host
     secrets:
       - postgres_password
+      - wifi_encryption_key
     volumes:
       - type: volume
         source: p9_postgres_socket
@@ -81,6 +84,9 @@ services:
       - type: volume
         source: p9_avatar_data
         target: /opt/bmo/data/avatars
+      - type: volume
+        source: p9_bug_report_data
+        target: /opt/bmo/data/bug-reports
     mem_limit: 512m
     memswap_limit: 512m
     cpus: "1.0"
@@ -106,7 +112,10 @@ networks:
 volumes:
   p9_postgres_socket:
   p9_avatar_data:
+  p9_bug_report_data:
 
 secrets:
   postgres_password:
     file: ${P9_POSTGRES_PASSWORD_FILE:?Set P9_POSTGRES_PASSWORD_FILE outside Git}
+  wifi_encryption_key:
+    file: ${P9_WIFI_ENCRYPTION_KEY_FILE:?Set P9_WIFI_ENCRYPTION_KEY_FILE outside Git}
