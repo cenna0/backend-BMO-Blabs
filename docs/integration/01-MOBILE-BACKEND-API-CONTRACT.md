@@ -916,6 +916,18 @@ POST /api/v1/integrations/spotify/actions
 GET  /api/v1/integrations/spotify/callback
 ```
 
+Phase 2.6 extends the candidate-only Spotify read/action surface with:
+
+```text
+GET /api/v1/integrations/spotify/search?q=<bounded-query>&type=track,artist,album,playlist
+GET /api/v1/integrations/spotify/active-device
+```
+
+The allowlisted action boundary additionally covers explicit track/artist/
+album/playlist playback, transfer/select device, seek, volume, shuffle, repeat,
+queue, and natural-language query resolution. Search results are normalized;
+provider tokens and raw provider payloads never enter mobile responses.
+
 OAuth callback is server-side and authenticated by exact redirect + single-use OAuth state, not by a mobile bearer token. Mobile must not store Spotify access/refresh tokens. The current server-side Authorization Code flow is the frozen default because the Backend can protect the client secret; if code exchange moves into mobile, PKCE requires a separate contract change.
 
 Spotify music plays on the user's Spotify device, not the BMO speaker.

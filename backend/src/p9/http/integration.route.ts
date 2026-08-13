@@ -27,8 +27,17 @@ export function createIntegrationRouter(integration: IntegrationService, accessT
 
   router.post("/integrations/spotify/connect", authenticated, asyncP9(async (request, response) => { response.json(await integration.spotifyConnect(currentAuth(request).userId)); }));
   router.get("/integrations/spotify/status", authenticated, asyncP9(async (request, response) => { response.json(await integration.connection(currentAuth(request).userId, "SPOTIFY" as any)); }));
+  router.get("/integrations/spotify/search", authenticated, asyncP9(async (request, response) => {
+    const query = queryString(request.query.q);
+    const rawTypes = typeof request.query.type === "string" ? request.query.type.split(",") : undefined;
+    const allowedTypes = new Set(["track", "artist", "album", "playlist"]);
+    if (rawTypes?.some((type) => !allowedTypes.has(type))) throw new P9Error("INVALID_INPUT", 400, "Invalid Spotify search type");
+    const types = rawTypes?.filter((type): type is "track" | "artist" | "album" | "playlist" => allowedTypes.has(type));
+    response.json({ results: await integration.spotifySearch(currentAuth(request).userId, query, types?.length ? types : undefined) });
+  }));
   router.post("/integrations/spotify/disconnect", authenticated, asyncP9(async (request, response) => { await integration.spotifyDisconnect(currentAuth(request).userId); response.status(204).end(); }));
   router.get("/integrations/spotify/devices", authenticated, asyncP9(async (request, response) => { response.json({ devices: await integration.spotifyDevices(currentAuth(request).userId) }); }));
+  router.get("/integrations/spotify/active-device", authenticated, asyncP9(async (request, response) => { response.json({ device: await integration.spotifyActiveDevice(currentAuth(request).userId) }); }));
   router.get("/integrations/spotify/playback", authenticated, asyncP9(async (request, response) => { response.json({ playback: await integration.spotifyPlayback(currentAuth(request).userId) }); }));
   router.post("/integrations/spotify/actions", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); response.status(202).json({ action: await integration.spotifyAction(auth.userId, parseSpotifyAction(request.body), auth.context.requestId) }); }));
   router.get("/integrations/spotify/callback", asyncP9(async (request, response) => { await integration.spotifyCallback(queryString(request.query.state), typeof request.query.code === "string" ? request.query.code : undefined, typeof request.query.error === "string" ? request.query.error : undefined); response.status(200).send("Spotify connection completed. You may return to BMO."); }));

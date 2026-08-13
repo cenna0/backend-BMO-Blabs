@@ -20,6 +20,10 @@ describe("integration boundary validation", () => {
     expect(() => parseSpotifyAction({ action: "DELETE_ALL", idempotencyKey: "x", payload: {} })).toThrow();
     expect(() => parseSpotifyAction({ action: "PAUSE", idempotencyKey: "x", payload: {}, userId: "attacker" })).toThrow();
     expect(() => parseSpotifyAction({ action: "PAUSE", idempotencyKey: "x", payload: { providerToken: "secret" } })).toThrow();
+    expect(parseSpotifyAction({ action: "PLAY_TRACK", idempotencyKey: "x", payload: { uri: "spotify:track:t1", deviceId: "device-1" }, confirmed: true })).toMatchObject({ action: "PLAY_TRACK" });
+    expect(parseSpotifyAction({ action: "SEEK", idempotencyKey: "x", payload: { positionMs: 12_000 } })).toMatchObject({ action: "SEEK" });
+    expect(parseSpotifyAction({ action: "REPEAT", idempotencyKey: "x", payload: { state: "context" } })).toMatchObject({ action: "REPEAT" });
+    expect(() => parseSpotifyAction({ action: "TRANSFER", idempotencyKey: "x", payload: { deviceId: "d1", userId: "attacker" } })).toThrow();
   });
 
   it("enforces WhatsApp target shape, bounds, and strict rules", () => {

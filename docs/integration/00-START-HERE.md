@@ -9,8 +9,10 @@
 personalization, mobile realtime `/api/v1/ws`, chat/Hermes, memory,
 scheduler/proactive delivery, device data-plane additions, provider integration
 boundaries, plugin catalog, and bug reports are source/test verified. Physical
-ESP behavior remains `PENDING_PHYSICAL_ESP`; live WhatsApp/Spotify capability is
-`BLOCKED_EXTERNAL_SECRET`. This does not alter the frozen Phase 1 runtime facts
+ESP behavior remains `PENDING_PHYSICAL_ESP`; Phase 2.6 source Spotify capability
+is `SOURCE_VERIFIED` while live Spotify acceptance is `BLOCKED_EXTERNAL_SECRET`.
+WhatsApp live acceptance is `BLOCKED_OPERATOR` pending protected Hermes runtime
+inspection. This does not alter the frozen Phase 1 runtime facts
 below: the running private candidate is still invitation-era/unmigrated and
 public production is unchanged.
 

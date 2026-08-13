@@ -1,0 +1,6 @@
+--- /opt/bmo/deploy/p7-caddy-cutover.Caddyfile
++++ /opt/bmo/deploy/p7-caddy-cutover.Caddyfile
+@@ -12,0 +13,3 @@
++    @phase26_spotify_callback path /api/v1/integrations/spotify/callback
++    reverse_proxy @phase26_spotify_callback 127.0.0.1:3010
++

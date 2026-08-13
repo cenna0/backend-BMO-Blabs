@@ -1,6 +1,8 @@
 # Hermes ↔ Backend Action-Intent Schema
 
-**Status:** `READY_TO_IMPLEMENT`
+**Status:** `SOURCE_VERIFIED` for validation/provider action payloads; Hermes
+tool binding remains `BLOCKED_OPERATOR` until the installed runtime boundary is
+inspected.
 
 Hermes proposes; Backend authenticates, authorizes, validates, confirms, and
 executes. The action schema is versioned and discriminated so unsupported
@@ -29,9 +31,15 @@ principal and rejects a mismatched or expired context.
 ```ts
 type ActionIntent =
   | { kind: "spotify.playback"; payload: {
-      command: "PLAY" | "PAUSE" | "RESUME" | "NEXT" | "PREVIOUS";
+      command: "PLAY" | "PLAY_TRACK" | "PLAY_ARTIST" | "PLAY_ALBUM" | "PLAY_PLAYLIST" | "PAUSE" | "RESUME" | "NEXT" | "PREVIOUS" | "TRANSFER" | "SEEK" | "VOLUME" | "SHUFFLE" | "REPEAT" | "QUEUE" | "SEARCH";
       query?: string;
+      uri?: string;
+      targetType?: "track" | "artist" | "album" | "playlist";
       deviceId?: string;
+      positionMs?: number;
+      volume?: number;
+      state?: "track" | "context" | "off" | boolean;
+      play?: boolean;
     }}
   | { kind: "spotify.volume"; payload: { volume: number; deviceId?: string } }
   | { kind: "whatsapp.send"; requested_confirmation: "user_required"; payload: {

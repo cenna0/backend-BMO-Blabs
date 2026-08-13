@@ -30,7 +30,7 @@ export const whatsappSendConfirmSchema = z.object({
 export const whatsappConnectSchema = z.object({}).strict();
 export const whatsappConfirmScannedSchema = z.object({}).strict();
 
-const spotifyActions = z.enum(["PLAY", "PAUSE", "RESUME", "NEXT", "PREVIOUS", "VOLUME", "SHUFFLE", "QUEUE", "SEARCH"]);
+const spotifyActions = z.enum(["PLAY", "PLAY_TRACK", "PLAY_ARTIST", "PLAY_ALBUM", "PLAY_PLAYLIST", "PAUSE", "RESUME", "NEXT", "PREVIOUS", "TRANSFER", "SEEK", "VOLUME", "SHUFFLE", "REPEAT", "QUEUE", "SEARCH"]);
 const spotifyPayload = z.record(z.string(), z.union([z.string().max(255), z.number().finite(), z.boolean()])).superRefine((value, context) => {
   if (Object.keys(value).length > 4 || Buffer.byteLength(JSON.stringify(value), "utf8") > 1_000) {
     context.addIssue({ code: "custom", message: "Spotify action payload is too large" });
@@ -43,17 +43,25 @@ export const spotifyActionSchema = z.object({
   confirmed: z.boolean().default(false),
 }).strict().superRefine((value, context) => {
   const allowed: Record<string, string[]> = {
-    PLAY: ["query", "deviceId"], SEARCH: ["query"], QUEUE: ["query", "deviceId"],
-    VOLUME: ["volume", "deviceId"], SHUFFLE: ["state", "deviceId"],
+    PLAY: ["query", "uri", "targetType", "deviceId"], PLAY_TRACK: ["uri", "deviceId"], PLAY_ARTIST: ["uri", "deviceId"], PLAY_ALBUM: ["uri", "deviceId"], PLAY_PLAYLIST: ["uri", "deviceId"],
+    SEARCH: ["query", "types"], QUEUE: ["query", "uri", "deviceId"], TRANSFER: ["deviceId", "play"], SEEK: ["positionMs", "deviceId"],
+    VOLUME: ["volume", "deviceId"], SHUFFLE: ["state", "deviceId"], REPEAT: ["state", "deviceId"],
     PAUSE: ["deviceId"], RESUME: ["deviceId"], NEXT: ["deviceId"], PREVIOUS: ["deviceId"],
   };
   const keys = Object.keys(value.payload);
   const invalid = keys.find((key) => !allowed[value.action]?.includes(key));
   if (invalid) context.addIssue({ code: "custom", path: ["payload", invalid], message: "Unsupported Spotify action field" });
-  if (["PLAY", "SEARCH", "QUEUE"].includes(value.action) && value.action !== "SEARCH" && value.payload.query !== undefined && typeof value.payload.query !== "string") context.addIssue({ code: "custom", path: ["payload", "query"], message: "query must be text" });
+  if (["PLAY", "SEARCH", "QUEUE"].includes(value.action) && value.payload.query !== undefined && typeof value.payload.query !== "string") context.addIssue({ code: "custom", path: ["payload", "query"], message: "query must be text" });
+  if (value.action === "PLAY" && value.payload.query === undefined && typeof value.payload.uri !== "string") context.addIssue({ code: "custom", path: ["payload", "uri"], message: "query or uri is required" });
+  if (value.action === "PLAY" && value.payload.targetType !== undefined && !["track", "artist", "album", "playlist"].includes(String(value.payload.targetType))) context.addIssue({ code: "custom", path: ["payload", "targetType"], message: "targetType is invalid" });
+  if (["PLAY_TRACK", "PLAY_ARTIST", "PLAY_ALBUM", "PLAY_PLAYLIST"].includes(value.action) && typeof value.payload.uri !== "string") context.addIssue({ code: "custom", path: ["payload", "uri"], message: "uri is required" });
+  if (value.action === "TRANSFER" && typeof value.payload.deviceId !== "string") context.addIssue({ code: "custom", path: ["payload", "deviceId"], message: "deviceId is required" });
+  if (value.action === "QUEUE" && typeof value.payload.query !== "string" && typeof value.payload.uri !== "string") context.addIssue({ code: "custom", path: ["payload", "uri"], message: "query or uri is required" });
+  if (value.action === "SEEK" && (!Number.isInteger(value.payload.positionMs) || Number(value.payload.positionMs) < 0)) context.addIssue({ code: "custom", path: ["payload", "positionMs"], message: "positionMs must be a non-negative integer" });
   if (value.action === "SEARCH" && typeof value.payload.query !== "string") context.addIssue({ code: "custom", path: ["payload", "query"], message: "query is required" });
   if (value.action === "VOLUME" && (!Number.isInteger(value.payload.volume) || Number(value.payload.volume) < 0 || Number(value.payload.volume) > 100)) context.addIssue({ code: "custom", path: ["payload", "volume"], message: "volume must be 0-100" });
   if (value.action === "SHUFFLE" && typeof value.payload.state !== "boolean") context.addIssue({ code: "custom", path: ["payload", "state"], message: "state is required" });
+  if (value.action === "REPEAT" && !["track", "context", "off"].includes(String(value.payload.state))) context.addIssue({ code: "custom", path: ["payload", "state"], message: "state must be track, context, or off" });
 });
 
 export const spotifyConnectSchema = z.object({}).strict();

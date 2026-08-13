@@ -1,9 +1,9 @@
 # WhatsApp Integration
 
-**BMO adapter/API:** `EXISTING_VERIFIED` at source/test tier
-**Live provider:** `BLOCKED_EXTERNAL_SECRET`
+**BMO adapter/API:** `BLOCKED_OPERATOR` pending protected installed-Hermes runtime inspection
+**Live provider:** `BLOCKED_OPERATOR` pending exact Hermes bridge/session boundary and QR pairing
 
-The audited Hermes version/documentation is WhatsApp-capable, but Phase 1 did not prove a configured BMO session, exact gateway API/version, persistence path, or credentials. Capability is not acceptance.
+The official Hermes documentation confirms a Baileys WhatsApp bridge and Hermes-owned session directory, but it does not define a generic HTTP WhatsApp send/receive API. The installed Hermes package/configuration is owned by `hermes` and unreadable to the current operator account. BMO must not invent an adapter from the documented CLI alone. A concrete adapter and incoming-event producer may be implemented only after the exact installed runtime boundary is inspected.
 
 Frozen ownership:
 
@@ -16,8 +16,13 @@ Outbound send requires a normalized preview, short-lived confirmation, ownership
 
 The QR/connect/status route family is a target contract only. Phase 2 must first prove the actual Hermes API boundary before implementing an adapter against it.
 
-Phase 2 source now exposes the frozen owner-scoped connect/status/QR/confirm/
-disconnect, notification-rule, send-preview/send-confirm, and plugin routes.
-Provider interaction is an injected Hermes boundary and remains fail-closed until
-the exact local API/session and credentials are proven. No Hermes session bytes or
-raw WhatsApp content are stored in PostgreSQL or returned to mobile.
+The existing owner-scoped routes remain fail-closed through the injected boundary.
+No Hermes session bytes or raw WhatsApp content are stored in PostgreSQL or
+returned to mobile. Incoming notification speech must use the generic
+`WHATSAPP` proactive-delivery source and remains `PENDING_PHYSICAL_ESP` until
+real device evidence exists.
+
+Operator checkpoint: exact installed runtime inspection must be performed with
+the `hermes` service account. Report only sanitized command/API shape and
+permissions; never send the gateway API key, QR, session directory contents,
+session files, or provider message payloads.

@@ -55,6 +55,7 @@ services:
       BACKEND_HOST: 127.0.0.1
       BACKEND_PORT: "3010"
       PUBLIC_BASE_URL: http://127.0.0.1:3010
+      SPOTIFY_CALLBACK_URL: https://api.personalbmo.web.id/api/v1/integrations/spotify/callback
       TRUST_PROXY_HOPS: "0"
       HERMES_API_URL: http://127.0.0.1:8642
       AUDIO_SERVICE_URL: http://127.0.0.1:8001

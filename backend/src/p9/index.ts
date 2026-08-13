@@ -30,6 +30,7 @@ import { decodeWifiEncryptionKey } from "./device-additions.crypto.js";
 import { IntegrationService } from "./services/integration.service.js";
 import { BugReportService } from "./services/bug-report.service.js";
 import type { HermesGenerateClient } from "../services/hermes.client.js";
+import { SpotifyApiClient } from "./providers/spotify.client.js";
 
 export interface P9Runtime {
   router: Router;
@@ -119,7 +120,19 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   if (!config.wifiEncryptionKey) throw new Error("P9 runtime requires P9_WIFI_ENCRYPTION_KEY");
   const deviceAdditions = new DeviceAdditionsService({ client, repositories, encryptionKey: decodeWifiEncryptionKey(config.wifiEncryptionKey), deviceEvents: { sendToDevice: () => false } });
   const schedule = new ScheduleService({ client, repositories, mobileEvents: options.mobileEvents ?? noMobileEvents });
-  const integrations = new IntegrationService({ client, repositories, publicBaseUrl: config.publicBaseUrl, ...(config.providerEncryptionKey === undefined ? {} : { providerEncryptionKey: config.providerEncryptionKey }) });
+  const spotify = config.spotifyClientId && config.spotifyClientSecret
+    ? new SpotifyApiClient({ clientId: config.spotifyClientId, clientSecret: config.spotifyClientSecret })
+    : undefined;
+  const integrations = new IntegrationService({
+    client,
+    repositories,
+    publicBaseUrl: config.publicBaseUrl,
+    ...(config.providerEncryptionKey === undefined ? {} : { providerEncryptionKey: config.providerEncryptionKey }),
+    ...(config.spotifyClientId === undefined ? {} : { spotifyClientId: config.spotifyClientId }),
+    ...(config.spotifyClientSecret === undefined ? {} : { spotifyClientSecret: config.spotifyClientSecret }),
+    ...(config.spotifyCallbackUrl === undefined ? {} : { spotifyCallbackUrl: config.spotifyCallbackUrl }),
+    ...(spotify === undefined ? {} : { spotify }),
+  });
   const bugReports = new BugReportService({ client, repositories, storageDir: config.bugReportStorageDir });
   const chat = new ChatService({
     client,

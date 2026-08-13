@@ -24,6 +24,16 @@ if (!process.env.P9_PROVIDER_ENCRYPTION_KEY && process.env.P9_PROVIDER_ENCRYPTIO
   if (!key) throw new Error("P9 provider encryption secret is empty");
   process.env.P9_PROVIDER_ENCRYPTION_KEY = key;
 }
+if (!process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_ID_FILE) {
+  const clientId = readFileSync(process.env.SPOTIFY_CLIENT_ID_FILE, "utf8").trim();
+  if (!clientId) throw new Error("Spotify client ID secret is empty");
+  process.env.SPOTIFY_CLIENT_ID = clientId;
+}
+if (!process.env.SPOTIFY_CLIENT_SECRET && process.env.SPOTIFY_CLIENT_SECRET_FILE) {
+  const clientSecret = readFileSync(process.env.SPOTIFY_CLIENT_SECRET_FILE, "utf8").trim();
+  if (!clientSecret) throw new Error("Spotify client secret is empty");
+  process.env.SPOTIFY_CLIENT_SECRET = clientSecret;
+}
 const config = parseP9Config(process.env);
 if (!config.enabled) throw new Error("P9 candidate requires P9_ENABLED=true");
 

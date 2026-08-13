@@ -62,8 +62,9 @@ events and physical behavior remain `PENDING_PHYSICAL_ESP`.
 Scheduler/proactive, device additions, and provider/support slices have
 candidate evidence where noted above and remain source/test verified for
 surfaces not exercised by the live harness. No production migration, recreation,
-or activation occurred. WhatsApp/Spotify live actions remain
-`BLOCKED_EXTERNAL_SECRET`; physical additive events remain
+or activation occurred. Spotify live actions remain
+`BLOCKED_EXTERNAL_SECRET`; WhatsApp runtime actions remain
+`BLOCKED_OPERATOR`; physical additive events remain
 `PENDING_PHYSICAL_ESP`.
 
 ## Runtime and existing voice surfaces
@@ -148,7 +149,7 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | Backend -> Mobile | `wifi_configuration_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; device additive lifecycle remains physical pending |
 | Backend -> Mobile | `proactive_delivery_status` | `EXISTING_VERIFIED` | Typed generic CHAT/SCHEDULE/WHATSAPP schema + per-user fanout and generic device-delivery lifecycle producer source/test; physical sender/playback remains `PENDING_PHYSICAL_ESP`; device-less MOBILE intents do not fabricate this device-scoped event |
 | Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user schedule lifecycle/one-shot completion producer source/test; candidate worker expiry path accepted, public production unchanged |
-| Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; adapter producers remain `READY_TO_IMPLEMENT`/externally blocked for live acceptance |
+| Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; Spotify adapter is `SOURCE_VERIFIED`, while the concrete WhatsApp producer remains `BLOCKED_OPERATOR` |
 | Backend -> Mobile | `notification` | `EXISTING_VERIFIED` | Typed bounded GENERIC schema + per-user fanout source/test; feature producer remains `READY_TO_IMPLEMENT` |
 
 ## Memory and schedules
@@ -173,17 +174,18 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Methods | Path | Status | Availability / gate |
 |---|---|---|---|
-| POST/GET | `/api/v1/integrations/whatsapp/connect`, `.../status` | `EXISTING_VERIFIED` | Source/test; owner-scoped metadata boundary; live provider `BLOCKED_EXTERNAL_SECRET` |
-| GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `EXISTING_VERIFIED` | Source/test; provider interaction fail-closed until exact Hermes boundary is proven |
-| POST | `/api/v1/integrations/whatsapp/disconnect` | `EXISTING_VERIFIED` | Source/test; owner-scoped provider boundary |
-| GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `EXISTING_VERIFIED` | Source/test; strict target shape and owner scope |
-| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `EXISTING_VERIFIED` | Source/test; bounded preview, five-minute confirmation, idempotency; live send blocked externally |
-| POST | `/api/v1/integrations/spotify/connect` | `EXISTING_VERIFIED` | Source/test; server-side Authorization Code state route; live credentials/callback `BLOCKED_EXTERNAL_SECRET` |
-| GET | `/api/v1/integrations/spotify/callback` | `EXISTING_VERIFIED` | Source/test; exact redirect and single-use state; tokens stay server-side |
-| GET | `/api/v1/integrations/spotify/status` | `EXISTING_VERIFIED` | Source/test; normalized state only |
-| POST | `/api/v1/integrations/spotify/disconnect` | `EXISTING_VERIFIED` | Source/test; owner-scoped credential removal |
-| GET | `/api/v1/integrations/spotify/devices`, `.../playback` | `EXISTING_VERIFIED` | Source/test; normalized provider boundary; no active device result is safe |
-| POST | `/api/v1/integrations/spotify/actions` | `EXISTING_VERIFIED` | Source/test; allowlisted action/idempotency/confirmation boundary; provider live blocked externally |
+| POST/GET | `/api/v1/integrations/whatsapp/connect`, `.../status` | `BLOCKED_OPERATOR` | Owner-scoped contract is source-verified; concrete Hermes status/session boundary remains protected and unverified |
+| GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `BLOCKED_OPERATOR` | Fail-closed route exists; exact installed Hermes pairing boundary and QR producer require protected inspection |
+| POST | `/api/v1/integrations/whatsapp/disconnect` | `SOURCE_VERIFIED` | Source/test owner-scoped boundary; live Hermes session operation remains blocked |
+| GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `SOURCE_VERIFIED` | Strict target shape and authenticated owner scope |
+| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `BLOCKED_OPERATOR` | Bounded preview/confirmation/idempotency is source-verified; exact Hermes outbound send boundary is unverified |
+| POST | `/api/v1/integrations/spotify/connect` | `SOURCE_VERIFIED` | Server-side Authorization Code state route; live credentials/callback `BLOCKED_EXTERNAL_SECRET` |
+| GET | `/api/v1/integrations/spotify/callback` | `SOURCE_VERIFIED` | Exact configured redirect and single-use state; tokens stay server-side |
+| GET | `/api/v1/integrations/spotify/status` | `SOURCE_VERIFIED` | Normalized owner-scoped state only |
+| POST | `/api/v1/integrations/spotify/disconnect` | `SOURCE_VERIFIED` | Owner-scoped credential removal |
+| GET | `/api/v1/integrations/spotify/search`, `/.../active-device` | `SOURCE_VERIFIED` | Concrete normalized catalog search and server-derived active-device projection; candidate provider credentials blocked |
+| GET | `/api/v1/integrations/spotify/devices`, `.../playback` | `SOURCE_VERIFIED` | Concrete normalized provider client; no active device result is safe |
+| POST | `/api/v1/integrations/spotify/actions` | `SOURCE_VERIFIED` | Explicit allowlist for search/resolution, track/artist/album/playlist play, pause/resume/skip, transfer, seek, volume, shuffle, repeat, queue, idempotency, and confirmation; live provider blocked |
 | GET | `/api/v1/plugins` | `EXISTING_VERIFIED` | Source/test; exactly WhatsApp + Spotify safe status catalog |
 | POST | `/api/v1/support/bug-reports` | `EXISTING_VERIFIED` | Source/test; bounded authenticated multipart, max five images, opaque persistent keys |
 | POST | `/api/v1/voice/preview` | `DEFERRED` | Not registered; last-priority optional surface |

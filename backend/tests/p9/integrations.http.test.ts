@@ -22,8 +22,10 @@ function fixture() {
     whatsappPreview: vi.fn().mockResolvedValue({ id, status: "PENDING_CONFIRMATION" }),
     whatsappConfirm: vi.fn().mockResolvedValue({ id, status: "FAILED" }),
     spotifyConnect: vi.fn().mockResolvedValue({ authorizationUrl: "https://accounts.spotify.com/authorize?state=x", state: "x".repeat(64) }),
+    spotifySearch: vi.fn().mockResolvedValue({ tracks: [], artists: [], albums: [], playlists: [] }),
     spotifyDisconnect: vi.fn().mockResolvedValue(undefined),
     spotifyDevices: vi.fn().mockResolvedValue([]),
+    spotifyActiveDevice: vi.fn().mockResolvedValue(null),
     spotifyPlayback: vi.fn().mockResolvedValue({ code: "NO_ACTIVE_SPOTIFY_DEVICE" }),
     spotifyAction: vi.fn().mockResolvedValue({ id, status: "PENDING_CONFIRMATION" }),
     spotifyCallback: vi.fn().mockResolvedValue({ ok: true }),
@@ -55,8 +57,11 @@ describe("integration HTTP contract", () => {
     expect((await auth(request(f.app).post("/integrations/whatsapp/send-confirm")).send({ requestId: id, confirmed: true })).status).toBe(200);
     expect((await auth(request(f.app).post("/integrations/spotify/connect"))).status).toBe(200);
     expect((await auth(request(f.app).get("/integrations/spotify/status"))).status).toBe(200);
+    expect((await auth(request(f.app).get("/integrations/spotify/search?q=NIKI&type=artist"))).status).toBe(200);
+    expect((await auth(request(f.app).get("/integrations/spotify/search?q=NIKI&type=unknown"))).status).toBe(400);
     expect((await auth(request(f.app).post("/integrations/spotify/disconnect")).send({})).status).toBe(204);
     expect((await auth(request(f.app).get("/integrations/spotify/devices"))).status).toBe(200);
+    expect((await auth(request(f.app).get("/integrations/spotify/active-device"))).status).toBe(200);
     expect((await auth(request(f.app).get("/integrations/spotify/playback"))).status).toBe(200);
     expect((await auth(request(f.app).post("/integrations/spotify/actions")).send({ action: "PAUSE", idempotencyKey: "sp-1" })).status).toBe(202);
     expect((await request(f.app).get(`/integrations/spotify/callback?state=${"x".repeat(64)}&code=code`)).status).toBe(200);
