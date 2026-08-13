@@ -95,6 +95,7 @@ function fixture() {
     device: { findFirst: vi.fn().mockResolvedValue(null) },
     chatMessageFeedback: { upsert: vi.fn() },
     auditEvent: { create: vi.fn().mockResolvedValue(undefined) },
+    memoryCandidate: { create: vi.fn() },
   };
   let transactionTail = Promise.resolve();
   const transaction = async <T>(work: (repositories: any) => Promise<T>): Promise<T> => {
@@ -457,6 +458,7 @@ describe("chat service durable orchestration", () => {
     expect(prompt).not.toContain("DATABASE_URL");
     expect(prompt.length).toBeLessThan(100_000);
     expect(f.memoryContext.search).toHaveBeenCalledWith(userId, "What should we do?", 8);
+    expect(f.repositories.memoryCandidate.create).not.toHaveBeenCalled();
   });
 
   it("persists a safe provider failure and audit without leaking provider details", async () => {

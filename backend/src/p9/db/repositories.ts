@@ -19,6 +19,31 @@ export class P9Repositories {
     return now;
   }
 
+  async searchActiveMemories(input: { userId: string; terms: string[]; limit: number }): Promise<string[]> {
+    const rows = await this.db.$queryRaw<Array<{ normalizedContent: string }>>`
+      SELECT memory."normalizedContent"
+      FROM "MemoryRecord" AS memory
+      WHERE memory."userId" = ${input.userId}::uuid
+        AND memory."deletedAt" IS NULL
+        AND (memory."expiresAt" IS NULL OR memory."expiresAt" > clock_timestamp())
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "MemoryTopicForget" AS forgotten
+          WHERE forgotten."userId" = memory."userId"
+            AND lower(forgotten."normalizedTopic") = lower(memory.topic)
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM unnest(${input.terms}::text[]) AS term(value)
+          WHERE memory.topic ILIKE ('%' || term.value || '%')
+             OR memory."normalizedContent" ILIKE ('%' || term.value || '%')
+        )
+      ORDER BY memory.importance DESC, memory."updatedAt" DESC, memory.id ASC
+      LIMIT ${input.limit}
+    `;
+    return rows.map((row) => row.normalizedContent);
+  }
+
   async claimChatOperation(input: {
     operationId: string;
     userId: string;

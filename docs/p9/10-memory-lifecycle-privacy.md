@@ -1,6 +1,6 @@
 # Memory Lifecycle and Privacy
 
-**Status:** `READY_TO_IMPLEMENT`
+**Status:** `EXISTING_VERIFIED` at source/test tier; not candidate/public deployed.
 
 Chat history, memory, schedules, and provider conversations are separate domains. Chat does not become memory automatically.
 
@@ -14,3 +14,10 @@ message -> policy/redaction -> candidate -> user/policy accept|reject
 - Every mutation is user-scoped, auditable, idempotent where retried, and reflected in export/deletion.
 - Clear-all and forget-topic must prevent resurfacing, not merely hide UI rows.
 - Retention defaults and legal audit floor remain explicit product/privacy gates in `25-unresolved-decisions.md`.
+
+The source runtime now registers the frozen lifecycle/settings/summary APIs.
+Candidate acceptance is explicit and idempotent; ordinary chat creates no
+candidate. Deleted, expired, forgotten, and cleared content is excluded from
+normal retrieval and bounded chat context. Summary regeneration persists an
+explicit `generating` state with runtime status `not_configured`; it does not
+invent a Hermes summary provider.

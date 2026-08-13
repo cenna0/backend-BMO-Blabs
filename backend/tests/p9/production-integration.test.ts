@@ -32,6 +32,7 @@ describe("production-shaped P9 integration", () => {
     expect(runtime.backend.app.get("trust proxy")).toBe(1);
     expect((await request(runtime.backend.app).post("/api/v1/auth/login").send({})).status).not.toBe(404);
     expect((await request(runtime.backend.app).get("/api/v1/chat/sessions")).status).toBe(401);
+    expect((await request(runtime.backend.app).get("/api/v1/memories")).status).toBe(401);
 
     const device = await connectDevice(runtime);
     expect(device.socket.readyState).toBe(device.socket.OPEN);

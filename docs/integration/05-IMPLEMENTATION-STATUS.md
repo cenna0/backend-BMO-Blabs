@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-11
-**Last implementation checkpoint:** 2026-08-12 — Slice 5A durable chat/history/idempotency and internal Hermes orchestration source candidate
+**Last implementation checkpoint:** 2026-08-12 — memory lifecycle/API and bounded PostgreSQL chat-memory context source slice
 **Baseline source:** `main` / `d638b20c381c676136c94524a38a1def5d70e565`
 **Documentation branch:** `docs/integration-contract-freeze`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -184,7 +184,7 @@ is deliberately deferred to a later slice.
 | Personalization | `EXISTING_VERIFIED` | Source + exact bare seven-field response/defaults/strict patch/owner tests; the chat slice now consumes all seven bounded fields in server-built Hermes context |
 | Mobile realtime `/api/v1/ws` | `EXISTING_VERIFIED` | Source + automated transport/auth/session/path/payload/expiry/heartbeat/fanout tests; enabled only with the P9 runtime and not deployed to candidate/public production |
 | Chat/history and Hermes-backed send | `EXISTING_VERIFIED` | Source/test tier: six owner-scoped REST routes, deterministic cursor history, transactional user-scoped idempotency, durable 202 operations, globally bounded local scheduling plus DB-enforced lower-cursor session ordering across runtimes, atomic DB-clock leases renewed immediately before Hermes, post-listen bounded recovery whose SQL selects claimable session heads before `LIMIT`, counts durable claims, stops on zero-progress pages, advances unrelated session heads beyond 64+ blocked upper rows, and coalesces overlapping startup/maintenance calls, delete preflight/active abort and cancellation-guarded persistence, server-built personalization + explicit empty-memory + recent-history context, isolated per-user/session internal Hermes conversation, sanitized assistant/error persistence, and per-user `chat_thinking`/`chat_message` fanout. Not migrated/deployed to the running candidate or public production |
-| Memory | `READY_TO_IMPLEMENT` | Durable record/candidate/action/topic-forget/summary source models are verified; gateway/routes/lifecycle runtime remain absent |
+| Memory | `EXISTING_VERIFIED` | Source/test tier: all 15 frozen bearer-owner routes, strict bounded bodies, deterministic cursors, active-record retrieval, candidate accept/reject replay, edit/delete/forget/clear/export privacy behavior, audited request IDs, and durable provider-free summary status/feedback. Chat consumes at most eight relevant active owner memories and creates no candidates. Not migrated/deployed to the running candidate or public production |
 | Schedules | `READY_TO_IMPLEMENT` | Durable schedule/run/delivery source models are verified; worker/routes/runtime remain absent |
 | Wi-Fi DB/API/queue | `READY_TO_IMPLEMENT` | Versioned encrypted desired-state source model is verified; encryption service/API/queue remain absent |
 | Wi-Fi ESP apply/status | `PENDING_PHYSICAL_ESP` | Additive ESP events and physical proof absent; first-boot bootstrap remains a hardware decision |
@@ -202,8 +202,8 @@ is deliberately deferred to a later slice.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.2`: 57 files passed, 1 skipped; 322 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs and was not run. Chat coverage includes ownership, strict request bodies, durable 202 acceptance, same-key/concurrent deduplication, conflict detection, cursor bounds/order, soft deletion, feedback, bounded fair scheduling, distributed lower-cursor session ordering, DB-clock lease renewal after slow context, cross-worker takeover exclusion, active delete abort/no persistence, post-listen startup recovery, SQL claimable-head discovery beyond 64+ blocked upper rows, multi-page durable-claim accounting, zero-progress termination, unrelated-session progress, single-flight recovery, periodic transient-error retry, bounded context, per-user/session Hermes isolation, hard timeout, safe provider failure/audit, and realtime fanout.
-- Backend typecheck and build: passed on Node `22.23.2`.
+- Backend on Node `22.23.1`: 61 files passed, 1 skipped; 346 tests passed, 1 skipped. The skipped suite requires `P9_INTEGRATION=true` and disposable candidate credentials/database inputs and was not run. Memory coverage adds all route ownership/strict-body/request-ID checks, deterministic cursors, active/expiry/deletion filters, cross-user isolation, idempotent candidate and lifecycle replay/conflicts, forget-marker suppression across accept/edit/chat retrieval, clear/export privacy, durable provider-free summary status/feedback, bounded relevant chat context, and proof that chat creates no candidates while retaining the full chat/account/avatar/mobile/device voice regressions.
+- Backend typecheck and build: passed on Node `22.23.1`.
 - Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. On disposable PostgreSQL, an empty three-migration deploy passed, repeat deploy reported no pending migrations, and a populated two-to-three migration upgrade preserved seeded rows in all 11 P9.1 models. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints, and the repeated database-to-schema diff returned `No difference detected`. Transaction-rolled-back positive/negative probes also verified avatar, Wi-Fi AEAD, battery, device-log expiry, provider-subtype, Spotify refresh-secret, and WhatsApp rule constraints. The disposable databases and review images were removed after verification. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the running `bmo` database still has only the two P9.1 migrations.
 - Static/rendered packaging: 13 tests passed, 1 unrelated packaging test skipped. PostgreSQL has no host-published port, Backend uses the named Unix-socket volume, and avatar storage uses a separate writable named volume without adding public routing. Fresh production Backend and P9 review-candidate image builds passed; ephemeral command-only probes verified application UID/GID `1000:1000` and avatar-directory ownership/mode `1000:1000`/`0700`. No service container was started and the live candidate was not recreated.
 - Audio Service: 103 tests passed in the production audio image.
@@ -220,8 +220,8 @@ is deliberately deferred to a later slice.
 
 ## Phase 2 next source slice
 
-Use `04-VPS-IMPLEMENTATION-PLAN.md`. The next source boundary is memory lifecycle,
-followed by schedules and generic proactive delivery. Slice 2A remains unapplied to the
+Use `04-VPS-IMPLEMENTATION-PLAN.md`. The next source boundary is schedules and
+generic proactive delivery. Slice 2A remains unapplied to the
 running candidate and production; candidate recreation, migration execution,
 public activation, provider configuration, and physical ESP work all require
 separate authorization/evidence.

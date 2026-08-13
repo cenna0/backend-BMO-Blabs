@@ -13,6 +13,7 @@ import { ProfileService } from "../services/profile.service.js";
 import { AvatarService } from "../services/avatar.service.js";
 import { PersonalizationService } from "../services/personalization.service.js";
 import { ChatService } from "../services/chat.service.js";
+import { MemoryService } from "../services/memory.service.js";
 import { createAuthRouter } from "./auth.route.js";
 import { createDeviceRouter } from "./device.route.js";
 import { ensureRequestContext, p9ErrorHandler } from "./middleware.js";
@@ -22,6 +23,7 @@ import { createSettingsRouter } from "./settings.route.js";
 import { createProfileRouter } from "./profile.route.js";
 import { createPersonalizationRouter } from "./personalization.route.js";
 import { createChatRouter } from "./chat.route.js";
+import { createMemoryRouter } from "./memory.route.js";
 
 export interface P9RouterServices {
   auth: AuthService;
@@ -38,6 +40,7 @@ export interface P9RouterServices {
   avatars: AvatarService;
   personalization: PersonalizationService;
   chat: ChatService;
+  memory: MemoryService;
   includeOps?: boolean;
 }
 
@@ -71,6 +74,7 @@ export function createP9Router(services: P9RouterServices): Router {
   ));
   router.use(createPersonalizationRouter(services.personalization, services.accessTokens, services.sessions));
   router.use(createChatRouter(services.chat, services.accessTokens, services.sessions));
+  router.use(createMemoryRouter(services.memory, services.accessTokens, services.sessions));
   if (services.includeOps === true) router.use(createOpsRouter(services.repositories));
   router.use(p9ErrorHandler);
   return router;

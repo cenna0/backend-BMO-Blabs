@@ -22,6 +22,10 @@ It is source/test verified only: the running candidate was not migrated or
 recreated, Caddy/public routing was not changed, and physical proactive speech
 remains pending the generic delivery slice and ESP evidence.
 
+The memory slice registers all 15 frozen memory/settings/summary routes and
+injects bounded active owner memory into chat. It is source/test verified only;
+the running candidate and public production were not migrated or recreated.
+
 ## Runtime and existing voice surfaces
 
 | Method/surface | Path/event | Status | Availability / evidence |
@@ -110,14 +114,14 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Methods | Path family | Status | Availability / gap |
 |---|---|---|---|
-| GET/PATCH | `/api/v1/settings/memory` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/memories`, `/api/v1/memories/:id` | `READY_TO_IMPLEMENT` | Not registered |
-| PATCH/DELETE | `/api/v1/memories/:id` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/memory-candidates` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/memory-candidates/:id/accept`, `.../reject` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/memories/forget-topic`, `.../clear-all`, `.../export` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/memory/summary` | `READY_TO_IMPLEMENT` | Not registered |
-| POST | `/api/v1/memory/summary/regenerate`, `.../feedback` | `READY_TO_IMPLEMENT` | Not registered |
+| GET/PATCH | `/api/v1/settings/memory` | `EXISTING_VERIFIED` | Source/test tier; exact `{automaticMemoryCandidates}` body and bearer-derived owner; not candidate/public deployed |
+| GET | `/api/v1/memories`, `/api/v1/memories/:id` | `EXISTING_VERIFIED` | Source/test tier; deterministic opaque cursor, bounded pages, active/unexpired owner rows only |
+| PATCH/DELETE | `/api/v1/memories/:id` | `EXISTING_VERIFIED` | Source/test tier; strict bounded patch, owner-safe soft delete, idempotent audited actions |
+| GET | `/api/v1/memory-candidates` | `EXISTING_VERIFIED` | Source/test tier; bounded deterministic pending/unexpired owner candidates only |
+| POST | `/api/v1/memory-candidates/:id/accept`, `.../reject` | `EXISTING_VERIFIED` | Source/test tier; transaction-locked owner scope and payload-aware idempotent replay/conflict behavior |
+| POST | `/api/v1/memories/forget-topic`, `.../clear-all`, `.../export` | `EXISTING_VERIFIED` | Source/test tier; suppression includes pending candidates/summary as applicable; JSON export excludes deleted/expired memory and non-pending candidates |
+| GET | `/api/v1/memory/summary` | `EXISTING_VERIFIED` | Source/test tier; active/unexpired owner summary or explicit null |
+| POST | `/api/v1/memory/summary/regenerate`, `.../feedback` | `EXISTING_VERIFIED` | Source/test tier; durable `generating` boundary reports memory-record source and `not_configured` runtime; no invented Hermes summary provider |
 | GET/POST | `/api/v1/schedules` | `READY_TO_IMPLEMENT` | Not registered |
 | GET/PATCH | `/api/v1/schedules/:id` | `READY_TO_IMPLEMENT` | Not registered |
 | POST | `/api/v1/schedules/:id/pause`, `.../resume` | `READY_TO_IMPLEMENT` | Not registered |
