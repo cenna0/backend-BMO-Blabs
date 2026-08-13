@@ -202,9 +202,10 @@ is deliberately deferred to a later slice.
 
 ## Tests captured at freeze
 
-- Backend on Node `22.23.1`: 68 files passed; 374 tests passed. Scheduler/delivery coverage adds all eight route shapes, strict owner/device/mobile-vocabulary validation, Jakarta recurrence and invalid-date handling, optimistic mutation conflicts, unique DB-clock due/missed claims, expiring leases, retry/expiry/idempotency races, recurrence advance/Once completion, one generic source queue, MOBILE intent handling, typed events, and proof that physical playback is not claimed while retaining memory/chat/account/avatar/mobile/device voice regressions. Disposable authenticated database HTTP acceptance was not enabled.
+- Backend on Node `22.23.1`: 72 files passed; 400 tests passed, 1 skipped. Coverage includes account/profile/recovery/avatar, mobile realtime, chat/Hermes, memory, schedules/proactive delivery, device additions, provider boundaries, plugin catalog, bug reports, and existing voice/device regressions. Disposable authenticated database HTTP acceptance was not enabled.
 - Backend typecheck and build: passed on Node `22.23.1`.
-- Integration/support source coverage: 20 focused route/config tests passed on pinned Node 22; an output-directory build to `/tmp/bmo-integration-build` passed. The normal `npm run build` and Prisma client regeneration were not writable because the existing `backend/dist` and generated-client files are owned by another runtime user; typecheck remains clean. Live WhatsApp/Spotify provider calls stay `BLOCKED_EXTERNAL_SECRET`.
+- Integration/support source coverage: focused boundary/HTTP tests passed on pinned Node 22; an isolated full suite reported 72 files/400 passed/1 skipped. Live WhatsApp/Spotify provider calls stay `BLOCKED_EXTERNAL_SECRET`.
+- Build evidence: typecheck passed; Prisma validate passed; isolated archive Prisma generate and out-of-tree TypeScript build passed. In-place `npm run build` and Prisma generate were not writable because existing `backend/dist` and generated-client files are owned by another runtime user.
 - Prisma validation and generated-client typecheck/build: passed. The source manifest requires three migrations. On disposable PostgreSQL, an empty three-migration deploy passed, repeat deploy reported no pending migrations, and a populated two-to-three migration upgrade preserved seeded rows in all 11 P9.1 models. The first post-deploy introspection diff proposed only 14 foreign-key renames; explicit Prisma relation maps now match the deployed constraint names without changing migration SQL or database constraints, and the repeated database-to-schema diff returned `No difference detected`. Transaction-rolled-back positive/negative probes also verified avatar, Wi-Fi AEAD, battery, device-log expiry, provider-subtype, Spotify refresh-secret, and WhatsApp rule constraints. The disposable databases and review images were removed after verification. Candidate `/ops/db/livez`, `/readyz`, and `/migrations` were not re-probed or changed in Slice 2A; the running `bmo` database still has only the two P9.1 migrations.
 - Static/rendered packaging: 13 tests passed, 1 unrelated packaging test skipped. PostgreSQL has no host-published port, Backend uses the named Unix-socket volume, and avatar storage uses a separate writable named volume without adding public routing. Fresh production Backend and P9 review-candidate image builds passed; ephemeral command-only probes verified application UID/GID `1000:1000` and avatar-directory ownership/mode `1000:1000`/`0700`. No service container was started and the live candidate was not recreated.
 - Audio Service: 103 tests passed in the production audio image.
@@ -221,8 +222,9 @@ is deliberately deferred to a later slice.
 
 ## Phase 2 next source slice
 
-Use `04-VPS-IMPLEMENTATION-PLAN.md`. Schedules and generic proactive delivery
-are source/test implemented. Slice 2A remains unapplied to the
-running candidate and production; candidate recreation, migration execution,
-public activation, provider configuration, and physical ESP work all require
-separate authorization/evidence.
+Use `04-VPS-IMPLEMENTATION-PLAN.md`. The approved Phase 2 application scope is
+source/test implemented through device additions, provider boundaries, plugin
+catalog, and bug reports. Slice 2A remains unapplied to the running candidate
+and production; candidate recreation, migration execution, public activation,
+provider configuration, and physical ESP work all require separate
+authorization/evidence.

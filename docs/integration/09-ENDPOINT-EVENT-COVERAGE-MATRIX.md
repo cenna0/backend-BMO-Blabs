@@ -3,9 +3,9 @@
 **Frozen:** 2026-08-11
 **Rule:** Status uses `08-DOCS-MAINTENANCE-PROTOCOL.md`; availability is independent from implementation status.
 
-Slice 2A adds the durable source schema behind the target routes below. It does
-not register any route or event, so their `READY_TO_IMPLEMENT` and
-`PENDING_PHYSICAL_ESP` states do not change. Migration
+Slice 2A adds the durable source schema behind the target routes below.
+Subsequent Phase 2 source slices register the application routes and event
+boundaries described in this matrix. Migration
 `20260811190000_phase2_application_foundation` is source-verified only and has
 not been applied to the running candidate or production.
 
@@ -31,6 +31,10 @@ device log, and telemetry routes in the production-shaped source runtime. Wi-Fi
 passwords use protected AES-256-GCM configuration and never appear in read
 responses or logs. Existing voice events remain unchanged; additive device
 events and physical behavior remain `PENDING_PHYSICAL_ESP`.
+
+Scheduler/proactive, device additions, and provider/support slices are source/test
+verified only. No candidate or public production migration, recreation, or
+activation occurred.
 
 ## Runtime and existing voice surfaces
 
