@@ -257,6 +257,7 @@ model User {
   spotifyCredential         SpotifyCredential?
   spotifyActions            SpotifyAction[]
   whatsAppConversations     WhatsAppConversation[]
+  whatsAppConversationAliases WhatsAppConversationAlias[]
   whatsAppNotificationRules WhatsAppNotificationRule[]
   whatsAppSendRequests      WhatsAppSendRequest[]
   whatsAppDeliveries        WhatsAppDelivery[]
@@ -811,6 +812,7 @@ model IntegrationConnection {
   spotifyActions       SpotifyAction[]
   whatsAppRules        WhatsAppNotificationRule[]
   whatsAppConversations WhatsAppConversation[]
+  whatsAppConversationAliases WhatsAppConversationAlias[]
   whatsAppSendRequests WhatsAppSendRequest[]
   whatsAppDeliveries   WhatsAppDelivery[]
 
@@ -894,10 +896,29 @@ model WhatsAppConversation {
   connection         IntegrationConnection     @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "WhatsAppConversation_connection_owner_provider_fkey")
   deliveries         WhatsAppDelivery[]
   sendRequests       WhatsAppSendRequest[]
+  aliases            WhatsAppConversationAlias[] @relation("WhatsAppConversationAliases")
 
   @@unique([id, userId, provider])
+  @@unique([id, userId, connectionId, provider])
   @@unique([userId, connectionId, provider, opaqueChatRef])
   @@index([userId, lastActivityAt, id])
+}
+
+model WhatsAppConversationAlias {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @db.Uuid
+  connectionId   String              @db.Uuid
+  provider       IntegrationProvider @default(WHATSAPP)
+  conversationId String              @db.Uuid
+  providerRef    String              @db.VarChar(255)
+  createdAt      DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(3)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection     IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "WhatsAppConversationAlias_connection_owner_provider_fkey")
+  conversation   WhatsAppConversation @relation("WhatsAppConversationAliases", fields: [conversationId, userId, connectionId, provider], references: [id, userId, connectionId, provider], onDelete: Cascade, map: "WhatsAppConversationAlias_conversation_owner_provider_fkey")
+
+  @@unique([userId, connectionId, provider, providerRef])
+  @@index([conversationId, userId, connectionId, provider])
 }
 
 model WhatsAppNotificationRule {

@@ -456,6 +456,10 @@ export class P9Repositories {
     return this.db.whatsAppConversation;
   }
 
+  get whatsAppConversationAlias() {
+    return this.db.whatsAppConversationAlias;
+  }
+
   get oAuthState() {
     return this.db.oAuthState;
   }

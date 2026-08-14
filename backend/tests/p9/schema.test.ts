@@ -13,6 +13,10 @@ const whatsappConversationMigrationPath = new URL(
   "../../prisma/migrations/20260814120000_whatsapp_conversations/migration.sql",
   import.meta.url,
 );
+const whatsappIdentityAliasMigrationPath = new URL(
+  "../../prisma/migrations/20260814210000_whatsapp_identity_aliases/migration.sql",
+  import.meta.url,
+);
 
 function sqlTableDefinition(sql: string, tableName: string): string {
   const match = sql.match(new RegExp(`CREATE TABLE "${tableName}" \\(([\\s\\S]*?)\\n\\);`));
@@ -90,6 +94,8 @@ const expectedMappedForeignKeys = [
   ],
   ["WhatsAppSendRequest", "connection", "WhatsAppSendRequest_connection_owner_provider_fkey"],
   ["WhatsAppDelivery", "connection", "WhatsAppDelivery_connection_owner_provider_fkey"],
+  ["WhatsAppConversationAlias", "connection", "WhatsAppConversationAlias_connection_owner_provider_fkey"],
+  ["WhatsAppConversationAlias", "conversation", "WhatsAppConversationAlias_conversation_owner_provider_fkey"],
 ] as const;
 
 describe("P9 Prisma schema", () => {
@@ -140,6 +146,7 @@ describe("P9 Prisma schema", () => {
       "SpotifyCredential",
       "SpotifyAction",
       "WhatsAppConversation",
+      "WhatsAppConversationAlias",
       "WhatsAppNotificationRule",
       "WhatsAppSendRequest",
       "WhatsAppDelivery",
@@ -324,6 +331,22 @@ describe("P9 Prisma schema", () => {
     expect(migrationSql).toContain('CONSTRAINT "WhatsAppConversation_connection_owner_provider_fkey"');
     expect(migrationSql).toContain('CONSTRAINT "WhatsAppSendRequest_conversation_owner_provider_fkey"');
     expect(migrationSql).toContain('CONSTRAINT "WhatsAppDelivery_conversation_owner_provider_fkey"');
+  });
+
+  it("declares additive provider identity aliases without exposing them to Mobile", async () => {
+    const [schema, migrationSql] = await Promise.all([
+      readFile(schemaPath, "utf8"),
+      readFile(whatsappIdentityAliasMigrationPath, "utf8"),
+    ]);
+    expect(sqlColumnTypes(sqlTableDefinition(migrationSql, "WhatsAppConversationAlias"))).toEqual([
+      "id:UUID", "userId:UUID", "connectionId:UUID", 'provider:"IntegrationProvider"',
+      "conversationId:UUID", "providerRef:VARCHAR(255)",
+      "createdAt:TIMESTAMPTZ(3)", "updatedAt:TIMESTAMPTZ(3)",
+    ]);
+    expect(schema).toMatch(/model WhatsAppConversationAlias[\s\S]*providerRef\s+String\s+@db\.VarChar\(255\)/);
+    expect(schema).toMatch(/model WhatsAppConversationAlias[\s\S]*@@unique\(\[userId, connectionId, provider, providerRef\]\)/);
+    expect(migrationSql).not.toMatch(/DROP\s|DELETE\s+FROM|UPDATE\s+"/i);
+    expect(migrationSql).toContain('CONSTRAINT "WhatsAppConversationAlias_conversation_owner_provider_fkey"');
   });
 
   it("closes nullable CHECK gaps and requires bounded device-log expiry", async () => {
