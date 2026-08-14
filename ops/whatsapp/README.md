@@ -53,6 +53,57 @@ notification. Incoming text is untrusted data and never directly enters Hermes
 reasoning/tools. The index is traffic-derived, not a full address-book/history
 sync. The bridge queue is in-memory and destructive, not durable/replayable.
 
+## Backend-only live acceptance
+
+Do not call the bridge `/messages` endpoint. Run the following against the
+candidate Backend with an existing non-production user's bearer token held only
+in the operator shell. Do not paste the token, phone identity, message body,
+conversation response, or raw provider identity into chat/logs.
+
+```bash
+set -eu
+API=http://127.0.0.1:3010/api/v1
+: "${BMO_ACCESS_TOKEN:?set locally; never paste this value into Git or chat}"
+: "${BMO_TEST_PHONE:?set locally for recipient-resolution only}"
+: "${BMO_TEST_MESSAGE:?set locally; do not print this value}"
+AUTH=(-H "Authorization: Bearer $BMO_ACCESS_TOKEN" -H 'content-type: application/json')
+
+curl -fsS "$API/integrations/whatsapp/status" "${AUTH[@]}" >/dev/null
+curl -fsS "$API/integrations/whatsapp/conversations?limit=50" "${AUTH[@]}" >/dev/null
+
+# Have the selected contact send a DM to the paired personal account here.
+# Read only the safe conversation UUID/displayName/type from the response.
+sleep 6
+conversations_json=$(curl -fsS "$API/integrations/whatsapp/conversations?limit=50" "${AUTH[@]}")
+conversation_id=$(printf '%s' "$conversations_json" | jq -r '.conversations[0].id')
+unset conversations_json
+
+# Configure one selected DM; the API accepts BMO conversation IDs only.
+curl -fsS -X PATCH "$API/integrations/whatsapp/notification-rules" "${AUTH[@]}" \
+  --data "{\"rules\":[{\"scope\":\"ALL\",\"enabled\":false,\"speakOnDevice\":false},{\"scope\":\"CONTACT\",\"conversationId\":\"$conversation_id\",\"enabled\":true,\"speakOnDevice\":false}]}" >/dev/null
+
+# Have the same contact send one more DM. Verify only a metadata event/notification
+# and conversation state through Backend/mobile WS instrumentation.
+
+send_preview=$(curl -fsS -X POST "$API/integrations/whatsapp/send-preview" "${AUTH[@]}" \
+  --data "{\"conversationId\":\"$conversation_id\",\"message\":\"$BMO_TEST_MESSAGE\",\"idempotencyKey\":\"phase26-wa-send-1\"}")
+send_id=$(printf '%s' "$send_preview" | jq -r '.send.id')
+unset send_preview
+curl -fsS -X POST "$API/integrations/whatsapp/send-confirm" "${AUTH[@]}" \
+  --data "{\"requestId\":\"$send_id\",\"confirmed\":true}" >/dev/null
+
+# Resolve an unobserved recipient only if needed; keep the phone value local.
+curl -fsS -X POST "$API/integrations/whatsapp/conversations/resolve" "${AUTH[@]}" \
+  --data "{\"phoneNumber\":\"$BMO_TEST_PHONE\"}" >/dev/null
+```
+
+For the negative checks, have a second contact send a DM while no enabled
+CONTACT rule exists and verify the conversation is indexed but no notification
+event is emitted. Have a group message occur and verify `type=GROUP`, default
+notification suppression, and no Hermes/tool activity. Finally have a contact
+send prompt-injection-shaped text; verify it remains data, creates no tool/send
+operation, and does not appear in the evidence. Record only boolean results.
+
 ## Read-only preflight
 
 Run these checks before any mutation. They print only paths, service state, and
