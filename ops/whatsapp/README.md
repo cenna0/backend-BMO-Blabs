@@ -1,8 +1,8 @@
 # Candidate WhatsApp personal-account connector operations
 
 This runbook is for the isolated candidate only. The personal account is
-paired and the dedicated bridge is active; the source/unit persistence repair
-is tracked below. It must not be used for `hermes-gateway.service`, production
+paired, the dedicated bridge is active and enabled for reboot, and source/unit
+persistence is verified. It must not be used for `hermes-gateway.service`, production
 Caddy, production migrations, or the production Backend.
 
 The dedicated unit launches the installed Hermes `bridge.js` unchanged as
@@ -52,6 +52,22 @@ are disabled unless explicitly enabled. Ingestion continues when a rule mutes
 notification. Incoming text is untrusted data and never directly enters Hermes
 reasoning/tools. The index is traffic-derived, not a full address-book/history
 sync. The bridge queue is in-memory and destructive, not durable/replayable.
+
+### Provider identity reconciliation
+
+WhatsApp/Baileys may expose more than one provider reference for one DM, such
+as a phone JID and an opaque LID. Backend stores those references in a private
+owner/connection-scoped alias index and uses the same BMO conversation for
+resolve-first and inbound-first flows when explicit aliases are present. If a
+bridge event contains only an opaque LID, Backend must not infer a phone match
+from display names or message text. Duplicate rows are merged deterministically
+to the conversation with the explicit notification rule, then earliest
+creation time, then lexical BMO UUID; deliveries and send requests move to the
+winner and the winning notification rule is retained.
+
+The alias index is server-side only. Mobile receives the existing BMO-safe
+conversation object and never receives a provider alias, JID, phone identity,
+session path, or bridge payload.
 
 ## Backend-only live acceptance
 
@@ -225,7 +241,7 @@ sudo -u hermes -H env BACKUP_DIR="$backup_dir" sh -c '
 '
 ```
 
-## Official pairing command — not run in this phase
+## Official pairing command — completed; do not repeat
 
 This is the installed Hermes CLI flow. It requires a TTY and the physical QR
 scan. Pair the user's personal WhatsApp account. When the wizard presents the
@@ -272,9 +288,10 @@ launcher passes that protected value only to the official bridge owner-forward
 gate. Backend still receives contact events independently and applies its own
 `ALL`/`CONTACT`/`GROUP` notification rules.
 
-The source unit now contains `[Install] WantedBy=multi-user.target`. Reinstall
-only the dedicated files and enable only this unit; the command does not
-restart `hermes-gateway.service`:
+The source unit contains `[Install] WantedBy=multi-user.target`; the installed
+unit is enabled and active. If a future candidate-only reinstall is required,
+reinstall only the dedicated files and enable only this unit; the command does
+not restart `hermes-gateway.service`:
 
 ```bash
 cd /opt/bmo/app
@@ -362,10 +379,11 @@ sudo -u hermes -H env BACKUP_DIR="$backup_dir" sh -c '
 
 No rollback command deletes `/home/hermes/.hermes/whatsapp/session`.
 
-## STOP boundary
+## Current stop boundary
 
-This runbook stops before the pairing command and before any install/start,
-systemd mutation, candidate restart, Hermes restart, or Caddy mutation. Return
-only sanitized boolean/status evidence after the operator review. Never share
-QR output, session files, `creds.json`, provider tokens, phone numbers, JIDs,
-or message bodies.
+Pairing and dedicated-unit installation are complete. Do not re-pair, modify or
+restart `hermes-gateway.service`, modify active Caddy, or promote the candidate
+to production as part of this runbook. The remaining post-fix live acceptance
+is operator-coordinated DM/group/manual-reply traffic only. Never share QR
+output, session files, `creds.json`, provider tokens, phone numbers, JIDs, or
+message bodies.

@@ -179,9 +179,9 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `CANDIDATE_VERIFIED` | Operator-only setup surface; QR pairing completed outside mobile UI and the dedicated bridge is active |
 | POST | `/api/v1/integrations/whatsapp/disconnect` | `SOURCE_VERIFIED` | Owner-scoped metadata/provider boundary; no live disconnect acceptance claimed |
 | GET | `/api/v1/integrations/whatsapp/conversations`, `.../:id` | `CANDIDATE_VERIFIED` | Candidate-only authenticated smoke passed owner-scoped list/detail; responses contain BMO UUID and safe display/type/activity/notification fields only |
-| POST | `/api/v1/integrations/whatsapp/conversations/resolve` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed validated international phone resolution/creation of a server-side DM mapping; no address-book import |
+| POST | `/api/v1/integrations/whatsapp/conversations/resolve` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed validated international phone resolution/creation and server-side provider-alias registration; no address-book import or provider identity projection |
 | GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed authenticated `ALL` DM default plus UUID-scoped `CONTACT`; `GROUP` remains default-disabled and ingestion-independent |
-| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed conversation-scoped preview and bounded foreign-confirm rejection; no real provider send was executed |
+| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed conversation-scoped preview and bounded foreign-confirm rejection; outbound resolution uses the reconciled server-side conversation mapping |
 | POST | `/api/v1/integrations/spotify/connect` | `SOURCE_VERIFIED` | Server-side Authorization Code state route; live credentials/callback `BLOCKED_EXTERNAL_SECRET` |
 | GET | `/api/v1/integrations/spotify/callback` | `SOURCE_VERIFIED` | Exact configured redirect and single-use state; tokens stay server-side |
 | GET | `/api/v1/integrations/spotify/status` | `SOURCE_VERIFIED` | Normalized owner-scoped state only |

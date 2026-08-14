@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-14
-**Last implementation checkpoint:** 2026-08-14 — Phase 2.6 personal WhatsApp Mobile API candidate implementation
+**Last implementation checkpoint:** 2026-08-14 — Phase 2.6 WhatsApp identity reconciliation candidate correction
 **Baseline source:** `feat/vps-mobile-device-integration` / current pushed Phase 2.6 source
 **Documentation branch:** `feat/vps-mobile-device-integration`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -14,18 +14,19 @@ Caddy mutation, or provider secret was performed.
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Spotify concrete provider client | `SOURCE_VERIFIED` | Bounded Authorization Code exchange, refresh-token exchange, normalized search/devices/playback, and explicit Web API action mapping. Focused provider/service/HTTP tests passed; full Node 22 suite: `412 passed, 1 skipped`; typecheck passed. |
+| Spotify concrete provider client | `SOURCE_VERIFIED` | Bounded Authorization Code exchange, refresh-token exchange, normalized search/devices/playback, and explicit Web API action mapping. Focused provider/service/HTTP tests passed; full Node 22 Backend suite: `442 passed, 1 skipped`; typecheck passed. |
 | Spotify capability contract | `SOURCE_VERIFIED` | Search/resolution plus track/artist/album/playlist play, resume/pause/next/previous, queue, transfer/select device, active device, current playback, seek, volume, shuffle, and repeat are validated and mapped to Spotify Connect endpoints. |
 | Spotify encrypted persistence/refresh | `SOURCE_VERIFIED` | Existing AES-256-GCM credential envelope is used; expiry-aware refresh preserves an omitted refresh token and retries one provider 401. Unit tests verify ciphertext-only persistence and owner isolation. |
 | Spotify live candidate acceptance | `BLOCKED_EXTERNAL_SECRET` | Client ID/secret, provider encryption key, exact callback registration, and an authorized Spotify account/device are not provisioned. |
 | Spotify callback exposure | `BLOCKED_OPERATOR` | Exact single-path diff is prepared at `ops/caddy/phase26-spotify-candidate-callback.patch` but has not been applied to active Caddy. Candidate remains loopback at `127.0.0.1:3010`. |
 | Hermes WhatsApp runtime boundary | `CANDIDATE_VERIFIED` | Installed Hermes 0.20.0 and the official unchanged Baileys bridge provide loopback `/health`, destructive `/messages`, and `/send`; the paired personal-account session is present and the bridge reports connected. |
 | WhatsApp dedicated transport runtime | `CANDIDATE_VERIFIED` | `bmo-whatsapp-bridge.service` runs as `hermes` on loopback 3001 with bounded crash restart, private stdout/stderr, and no dependency/restart of `hermes-gateway.service`; source now includes reboot enablement. |
-| WhatsApp candidate runtime/source alignment | `CANDIDATE_VERIFIED` | Earlier runtime used the Phase 2.6 route build but an older service bundle: compiled route hash matched source while service hash differed. Candidate was rebuilt from pushed `dc831c2`, tagged `bmo-phase26-whatsapp-candidate:dc831c2`, recreated only for `bmo-p9-1-backend-1`, and reported no pending migrations. |
+| WhatsApp candidate runtime/source alignment | `CANDIDATE_VERIFIED` | Candidate was rebuilt from pushed `fa7cd0a17254a9a897d0f30b12fc3736d94fe2dd`, tagged `bmo-phase26-whatsapp-candidate:fa7cd0a`, image ID `sha256:09fa0807f9665488a7414799ad902f7f34d639b75fe1ffcb218062b1d0a7cd7d`, and recreated only for `bmo-p9-1-backend-1`; the identity-alias migration is applied only to candidate PostgreSQL. |
 | WhatsApp concrete adapter | `SOURCE_VERIFIED` | Candidate `HermesWhatsAppBridgeClient` implements bounded loopback health, receives validated contact/group events, preserves owner markers, maps `/send`, returns bounded errors, and never exposes provider response data. |
 | WhatsApp personal-account ownership/inbound producer | `SOURCE_VERIFIED` | Candidate poller binds exactly one connected personal-account owner, indexes DM/GROUP traffic into owner-scoped BMO conversations, deduplicates provider message IDs, stores no body, and keeps inbound text out of Hermes privileged paths. Real traffic remains intentionally untested. |
-| WhatsApp Mobile conversation/API contract | `CANDIDATE_VERIFIED` | Candidate-only authenticated smoke passed for connection/status, resolve, list/detail, UUID-scoped rules, send-preview, and bounded send-confirm ownership rejection; no real outbound send or inbound traffic was performed. |
+| WhatsApp Mobile conversation/API contract | `CANDIDATE_VERIFIED` | Candidate-only authenticated smoke passed for connection/status, resolve, list/detail, UUID-scoped rules, send-preview, and bounded send-confirm ownership rejection; provider identities remain server-side. |
 | WhatsApp notification rules | `CANDIDATE_VERIFIED` | Candidate-only rule smoke passed with `ALL` plus UUID-scoped `CONTACT`; stale unbound `PENDING` rows no longer block a new owner, while connected/externally bound owners remain protected. |
+| WhatsApp identity reconciliation | `CANDIDATE_VERIFIED` | Real candidate evidence showed the same reported DM arriving as a phone-JID resolve identity versus a LID-only inbound identity. Additive `WhatsAppConversationAlias` migration, alias-aware resolve/inbound convergence, deterministic rule-bearing duplicate selection, dependent delivery/send-history move, and candidate-only repair passed; no display-name/body heuristic is used. A new real DM retest remains operator-gated. |
 | Generic WhatsApp proactive speech | `PENDING_PHYSICAL_ESP` | A real inbound event can create the generic `WHATSAPP` proactive-delivery job when an enabled rule and active device match; physical synthesis/playback evidence is absent. |
 
 ## Historical Phase 2.5 candidate acceptance
@@ -62,7 +63,7 @@ availability.
 | Backend tests and voice regression | `CANDIDATE_VERIFIED` | Node `22.23.1` full suite: 72 files passed, 401 tests passed, one pre-existing DB HTTP test skipped. Candidate fake-ESP whole-WAV flow completed through STT, Hermes, Piper, MP3 storage, `audio_ready`, and playback lifecycle; candidate remained healthy. |
 | Chat/Hermes and proactive server lifecycle | `CANDIDATE_VERIFIED` | Candidate chat operations/messages persisted and Hermes responses were stored; `speakOnDevice=false` was accepted without device audio. Schedule worker expiry guard produced one durable `MISSED` run for a forced expired occurrence; generic proactive queue/unit coverage passed. |
 | Wi-Fi server security/lifecycle | `CANDIDATE_VERIFIED` | Candidate-only AES-256-GCM protected key file was mode `0600`, stable across restart, and never logged/returned. Password-bearing and open-network writes/read projection passed; physical apply/rollback remains hardware-gated. |
-| WhatsApp live provider | `BLOCKED_OPERATOR` | Pairing and dedicated bridge are complete; Backend-only real DM/group/send acceptance still requires the operator to coordinate sanitized contact interaction and an authenticated non-production candidate user. |
+| WhatsApp live provider | `BLOCKED_OPERATOR` | Pairing and dedicated bridge are complete and the first real DM exposed the identity defect. The defect is repaired in candidate; final post-fix DM/group/send/owner-reply acceptance still requires the operator to coordinate sanitized traffic. |
 | Spotify live provider | `BLOCKED_EXTERNAL_SECRET` | Client credentials, callback registration, and provider encryption secret are not provisioned or verified; candidate boundary returned sanitized `503`. |
 | Physical ESP acceptance | `PENDING_PHYSICAL_ESP` | Fake-device server acceptance passed for additive event handling. Firmware, real Wi-Fi application/rollback, telemetry/log emission, settings acknowledgement, and physical proactive playback remain unverified. |
 | Firewall policy inspection | `BLOCKED_OPERATOR` | `ufw status verbose` and `nft list ruleset` require passworded elevated access. Service/listener/Docker/Caddy checks independently show no port 5555 exposure. |

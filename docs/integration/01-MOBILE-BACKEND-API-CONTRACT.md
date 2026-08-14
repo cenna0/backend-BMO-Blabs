@@ -943,6 +943,15 @@ mapped to the provider destination only on the server; the response never
 contains the phone number or JID. Invalid input returns `INVALID_INPUT` (400),
 and a foreign/malformed conversation returns `OWNERSHIP_DENIED` (404).
 
+For DM identity reconciliation, Backend keeps a private provider-alias index
+for every explicit provider reference observed for the owner-scoped
+conversation. This allows a phone-JID resolve and a Baileys LID/chat alias to
+converge when the bridge exposes both references. If the official bridge emits
+only an opaque LID with no phone alias, Backend does not guess from a display
+name or message text; it keeps the event conservative until an explicit
+provider/operator mapping is available. Alias rows never appear in Mobile
+responses.
+
 ## Notification rules
 
 ```text
@@ -1020,7 +1029,10 @@ It contains no body preview, phone number, raw JID, session identifier, QR,
 token, or credential. Official owner-forward events, where enabled, update
 bounded conversation activity only and do not create duplicate notifications
 for Backend `/send` echoes. Full history sync, media, typing/read receipts,
-and address-book import are outside MVP. The bridge queue is in-memory and
+and address-book import are outside MVP. For duplicate provider aliases,
+Backend keeps the conversation with an explicit notification rule, then uses
+earliest creation time and BMO UUID as deterministic tie-breakers; deliveries
+and send requests move to that winner. The bridge queue is in-memory and
 destructive, so WhatsApp delivery is not durable or replayable.
 
 ## Runtime boundary
