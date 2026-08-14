@@ -66,17 +66,72 @@ creation time, then lexical BMO UUID; deliveries and send requests move to the
 winner and the winning notification rule is retained.
 
 The observed Hermes 0.20.0 bridge sequence is `phone-JID resolve ->
-chatId=senderId LID-only inbound`. The bridge's internal LID-to-phone map is
-not included in the destructive `/messages` payload, so the first LID-only
-event cannot be reconciled automatically by Backend without an explicit
-provider/operator relationship. Once that relationship is present, alias
-lookup runs before conversation creation and the deterministic merge path
-reconciles all subsequent aliases. This is a provider capability limitation,
-not a reason to use display-name, message-text, timing, or wildcard matching.
+chatId=senderId LID-only inbound`. The official bridge maintains the
+phone/LID relationship in session mapping files but does not include it in the
+destructive `/messages` payload. The dedicated resolver below reads only those
+mapping files as `hermes`; Backend receives bounded requested equivalence sets,
+never the session directory. It rescans on every request, so a `creds.update`
+mapping becomes available without restarting the bridge. If the resolver is
+unavailable or the mapping is absent, Backend remains conservative and later
+traffic/resolve will reconcile once the mapping appears. This never uses
+display-name, message-text, timing, or wildcard matching.
 
 The alias index is server-side only. Mobile receives the existing BMO-safe
 conversation object and never receives a provider alias, JID, phone identity,
 session path, or bridge payload.
+
+### Provider identity resolver preparation
+
+The source files are:
+
+```text
+ops/whatsapp/bmo-whatsapp-identity-resolver.mjs
+ops/whatsapp/identity-resolver.test.mjs
+ops/whatsapp/systemd/bmo-whatsapp-identity-resolver.service
+ops/whatsapp/p9.1-identity-resolver.override.yml
+```
+
+The resolver is loopback-only on `127.0.0.1:3002`, has no Caddy route, emits no
+stdout/stderr, and exposes only unauthenticated metadata health plus an
+authenticated `/resolve` relation query. It reads strict
+`lid-mapping-{digits}.json` and `lid-mapping-{digits}_reverse.json` files only;
+invalid, world/group-readable, non-owned, oversized, or unrelated session files
+are ignored. It never opens `creds.json`, keys, history, media, or Baileys
+state.
+
+Installation is intentionally a protected operator checkpoint and has not
+been run by the unprivileged review shell:
+
+```bash
+sudo install -d -o root -g root -m 0700 /opt/bmo/config/whatsapp
+sudo sh -c 'umask 077; openssl rand -hex 32 > /opt/bmo/config/whatsapp/identity-resolver.token'
+sudo chown root:root /opt/bmo/config/whatsapp/identity-resolver.token
+sudo chmod 0400 /opt/bmo/config/whatsapp/identity-resolver.token
+sudo install -o root -g root -m 0755 ops/whatsapp/bmo-whatsapp-identity-resolver.mjs /usr/local/libexec/bmo-whatsapp-identity-resolver
+sudo install -o root -g root -m 0644 ops/whatsapp/systemd/bmo-whatsapp-identity-resolver.service /etc/systemd/system/bmo-whatsapp-identity-resolver.service
+sudo systemd-analyze verify /etc/systemd/system/bmo-whatsapp-identity-resolver.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now bmo-whatsapp-identity-resolver.service
+curl -fsS http://127.0.0.1:3002/health
+```
+
+After the resolver is healthy, recreate only the candidate Backend with the
+protected compose override. This does not migrate PostgreSQL or touch Hermes:
+
+```bash
+P9_WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE=/opt/bmo/config/whatsapp/identity-resolver.token \
+docker compose --project-name bmo-p9-1 \
+  --env-file /tmp/bmo-p9-1-validation-20260804/compose.env \
+  -f p9.1-compose.yml \
+  -f ops/whatsapp/p9.1-identity-resolver.override.yml \
+  up -d --no-deps --force-recreate backend
+curl -fsS http://127.0.0.1:3010/livez
+curl -fsS http://127.0.0.1:3010/readyz
+```
+
+Rollback is candidate-only: recreate Backend with only `p9.1-compose.yml`,
+disable the resolver unit, then remove only the resolver unit/token if the
+operator chooses. Do not remove or modify the paired WhatsApp session.
 
 ## Backend-only live acceptance
 
@@ -86,11 +141,11 @@ in the operator shell. Do not paste the token, phone identity, message body,
 conversation response, or raw provider identity into chat/logs.
 
 ```bash
-set -Eeuo pipefail
+wa_acceptance() {
 API=http://127.0.0.1:3010/api/v1
-: "${BMO_ACCESS_TOKEN:?set locally; never paste this value into Git or chat}"
-: "${BMO_TEST_PHONE:?set locally for recipient-resolution only}"
-: "${BMO_TEST_MESSAGE:?set locally; do not print this value}"
+if [ -z "${BMO_ACCESS_TOKEN:-}" ]; then echo 'missing BMO_ACCESS_TOKEN' >&2; return 1; fi
+if [ -z "${BMO_TEST_PHONE:-}" ]; then echo 'missing BMO_TEST_PHONE' >&2; return 1; fi
+if [ -z "${BMO_TEST_MESSAGE:-}" ]; then echo 'missing BMO_TEST_MESSAGE' >&2; return 1; fi
 AUTH=(-H "Authorization: Bearer $BMO_ACCESS_TOKEN" -H 'content-type: application/json')
 
 wa_request() {
@@ -123,49 +178,53 @@ wa_get() { wa_request GET "$1"; }
 wa_post() { wa_request POST "$1" "$2"; }
 wa_patch() { wa_request PATCH "$1" "$2"; }
 
-connect_json="$(wa_post '/integrations/whatsapp/connect' '{}')"
-printf '%s' "$connect_json" | jq -e '.connection.status == "CONNECTED" and .blocked == false' >/dev/null
+if ! connect_json="$(wa_post '/integrations/whatsapp/connect' '{}')"; then return 1; fi
+if ! printf '%s' "$connect_json" | jq -e '.connection.status == "CONNECTED" and .blocked == false' >/dev/null; then echo 'whatsapp_connect_check=fail' >&2; return 1; fi
 unset connect_json
 
-status_json="$(wa_get '/integrations/whatsapp/status')"
-printf '%s' "$status_json" | jq -e '.provider == "whatsapp" and .status == "CONNECTED"' >/dev/null
+if ! status_json="$(wa_get '/integrations/whatsapp/status')"; then return 1; fi
+if ! printf '%s' "$status_json" | jq -e '.provider == "whatsapp" and .status == "CONNECTED"' >/dev/null; then echo 'whatsapp_status_check=fail' >&2; return 1; fi
 unset status_json
 
-conversations_json="$(wa_get '/integrations/whatsapp/conversations?limit=50')"
-printf '%s' "$conversations_json" | jq -e '(.conversations | type) == "array"' >/dev/null
+if ! conversations_json="$(wa_get '/integrations/whatsapp/conversations?limit=50')"; then return 1; fi
+if ! printf '%s' "$conversations_json" | jq -e '(.conversations | type) == "array"' >/dev/null; then echo 'whatsapp_conversation_list_check=fail' >&2; return 1; fi
 
 # Have the selected contact send a DM to the paired personal account here.
 # Read only the safe conversation UUID/displayName/type from the response.
 sleep 6
-conversations_json="$(wa_get '/integrations/whatsapp/conversations?limit=50')"
-conversation_id="$(printf '%s' "$conversations_json" | jq -er '.conversations[0].id')"
+if ! conversations_json="$(wa_get '/integrations/whatsapp/conversations?limit=50')"; then return 1; fi
+if ! conversation_id="$(printf '%s' "$conversations_json" | jq -er '.conversations[0].id')"; then echo 'no safe BMO conversation found' >&2; return 1; fi
 unset conversations_json
 
 # Configure one selected DM; the API accepts BMO conversation IDs only.
 rules_payload="$(jq -n --arg id "$conversation_id" '{rules:[{scope:"ALL",enabled:false,speakOnDevice:false},{scope:"CONTACT",conversationId:$id,enabled:true,speakOnDevice:false}]}')"
-rules_json="$(wa_patch '/integrations/whatsapp/notification-rules' "$rules_payload")"
-printf '%s' "$rules_json" | jq -e --arg id "$conversation_id" '.rules | any(.[]; .scope=="CONTACT" and .conversationId==$id and .enabled==true)' >/dev/null
+if ! rules_json="$(wa_patch '/integrations/whatsapp/notification-rules' "$rules_payload")"; then return 1; fi
+if ! printf '%s' "$rules_json" | jq -e --arg id "$conversation_id" '.rules | any(.[]; .scope=="CONTACT" and .conversationId==$id and .enabled==true)' >/dev/null; then echo 'whatsapp_notification_rule_check=fail' >&2; return 1; fi
 unset rules_json rules_payload
 
 # Have the same contact send one more DM. Verify only a metadata event/notification
 # and conversation state through Backend/mobile WS instrumentation.
 
 send_payload="$(jq -n --arg id "$conversation_id" --arg message "$BMO_TEST_MESSAGE" '{conversationId:$id,message:$message,idempotencyKey:"phase26-wa-send-1"}')"
-send_preview="$(wa_post '/integrations/whatsapp/send-preview' "$send_payload")"
-send_id="$(printf '%s' "$send_preview" | jq -er '.send.id')"
+if ! send_preview="$(wa_post '/integrations/whatsapp/send-preview' "$send_payload")"; then return 1; fi
+if ! send_id="$(printf '%s' "$send_preview" | jq -er '.send.id')"; then echo 'send_preview_check=fail' >&2; return 1; fi
 unset send_preview
 confirm_payload="$(jq -n --arg id "$send_id" '{requestId:$id,confirmed:true}')"
-confirm_json="$(wa_post '/integrations/whatsapp/send-confirm' "$confirm_payload")"
-printf '%s' "$confirm_json" | jq -e '.send.status == "SUCCEEDED"' >/dev/null
+if ! confirm_json="$(wa_post '/integrations/whatsapp/send-confirm' "$confirm_payload")"; then return 1; fi
+if ! printf '%s' "$confirm_json" | jq -e '.send.status == "SUCCEEDED"' >/dev/null; then echo 'send_confirm_check=fail' >&2; return 1; fi
 unset confirm_json confirm_payload send_payload
 
 # Resolve an unobserved recipient only if needed; keep the phone value local.
 resolve_payload="$(jq -n --arg phone "$BMO_TEST_PHONE" '{phoneNumber:$phone}')"
-resolve_json="$(wa_post '/integrations/whatsapp/conversations/resolve' "$resolve_payload")"
-printf '%s' "$resolve_json" | jq -e '.id and (.type == "DM")' >/dev/null
+if ! resolve_json="$(wa_post '/integrations/whatsapp/conversations/resolve' "$resolve_payload")"; then return 1; fi
+if ! printf '%s' "$resolve_json" | jq -e '.id and (.type == "DM")' >/dev/null; then echo 'conversation_resolve_check=fail' >&2; return 1; fi
 unset resolve_json resolve_payload
 
 printf 'backend_api_smoke=pass\n'
+}
+
+# A failure returns from this function and leaves the interactive SSH shell open.
+wa_acceptance
 ```
 
 For the negative checks, have a second contact send a DM while no enabled

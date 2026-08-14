@@ -31,6 +31,9 @@ describe("P9 configuration", () => {
     expect(() => parseP9Config({ ...enabled, P9_PAIRING_PEPPER: "short" })).toThrow(
       /P9_PAIRING_PEPPER/,
     );
+    expect(() => parseP9Config({ ...enabled, WHATSAPP_IDENTITY_RESOLVER_TOKEN: "short" })).toThrow(
+      /WHATSAPP_IDENTITY_RESOLVER_TOKEN/,
+    );
   });
 
   it("accepts the isolated candidate defaults and explicit safe limits", () => {
@@ -45,6 +48,8 @@ describe("P9 configuration", () => {
       spotifyClientSecret: undefined,
       spotifyCallbackUrl: undefined,
       whatsappBridgeUrl: "http://127.0.0.1:3001",
+      whatsappIdentityResolverUrl: "http://127.0.0.1:3002",
+      whatsappIdentityResolverToken: undefined,
       canonicalTimezone: "Asia/Jakarta",
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 2_592_000,

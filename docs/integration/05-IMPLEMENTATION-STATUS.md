@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-14
-**Last implementation checkpoint:** 2026-08-14 — Phase 2.6 WhatsApp identity reconciliation v2 runtime correction
+**Last implementation checkpoint:** 2026-08-15 — Phase 2.6 WhatsApp provider identity resolver preparation
 **Baseline source:** `feat/vps-mobile-device-integration` / current pushed Phase 2.6 source
 **Documentation branch:** `feat/vps-mobile-device-integration`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -21,12 +21,13 @@ Caddy mutation, or provider secret was performed.
 | Spotify callback exposure | `BLOCKED_OPERATOR` | Exact single-path diff is prepared at `ops/caddy/phase26-spotify-candidate-callback.patch` but has not been applied to active Caddy. Candidate remains loopback at `127.0.0.1:3010`. |
 | Hermes WhatsApp runtime boundary | `CANDIDATE_VERIFIED` | Installed Hermes 0.20.0 and the official unchanged Baileys bridge provide loopback `/health`, destructive `/messages`, and `/send`; the paired personal-account session is present and the bridge reports connected. |
 | WhatsApp dedicated transport runtime | `CANDIDATE_VERIFIED` | `bmo-whatsapp-bridge.service` runs as `hermes` on loopback 3001 with bounded crash restart, private stdout/stderr, and no dependency/restart of `hermes-gateway.service`; source now includes reboot enablement. |
+| WhatsApp provider identity resolver | `BLOCKED_OPERATOR` | Source-side resolver, loopback-only systemd unit, protected token contract, forward/reverse mapping parser, refresh-on-request behavior, and Backend fail-closed client tests pass. Installation requires protected operator access to `/home/hermes`/`/opt/bmo/config`; no resolver service has been installed or started from this shell. |
 | WhatsApp candidate runtime/source alignment | `CANDIDATE_VERIFIED` | Candidate runs `bmo-phase26-whatsapp-candidate:69a1b4e` from pushed SHA `69a1b4e6e26f6634311d23595b373560f362f95c`, image ID `sha256:c5f4bcce627b9fec6f69c6871200fe48006081b43de22f0418314d12fcf66c34`, and was recreated only for `bmo-p9-1-backend-1`; the identity-alias migration is applied only to candidate PostgreSQL. |
 | WhatsApp concrete adapter | `SOURCE_VERIFIED` | Candidate `HermesWhatsAppBridgeClient` implements bounded loopback health, receives validated contact/group events, preserves owner markers, maps `/send`, returns bounded errors, and never exposes provider response data. |
 | WhatsApp personal-account ownership/inbound producer | `SOURCE_VERIFIED` | Candidate poller binds exactly one connected personal-account owner, indexes DM/GROUP traffic into owner-scoped BMO conversations, deduplicates provider message IDs, stores no body, and keeps inbound text out of Hermes privileged paths. Real traffic remains intentionally untested. |
 | WhatsApp Mobile conversation/API contract | `CANDIDATE_VERIFIED` | Candidate-only authenticated smoke passed for connection/status, resolve, list/detail, UUID-scoped rules, send-preview, and bounded send-confirm ownership rejection; provider identities remain server-side. |
 | WhatsApp notification rules | `CANDIDATE_VERIFIED` | Candidate-only rule smoke passed with `ALL` plus UUID-scoped `CONTACT`; stale unbound `PENDING` rows no longer block a new owner, while connected/externally bound owners remain protected. |
-| WhatsApp identity reconciliation | `BLOCKED_OPERATOR` | The real sequence is phone-JID resolve followed by inbound `chatId=senderId` LID-only events. The unchanged installed bridge does not serialize its internal phone↔LID map or an alternate identity field, so Backend cannot safely link the first LID-only event without guessing. V2 preserves explicit provider aliases, merges duplicates deterministically, moves deliveries/send state, and retains the rule-bearing canonical conversation; the observed duplicate was repaired in candidate. Automatic new-contact LID linking remains blocked until an explicit provider/operator relationship is available. |
+| WhatsApp identity reconciliation | `BLOCKED_OPERATOR` | V2 now consumes explicit forward/reverse Hermes session mappings through the separate resolver without modifying bridge.js or granting Backend session access. Resolve/inbound/outbound convergence and deterministic duplicate merge pass synthetically; live resolver installation and mapping-file evidence remain operator-gated. The prior duplicate remains repaired in candidate. |
 | Generic WhatsApp proactive speech | `PENDING_PHYSICAL_ESP` | A real inbound event can create the generic `WHATSAPP` proactive-delivery job when an enabled rule and active device match; physical synthesis/playback evidence is absent. |
 
 ## Historical Phase 2.5 candidate acceptance

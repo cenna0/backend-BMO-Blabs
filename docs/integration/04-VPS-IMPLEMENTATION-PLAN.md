@@ -80,8 +80,10 @@ official Hermes bridge as private transport for the user's personal account;
 the official `bot` mode is transport semantics only. `WHATSAPP_ENABLED` stays
 false; Backend is the sole queue consumer and owns the conversation index,
 notification rules, group classification, ownership, and untrusted-message
-handling. Live WhatsApp and Spotify acceptance stays blocked until provider
-session/credentials are proven.
+handling. A separate loopback Hermes identity resolver may read only the
+provider's LID mapping files so phone/LID equivalence is available without
+giving Backend session access. Live WhatsApp and Spotify acceptance stays
+blocked until provider session/credentials are proven.
 
 ### Slice 8 — gated rollout
 

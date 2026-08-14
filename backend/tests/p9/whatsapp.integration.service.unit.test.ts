@@ -13,7 +13,7 @@ const sendRequestA = "00000000-0000-4000-8000-000000000008";
 const conversationB = "00000000-0000-4000-8000-000000000010";
 const now = new Date("2026-08-13T00:00:00.000Z");
 
-function fixture() {
+function fixture(whatsAppIdentity?: any) {
   const connection = { id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "CONNECTED", scopes: [], connectedAt: now };
   const delivery = { id: deliveryA, userId: userA, connectionId: connectionA, provider: IntegrationProvider.WHATSAPP, direction: "INBOUND", status: "RECEIVED", providerMessageRef: "message-1", metadata: null };
   const conversation = { id: conversationA, userId: userA, connectionId: connectionA, provider: IntegrationProvider.WHATSAPP, opaqueChatRef: "123@s.whatsapp.net", displayName: "Rangga", type: "DM", lastActivityAt: now };
@@ -73,7 +73,7 @@ function fixture() {
     poll: vi.fn().mockResolvedValue([{ messageId: "message-1", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "hello", isGroup: false }]),
     send: vi.fn().mockResolvedValue({ providerMessageRef: "out-1" }),
   };
-  const service = new IntegrationService({ client: {} as any, repositories, publicBaseUrl: "http://127.0.0.1:3010", whatsApp: whatsApp as any, whatsAppProactiveDelivery: proactive, mobileEvents });
+  const service = new IntegrationService({ client: {} as any, repositories, publicBaseUrl: "http://127.0.0.1:3010", whatsApp: whatsApp as any, ...(whatsAppIdentity ? { whatsAppIdentity } : {}), whatsAppProactiveDelivery: proactive, mobileEvents });
   return { repositories, whatsApp, proactive, mobileEvents, service, delivery, aliases, conversation, now };
 }
 
@@ -368,5 +368,43 @@ describe("WhatsApp IntegrationService", () => {
     expect(f.repositories.whatsAppConversation.delete).toHaveBeenCalledWith({ where: { id: conversationB } });
     expect(f.repositories.whatsAppDelivery.updateMany).toHaveBeenCalledWith({ where: expect.objectContaining({ conversationId: conversationB }), data: { conversationId: conversationA } });
     expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userA, expect.objectContaining({ conversationId: conversationA }));
+  });
+
+  it("uses the trusted provider mapping for resolve and inbound convergence", async () => {
+    const whatsAppIdentity = { expand: vi.fn().mockResolvedValue(["123@s.whatsapp.net", "456@lid"]) };
+    const f = fixture(whatsAppIdentity);
+
+    await expect(f.service.resolveWhatsAppConversation(userA, { phoneNumber: "+123" })).resolves.toMatchObject({ id: conversationA });
+    expect(whatsAppIdentity.expand).toHaveBeenCalledWith(["123@s.whatsapp.net"]);
+    expect(f.repositories.whatsAppConversationAlias.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: conversationA, providerRef: "456@lid" }) });
+
+    f.repositories.whatsAppDelivery.findFirst.mockResolvedValue(null);
+    f.whatsApp.poll.mockResolvedValue([{ messageId: "mapped-lid", chatId: "456@lid", senderId: "456@lid", body: "mapped", isGroup: false }]);
+    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 1, queued: 1 });
+    expect(f.repositories.whatsAppConversation.create).not.toHaveBeenCalled();
+    expect(f.repositories.whatsAppDelivery.create).toHaveBeenLastCalledWith({ data: expect.objectContaining({ conversationId: conversationA }) });
+  });
+
+  it("uses the mapped LID as the outbound destination while preserving the BMO conversation ID", async () => {
+    const whatsAppIdentity = { expand: vi.fn().mockResolvedValue(["123@s.whatsapp.net", "456@lid"]) };
+    const f = fixture(whatsAppIdentity);
+
+    await expect(f.service.whatsappPreview(userA, { conversationId: conversationA, message: "mapped outbound", idempotencyKey: "wa-mapped-outbound" })).resolves.toMatchObject({ conversationId: conversationA });
+    expect(f.repositories.whatsAppSendRequest.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: conversationA, opaqueRecipientRef: "456@lid" }) });
+    f.repositories.whatsAppSendRequest.findFirst.mockResolvedValue({
+      id: sendRequestA,
+      userId: userA,
+      connectionId: connectionA,
+      provider: IntegrationProvider.WHATSAPP,
+      conversationId: conversationA,
+      opaqueRecipientRef: "456@lid",
+      preview: "mapped outbound",
+      idempotencyKey: "wa-mapped-outbound",
+      status: "PENDING_CONFIRMATION",
+      confirmationExpiresAt: new Date(f.now.getTime() + 60_000),
+      errorCode: null,
+    });
+    await expect(f.service.whatsappConfirm(userA, sendRequestA)).resolves.toMatchObject({ conversationId: conversationA });
+    expect(f.whatsApp.send).toHaveBeenCalledWith(userA, "456@lid", "mapped outbound");
   });
 });

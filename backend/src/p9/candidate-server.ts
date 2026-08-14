@@ -34,6 +34,11 @@ if (!process.env.SPOTIFY_CLIENT_SECRET && process.env.SPOTIFY_CLIENT_SECRET_FILE
   if (!clientSecret) throw new Error("Spotify client secret is empty");
   process.env.SPOTIFY_CLIENT_SECRET = clientSecret;
 }
+if (!process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN && process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE) {
+  const resolverToken = readFileSync(process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE, "utf8").trim();
+  if (!resolverToken) throw new Error("WhatsApp identity resolver secret is empty");
+  process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN = resolverToken;
+}
 const config = parseP9Config(process.env);
 if (!config.enabled) throw new Error("P9 candidate requires P9_ENABLED=true");
 

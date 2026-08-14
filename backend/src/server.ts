@@ -307,9 +307,17 @@ function loadP9ProviderEncryptionSecret(): void {
   process.env.P9_PROVIDER_ENCRYPTION_KEY = key;
 }
 
+function loadWhatsAppIdentityResolverSecret(): void {
+  if (process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN || !process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE) return;
+  const token = readFileSync(process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE, "utf8").trim();
+  if (!token) throw new Error("WhatsApp identity resolver secret is empty");
+  process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN = token;
+}
+
 async function run(): Promise<void> {
   loadP9WifiEncryptionSecret();
   loadP9ProviderEncryptionSecret();
+  loadWhatsAppIdentityResolverSecret();
   const runtime = createBackendRuntime(parseEnv(process.env));
   await runtime.start();
   const shutdown = async () => {

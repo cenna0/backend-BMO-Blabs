@@ -9,6 +9,7 @@ import { parseSpotifyAction, parseWhatsAppRulesPatch } from "../integrations.val
 import { SpotifyProviderError, type SpotifySearchType } from "../providers/spotify.client.js";
 import type { HermesWhatsAppMessage } from "../providers/hermes-whatsapp.client.js";
 import { HermesWhatsAppProviderError } from "../providers/hermes-whatsapp.client.js";
+import { preferredWhatsAppDestination, type WhatsAppIdentityResolverBoundary } from "../providers/hermes-whatsapp-identity.client.js";
 import type { MobileOutboundEvent } from "../websocket/mobile-events.js";
 
 const OAUTH_TTL_MS = 10 * 60_000;
@@ -81,6 +82,7 @@ export class IntegrationService {
     spotifyClientSecret?: string;
     spotifyCallbackUrl?: string;
     whatsApp?: HermesWhatsAppBoundary;
+    whatsAppIdentity?: WhatsAppIdentityResolverBoundary;
     whatsAppProactiveDelivery?: (input: { userId: string; deliveryId: string; deviceId: string; text: string }) => Promise<void>;
     mobileEvents?: MobileEvents;
     spotify?: SpotifyProviderBoundary;
@@ -236,8 +238,9 @@ export class IntegrationService {
   async resolveWhatsAppConversation(userId: string, input: { phoneNumber: string; displayName?: string | undefined }): Promise<unknown> {
     const connection = await this.#requireConnectedWhatsAppOwner(userId);
     const opaqueChatRef = `${input.phoneNumber.slice(1)}@s.whatsapp.net`;
+    const providerRefs = await this.#expandWhatsAppRefs([opaqueChatRef]);
     const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP } });
-    const candidates = await this.#conversationCandidates(userId, connection.id, [opaqueChatRef]);
+    const candidates = await this.#conversationCandidates(userId, connection.id, providerRefs);
     const canonical = this.#chooseCanonicalConversation(candidates, rules as WhatsAppRuleRow[]);
     const row = canonical
       ? (input.displayName ? await this.options.repositories.whatsAppConversation.update({ where: { id: canonical.id }, data: { displayName: input.displayName } }) : canonical)
@@ -250,7 +253,7 @@ export class IntegrationService {
         type: WhatsAppConversationType.DM,
         lastActivityAt: await this.options.repositories.databaseNow(),
       } });
-    await this.#ensureConversationAliases(userId, connection.id, row, [opaqueChatRef]);
+    await this.#ensureConversationAliases(userId, connection.id, row, providerRefs);
     return this.#publicWhatsAppConversation(row, rules as WhatsAppRuleRow[]);
   }
 
@@ -285,12 +288,13 @@ export class IntegrationService {
     if (!isUuid(input.conversationId)) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp conversation not found");
     const conversation = await this.options.repositories.whatsAppConversation.findFirst({ where: { id: input.conversationId, userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP } });
     if (!conversation) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp conversation not found");
+    const recipientRef = preferredWhatsAppDestination(await this.#expandWhatsAppRefs([conversation.opaqueChatRef])) ?? conversation.opaqueChatRef;
     const now = await this.options.repositories.databaseNow();
     const existing = await this.options.repositories.whatsAppSendRequest.findUnique({ where: { userId_idempotencyKey: { userId, idempotencyKey: input.idempotencyKey } } });
     if (existing) return this.#publicSend(existing);
     const row = await this.options.repositories.whatsAppSendRequest.create({ data: {
       userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP,
-      conversationId: conversation.id, opaqueRecipientRef: conversation.opaqueChatRef, preview: input.message, idempotencyKey: input.idempotencyKey,
+      conversationId: conversation.id, opaqueRecipientRef: recipientRef, preview: input.message, idempotencyKey: input.idempotencyKey,
       confirmationExpiresAt: new Date(now.getTime() + CONFIRMATION_TTL_MS),
     } });
     await this.#audit(this.options.repositories, userId, "whatsapp.send.preview", "whatsapp_send", row.id, requestId);
@@ -402,11 +406,21 @@ export class IntegrationService {
     return [{ id: "whatsapp", title: "WhatsApp", installed: whatsapp.status !== IntegrationStatus.DISCONNECTED, status: whatsapp.status }, { id: "spotify", title: "Spotify", installed: spotify.status !== IntegrationStatus.DISCONNECTED, status: spotify.status }];
   }
 
+  async #expandWhatsAppRefs(refs: string[]): Promise<string[]> {
+    const normalized = uniqueProviderRefs(refs);
+    if (!this.options.whatsAppIdentity) return normalized;
+    try {
+      return uniqueProviderRefs(await this.options.whatsAppIdentity.expand(normalized));
+    } catch {
+      return normalized;
+    }
+  }
+
   async #upsertWhatsAppConversation(userId: string, connectionId: string, message: HermesWhatsAppMessage): Promise<WhatsAppConversationRow> {
     const type = message.isGroup ? WhatsAppConversationType.GROUP : WhatsAppConversationType.DM;
     const providerName = message.isGroup ? message.chatName : message.senderName;
     const displayName = providerName?.trim().slice(0, 120) || (message.isGroup ? "WhatsApp group" : "WhatsApp contact");
-    const refs = message.isGroup ? [message.chatId] : uniqueProviderRefs([message.chatId, message.senderId]);
+    const refs = message.isGroup ? [message.chatId] : await this.#expandWhatsAppRefs([message.chatId, message.senderId]);
     const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId, connectionId, provider: IntegrationProvider.WHATSAPP } });
     const candidates = await this.#conversationCandidates(userId, connectionId, refs);
     const canonical = this.#chooseCanonicalConversation(candidates, rules as WhatsAppRuleRow[]);

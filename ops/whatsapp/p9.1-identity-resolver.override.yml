@@ -1,0 +1,11 @@
+services:
+  backend:
+    environment:
+      WHATSAPP_IDENTITY_RESOLVER_URL: http://127.0.0.1:3002
+      WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE: /run/secrets/whatsapp_identity_resolver_token
+    secrets:
+      - whatsapp_identity_resolver_token
+
+secrets:
+  whatsapp_identity_resolver_token:
+    file: ${P9_WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE:?Set the protected resolver token path outside Git}
