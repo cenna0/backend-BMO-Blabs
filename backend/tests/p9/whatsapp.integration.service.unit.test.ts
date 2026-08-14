@@ -8,11 +8,15 @@ const userB = "00000000-0000-4000-8000-000000000006";
 const connectionA = "00000000-0000-4000-8000-000000000002";
 const deliveryA = "00000000-0000-4000-8000-000000000003";
 const deviceA = "00000000-0000-4000-8000-000000000004";
+const conversationA = "00000000-0000-4000-8000-000000000007";
+const sendRequestA = "00000000-0000-4000-8000-000000000008";
 const now = new Date("2026-08-13T00:00:00.000Z");
 
 function fixture() {
   const connection = { id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "CONNECTED", scopes: [], connectedAt: now };
   const delivery = { id: deliveryA, userId: userA, connectionId: connectionA, provider: IntegrationProvider.WHATSAPP, direction: "INBOUND", status: "RECEIVED", providerMessageRef: "message-1", metadata: null };
+  const conversation = { id: conversationA, userId: userA, connectionId: connectionA, provider: IntegrationProvider.WHATSAPP, opaqueChatRef: "123@s.whatsapp.net", displayName: "Rangga", type: "DM", lastActivityAt: now };
+  const sendRequest = { id: sendRequestA, userId: userA, connectionId: connectionA, provider: IntegrationProvider.WHATSAPP, conversationId: conversationA, opaqueRecipientRef: "123@s.whatsapp.net", preview: "bounded outbound", idempotencyKey: "wa-send-1", status: "PENDING_CONFIRMATION", confirmationExpiresAt: new Date(now.getTime() + 60_000), errorCode: null };
   const repositories: any = {
     databaseNow: vi.fn().mockResolvedValue(now),
     integrationConnection: {
@@ -27,8 +31,21 @@ function fixture() {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue(delivery),
     },
+    whatsAppConversation: {
+      findFirst: vi.fn().mockImplementation(async ({ where }: any) => where.id === conversationA || where.opaqueChatRef === "123@s.whatsapp.net" ? conversation : null),
+      findMany: vi.fn().mockResolvedValue([conversation]),
+      create: vi.fn().mockImplementation(async ({ data }: any) => ({ ...conversation, ...data, id: conversationA })),
+      update: vi.fn().mockImplementation(async ({ data }: any) => ({ ...conversation, ...data })),
+    },
     whatsAppNotificationRule: {
       findMany: vi.fn().mockResolvedValue([{ scope: "CONTACT", opaqueTargetRef: "123@s.whatsapp.net", enabled: true, speakOnDevice: true }]),
+    },
+    whatsAppSendRequest: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      findFirst: vi.fn().mockResolvedValue(sendRequest),
+      create: vi.fn().mockResolvedValue(sendRequest),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      update: vi.fn().mockImplementation(async ({ data }: any) => ({ ...sendRequest, ...data })),
     },
     device: { findFirst: vi.fn().mockResolvedValue({ id: deviceA, userId: userA, status: "ACTIVE" }) },
     auditEvent: { create: vi.fn() },
@@ -54,13 +71,14 @@ describe("WhatsApp IntegrationService", () => {
       userId: userA,
       connectionId: connectionA,
       provider: IntegrationProvider.WHATSAPP,
+      conversationId: conversationA,
       direction: "INBOUND",
       providerMessageRef: "message-1",
       status: "RECEIVED",
       metadata: JSON.stringify({ chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", isGroup: false, bodyLength: 5, fromOwner: false }),
     }) });
     expect(f.proactive).toHaveBeenCalledWith({ userId: userA, deliveryId: deliveryA, deviceId: deviceA, text: "hello" });
-    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userA, expect.objectContaining({ event: "notification", type: "GENERIC", body: "hello" }));
+    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userA, expect.objectContaining({ event: "whatsapp_notification", conversationId: conversationA, conversationType: "DM" }));
     expect(JSON.stringify(f.repositories.whatsAppDelivery.create.mock.calls[0]?.[0])).not.toContain("hello");
   });
 
@@ -81,7 +99,7 @@ describe("WhatsApp IntegrationService", () => {
     expect(f.whatsApp.connect).not.toHaveBeenCalled();
 
     f.repositories.integrationConnection.findUnique.mockResolvedValue({ ...f.delivery, id: "foreign-row", userId: userB, provider: IntegrationProvider.WHATSAPP, status: "DISCONNECTED" });
-    await expect(f.service.whatsappPreview(userB, { recipientRef: "123@s.whatsapp.net", message: "not yours", idempotencyKey: "wa-foreign" })).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
+    await expect(f.service.whatsappPreview(userB, { conversationId: conversationA, message: "not yours", idempotencyKey: "wa-foreign" })).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
   });
 
   it("keeps the persistent Hermes identity bound after BMO metadata disconnect", async () => {
@@ -133,7 +151,7 @@ describe("WhatsApp IntegrationService", () => {
       { messageId: "group-2", chatId: "team@g.us", senderId: "123@s.whatsapp.net", body: "hello group", isGroup: true },
     ]);
     await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 1, queued: 1 });
-    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userA, expect.objectContaining({ event: "notification", body: "hello group" }));
+    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userA, expect.objectContaining({ event: "whatsapp_notification", conversationType: "GROUP" }));
     expect(f.proactive).toHaveBeenCalled();
   });
 
@@ -144,7 +162,7 @@ describe("WhatsApp IntegrationService", () => {
       { scope: "CONTACT", opaqueTargetRef: "123@s.whatsapp.net", enabled: true, speakOnDevice: false },
     ]);
     await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 1, queued: 0 });
-    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userA, expect.objectContaining({ event: "notification", body: "hello" }));
+    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userA, expect.objectContaining({ event: "whatsapp_notification", conversationId: conversationA }));
 
     f.mobileEvents.sendToUser.mockClear();
     f.repositories.whatsAppDelivery.findFirst.mockResolvedValue(null);
@@ -191,5 +209,43 @@ describe("WhatsApp IntegrationService", () => {
 
     await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 1, queued: 0 });
     expect(f.proactive).not.toHaveBeenCalled();
+  });
+
+  it("exposes a safe conversation index and resolves a phone recipient without returning provider identity", async () => {
+    const f = fixture();
+
+    await expect(f.service.whatsappConversations(userA, { limit: 10 })).resolves.toMatchObject({
+      conversations: [{ id: conversationA, displayName: "Rangga", type: "DM", notificationEnabled: true }],
+      nextCursor: null,
+    });
+    const listed = await f.service.whatsappConversation(userA, conversationA);
+    expect(listed).toMatchObject({ id: conversationA, type: "DM" });
+    expect(JSON.stringify(listed)).not.toContain("s.whatsapp.net");
+
+    const resolved = await f.service.resolveWhatsAppConversation(userA, { phoneNumber: "+6281234567890", displayName: "New contact" });
+    expect(resolved).toMatchObject({ id: conversationA, displayName: "New contact", type: "DM" });
+    expect(JSON.stringify(resolved)).not.toContain("6281234567890");
+    expect(f.repositories.whatsAppConversation.create).toHaveBeenCalledWith({ data: expect.objectContaining({ opaqueChatRef: "6281234567890@s.whatsapp.net", type: "DM" }) });
+  });
+
+  it("keeps conversation and send ownership server-side and sends only after authenticated confirmation", async () => {
+    const f = fixture();
+
+    const preview = await f.service.whatsappPreview(userA, { conversationId: conversationA, message: "bounded outbound", idempotencyKey: "wa-send-1" });
+    expect(preview).toMatchObject({ id: sendRequestA, conversationId: conversationA, status: "PENDING_CONFIRMATION" });
+    expect(JSON.stringify(preview)).not.toContain("s.whatsapp.net");
+    expect(f.repositories.whatsAppSendRequest.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: conversationA, opaqueRecipientRef: "123@s.whatsapp.net" }) });
+
+    await expect(f.service.whatsappConfirm(userA, sendRequestA)).resolves.toMatchObject({ id: sendRequestA, status: "SUCCEEDED", conversationId: conversationA });
+    expect(f.whatsApp.send).toHaveBeenCalledWith(userA, "123@s.whatsapp.net", "bounded outbound");
+    expect(f.repositories.whatsAppDelivery.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: conversationA, sendRequestId: sendRequestA, direction: "OUTBOUND" }) });
+  });
+
+  it("rejects a foreign or malformed conversation before provider access", async () => {
+    const f = fixture();
+    await expect(f.service.whatsappConversation(userA, "not-a-uuid")).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
+    f.repositories.whatsAppConversation.findFirst.mockResolvedValue(null);
+    await expect(f.service.whatsappPreview(userA, { conversationId: "00000000-0000-4000-8000-000000000099", message: "foreign", idempotencyKey: "wa-foreign-conversation" })).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
+    expect(f.whatsApp.send).not.toHaveBeenCalled();
   });
 });

@@ -452,6 +452,10 @@ export class P9Repositories {
     return this.db.integrationConnection;
   }
 
+  get whatsAppConversation() {
+    return this.db.whatsAppConversation;
+  }
+
   get oAuthState() {
     return this.db.oAuthState;
   }

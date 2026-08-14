@@ -1,8 +1,9 @@
-# Candidate WhatsApp transport-only operations
+# Candidate WhatsApp personal-account connector operations
 
-This runbook is prepared for the isolated candidate only. It has not been
-executed. It must not be used for `hermes-gateway.service`, production Caddy,
-production migrations, or the production Backend.
+This runbook is for the isolated candidate only. The personal account is
+paired and the dedicated bridge is active; the source/unit persistence repair
+is tracked below. It must not be used for `hermes-gateway.service`, production
+Caddy, production migrations, or the production Backend.
 
 The dedicated unit launches the installed Hermes `bridge.js` unchanged as
 `hermes`, with:
@@ -23,6 +24,34 @@ policy. A protected non-wildcard `WHATSAPP_ALLOWED_USERS` value is optional
 and is used only by the official bridge to permit forwarding manual owner
 messages for selected chats; it is never used as the Backend notification
 filter.
+
+## Mobile-facing Backend contract
+
+Mobile uses only authenticated `/api/v1` Backend routes:
+
+```text
+GET  /integrations/whatsapp/status
+POST /integrations/whatsapp/disconnect
+GET  /integrations/whatsapp/conversations?limit=&cursor=
+GET  /integrations/whatsapp/conversations/:conversationId
+POST /integrations/whatsapp/conversations/resolve
+GET/PATCH /integrations/whatsapp/notification-rules
+POST /integrations/whatsapp/send-preview
+POST /integrations/whatsapp/send-confirm
+```
+
+Conversation responses contain only the BMO UUID, bounded display name,
+`DM`/`GROUP`, notification state, and activity timestamp. Resolve accepts an
+international phone identity and keeps the provider mapping server-side.
+Send uses `conversationId`, message, and idempotency key; Mobile never sends or
+receives a JID. The realtime `whatsapp_notification` event contains only
+`conversationId`, `displayName`, `conversationType`, and `receivedAt`.
+
+`ALL` is the DM default, `CONTACT` is a per-conversation override, and groups
+are disabled unless explicitly enabled. Ingestion continues when a rule mutes
+notification. Incoming text is untrusted data and never directly enters Hermes
+reasoning/tools. The index is traffic-derived, not a full address-book/history
+sync. The bridge queue is in-memory and destructive, not durable/replayable.
 
 ## Read-only preflight
 
@@ -137,7 +166,7 @@ Do not use `hermes gateway` for this transport. Do not delete an existing
 session directory or run the pairing wizard with a re-pair confirmation unless
 the operator explicitly intends to replace that provider session.
 
-## Install and start — prepared, not executed
+## Targeted unit installation and reboot persistence
 
 No Backend `WHATSAPP_ALLOWED_USERS` provisioning is required. If the operator
 wants manual replies from the phone observed for selected chats, the official
@@ -146,7 +175,9 @@ launcher passes that protected value only to the official bridge owner-forward
 gate. Backend still receives contact events independently and applies its own
 `ALL`/`CONTACT`/`GROUP` notification rules.
 
-Then install only the two prepared files:
+The source unit now contains `[Install] WantedBy=multi-user.target`. Reinstall
+only the dedicated files and enable only this unit; the command does not
+restart `hermes-gateway.service`:
 
 ```bash
 cd /opt/bmo/app

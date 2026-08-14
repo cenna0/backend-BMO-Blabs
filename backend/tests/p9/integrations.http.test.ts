@@ -20,6 +20,9 @@ function fixture() {
     disconnectWhatsApp: vi.fn().mockResolvedValue(undefined),
     whatsappRules: vi.fn().mockResolvedValue([]),
     updateWhatsAppRules: vi.fn().mockResolvedValue([]),
+    whatsappConversations: vi.fn().mockResolvedValue({ conversations: [], nextCursor: null }),
+    whatsappConversation: vi.fn().mockResolvedValue({ id, displayName: "Rangga", type: "DM", notificationEnabled: true, lastActivityAt: null }),
+    resolveWhatsAppConversation: vi.fn().mockResolvedValue({ id, displayName: "Rangga", type: "DM", notificationEnabled: true, lastActivityAt: null }),
     whatsappPreview: vi.fn().mockResolvedValue({ id, status: "PENDING_CONFIRMATION" }),
     whatsappConfirm: vi.fn().mockResolvedValue({ id, status: "FAILED" }),
     spotifyConnect: vi.fn().mockResolvedValue({ authorizationUrl: "https://accounts.spotify.com/authorize?state=x", state: "x".repeat(64) }),
@@ -54,7 +57,10 @@ describe("integration HTTP contract", () => {
     expect((await auth(request(f.app).post("/integrations/whatsapp/disconnect")).send({})).status).toBe(204);
     expect((await auth(request(f.app).get("/integrations/whatsapp/notification-rules"))).status).toBe(200);
     expect((await auth(request(f.app).patch("/integrations/whatsapp/notification-rules")).send({ rules: [{ scope: "ALL" }] })).status).toBe(200);
-    expect((await auth(request(f.app).post("/integrations/whatsapp/send-preview")).send({ recipientRef: "contact:1", message: "hi", idempotencyKey: "wa-1" })).status).toBe(201);
+    expect((await auth(request(f.app).get("/integrations/whatsapp/conversations?limit=10"))).status).toBe(200);
+    expect((await auth(request(f.app).get(`/integrations/whatsapp/conversations/${id}`))).status).toBe(200);
+    expect((await auth(request(f.app).post("/integrations/whatsapp/conversations/resolve")).send({ phoneNumber: "+6281234567890" })).status).toBe(200);
+    expect((await auth(request(f.app).post("/integrations/whatsapp/send-preview")).send({ conversationId: id, message: "hi", idempotencyKey: "wa-1" }))).toHaveProperty("status", 201);
     expect((await auth(request(f.app).post("/integrations/whatsapp/send-confirm")).send({ requestId: id, confirmed: true })).status).toBe(200);
     expect((await auth(request(f.app).post("/integrations/spotify/connect"))).status).toBe(200);
     expect((await auth(request(f.app).get("/integrations/spotify/status"))).status).toBe(200);

@@ -15,6 +15,8 @@ export interface HermesWhatsAppMessage {
   body: string;
   isGroup: boolean;
   fromOwner: boolean;
+  senderName: string | null;
+  chatName: string | null;
 }
 
 export type HermesWhatsAppProviderErrorCode =
@@ -109,7 +111,9 @@ export class HermesWhatsAppBridgeClient {
       const senderId = boundedString(value.senderId, 255);
       const body = typeof value.body === "string" && value.body.length <= 65_536 ? value.body : null;
       if (!messageId || !chatId || !senderId || body === null || body.trim().length === 0) return null;
-      return { messageId, chatId, senderId, body, isGroup: value.isGroup === true, fromOwner: value.fromOwner === true };
+      const senderName = boundedString(value.senderName, 120);
+      const chatName = boundedString(value.chatName, 120);
+      return { messageId, chatId, senderId, body, isGroup: value.isGroup === true, fromOwner: value.fromOwner === true, senderName, chatName };
     }).filter((value): value is HermesWhatsAppMessage => value !== null);
   }
 

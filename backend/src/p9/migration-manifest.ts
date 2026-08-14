@@ -2,6 +2,7 @@ export const P9_REQUIRED_MIGRATIONS = [
   "20260804110000_p9_1_foundation",
   "20260804123000_p9_1_integrity_constraints",
   "20260811190000_phase2_application_foundation",
+  "20260814120000_whatsapp_conversations",
 ] as const;
 
 export interface P9MigrationState {

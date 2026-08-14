@@ -53,6 +53,8 @@ describe("WhatsApp transport-only boundary", () => {
     expect(unit).toContain("StartLimitBurst=5");
     expect(unit).toContain("StandardOutput=null");
     expect(unit).toContain("StandardError=null");
+    expect(unit).toContain("[Install]");
+    expect(unit).toContain("WantedBy=multi-user.target");
     expect(unit).not.toContain("WatchdogSec=");
     expect(unit).not.toContain("ExecStartPost=");
   });

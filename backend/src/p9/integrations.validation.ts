@@ -1,23 +1,40 @@
 import { z } from "zod";
 
 const idempotencyKey = z.string().trim().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/u);
-const targetRef = z.string().trim().min(1).max(255);
+const uuid = z.string().uuid();
+const cursor = z.string().max(128).regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\|[0-9a-f-]{36}$/u);
+
+function normalizePhoneNumber(value: string, context: z.RefinementCtx): string {
+  const compact = value.trim().replace(/[\s().-]/gu, "");
+  const normalized = compact.startsWith("00") ? `+${compact.slice(2)}` : compact.startsWith("+") ? compact : `+${compact}`;
+  if (!/^\+[1-9]\d{7,14}$/u.test(normalized)) {
+    context.addIssue({ code: "custom", message: "phoneNumber must be an international phone number" });
+    return z.NEVER as never;
+  }
+  return normalized;
+}
 
 const whatsAppRule = z.object({
   scope: z.enum(["ALL", "CONTACT", "GROUP"]),
-  targetRef: targetRef.optional(),
+  conversationId: uuid.optional(),
   enabled: z.boolean().default(true),
   speakOnDevice: z.boolean().default(false),
 }).strict().superRefine((value, context) => {
-  if (value.scope === "ALL" && value.targetRef !== undefined) context.addIssue({ code: "custom", path: ["targetRef"], message: "ALL rules cannot target a contact" });
-  if (value.scope !== "ALL" && value.targetRef === undefined) context.addIssue({ code: "custom", path: ["targetRef"], message: "targetRef is required" });
+  if (value.scope === "ALL" && value.conversationId !== undefined) context.addIssue({ code: "custom", path: ["conversationId"], message: "ALL rules cannot target a conversation" });
+  if (value.scope !== "ALL" && value.conversationId === undefined) context.addIssue({ code: "custom", path: ["conversationId"], message: "conversationId is required" });
 });
 
 export const whatsappRulesPatchSchema = z.object({ rules: z.array(whatsAppRule).min(1).max(100) }).strict();
 export type WhatsAppRuleInput = z.infer<typeof whatsAppRule>;
 
+export const whatsappConversationQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(100).default(50), cursor: cursor.optional() }).strict();
+export const whatsappRecipientResolveSchema = z.object({
+  phoneNumber: z.string().trim().min(1).max(32).transform(normalizePhoneNumber),
+  displayName: z.string().trim().min(1).max(120).optional(),
+}).strict();
+
 export const whatsappSendPreviewSchema = z.object({
-  recipientRef: targetRef,
+  conversationId: uuid,
   message: z.string().trim().min(1).max(1_000),
   idempotencyKey,
 }).strict();
@@ -81,6 +98,9 @@ export const bugReportSchema = z.object({
   includeScreenshot: value.includeScreenshot === true || value.includeScreenshot === "true",
 }));
 
+export function parseWhatsAppConversationQuery(value: unknown) { return whatsappConversationQuerySchema.parse(value); }
+export function parseWhatsAppRecipientResolve(value: unknown) { return whatsappRecipientResolveSchema.parse(value); }
 export function parseWhatsAppRulesPatch(value: unknown) { return whatsappRulesPatchSchema.parse(value); }
+export function parseWhatsAppSendPreview(value: unknown) { return whatsappSendPreviewSchema.parse(value); }
 export function parseSpotifyAction(value: unknown) { return spotifyActionSchema.parse(value); }
 export function parseBugReportInput(value: unknown) { return bugReportSchema.parse(value); }

@@ -60,6 +60,13 @@ describe("mobile realtime outbound event contract", () => {
       body: "Safe bounded text",
       createdAt,
     },
+    {
+      event: "whatsapp_notification",
+      conversationId: id,
+      displayName: "Rangga",
+      conversationType: "DM",
+      receivedAt: createdAt,
+    },
   ])("accepts the frozen $event schema", (event) => {
     expect(mobileOutboundEventSchema.safeParse(event).success).toBe(true);
   });

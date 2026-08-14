@@ -150,7 +150,8 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | Backend -> Mobile | `proactive_delivery_status` | `EXISTING_VERIFIED` | Typed generic CHAT/SCHEDULE/WHATSAPP schema + per-user fanout and generic device-delivery lifecycle producer source/test; physical sender/playback remains `PENDING_PHYSICAL_ESP`; device-less MOBILE intents do not fabricate this device-scoped event |
 | Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user schedule lifecycle/one-shot completion producer source/test; candidate worker expiry path accepted, public production unchanged |
 | Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; WhatsApp bridge adapter/poller is source-verified while live session acceptance remains `BLOCKED_OPERATOR`; Spotify live credentials remain blocked |
-| Backend -> Mobile | `notification` | `EXISTING_VERIFIED` | Typed bounded GENERIC schema + WhatsApp per-user producer/source tests; live provider event acceptance remains `BLOCKED_OPERATOR` |
+| Backend -> Mobile | `whatsapp_notification` | `SOURCE_VERIFIED` | Metadata-only per-user event with BMO conversation UUID/display name/DM-GROUP classification; no body, phone, JID, session, or credential; live provider acceptance is candidate-gated |
+| Backend -> Mobile | `notification` | `EXISTING_VERIFIED` | Typed bounded GENERIC schema for non-WhatsApp notifications; WhatsApp uses the dedicated metadata-only event above |
 
 ## Memory and schedules
 
@@ -174,11 +175,13 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 
 | Methods | Path | Status | Availability / gate |
 |---|---|---|---|
-| POST/GET | `/api/v1/integrations/whatsapp/connect`, `.../status` | `SOURCE_VERIFIED` | Owner-scoped routes call the verified loopback Hermes health boundary; live bridge/session is not present on candidate |
-| GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `BLOCKED_OPERATOR` | Fail-closed route exists; dedicated official bridge unit is prepared but not installed/started, and QR pairing requires protected operator action |
-| POST | `/api/v1/integrations/whatsapp/disconnect` | `SOURCE_VERIFIED` | Source/test owner-scoped boundary; live Hermes session operation remains blocked |
-| GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `SOURCE_VERIFIED` | Authenticated owner-scoped `ALL` global DM default, `CONTACT` override, and explicit `GROUP` allow/deny (groups default disabled); transport intake remains independent |
-| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `SOURCE_VERIFIED` | Bounded preview/confirmation/idempotency calls verified Hermes `POST /send`; live send remains operator-gated and requires a protected provider recipient reference |
+| GET/POST | `/api/v1/integrations/whatsapp/connect`, `.../status` | `SOURCE_VERIFIED` | Owner-scoped connection state with paired personal account; mobile receives application status only, not bridge details; Backend live acceptance pending |
+| GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `CANDIDATE_VERIFIED` | Operator-only setup surface; QR pairing completed outside mobile UI and the dedicated bridge is active |
+| POST | `/api/v1/integrations/whatsapp/disconnect` | `SOURCE_VERIFIED` | Owner-scoped metadata/provider boundary; no live disconnect acceptance claimed |
+| GET | `/api/v1/integrations/whatsapp/conversations`, `.../:id` | `SOURCE_VERIFIED` | Owner-scoped traffic-derived index returns opaque BMO UUID, safe display/type/activity/notification fields only; no raw provider identity |
+| POST | `/api/v1/integrations/whatsapp/conversations/resolve` | `SOURCE_VERIFIED` | Validated international phone input resolves/creates a server-side DM mapping; no address-book import |
+| GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `SOURCE_VERIFIED` | Authenticated `ALL` DM default, `CONTACT` override, explicit `GROUP` rule with default disabled; ingestion remains independent |
+| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `SOURCE_VERIFIED` | Conversation-scoped bounded confirmation/idempotency calls resolve provider destination only inside Backend before official bridge `POST /send`; no raw recipient ref in Mobile |
 | POST | `/api/v1/integrations/spotify/connect` | `SOURCE_VERIFIED` | Server-side Authorization Code state route; live credentials/callback `BLOCKED_EXTERNAL_SECRET` |
 | GET | `/api/v1/integrations/spotify/callback` | `SOURCE_VERIFIED` | Exact configured redirect and single-use state; tokens stay server-side |
 | GET | `/api/v1/integrations/spotify/status` | `SOURCE_VERIFIED` | Normalized owner-scoped state only |

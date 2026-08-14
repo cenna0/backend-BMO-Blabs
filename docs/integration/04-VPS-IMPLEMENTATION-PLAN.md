@@ -76,11 +76,12 @@ Implement DB/API ownership for Wi-Fi configuration, telemetry/RSSI, device logs,
 
 Implement plugin catalog, the personal-account WhatsApp transport adapter,
 Spotify server-side OAuth/actions, and bug reports. WhatsApp uses the unchanged
-official Hermes bridge in private bot transport mode while `WHATSAPP_ENABLED`
-stays false; Backend is the sole queue consumer and owns notification rules,
-group classification, ownership, and untrusted-message handling. Live WhatsApp
-and Spotify acceptance stays blocked until provider session/credentials are
-proven.
+official Hermes bridge as private transport for the user's personal account;
+the official `bot` mode is transport semantics only. `WHATSAPP_ENABLED` stays
+false; Backend is the sole queue consumer and owns the conversation index,
+notification rules, group classification, ownership, and untrusted-message
+handling. Live WhatsApp and Spotify acceptance stays blocked until provider
+session/credentials are proven.
 
 ### Slice 8 — gated rollout
 

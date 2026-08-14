@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { encryptProviderToken, decryptProviderToken } from "../../src/p9/integrations.crypto.js";
-import { parseBugReportInput, parseSpotifyAction, parseWhatsAppRulesPatch } from "../../src/p9/integrations.validation.js";
+import { parseBugReportInput, parseSpotifyAction, parseWhatsAppConversationQuery, parseWhatsAppRecipientResolve, parseWhatsAppRulesPatch, parseWhatsAppSendPreview } from "../../src/p9/integrations.validation.js";
 
 describe("integration boundary validation", () => {
   it("encrypts provider tokens with an authenticated, versioned envelope", () => {
@@ -32,6 +32,16 @@ describe("integration boundary validation", () => {
     });
     expect(() => parseWhatsAppRulesPatch({ rules: [{ scope: "ALL", targetRef: "unexpected" }] })).toThrow();
     expect(() => parseWhatsAppRulesPatch({ rules: Array.from({ length: 101 }, () => ({ scope: "ALL" })) })).toThrow();
+    expect(parseWhatsAppRulesPatch({ rules: [{ scope: "CONTACT", conversationId: "00000000-0000-4000-8000-000000000010", enabled: false, speakOnDevice: false }] })).toMatchObject({ rules: [{ conversationId: "00000000-0000-4000-8000-000000000010", enabled: false }] });
+    expect(() => parseWhatsAppRulesPatch({ rules: [{ scope: "CONTACT", targetRef: "123@s.whatsapp.net" }] })).toThrow();
+  });
+
+  it("keeps WhatsApp mobile inputs opaque and validates phone resolution", () => {
+    expect(parseWhatsAppConversationQuery({ limit: "10" })).toEqual({ limit: 10 });
+    expect(parseWhatsAppRecipientResolve({ phoneNumber: "+62 812-3456-7890", displayName: "Rangga" })).toEqual({ phoneNumber: "+6281234567890", displayName: "Rangga" });
+    expect(parseWhatsAppSendPreview({ conversationId: "00000000-0000-4000-8000-000000000010", message: "hello", idempotencyKey: "wa-1" })).toMatchObject({ conversationId: "00000000-0000-4000-8000-000000000010" });
+    expect(() => parseWhatsAppSendPreview({ recipientRef: "123@s.whatsapp.net", message: "hello", idempotencyKey: "wa-1" })).toThrow();
+    expect(() => parseWhatsAppRecipientResolve({ phoneNumber: "not-a-phone" })).toThrow();
   });
 
   it("bounds bug report text and excludes arbitrary multipart metadata", () => {

@@ -185,6 +185,11 @@ enum WhatsAppRuleScope {
   GROUP
 }
 
+enum WhatsAppConversationType {
+  DM
+  GROUP
+}
+
 enum WhatsAppSendStatus {
   PENDING_CONFIRMATION
   CONFIRMED
@@ -251,6 +256,7 @@ model User {
   oauthStates               OAuthState[]
   spotifyCredential         SpotifyCredential?
   spotifyActions            SpotifyAction[]
+  whatsAppConversations     WhatsAppConversation[]
   whatsAppNotificationRules WhatsAppNotificationRule[]
   whatsAppSendRequests      WhatsAppSendRequest[]
   whatsAppDeliveries        WhatsAppDelivery[]
@@ -804,6 +810,7 @@ model IntegrationConnection {
   spotifyCredential    SpotifyCredential?
   spotifyActions       SpotifyAction[]
   whatsAppRules        WhatsAppNotificationRule[]
+  whatsAppConversations WhatsAppConversation[]
   whatsAppSendRequests WhatsAppSendRequest[]
   whatsAppDeliveries   WhatsAppDelivery[]
 
@@ -872,6 +879,27 @@ model SpotifyAction {
   @@index([userId, status, createdAt])
 }
 
+model WhatsAppConversation {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  userId             String                    @db.Uuid
+  connectionId       String                    @db.Uuid
+  provider           IntegrationProvider       @default(WHATSAPP)
+  opaqueChatRef      String                    @db.VarChar(255)
+  displayName        String                    @db.VarChar(120)
+  type               WhatsAppConversationType
+  lastActivityAt     DateTime                  @db.Timestamptz(3)
+  createdAt          DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                  @updatedAt @db.Timestamptz(3)
+  user               User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection         IntegrationConnection     @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "WhatsAppConversation_connection_owner_provider_fkey")
+  deliveries         WhatsAppDelivery[]
+  sendRequests       WhatsAppSendRequest[]
+
+  @@unique([id, userId, provider])
+  @@unique([userId, connectionId, provider, opaqueChatRef])
+  @@index([userId, lastActivityAt, id])
+}
+
 model WhatsAppNotificationRule {
   id              String                @id @default(uuid()) @db.Uuid
   userId          String                @db.Uuid
@@ -896,6 +924,7 @@ model WhatsAppSendRequest {
   userId                String                @db.Uuid
   connectionId          String                @db.Uuid
   provider              IntegrationProvider   @default(WHATSAPP)
+  conversationId        String?               @db.Uuid
   opaqueRecipientRef    String                @db.VarChar(255)
   preview               String                @db.VarChar(1000)
   idempotencyKey        String                @db.VarChar(128)
@@ -908,6 +937,7 @@ model WhatsAppSendRequest {
   updatedAt             DateTime              @updatedAt @db.Timestamptz(3)
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   connection            IntegrationConnection @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "WhatsAppSendRequest_connection_owner_provider_fkey")
+  conversation           WhatsAppConversation? @relation(fields: [conversationId, userId, provider], references: [id, userId, provider], onDelete: Restrict, map: "WhatsAppSendRequest_conversation_owner_provider_fkey")
   deliveries            WhatsAppDelivery[]
 
   @@unique([id, userId])
@@ -921,6 +951,7 @@ model WhatsAppDelivery {
   userId             String                    @db.Uuid
   connectionId       String                    @db.Uuid
   provider           IntegrationProvider       @default(WHATSAPP)
+  conversationId     String?                   @db.Uuid
   sendRequestId      String?                   @db.Uuid
   direction          WhatsAppDeliveryDirection
   status             WhatsAppDeliveryStatus
@@ -933,6 +964,7 @@ model WhatsAppDelivery {
   updatedAt          DateTime                  @updatedAt @db.Timestamptz(3)
   user               User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   connection         IntegrationConnection     @relation(fields: [connectionId, userId, provider], references: [id, userId, provider], onDelete: Cascade, map: "WhatsAppDelivery_connection_owner_provider_fkey")
+  conversation        WhatsAppConversation?    @relation(fields: [conversationId, userId, provider], references: [id, userId, provider], onDelete: Restrict, map: "WhatsAppDelivery_conversation_owner_provider_fkey")
   sendRequest        WhatsAppSendRequest?      @relation(fields: [sendRequestId, userId], references: [id, userId], onDelete: Restrict)
 
   @@index([userId, status, createdAt])

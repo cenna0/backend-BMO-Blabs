@@ -82,6 +82,13 @@ export const mobileOutboundEventSchema = z.discriminatedUnion("event", [
     body: boundedText(1_000),
     createdAt: timestamp,
   }).strict(),
+  z.object({
+    event: z.literal("whatsapp_notification"),
+    conversationId: uuid,
+    displayName: boundedText(120),
+    conversationType: z.enum(["DM", "GROUP"]),
+    receivedAt: timestamp,
+  }).strict(),
 ]);
 
 export type MobileOutboundEvent = z.infer<typeof mobileOutboundEventSchema>;

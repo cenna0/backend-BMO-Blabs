@@ -872,54 +872,166 @@ Device speech uses the generic proactive-delivery contract in `02-BACKEND-DEVICE
 
 ---
 
-# 13. WhatsApp
+# 13. WhatsApp personal-account connector
 
-Priority integration.
+WhatsApp is a BMO integration/action surface. The user pairs their personal
+WhatsApp account; there is no separate BMO bot number. Mobile talks only to
+these authenticated BMO routes and never to Hermes, Baileys, `/messages`,
+`/send`, raw JIDs, session paths, or provider credentials.
 
-Backend remains the public authority; Hermes/WhatsApp gateway is internal.
-
-Implement:
+## Connection
 
 ```text
-POST /api/v1/integrations/whatsapp/connect
 GET  /api/v1/integrations/whatsapp/status
-GET  /api/v1/integrations/whatsapp/qr
-POST /api/v1/integrations/whatsapp/confirm-scanned
 POST /api/v1/integrations/whatsapp/disconnect
+```
 
+Response:
+
+```json
+{
+  "provider": "whatsapp",
+  "status": "CONNECTED|DISCONNECTED|PENDING|ERROR",
+  "connectedAt": "ISO_TIMESTAMP|null",
+  "scopes": []
+}
+```
+
+The QR/connect routes remain operator/provider setup surfaces and are not
+needed by the mobile conversation UI.
+
+## Conversations and recipients
+
+```text
+GET  /api/v1/integrations/whatsapp/conversations?limit=50&cursor=...
+GET  /api/v1/integrations/whatsapp/conversations/:conversationId
+POST /api/v1/integrations/whatsapp/conversations/resolve
+```
+
+All require the bearer token. The list response is:
+
+```json
+{
+  "conversations": [
+    {
+      "id": "BMO_UUID",
+      "displayName": "Rangga",
+      "type": "DM",
+      "notificationEnabled": true,
+      "lastActivityAt": "ISO_TIMESTAMP"
+    }
+  ],
+  "nextCursor": "ISO_TIMESTAMP|BMO_UUID|null"
+}
+```
+
+Groups use `"type":"GROUP"` and are notification-disabled by default. The
+Backend builds this traffic-derived index from observed messages and sends;
+it does not import the complete WhatsApp address book or history. To create or
+reuse a DM that has not yet been observed:
+
+```json
+POST /api/v1/integrations/whatsapp/conversations/resolve
+{
+  "phoneNumber": "<E.164_PHONE>",
+  "displayName": "Rangga"
+}
+```
+
+The response is one safe conversation object. Phone identity is normalized and
+mapped to the provider destination only on the server; the response never
+contains the phone number or JID. Invalid input returns `INVALID_INPUT` (400),
+and a foreign/malformed conversation returns `OWNERSHIP_DENIED` (404).
+
+## Notification rules
+
+```text
 GET   /api/v1/integrations/whatsapp/notification-rules
 PATCH /api/v1/integrations/whatsapp/notification-rules
+```
 
+The patch replaces the authenticated user's WhatsApp rule set:
+
+```json
+{
+  "rules": [
+    { "scope": "ALL", "enabled": true, "speakOnDevice": false },
+    { "scope": "CONTACT", "conversationId": "BMO_UUID", "enabled": false, "speakOnDevice": false },
+    { "scope": "GROUP", "conversationId": "BMO_UUID", "enabled": true, "speakOnDevice": false }
+  ]
+}
+```
+
+`ALL` is the DM default; `CONTACT` overrides one DM; `GROUP` is disabled
+unless explicitly enabled. No raw provider target is accepted. Transport
+ingestion continues for muted/unknown contacts and groups; only notification
+and optional generic proactive speech are suppressed. Notification filtering
+is PostgreSQL/BMO application state, not the Hermes transport allowlist.
+
+## Send/reply
+
+```text
 POST /api/v1/integrations/whatsapp/send-preview
 POST /api/v1/integrations/whatsapp/send-confirm
 ```
 
-If incoming WhatsApp notification is configured to speak on BMO, Backend creates generic proactive delivery with source `WHATSAPP`.
+Preview request:
 
-The candidate adapter uses only the verified Hermes 0.20.0 loopback bridge:
-`GET /health`, destructive `GET /messages`, and `POST /send`. Hermes owns the
-session and QR flow; the candidate bridge URL is loopback-only and configured as
-`http://127.0.0.1:3001`. Outbound `recipientRef` must be a validated WhatsApp
-JID. A single global Hermes identity is bound to exactly one connected BMO owner;
-ambiguous or foreign-owner operations fail closed.
+```json
+{
+  "conversationId": "BMO_UUID",
+  "message": "Gw telat 10 menit",
+  "idempotencyKey": "wa-send-1"
+}
+```
 
-For the dedicated transport-only candidate design, `hermes-gateway.service`
-keeps `WHATSAPP_ENABLED=false` and does not consume this queue. A separate
-repository unit launches the unchanged official Baileys `bridge.js` as
-`hermes` with `--port 3001 --session /home/hermes/.hermes/whatsapp/session
---mode bot` using the user's personal paired account. `bot` is transport
-semantics, not a second-number or BMO-bot product identity. BMO Backend is the
-only `GET /messages` consumer and uses the official pairing DM policy only to
-admit events to that private queue. Backend-owned rules then independently
-control notifications: `ALL` is the DM default, `CONTACT` overrides a contact,
-and `GROUP` is disabled unless explicitly enabled. Groups are classified and
-bounded-persisted, but never become Hermes prompts or privileged tool requests.
-`WHATSAPP_GROUP_POLICY` is not the enforcement layer for this design.
+The preview/confirm response contains `id`, `conversationId`, `preview`,
+`status`, `confirmationExpiresAt`, and nullable `errorCode`. The Backend checks
+ownership, resolves the server-side provider mapping, calls the official
+bridge `/send`, and persists an outbound delivery. Mobile never supplies or
+receives a JID. Natural-language commands such as “bales Rangga ...” must first
+be authenticated as a BMO chat/voice action and then use this explicit
+allowlisted send boundary.
 
-Incoming WhatsApp text is untrusted message data. Only an authenticated BMO
-user action can authorize a reply/send or any Hermes/tool action. Manual owner
-messages forwarded by the official bridge are recorded as bounded activity
-metadata and do not create duplicate notifications for BMO `/send` echoes.
+## Inbound data and realtime event
+
+The dedicated official Hermes Baileys bridge feeds the Backend's sole
+destructive `GET /messages` consumer. Each supported event is validated,
+classified as DM/GROUP, indexed, and persisted only as bounded BMO routing and
+delivery metadata; message bodies are not mirrored into the WhatsApp index.
+Incoming WhatsApp text is `UNTRUSTED_MESSAGE_DATA`: it never becomes a Hermes
+prompt, tool request, privileged action, or automatic reply. Only an
+authenticated BMO user action can authorize tools or send/reply.
+
+When the notification rule permits, mobile receives this metadata-only event
+on `/api/v1/ws`:
+
+```json
+{
+  "event": "whatsapp_notification",
+  "conversationId": "BMO_UUID",
+  "displayName": "Rangga",
+  "conversationType": "DM",
+  "receivedAt": "ISO_TIMESTAMP"
+}
+```
+
+It contains no body preview, phone number, raw JID, session identifier, QR,
+token, or credential. Official owner-forward events, where enabled, update
+bounded conversation activity only and do not create duplicate notifications
+for Backend `/send` echoes. Full history sync, media, typing/read receipts,
+and address-book import are outside MVP. The bridge queue is in-memory and
+destructive, so WhatsApp delivery is not durable or replayable.
+
+## Runtime boundary
+
+The unchanged Hermes 0.20.0 bridge is private at `http://127.0.0.1:3001` and
+runs as the personal-account transport with `--mode bot`; `bot` is transport
+semantics, not product identity. `hermes-gateway.service` remains separate with
+`WHATSAPP_ENABLED=false` and does not consume this queue. `bmo-whatsapp-bridge.service`
+runs as `hermes`, has bounded crash restart, and is independent of the shared
+Hermes gateway. `WHATSAPP_GROUP_POLICY` is not the security enforcement layer;
+Backend classification and ownership rules are authoritative.
 
 Do not implement Telegram/SMS plugins.
 

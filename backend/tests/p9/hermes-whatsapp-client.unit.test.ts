@@ -22,7 +22,7 @@ describe("HermesWhatsAppBridgeClient", () => {
     ]));
     const client = new HermesWhatsAppBridgeClient({ baseUrl: "http://localhost:3001", fetcher });
 
-    await expect(client.poll()).resolves.toEqual([{ messageId: "m1", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "hello", isGroup: false, fromOwner: false }]);
+    await expect(client.poll()).resolves.toEqual([{ messageId: "m1", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", senderName: null, chatName: null, body: "hello", isGroup: false, fromOwner: false }]);
     expect(fetcher).toHaveBeenCalledWith("http://localhost:3001/messages", expect.objectContaining({ method: "GET" }));
   });
 
@@ -38,9 +38,9 @@ describe("HermesWhatsAppBridgeClient", () => {
     });
 
     await expect(client.poll()).resolves.toEqual([
-      { messageId: "allowed", chatId: "sender-a@s.whatsapp.net", senderId: "sender-a@s.whatsapp.net", body: "hello", isGroup: false, fromOwner: false },
-      { messageId: "unauthorized", chatId: "sender-b@s.whatsapp.net", senderId: "sender-b@s.whatsapp.net", body: "no", isGroup: false, fromOwner: false },
-      { messageId: "group", chatId: "team@g.us", senderId: "sender-c@s.whatsapp.net", body: "group data", isGroup: true, fromOwner: false },
+      { messageId: "allowed", chatId: "sender-a@s.whatsapp.net", senderId: "sender-a@s.whatsapp.net", senderName: null, chatName: null, body: "hello", isGroup: false, fromOwner: false },
+      { messageId: "unauthorized", chatId: "sender-b@s.whatsapp.net", senderId: "sender-b@s.whatsapp.net", senderName: null, chatName: null, body: "no", isGroup: false, fromOwner: false },
+      { messageId: "group", chatId: "team@g.us", senderId: "sender-c@s.whatsapp.net", senderName: null, chatName: null, body: "group data", isGroup: true, fromOwner: false },
     ]);
   });
 
@@ -53,7 +53,7 @@ describe("HermesWhatsAppBridgeClient", () => {
       fetcher,
     });
 
-    await expect(client.poll()).resolves.toEqual([{ messageId: "owner", chatId: "contact@s.whatsapp.net", senderId: "contact@s.whatsapp.net", body: "owner typed", isGroup: false, fromOwner: true }]);
+    await expect(client.poll()).resolves.toEqual([{ messageId: "owner", chatId: "contact@s.whatsapp.net", senderId: "contact@s.whatsapp.net", senderName: null, chatName: null, body: "owner typed", isGroup: false, fromOwner: true }]);
   });
 
   it("maps outbound send to the documented bridge payload and returns only the provider message reference", async () => {

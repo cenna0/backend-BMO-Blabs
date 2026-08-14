@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Prisma, PrismaClient } from "../../generated/prisma/client.js";
-import { IntegrationProvider, IntegrationStatus, SpotifyActionStatus, WhatsAppRuleScope, WhatsAppSendStatus } from "../../generated/prisma/enums.js";
+import { IntegrationProvider, IntegrationStatus, SpotifyActionStatus, WhatsAppConversationType, WhatsAppRuleScope, WhatsAppSendStatus } from "../../generated/prisma/enums.js";
 import { withP9Transaction } from "../db/client.js";
 import { P9Repositories } from "../db/repositories.js";
 import { P9Error } from "../errors.js";
@@ -19,26 +19,31 @@ const ALL_SEARCH_TYPES: SpotifySearchType[] = ["track", "artist", "album", "play
 
 type PublicConnection = { provider: "whatsapp" | "spotify"; status: string; connectedAt: string | null; scopes: string[] };
 type WhatsAppRuleRow = { scope: "ALL" | "CONTACT" | "GROUP"; opaqueTargetRef: string | null; enabled: boolean; speakOnDevice: boolean };
+type WhatsAppConversationRow = { id: string; userId: string; connectionId: string; provider: IntegrationProvider; opaqueChatRef: string; displayName: string; type: "DM" | "GROUP"; lastActivityAt: Date };
 type MobileEvents = { sendToUser(userId: string, event: MobileOutboundEvent): number };
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function isUuid(value: unknown): value is string { return typeof value === "string" && UUID_PATTERN.test(value); }
 
 function publicConnection(row: any, provider: "whatsapp" | "spotify"): PublicConnection {
   return { provider, status: row.status, connectedAt: row.connectedAt?.toISOString() ?? null, scopes: row.scopes ?? [] };
 }
 
-function matchingWhatsAppRule(rules: WhatsAppRuleRow[], message: HermesWhatsAppMessage): WhatsAppRuleRow | undefined {
-  if (message.isGroup) return rules.find((rule) => rule.scope === "GROUP" && rule.opaqueTargetRef === message.chatId);
-  return rules.find((rule) => rule.scope === "CONTACT" && rule.opaqueTargetRef === message.senderId);
+function matchingWhatsAppRule(rules: WhatsAppRuleRow[], conversation: WhatsAppConversationRow): WhatsAppRuleRow | undefined {
+  if (conversation.type === "GROUP") return rules.find((rule) => rule.scope === "GROUP" && (rule.opaqueTargetRef === conversation.id || rule.opaqueTargetRef === conversation.opaqueChatRef));
+  return rules.find((rule) => rule.scope === "CONTACT" && (rule.opaqueTargetRef === conversation.id || rule.opaqueTargetRef === conversation.opaqueChatRef));
 }
 
-function whatsappNotificationRule(rules: WhatsAppRuleRow[], message: HermesWhatsAppMessage): WhatsAppRuleRow | undefined {
-  const targeted = matchingWhatsAppRule(rules, message);
+function whatsappNotificationRule(rules: WhatsAppRuleRow[], conversation: WhatsAppConversationRow): WhatsAppRuleRow | undefined {
+  const targeted = matchingWhatsAppRule(rules, conversation);
   if (targeted) return targeted;
-  if (message.isGroup) return undefined;
+  if (conversation.type === "GROUP") return undefined;
   return rules.find((rule) => rule.scope === "ALL" && rule.opaqueTargetRef === null);
 }
 
-function shouldNotifyWhatsApp(rules: WhatsAppRuleRow[], message: HermesWhatsAppMessage): boolean {
-  const rule = whatsappNotificationRule(rules, message);
+function shouldNotifyWhatsApp(rules: WhatsAppRuleRow[], conversation: WhatsAppConversationRow): boolean {
+  const rule = whatsappNotificationRule(rules, conversation);
   return rule?.enabled === true;
 }
 
@@ -142,19 +147,20 @@ export class IntegrationService {
   async pollWhatsApp(): Promise<{ processed: number; queued: number }> {
     if (!this.options.whatsApp?.poll) return { processed: 0, queued: 0 };
     const messages = await this.options.whatsApp.poll();
+    const owners = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP, status: IntegrationStatus.CONNECTED }, select: { id: true, userId: true } });
+    if (owners.length !== 1 || !owners[0]) return { processed: 0, queued: 0 };
+    const owner = owners[0];
     let processed = 0;
     let queued = 0;
     for (const message of messages) {
-      const owners = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP, status: IntegrationStatus.CONNECTED }, select: { id: true, userId: true } });
-      if (owners.length !== 1) continue;
-      const owner = owners[0];
-      if (!owner) continue;
       const duplicate = await this.options.repositories.whatsAppDelivery.findFirst({ where: { provider: IntegrationProvider.WHATSAPP, connectionId: owner.id, providerMessageRef: message.messageId } });
       if (duplicate) continue;
+      const conversation = await this.#upsertWhatsAppConversation(owner.userId, owner.id, message);
       const delivery = await this.options.repositories.whatsAppDelivery.create({ data: {
         userId: owner.userId,
         connectionId: owner.id,
         provider: IntegrationProvider.WHATSAPP,
+        conversationId: conversation.id,
         direction: "INBOUND",
         status: "RECEIVED",
         providerMessageRef: message.messageId,
@@ -166,17 +172,16 @@ export class IntegrationService {
       // notifications, or proactive speech.
       if (message.fromOwner === true) continue;
       const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId: owner.userId, connectionId: owner.id, provider: IntegrationProvider.WHATSAPP } });
-      const notificationRule = whatsappNotificationRule(rules as WhatsAppRuleRow[], message);
-      if (!shouldNotifyWhatsApp(rules as WhatsAppRuleRow[], message)) continue;
+      const notificationRule = whatsappNotificationRule(rules as WhatsAppRuleRow[], conversation);
+      if (!shouldNotifyWhatsApp(rules as WhatsAppRuleRow[], conversation)) continue;
       if (this.options.mobileEvents) {
         try {
           this.options.mobileEvents.sendToUser(owner.userId, {
-            event: "notification",
-            id: delivery.id,
-            type: "GENERIC",
-            title: message.isGroup ? "WhatsApp group message" : "WhatsApp message",
-            body: message.body.slice(0, 1_000),
-            createdAt: new Date().toISOString(),
+            event: "whatsapp_notification",
+            conversationId: conversation.id,
+            displayName: conversation.displayName,
+            conversationType: conversation.type,
+            receivedAt: new Date().toISOString(),
           });
         } catch {
           // A mobile socket failure must not make the provider poller unhealthy.
@@ -192,11 +197,61 @@ export class IntegrationService {
     return { processed, queued };
   }
 
+  async whatsappConversations(userId: string, input: { limit: number; cursor?: string | undefined }): Promise<{ conversations: unknown[]; nextCursor: string | null }> {
+    const connection = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
+    if (!connection) return { conversations: [], nextCursor: null };
+    const cursor = input.cursor ? this.#decodeWhatsAppCursor(input.cursor) : null;
+    const rows = await this.options.repositories.whatsAppConversation.findMany({
+      where: {
+        userId,
+        connectionId: connection.id,
+        provider: IntegrationProvider.WHATSAPP,
+        ...(cursor ? { OR: [{ lastActivityAt: { lt: cursor.at } }, { lastActivityAt: cursor.at, id: { gt: cursor.id } }] } : {}),
+      },
+      orderBy: [{ lastActivityAt: "desc" }, { id: "asc" }],
+      take: input.limit + 1,
+    });
+    const hasMore = rows.length > input.limit;
+    const page = hasMore ? rows.slice(0, input.limit) : rows;
+    const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP } });
+    return {
+      conversations: page.map((row: WhatsAppConversationRow) => this.#publicWhatsAppConversation(row, rules as WhatsAppRuleRow[])),
+      nextCursor: hasMore && page.at(-1) ? this.#encodeWhatsAppCursor(page.at(-1)!) : null,
+    };
+  }
+
+  async whatsappConversation(userId: string, conversationId: string): Promise<unknown> {
+    if (!isUuid(conversationId)) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp conversation not found");
+    const row = await this.options.repositories.whatsAppConversation.findFirst({ where: { id: conversationId, userId, provider: IntegrationProvider.WHATSAPP } });
+    if (!row) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp conversation not found");
+    const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId, connectionId: row.connectionId, provider: IntegrationProvider.WHATSAPP } });
+    return this.#publicWhatsAppConversation(row, rules as WhatsAppRuleRow[]);
+  }
+
+  async resolveWhatsAppConversation(userId: string, input: { phoneNumber: string; displayName?: string | undefined }): Promise<unknown> {
+    const connection = await this.#requireConnectedWhatsAppOwner(userId);
+    const opaqueChatRef = `${input.phoneNumber.slice(1)}@s.whatsapp.net`;
+    const existing = await this.options.repositories.whatsAppConversation.findFirst({ where: { userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP, opaqueChatRef } });
+    const row = existing
+      ? (input.displayName ? await this.options.repositories.whatsAppConversation.update({ where: { id: existing.id }, data: { displayName: input.displayName } }) : existing)
+      : await this.options.repositories.whatsAppConversation.create({ data: {
+        userId,
+        connectionId: connection.id,
+        provider: IntegrationProvider.WHATSAPP,
+        opaqueChatRef,
+        displayName: input.displayName ?? "WhatsApp contact",
+        type: WhatsAppConversationType.DM,
+        lastActivityAt: await this.options.repositories.databaseNow(),
+      } });
+    const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP } });
+    return this.#publicWhatsAppConversation(row, rules as WhatsAppRuleRow[]);
+  }
+
   async whatsappRules(userId: string): Promise<unknown[]> {
     const connection = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
     if (!connection) return [];
     const rows = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP }, orderBy: [{ scope: "asc" }, { id: "asc" }] });
-    return rows.map((row: any) => ({ id: row.id, scope: row.scope, targetRef: row.opaqueTargetRef, enabled: row.enabled, speakOnDevice: row.speakOnDevice }));
+    return this.#publicWhatsAppRules(rows as WhatsAppRuleRow[], userId, connection.id);
   }
 
   async updateWhatsAppRules(userId: string, input: unknown, requestId?: string): Promise<unknown[]> {
@@ -208,24 +263,27 @@ export class IntegrationService {
       for (const rule of parsed.rules) {
         await repo.whatsAppNotificationRule.create({ data: {
           userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP,
-          scope: rule.scope as WhatsAppRuleScope, opaqueTargetRef: rule.targetRef ?? null,
+          scope: rule.scope as WhatsAppRuleScope, opaqueTargetRef: rule.conversationId ?? null,
           enabled: rule.enabled, speakOnDevice: rule.speakOnDevice,
         } });
       }
       await this.#audit(repo, userId, "whatsapp.rules.updated", "integration", connection.id, requestId);
       const rows = await repo.whatsAppNotificationRule.findMany({ where: { userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP }, orderBy: [{ scope: "asc" }, { id: "asc" }] });
-      return rows.map((row: any) => ({ id: row.id, scope: row.scope, targetRef: row.opaqueTargetRef, enabled: row.enabled, speakOnDevice: row.speakOnDevice }));
+      return this.#publicWhatsAppRules(rows as WhatsAppRuleRow[], userId, connection.id);
     });
   }
 
-  async whatsappPreview(userId: string, input: { recipientRef: string; message: string; idempotencyKey: string }, requestId?: string): Promise<unknown> {
+  async whatsappPreview(userId: string, input: { conversationId: string; message: string; idempotencyKey: string }, requestId?: string): Promise<unknown> {
     const connection = await this.#requireConnectedWhatsAppOwner(userId);
+    if (!isUuid(input.conversationId)) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp conversation not found");
+    const conversation = await this.options.repositories.whatsAppConversation.findFirst({ where: { id: input.conversationId, userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP } });
+    if (!conversation) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp conversation not found");
     const now = await this.options.repositories.databaseNow();
     const existing = await this.options.repositories.whatsAppSendRequest.findUnique({ where: { userId_idempotencyKey: { userId, idempotencyKey: input.idempotencyKey } } });
     if (existing) return this.#publicSend(existing);
     const row = await this.options.repositories.whatsAppSendRequest.create({ data: {
       userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP,
-      opaqueRecipientRef: input.recipientRef, preview: input.message, idempotencyKey: input.idempotencyKey,
+      conversationId: conversation.id, opaqueRecipientRef: conversation.opaqueChatRef, preview: input.message, idempotencyKey: input.idempotencyKey,
       confirmationExpiresAt: new Date(now.getTime() + CONFIRMATION_TTL_MS),
     } });
     await this.#audit(this.options.repositories, userId, "whatsapp.send.preview", "whatsapp_send", row.id, requestId);
@@ -248,7 +306,8 @@ export class IntegrationService {
     try {
       const sent = await this.options.whatsApp.send(userId, row.opaqueRecipientRef, row.preview);
       const finished = await this.options.repositories.whatsAppSendRequest.update({ where: { id: row.id }, data: { status: WhatsAppSendStatus.SUCCEEDED } });
-      await this.options.repositories.whatsAppDelivery.create({ data: { userId, connectionId: row.connectionId, provider: IntegrationProvider.WHATSAPP, sendRequestId: row.id, direction: "OUTBOUND", status: "DELIVERED", providerMessageRef: sent.providerMessageRef ?? null, deliveredAt: now } });
+      if (row.conversationId) await this.options.repositories.whatsAppConversation.update({ where: { id: row.conversationId }, data: { lastActivityAt: now } });
+      await this.options.repositories.whatsAppDelivery.create({ data: { userId, connectionId: row.connectionId, provider: IntegrationProvider.WHATSAPP, conversationId: row.conversationId ?? null, sendRequestId: row.id, direction: "OUTBOUND", status: "DELIVERED", providerMessageRef: sent.providerMessageRef ?? null, deliveredAt: now } });
       return this.#publicSend(finished);
     } catch {
       const failed = await this.options.repositories.whatsAppSendRequest.update({ where: { id: row.id }, data: { status: WhatsAppSendStatus.FAILED, errorCode: "PROVIDER_SEND_FAILED" } });
@@ -334,6 +393,63 @@ export class IntegrationService {
   async pluginCatalog(userId: string): Promise<unknown[]> {
     const [whatsapp, spotify] = await Promise.all([this.connection(userId, IntegrationProvider.WHATSAPP), this.connection(userId, IntegrationProvider.SPOTIFY)]);
     return [{ id: "whatsapp", title: "WhatsApp", installed: whatsapp.status !== IntegrationStatus.DISCONNECTED, status: whatsapp.status }, { id: "spotify", title: "Spotify", installed: spotify.status !== IntegrationStatus.DISCONNECTED, status: spotify.status }];
+  }
+
+  #upsertWhatsAppConversation(userId: string, connectionId: string, message: HermesWhatsAppMessage): Promise<WhatsAppConversationRow> {
+    const type = message.isGroup ? WhatsAppConversationType.GROUP : WhatsAppConversationType.DM;
+    const providerName = message.isGroup ? message.chatName : message.senderName;
+    const displayName = providerName?.trim().slice(0, 120) || (message.isGroup ? "WhatsApp group" : "WhatsApp contact");
+    return this.options.repositories.whatsAppConversation.findFirst({ where: { userId, connectionId, provider: IntegrationProvider.WHATSAPP, opaqueChatRef: message.chatId } }).then(async (existing: WhatsAppConversationRow | null) => {
+      const activity = await this.options.repositories.databaseNow();
+      if (existing) {
+        const shouldRefreshName = existing.displayName === "WhatsApp contact" || existing.displayName === "WhatsApp group";
+        return this.options.repositories.whatsAppConversation.update({ where: { id: existing.id }, data: { type, lastActivityAt: activity, ...(shouldRefreshName ? { displayName } : {}) } });
+      }
+      return this.options.repositories.whatsAppConversation.create({ data: {
+        userId,
+        connectionId,
+        provider: IntegrationProvider.WHATSAPP,
+        opaqueChatRef: message.chatId,
+        displayName,
+        type,
+        lastActivityAt: activity,
+      } });
+    });
+  }
+
+  #publicWhatsAppConversation(row: WhatsAppConversationRow, rules: WhatsAppRuleRow[]) {
+    return {
+      id: row.id,
+      displayName: row.displayName,
+      type: row.type,
+      notificationEnabled: shouldNotifyWhatsApp(rules, row),
+      lastActivityAt: row.lastActivityAt.toISOString(),
+    };
+  }
+
+  async #publicWhatsAppRules(rows: WhatsAppRuleRow[], userId: string, connectionId: string): Promise<unknown[]> {
+    const result: unknown[] = [];
+    for (const row of rows) {
+      if (row.scope === "ALL") {
+        result.push({ id: (row as any).id, scope: row.scope, conversationId: null, enabled: row.enabled, speakOnDevice: row.speakOnDevice });
+        continue;
+      }
+      if (!row.opaqueTargetRef) continue;
+      const conversation = await this.options.repositories.whatsAppConversation.findFirst({ where: { userId, connectionId, provider: IntegrationProvider.WHATSAPP, ...(isUuid(row.opaqueTargetRef) ? { id: row.opaqueTargetRef } : { opaqueChatRef: row.opaqueTargetRef }) } });
+      if (!conversation) continue;
+      result.push({ id: (row as any).id, scope: row.scope, conversationId: conversation.id, enabled: row.enabled, speakOnDevice: row.speakOnDevice });
+    }
+    return result;
+  }
+
+  #encodeWhatsAppCursor(row: WhatsAppConversationRow): string { return `${row.lastActivityAt.toISOString()}|${row.id}`; }
+
+  #decodeWhatsAppCursor(value: string): { at: Date; id: string } {
+    const separator = value.lastIndexOf("|");
+    const at = new Date(value.slice(0, separator));
+    const id = value.slice(separator + 1);
+    if (separator <= 0 || Number.isNaN(at.getTime()) || !isUuid(id)) throw new P9Error("INVALID_INPUT", 400, "Invalid WhatsApp conversation cursor");
+    return { at, id };
   }
 
   async #spotifyProviderCall(userId: string, operation: "devices" | "playback"): Promise<any> {
@@ -447,7 +563,7 @@ export class IntegrationService {
   async #ensureConnection(userId: string, provider: IntegrationProvider): Promise<any> { const current = await this.#getConnection(userId, provider); if (current) return current; return this.options.repositories.integrationConnection.create({ data: { userId, provider, scopes: [], status: IntegrationStatus.DISCONNECTED } }); }
   async #upsertConnection(userId: string, provider: IntegrationProvider, requestId?: string): Promise<any> { const row = await this.#ensureConnection(userId, provider); await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status: IntegrationStatus.PENDING, disconnectedAt: null } }); await this.#audit(this.options.repositories, userId, `${provider.toLowerCase()}.connect`, "integration", row.id, requestId); return this.options.repositories.integrationConnection.findUniqueOrThrow({ where: { id: row.id } }); }
   async #setStatus(userId: string, provider: IntegrationProvider, status: IntegrationStatus, requestId?: string): Promise<any> { const row = await this.#ensureConnection(userId, provider); const updated = await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status, ...(status === IntegrationStatus.CONNECTED ? { connectedAt: new Date(), disconnectedAt: null } : { disconnectedAt: new Date() }) } }); await this.#audit(this.options.repositories, userId, `${provider.toLowerCase()}.status`, "integration", row.id, requestId); return updated; }
-  #publicSend(row: any) { return { id: row.id, recipientRef: row.opaqueRecipientRef, preview: row.preview, status: row.status, confirmationExpiresAt: row.confirmationExpiresAt.toISOString(), errorCode: row.errorCode ?? null }; }
+  #publicSend(row: any) { return { id: row.id, conversationId: row.conversationId ?? null, preview: row.preview, status: row.status, confirmationExpiresAt: row.confirmationExpiresAt.toISOString(), errorCode: row.errorCode ?? null }; }
   #publicSpotifyAction(row: any) { return { id: row.id, action: row.action, status: row.status, confirmationExpiresAt: row.confirmationExpiresAt?.toISOString() ?? null, resultCode: row.resultCode ?? null, errorCode: row.errorCode ?? null }; }
   #audit(repo: P9Repositories, userId: string, eventType: string, resourceType: string, resourceId: string, requestId?: string) { return repo.auditEvent.create({ data: { eventType, outcome: "success", actorType: "user", resourceType, resourceId, userId, ...(requestId ? { requestId } : {}), metadata: {} } }); }
 }

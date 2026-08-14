@@ -9,6 +9,10 @@ const phase2MigrationPath = new URL(
   `../../prisma/migrations/${phase2MigrationName}/migration.sql`,
   import.meta.url,
 );
+const whatsappConversationMigrationPath = new URL(
+  "../../prisma/migrations/20260814120000_whatsapp_conversations/migration.sql",
+  import.meta.url,
+);
 
 function sqlTableDefinition(sql: string, tableName: string): string {
   const match = sql.match(new RegExp(`CREATE TABLE "${tableName}" \\(([\\s\\S]*?)\\n\\);`));
@@ -135,6 +139,7 @@ describe("P9 Prisma schema", () => {
       "OAuthState",
       "SpotifyCredential",
       "SpotifyAction",
+      "WhatsAppConversation",
       "WhatsAppNotificationRule",
       "WhatsAppSendRequest",
       "WhatsAppDelivery",
@@ -301,6 +306,24 @@ describe("P9 Prisma schema", () => {
     for (const [tableName, expectedColumnTypes] of Object.entries(expectedPhase2TableColumnTypes)) {
       expect(sqlColumnTypes(sqlTableDefinition(migrationSql, tableName)), tableName).toEqual(expectedColumnTypes);
     }
+  });
+
+  it("declares the additive WhatsApp conversation migration and relations", async () => {
+    const [schema, migrationSql] = await Promise.all([
+      readFile(schemaPath, "utf8"),
+      readFile(whatsappConversationMigrationPath, "utf8"),
+    ]);
+    expect(schema).toContain("enum WhatsAppConversationType");
+    expect(sqlColumnTypes(sqlTableDefinition(migrationSql, "WhatsAppConversation"))).toEqual([
+      "id:UUID", "userId:UUID", "connectionId:UUID", 'provider:"IntegrationProvider"',
+      "opaqueChatRef:VARCHAR(255)", "displayName:VARCHAR(120)", 'type:"WhatsAppConversationType"',
+      "lastActivityAt:TIMESTAMPTZ(3)", "createdAt:TIMESTAMPTZ(3)", "updatedAt:TIMESTAMPTZ(3)",
+    ]);
+    expect(migrationSql).toContain('ALTER TABLE "WhatsAppSendRequest" ADD COLUMN "conversationId" UUID;');
+    expect(migrationSql).toContain('ALTER TABLE "WhatsAppDelivery" ADD COLUMN "conversationId" UUID;');
+    expect(migrationSql).toContain('CONSTRAINT "WhatsAppConversation_connection_owner_provider_fkey"');
+    expect(migrationSql).toContain('CONSTRAINT "WhatsAppSendRequest_conversation_owner_provider_fkey"');
+    expect(migrationSql).toContain('CONSTRAINT "WhatsAppDelivery_conversation_owner_provider_fkey"');
   });
 
   it("closes nullable CHECK gaps and requires bounded device-log expiry", async () => {

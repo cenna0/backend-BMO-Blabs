@@ -35,3 +35,6 @@ CapabilityBoundingSet=
 # from loopback /health and crash state from systemd; no bridge output is retained.
 StandardOutput=null
 StandardError=null
+
+[Install]
+WantedBy=multi-user.target
