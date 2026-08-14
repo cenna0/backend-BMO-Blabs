@@ -58,4 +58,15 @@ describe("WhatsApp transport-only boundary", () => {
     expect(unit).not.toContain("WatchdogSec=");
     expect(unit).not.toContain("ExecStartPost=");
   });
+
+  it("makes the Backend acceptance runbook fail closed on HTTP or schema errors", () => {
+    const runbook = readFileSync(runbookPath, "utf8");
+    expect(runbook).toContain("set -Eeuo pipefail");
+    expect(runbook).toContain("wa_request()");
+    expect(runbook).toContain("backend_request_failed");
+    expect(runbook).toContain("case \"$http_code\" in");
+    expect(runbook).toContain("jq -e '.connection.status == \"CONNECTED\"");
+    expect(runbook).toContain("jq -er '.conversations[0].id'");
+    expect(runbook).toContain("backend_api_smoke=pass");
+  });
 });

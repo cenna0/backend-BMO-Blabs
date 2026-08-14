@@ -21,10 +21,11 @@ Caddy mutation, or provider secret was performed.
 | Spotify callback exposure | `BLOCKED_OPERATOR` | Exact single-path diff is prepared at `ops/caddy/phase26-spotify-candidate-callback.patch` but has not been applied to active Caddy. Candidate remains loopback at `127.0.0.1:3010`. |
 | Hermes WhatsApp runtime boundary | `CANDIDATE_VERIFIED` | Installed Hermes 0.20.0 and the official unchanged Baileys bridge provide loopback `/health`, destructive `/messages`, and `/send`; the paired personal-account session is present and the bridge reports connected. |
 | WhatsApp dedicated transport runtime | `CANDIDATE_VERIFIED` | `bmo-whatsapp-bridge.service` runs as `hermes` on loopback 3001 with bounded crash restart, private stdout/stderr, and no dependency/restart of `hermes-gateway.service`; source now includes reboot enablement. |
+| WhatsApp candidate runtime/source alignment | `CANDIDATE_VERIFIED` | Earlier runtime used the Phase 2.6 route build but an older service bundle: compiled route hash matched source while service hash differed. Candidate was rebuilt from pushed `dc831c2`, tagged `bmo-phase26-whatsapp-candidate:dc831c2`, recreated only for `bmo-p9-1-backend-1`, and reported no pending migrations. |
 | WhatsApp concrete adapter | `SOURCE_VERIFIED` | Candidate `HermesWhatsAppBridgeClient` implements bounded loopback health, receives validated contact/group events, preserves owner markers, maps `/send`, returns bounded errors, and never exposes provider response data. |
-| WhatsApp personal-account ownership/inbound producer | `SOURCE_VERIFIED` | Candidate poller binds exactly one connected personal-account owner, indexes DM/GROUP traffic into owner-scoped BMO conversations, deduplicates provider message IDs, stores no body, and keeps inbound text out of Hermes privileged paths. |
-| WhatsApp Mobile conversation/API contract | `SOURCE_VERIFIED` | Authenticated list/get/resolve, UUID-scoped notification rules, conversation-scoped send/confirm, metadata-only `whatsapp_notification`, validation, ownership, migration, and focused/full test coverage are implemented. |
-| WhatsApp notification rules | `SOURCE_VERIFIED` | Owner-scoped `ALL`/`CONTACT`/`GROUP` rules are independent of transport intake: DM default, contact override, group default deny, mobile notification, and optional generic proactive delivery. |
+| WhatsApp personal-account ownership/inbound producer | `SOURCE_VERIFIED` | Candidate poller binds exactly one connected personal-account owner, indexes DM/GROUP traffic into owner-scoped BMO conversations, deduplicates provider message IDs, stores no body, and keeps inbound text out of Hermes privileged paths. Real traffic remains intentionally untested. |
+| WhatsApp Mobile conversation/API contract | `CANDIDATE_VERIFIED` | Candidate-only authenticated smoke passed for connection/status, resolve, list/detail, UUID-scoped rules, send-preview, and bounded send-confirm ownership rejection; no real outbound send or inbound traffic was performed. |
+| WhatsApp notification rules | `CANDIDATE_VERIFIED` | Candidate-only rule smoke passed with `ALL` plus UUID-scoped `CONTACT`; stale unbound `PENDING` rows no longer block a new owner, while connected/externally bound owners remain protected. |
 | Generic WhatsApp proactive speech | `PENDING_PHYSICAL_ESP` | A real inbound event can create the generic `WHATSAPP` proactive-delivery job when an enabled rule and active device match; physical synthesis/playback evidence is absent. |
 
 ## Historical Phase 2.5 candidate acceptance
@@ -321,7 +322,7 @@ is deliberately deferred to a later slice.
 
 ## Current blockers
 
-1. `BLOCKED_OPERATOR`: Backend-only live WhatsApp acceptance still needs one authenticated non-production BMO user and operator-coordinated contact/group interactions; QR pairing and bridge startup are complete.
+1. `BLOCKED_OPERATOR`: Real WhatsApp DM/group/send/owner-reply acceptance remains intentionally paused until the operator requests traffic testing; QR pairing and bridge startup are complete.
 2. `BLOCKED_EXTERNAL_SECRET`: Spotify application credentials, protected provider encryption secret, and callback registration are not proven.
 3. `PENDING_PHYSICAL_ESP`: first-boot Wi-Fi bootstrap, battery sensing capability, additive events, and physical playback require firmware/bench evidence.
 4. Current UFW/nft rules remain unreadable without passworded elevated privileges. Listener, Docker, and Caddy evidence prove no service currently accepts port 5555; firewall-policy inspection remains an operator evidence gap for final public/private sign-off.
