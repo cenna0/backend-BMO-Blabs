@@ -14,12 +14,20 @@ The dedicated unit launches the installed Hermes `bridge.js` unchanged as
 ```
 
 `hermes-gateway.service` remains independent and must keep
-`WHATSAPP_ENABLED=false`. BMO Backend is the only `GET /messages` consumer.
+`WHATSAPP_ENABLED=false`. The paired account is the user's personal WhatsApp
+account; `--mode bot` is only the official bridge's contact-event transport
+behavior, not a separate bot number. BMO Backend is the only `GET /messages`
+consumer. The launcher uses `WHATSAPP_DM_POLICY=pairing` so the private bridge
+queue can receive contact events; Backend notification rules remain the product
+policy. A protected non-wildcard `WHATSAPP_ALLOWED_USERS` value is optional
+and is used only by the official bridge to permit forwarding manual owner
+messages for selected chats; it is never used as the Backend notification
+filter.
 
 ## Read-only preflight
 
 Run these checks before any mutation. They print only paths, service state, and
-boolean metadata; do not print `.env`, `config.yaml`, allowlist values, QR
+boolean metadata; do not print `.env`, `config.yaml`, provider identities, QR
 contents, session files, JIDs, or message bodies.
 
 ```bash
@@ -61,10 +69,9 @@ sudo -u hermes -H sh -c '
   allow=$(sed -n 's/^WHATSAPP_ALLOWED_USERS=//p' "$f" | head -n 1)
   test "$enabled" = false
   test "$mode" = bot
-  test -n "$allow"
-  test "$allow" != "*"
-  case "$allow" in *\**|*[	 ]*) exit 1 ;; esac
-  printf "hermes_preflight=ok enabled=false mode=bot allowlist=present session=present\n"
+  case "$allow" in *\**|*,,*|,*|*,) exit 1 ;; esac
+  if [ -n "$allow" ]; then owner_gate=present; else owner_gate=not_configured; fi
+  printf "hermes_preflight=ok enabled=false mode=bot personal-account=session-ready owner-forward-gate=%s\n" "$owner_gate"
 '
 ```
 
@@ -95,10 +102,16 @@ sudo -u hermes -H env BACKUP_DIR="$backup_dir" sh -c '
 ## Official pairing command — not run in this phase
 
 This is the installed Hermes CLI flow. It requires a TTY and the physical QR
-scan. Select mode `1` (separate bot number) if the wizard asks, provide a
-non-wildcard allowlist, and never capture its output. The CLI's successful
-pairing path may write `WHATSAPP_ENABLED=true`; immediately set it back to
-false before starting the dedicated unit:
+scan. Pair the user's personal WhatsApp account. When the wizard presents the
+legacy mode labels, select `1` so the official bridge writes `WHATSAPP_MODE=bot`;
+this is transport behavior only and does not require a second number. If manual
+owner-message observation is required, configure only the operator-approved
+contact identities in the protected Hermes allowlist; this is not a BMO
+notification setting. Leaving it empty keeps manual owner forwarding disabled
+while inbound contact ingestion remains available through pairing policy. Never
+capture CLI output. The CLI's successful pairing path may write
+`WHATSAPP_ENABLED=true`; immediately set it back to false before starting the
+dedicated unit:
 
 ```bash
 sudo -u hermes -H env \
@@ -126,13 +139,12 @@ the operator explicitly intends to replace that provider session.
 
 ## Install and start — prepared, not executed
 
-First provision the exact bridge-emitted sender ID list in the protected
-candidate Backend environment (normally `/opt/bmo/config/backend.env`) as
-`WHATSAPP_ALLOWED_USERS=...`. Do not put the value in Git or send it in chat.
-The Backend list is exact and fail-closed; it must not be `*`. Hermes may
-resolve a phone allowlist through its protected LID mapping. If a paired bridge
-event uses a LID identifier, add that normalized identifier to the protected
-Backend list as well; do not print or send it.
+No Backend `WHATSAPP_ALLOWED_USERS` provisioning is required. If the operator
+wants manual replies from the phone observed for selected chats, the official
+CLI may store the approved non-wildcard identities in Hermes `.env`; the
+launcher passes that protected value only to the official bridge owner-forward
+gate. Backend still receives contact events independently and applies its own
+`ALL`/`CONTACT`/`GROUP` notification rules.
 
 Then install only the two prepared files:
 
@@ -157,7 +169,9 @@ The unit has no dependency on `hermes-gateway.service`, uses
 `Restart=on-failure` with a ten-second delay and five-start/300-second limits,
 and prevents restart loops for configuration exit code 78. A temporary
 WhatsApp disconnect is handled by bridge.js internally; systemd does not health
-restart the process.
+restart the process. The bridge queue is in-memory and destructive: delivery is
+not durable or replayable if the bridge or poller fails before Backend
+processing.
 
 ## Shared Hermes restart evidence — prepared, not executed
 
@@ -225,5 +239,5 @@ No rollback command deletes `/home/hermes/.hermes/whatsapp/session`.
 This runbook stops before the pairing command and before any install/start,
 systemd mutation, candidate restart, Hermes restart, or Caddy mutation. Return
 only sanitized boolean/status evidence after the operator review. Never share
-allowlist values, QR output, session files, `creds.json`, provider tokens,
-phone numbers, JIDs, or message bodies.
+QR output, session files, `creds.json`, provider tokens, phone numbers, JIDs,
+or message bodies.

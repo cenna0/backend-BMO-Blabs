@@ -125,7 +125,10 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   const spotify = config.spotifyClientId && config.spotifyClientSecret
     ? new SpotifyApiClient({ clientId: config.spotifyClientId, clientSecret: config.spotifyClientSecret })
     : undefined;
-  const whatsApp = new HermesWhatsAppBridgeClient({ baseUrl: config.whatsappBridgeUrl, allowedSenderIds: config.whatsAppAllowedUsers });
+  // The dedicated bridge is a personal-account transport. The bridge's
+  // destructive queue is ingested here, while notification authorization is
+  // owned by WhatsAppNotificationRule in the Backend.
+  const whatsApp = new HermesWhatsAppBridgeClient({ baseUrl: config.whatsappBridgeUrl });
   const integrations = new IntegrationService({
     client,
     repositories,
@@ -136,7 +139,8 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     ...(config.spotifyCallbackUrl === undefined ? {} : { spotifyCallbackUrl: config.spotifyCallbackUrl }),
     ...(spotify === undefined ? {} : { spotify }),
     whatsApp,
-    whatsAppInbound: async (input) => {
+    mobileEvents: options.mobileEvents ?? noMobileEvents,
+    whatsAppProactiveDelivery: async (input) => {
       await proactive.enqueue({
         userId: input.userId,
         deviceId: input.deviceId,

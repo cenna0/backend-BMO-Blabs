@@ -34,7 +34,6 @@ mode="$(read_env_value WHATSAPP_MODE || true)"
 allowed="$(read_env_value WHATSAPP_ALLOWED_USERS || true)"
 [ "$enabled" = "false" ] || exit 78
 [ "$mode" = "bot" ] || exit 78
-[ -n "$allowed" ] || exit 78
 case "$allowed" in
   *[[:space:]]*|*\**|*,,*|,*|*,) exit 78 ;;
 esac
@@ -42,20 +41,29 @@ esac
 install_bridge="$HERMES_HOME/hermes-agent/scripts/whatsapp-bridge/bridge.js"
 mirror_bridge="$HERMES_HOME/scripts/whatsapp-bridge/bridge.js"
 bridge_script=""
-if [ -f "$install_bridge" ] && [ -w "$(dirname "$install_bridge")" ]; then
-  bridge_script="$install_bridge"
-elif [ -f "$mirror_bridge" ]; then
-  bridge_script="$mirror_bridge"
-elif [ -f "$install_bridge" ]; then
-  bridge_script="$install_bridge"
-fi
+for candidate in "$install_bridge" "$mirror_bridge"; do
+  [ -f "$candidate" ] || continue
+  candidate_dir=$(dirname "$candidate")
+  [ -f "$candidate_dir/package.json" ] || continue
+  [ -d "$candidate_dir/node_modules" ] || continue
+  bridge_script="$candidate"
+  break
+done
 [ -n "$bridge_script" ] || exit 78
 
 export HOME="$HERMES_HOME"
 export HERMES_HOME
 export WHATSAPP_MODE=bot
-export WHATSAPP_ALLOWED_USERS="$allowed"
-export WHATSAPP_DM_POLICY=allowlist
+if [ -n "$allowed" ]; then
+  # This is an official bridge owner-forward gate only. It is not the BMO
+  # notification policy; pairing DM policy still admits contact events.
+  export WHATSAPP_ALLOWED_USERS="$allowed"
+fi
+# Official bridge bot behavior is used as transport only. Pairing policy
+# admits contact events to the private queue; the Hermes gateway adapter stays
+# disabled, and Backend rules own all notification/action authorization.
+export WHATSAPP_DM_POLICY=pairing
+export WHATSAPP_FORWARD_OWNER_MESSAGES=true
 export WHATSAPP_GROUP_POLICY=disabled
 export WHATSAPP_SEND_READ_RECEIPTS=false
 

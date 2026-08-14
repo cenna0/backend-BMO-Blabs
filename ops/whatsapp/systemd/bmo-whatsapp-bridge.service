@@ -31,7 +31,7 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 CapabilityBoundingSet=
-# Official bridge startup output includes the allowlist. Health is read from
-# loopback /health and crash state from systemd; no bridge output is retained.
+# Official bridge startup output can include provider identities. Health is read
+# from loopback /health and crash state from systemd; no bridge output is retained.
 StandardOutput=null
 StandardError=null

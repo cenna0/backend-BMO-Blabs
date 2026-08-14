@@ -907,11 +907,19 @@ For the dedicated transport-only candidate design, `hermes-gateway.service`
 keeps `WHATSAPP_ENABLED=false` and does not consume this queue. A separate
 repository unit launches the unchanged official Baileys `bridge.js` as
 `hermes` with `--port 3001 --session /home/hermes/.hermes/whatsapp/session
---mode bot`. BMO Backend is the only `GET /messages` consumer. It rejects
-unauthorized DMs using a protected exact sender allowlist and drops every event
-with `isGroup === true` before owner lookup, persistence, notification rules,
-Hermes reasoning, or generic proactive delivery. `WHATSAPP_GROUP_POLICY` is not
-the enforcement layer for this design.
+--mode bot` using the user's personal paired account. `bot` is transport
+semantics, not a second-number or BMO-bot product identity. BMO Backend is the
+only `GET /messages` consumer and uses the official pairing DM policy only to
+admit events to that private queue. Backend-owned rules then independently
+control notifications: `ALL` is the DM default, `CONTACT` overrides a contact,
+and `GROUP` is disabled unless explicitly enabled. Groups are classified and
+bounded-persisted, but never become Hermes prompts or privileged tool requests.
+`WHATSAPP_GROUP_POLICY` is not the enforcement layer for this design.
+
+Incoming WhatsApp text is untrusted message data. Only an authenticated BMO
+user action can authorize a reply/send or any Hermes/tool action. Manual owner
+messages forwarded by the official bridge are recorded as bounded activity
+metadata and do not create duplicate notifications for BMO `/send` echoes.
 
 Do not implement Telegram/SMS plugins.
 

@@ -14,6 +14,7 @@ export interface HermesWhatsAppMessage {
   senderId: string;
   body: string;
   isGroup: boolean;
+  fromOwner: boolean;
 }
 
 export type HermesWhatsAppProviderErrorCode =
@@ -33,7 +34,6 @@ type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 
 interface HermesWhatsAppClientOptions {
   baseUrl: string;
-  allowedSenderIds?: readonly string[];
   fetcher?: Fetcher;
   timeoutMs?: number;
 }
@@ -44,10 +44,6 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function boundedString(value: unknown, max: number): string | null {
   return typeof value === "string" && value.length > 0 && value.length <= max ? value : null;
-}
-
-function normalizeAllowedSenderId(value: string): string {
-  return value.trim().replace(/:.*@/u, "@").replace(/@.*/u, "").replace(/^\+/u, "");
 }
 
 function loopbackBaseUrl(value: string): string {
@@ -69,17 +65,11 @@ export class HermesWhatsAppBridgeClient {
   readonly #baseUrl: string;
   readonly #fetcher: Fetcher;
   readonly #timeoutMs: number;
-  readonly #allowedSenderIds: ReadonlySet<string>;
 
   constructor(options: HermesWhatsAppClientOptions) {
     this.#baseUrl = loopbackBaseUrl(options.baseUrl).replace(/\/$/u, "");
     this.#fetcher = options.fetcher ?? fetch;
     this.#timeoutMs = options.timeoutMs ?? 30_000;
-    const allowedSenderIds = options.allowedSenderIds ?? [];
-    if (allowedSenderIds.some((value) => value.trim() === "" || value === "*" || value.includes("*"))) {
-      throw new HermesWhatsAppProviderError("PROVIDER_REQUEST_FAILED");
-    }
-    this.#allowedSenderIds = new Set(allowedSenderIds.map(normalizeAllowedSenderId));
   }
 
   async status(): Promise<HermesWhatsAppStatus> {
@@ -119,8 +109,8 @@ export class HermesWhatsAppBridgeClient {
       const senderId = boundedString(value.senderId, 255);
       const body = typeof value.body === "string" && value.body.length <= 65_536 ? value.body : null;
       if (!messageId || !chatId || !senderId || body === null || body.trim().length === 0) return null;
-      return { messageId, chatId, senderId, body, isGroup: value.isGroup === true };
-    }).filter((value): value is HermesWhatsAppMessage => value !== null && (value.isGroup || this.#allowedSenderIds.has(normalizeAllowedSenderId(value.senderId))));
+      return { messageId, chatId, senderId, body, isGroup: value.isGroup === true, fromOwner: value.fromOwner === true };
+    }).filter((value): value is HermesWhatsAppMessage => value !== null);
   }
 
   async send(_userId: string, recipientRef: string, message: string): Promise<{ providerMessageRef?: string }> {

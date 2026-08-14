@@ -20,48 +20,40 @@ describe("HermesWhatsAppBridgeClient", () => {
       { messageId: "m1", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "hello", isGroup: false, secret: "must-not-leak" },
       { messageId: "bad", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "" },
     ]));
-    const client = new HermesWhatsAppBridgeClient({ baseUrl: "http://localhost:3001", allowedSenderIds: ["123@s.whatsapp.net"], fetcher });
+    const client = new HermesWhatsAppBridgeClient({ baseUrl: "http://localhost:3001", fetcher });
 
-    await expect(client.poll()).resolves.toEqual([{ messageId: "m1", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "hello", isGroup: false }]);
+    await expect(client.poll()).resolves.toEqual([{ messageId: "m1", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "hello", isGroup: false, fromOwner: false }]);
     expect(fetcher).toHaveBeenCalledWith("http://localhost:3001/messages", expect.objectContaining({ method: "GET" }));
   });
 
-  it("passes an allowlisted DM and rejects an unauthorized DM without changing bridge transport", async () => {
+  it("passes every validated DM and group event without using a transport allowlist as notification policy", async () => {
     const fetcher = vi.fn().mockResolvedValue(response([
       { messageId: "allowed", chatId: "sender-a@s.whatsapp.net", senderId: "sender-a@s.whatsapp.net", body: "hello", isGroup: false },
       { messageId: "unauthorized", chatId: "sender-b@s.whatsapp.net", senderId: "sender-b@s.whatsapp.net", body: "no", isGroup: false },
+      { messageId: "group", chatId: "team@g.us", senderId: "sender-c@s.whatsapp.net", body: "group data", isGroup: true },
     ]));
     const client = new HermesWhatsAppBridgeClient({
       baseUrl: "http://127.0.0.1:3001",
-      allowedSenderIds: ["sender-a"],
       fetcher,
     });
 
-    await expect(client.poll()).resolves.toEqual([{
-      messageId: "allowed",
-      chatId: "sender-a@s.whatsapp.net",
-      senderId: "sender-a@s.whatsapp.net",
-      body: "hello",
-      isGroup: false,
-    }]);
+    await expect(client.poll()).resolves.toEqual([
+      { messageId: "allowed", chatId: "sender-a@s.whatsapp.net", senderId: "sender-a@s.whatsapp.net", body: "hello", isGroup: false, fromOwner: false },
+      { messageId: "unauthorized", chatId: "sender-b@s.whatsapp.net", senderId: "sender-b@s.whatsapp.net", body: "no", isGroup: false, fromOwner: false },
+      { messageId: "group", chatId: "team@g.us", senderId: "sender-c@s.whatsapp.net", body: "group data", isGroup: true, fromOwner: false },
+    ]);
   });
 
-  it("matches the official Hermes bare sender allowlist against an inbound WhatsApp JID", async () => {
+  it("preserves the official owner-message marker without exposing extra provider fields", async () => {
     const fetcher = vi.fn().mockResolvedValue(response([
-      { messageId: "allowed-bare", chatId: "62812@s.whatsapp.net", senderId: "62812@s.whatsapp.net", body: "hello", isGroup: false },
+      { messageId: "owner", chatId: "contact@s.whatsapp.net", senderId: "contact@s.whatsapp.net", body: "owner typed", isGroup: false, fromOwner: true, phone: "must-not-leak" },
     ]));
     const client = new HermesWhatsAppBridgeClient({
       baseUrl: "http://127.0.0.1:3001",
-      allowedSenderIds: ["62812"],
       fetcher,
     });
 
-    await expect(client.poll()).resolves.toHaveLength(1);
-  });
-
-  it("fails closed when the Backend allowlist is empty or wildcarded", () => {
-    expect(() => new HermesWhatsAppBridgeClient({ baseUrl: "http://127.0.0.1:3001", allowedSenderIds: [] })).not.toThrow();
-    expect(() => new HermesWhatsAppBridgeClient({ baseUrl: "http://127.0.0.1:3001", allowedSenderIds: ["*"] })).toThrow(HermesWhatsAppProviderError);
+    await expect(client.poll()).resolves.toEqual([{ messageId: "owner", chatId: "contact@s.whatsapp.net", senderId: "contact@s.whatsapp.net", body: "owner typed", isGroup: false, fromOwner: true }]);
   });
 
   it("maps outbound send to the documented bridge payload and returns only the provider message reference", async () => {

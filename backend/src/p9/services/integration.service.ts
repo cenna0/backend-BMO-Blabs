@@ -9,6 +9,7 @@ import { parseSpotifyAction, parseWhatsAppRulesPatch } from "../integrations.val
 import { SpotifyProviderError, type SpotifySearchType } from "../providers/spotify.client.js";
 import type { HermesWhatsAppMessage } from "../providers/hermes-whatsapp.client.js";
 import { HermesWhatsAppProviderError } from "../providers/hermes-whatsapp.client.js";
+import type { MobileOutboundEvent } from "../websocket/mobile-events.js";
 
 const OAUTH_TTL_MS = 10 * 60_000;
 const CONFIRMATION_TTL_MS = 5 * 60_000;
@@ -17,9 +18,28 @@ const TOKEN_REFRESH_SKEW_MS = 30_000;
 const ALL_SEARCH_TYPES: SpotifySearchType[] = ["track", "artist", "album", "playlist"];
 
 type PublicConnection = { provider: "whatsapp" | "spotify"; status: string; connectedAt: string | null; scopes: string[] };
+type WhatsAppRuleRow = { scope: "ALL" | "CONTACT" | "GROUP"; opaqueTargetRef: string | null; enabled: boolean; speakOnDevice: boolean };
+type MobileEvents = { sendToUser(userId: string, event: MobileOutboundEvent): number };
 
 function publicConnection(row: any, provider: "whatsapp" | "spotify"): PublicConnection {
   return { provider, status: row.status, connectedAt: row.connectedAt?.toISOString() ?? null, scopes: row.scopes ?? [] };
+}
+
+function matchingWhatsAppRule(rules: WhatsAppRuleRow[], message: HermesWhatsAppMessage): WhatsAppRuleRow | undefined {
+  if (message.isGroup) return rules.find((rule) => rule.scope === "GROUP" && rule.opaqueTargetRef === message.chatId);
+  return rules.find((rule) => rule.scope === "CONTACT" && rule.opaqueTargetRef === message.senderId);
+}
+
+function whatsappNotificationRule(rules: WhatsAppRuleRow[], message: HermesWhatsAppMessage): WhatsAppRuleRow | undefined {
+  const targeted = matchingWhatsAppRule(rules, message);
+  if (targeted) return targeted;
+  if (message.isGroup) return undefined;
+  return rules.find((rule) => rule.scope === "ALL" && rule.opaqueTargetRef === null);
+}
+
+function shouldNotifyWhatsApp(rules: WhatsAppRuleRow[], message: HermesWhatsAppMessage): boolean {
+  const rule = whatsappNotificationRule(rules, message);
+  return rule?.enabled === true;
 }
 
 export interface HermesWhatsAppBoundary {
@@ -51,7 +71,8 @@ export class IntegrationService {
     spotifyClientSecret?: string;
     spotifyCallbackUrl?: string;
     whatsApp?: HermesWhatsAppBoundary;
-    whatsAppInbound?: (input: { userId: string; deliveryId: string; deviceId: string; text: string }) => Promise<void>;
+    whatsAppProactiveDelivery?: (input: { userId: string; deliveryId: string; deviceId: string; text: string }) => Promise<void>;
+    mobileEvents?: MobileEvents;
     spotify?: SpotifyProviderBoundary;
   }) {}
 
@@ -124,9 +145,6 @@ export class IntegrationService {
     let processed = 0;
     let queued = 0;
     for (const message of messages) {
-      // This is the authoritative BMO group boundary. It must run before owner lookup,
-      // duplicate lookup, persistence, notification evaluation, or proactive delivery.
-      if (message.isGroup === true) continue;
       const owners = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP, status: IntegrationStatus.CONNECTED }, select: { id: true, userId: true } });
       if (owners.length !== 1) continue;
       const owner = owners[0];
@@ -140,15 +158,35 @@ export class IntegrationService {
         direction: "INBOUND",
         status: "RECEIVED",
         providerMessageRef: message.messageId,
-        metadata: JSON.stringify({ chatId: message.chatId, senderId: message.senderId, isGroup: message.isGroup, bodyLength: message.body.length }),
+        metadata: JSON.stringify({ chatId: message.chatId, senderId: message.senderId, isGroup: message.isGroup, bodyLength: message.body.length, fromOwner: message.fromOwner === true }),
       } });
       processed += 1;
-      const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId: owner.userId, connectionId: owner.id, provider: IntegrationProvider.WHATSAPP, enabled: true } });
-      const shouldSpeak = rules.some((rule: any) => rule.speakOnDevice === true && (rule.scope === "ALL" || (rule.scope === "GROUP" && message.isGroup && rule.opaqueTargetRef === message.chatId) || (rule.scope === "CONTACT" && rule.opaqueTargetRef === message.senderId)));
-      if (!shouldSpeak || !this.options.whatsAppInbound) continue;
+      // The bridge marks owner-typed messages separately from /send echoes. They
+      // update bounded delivery metadata only; they never become BMO prompts,
+      // notifications, or proactive speech.
+      if (message.fromOwner === true) continue;
+      const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId: owner.userId, connectionId: owner.id, provider: IntegrationProvider.WHATSAPP } });
+      const notificationRule = whatsappNotificationRule(rules as WhatsAppRuleRow[], message);
+      if (!shouldNotifyWhatsApp(rules as WhatsAppRuleRow[], message)) continue;
+      if (this.options.mobileEvents) {
+        try {
+          this.options.mobileEvents.sendToUser(owner.userId, {
+            event: "notification",
+            id: delivery.id,
+            type: "GENERIC",
+            title: message.isGroup ? "WhatsApp group message" : "WhatsApp message",
+            body: message.body.slice(0, 1_000),
+            createdAt: new Date().toISOString(),
+          });
+        } catch {
+          // A mobile socket failure must not make the provider poller unhealthy.
+        }
+      }
+      const shouldSpeak = notificationRule?.speakOnDevice === true;
+      if (!shouldSpeak || !this.options.whatsAppProactiveDelivery) continue;
       const device = await this.options.repositories.device.findFirst({ where: { userId: owner.userId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, select: { id: true } });
       if (!device) continue;
-      await this.options.whatsAppInbound({ userId: owner.userId, deliveryId: delivery.id, deviceId: device.id, text: message.body });
+      await this.options.whatsAppProactiveDelivery({ userId: owner.userId, deliveryId: delivery.id, deviceId: device.id, text: message.body });
       queued += 1;
     }
     return { processed, queued };

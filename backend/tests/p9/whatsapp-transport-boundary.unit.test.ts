@@ -9,6 +9,7 @@ const backendRoot = join(testsDir, "../..");
 const sourceRoot = join(backendRoot, "src");
 const launcherPath = join(backendRoot, "../ops/whatsapp/bmo-whatsapp-bridge-launcher");
 const unitPath = join(backendRoot, "../ops/whatsapp/systemd/bmo-whatsapp-bridge.service");
+const runbookPath = join(backendRoot, "../ops/whatsapp/README.md");
 
 function sourceFiles(root: string): string[] {
   return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
@@ -21,11 +22,14 @@ describe("WhatsApp transport-only boundary", () => {
   it("has exactly one production GET /messages consumer and it is the BMO client", () => {
     const consumers = sourceFiles(sourceRoot).filter((path) => /["'`]\/messages["'`]/u.test(readFileSync(path, "utf8")));
     expect(consumers.map((path) => relative(sourceRoot, path))).toEqual(["p9/providers/hermes-whatsapp.client.ts"]);
+    const server = readFileSync(join(backendRoot, "src/server.ts"), "utf8");
+    expect(server.match(/p9\.pollWhatsApp\(\)/gu)).toHaveLength(1);
   });
 
   it("keeps the dedicated runtime out of the destructive queue and shared Hermes unit", () => {
     const launcher = readFileSync(launcherPath, "utf8");
     const unit = readFileSync(unitPath, "utf8");
+    const runbook = readFileSync(runbookPath, "utf8");
     expect(launcher).not.toMatch(/\/messages/u);
     expect(launcher).toContain("--port 3001");
     expect(launcher).toContain("--session \"$SESSION_DIR\"");
@@ -33,7 +37,11 @@ describe("WhatsApp transport-only boundary", () => {
     expect(launcher).toContain("hermes-agent/scripts/whatsapp-bridge/bridge.js");
     expect(launcher).toContain("scripts/whatsapp-bridge/bridge.js");
     expect(launcher).toContain("[ \"$enabled\" = \"false\" ]");
-    expect(launcher).toContain("export WHATSAPP_DM_POLICY=allowlist");
+    expect(launcher).toContain("export WHATSAPP_DM_POLICY=pairing");
+    expect(launcher).toContain("export WHATSAPP_FORWARD_OWNER_MESSAGES=true");
+    expect(launcher).toContain('export WHATSAPP_ALLOWED_USERS="$allowed"');
+    expect(runbook).toContain("personal WhatsApp account");
+    expect(runbook).toContain("not a separate bot number");
     expect(launcher).toContain("export WHATSAPP_GROUP_POLICY=disabled");
     expect(unit).not.toMatch(/\/messages/u);
     expect(unit).not.toMatch(/hermes-gateway\.service/u);

@@ -28,14 +28,20 @@ search, natural-language resolution inputs, playback/context selection, device
 transfer, pause/resume/skip, seek, volume, shuffle, and repeat.
 
 The WhatsApp implementation uses the installed Hermes 0.20.0 Baileys bridge
-unchanged as a transport-only process. `hermes-gateway.service` keeps
-`WHATSAPP_ENABLED=false`; a separate `bmo-whatsapp-bridge.service` binds the
-official bridge to loopback `127.0.0.1:3001` with the paired session at
-`/home/hermes/.hermes/whatsapp/session` and `--mode bot`. BMO Backend is the
-sole `GET /messages` consumer. The Backend requires a protected exact sender
-allowlist and unconditionally drops `isGroup === true` before any owner lookup,
-persistence, notification, Hermes reasoning, or proactive delivery. The
-Hermes gateway's group-policy variable is not treated as enforcement.
+unchanged as a transport-only process for the user's personal WhatsApp
+account. `hermes-gateway.service` keeps `WHATSAPP_ENABLED=false`; a separate
+`bmo-whatsapp-bridge.service` binds the official bridge to loopback
+`127.0.0.1:3001` with the paired session at
+`/home/hermes/.hermes/whatsapp/session` and `--mode bot`. `bot` is transport
+semantics, not a second-number product identity. BMO Backend is the sole
+`GET /messages` consumer and the launcher uses official
+`WHATSAPP_DM_POLICY=pairing` only to admit events to the private queue. An
+optional protected non-wildcard `WHATSAPP_ALLOWED_USERS` value is used only by
+the official owner-forward gate; it is not a Backend notification filter. The
+Backend independently owns `ALL`/`CONTACT`/explicit `GROUP` notification rules;
+groups are disabled by default and never become Hermes prompts or privileged
+tools. The Hermes gateway's group-policy variable is not treated as
+enforcement.
 
 ## Spotify capability contract
 
@@ -57,10 +63,13 @@ failures.
 
 ## WhatsApp data flow
 
-An approved Hermes inbound event is first normalized to an opaque provider
-sender/reference and checked against the authenticated user's connection and
-notification rules. The Backend stores sanitized delivery metadata only. If
-the rule requests device speech, it enqueues the existing generic
+An approved bridge inbound event is normalized to bounded provider metadata and
+checked against the authenticated user's connection and Backend notification
+rules. The message body is untrusted data and is never passed to Hermes
+reasoning or privileged tools. Owner-typed events are metadata-only and do not
+notify; `/send` echoes are suppressed by the official bridge tracker. The
+Backend stores no raw message body. An enabled rule emits a generic mobile
+notification and, if requested, enqueues the existing generic
 `ProactiveDeliveryService` with source `WHATSAPP`; physical completion remains
 `PENDING_PHYSICAL_ESP` without real ESP evidence. Outbound sends use the
 existing preview, confirmation, ownership, idempotency, and delivery lifecycle.
