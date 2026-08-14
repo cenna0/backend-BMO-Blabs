@@ -65,6 +65,15 @@ to the conversation with the explicit notification rule, then earliest
 creation time, then lexical BMO UUID; deliveries and send requests move to the
 winner and the winning notification rule is retained.
 
+The observed Hermes 0.20.0 bridge sequence is `phone-JID resolve ->
+chatId=senderId LID-only inbound`. The bridge's internal LID-to-phone map is
+not included in the destructive `/messages` payload, so the first LID-only
+event cannot be reconciled automatically by Backend without an explicit
+provider/operator relationship. Once that relationship is present, alias
+lookup runs before conversation creation and the deterministic merge path
+reconciles all subsequent aliases. This is a provider capability limitation,
+not a reason to use display-name, message-text, timing, or wildcard matching.
+
 The alias index is server-side only. Mobile receives the existing BMO-safe
 conversation object and never receives a provider alias, JID, phone identity,
 session path, or bridge payload.

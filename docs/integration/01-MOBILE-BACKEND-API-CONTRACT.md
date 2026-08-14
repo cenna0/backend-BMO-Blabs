@@ -946,9 +946,11 @@ and a foreign/malformed conversation returns `OWNERSHIP_DENIED` (404).
 For DM identity reconciliation, Backend keeps a private provider-alias index
 for every explicit provider reference observed for the owner-scoped
 conversation. This allows a phone-JID resolve and a Baileys LID/chat alias to
-converge when the bridge exposes both references. If the official bridge emits
-only an opaque LID with no phone alias, Backend does not guess from a display
-name or message text; it keeps the event conservative until an explicit
+converge when the bridge exposes both references. The installed Hermes bridge
+currently emits only `chatId` and `senderId` for the affected LID-only event;
+its internal LID-to-phone map is not serialized into `/messages`. Backend must
+therefore not guess from a display name, message text, timing, or contact
+cardinality. It keeps the event conservative until an explicit
 provider/operator mapping is available. Alias rows never appear in Mobile
 responses.
 

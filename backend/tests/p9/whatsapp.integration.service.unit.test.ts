@@ -324,4 +324,49 @@ describe("WhatsApp IntegrationService", () => {
     expect(f.repositories.whatsAppDelivery.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: conversationA }) });
     expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userA, expect.objectContaining({ conversationId: conversationA }));
   });
+
+  it("keeps a phone-resolved contact conservative for a LID-only event, then converges when the provider exposes both aliases", async () => {
+    const f = fixture();
+    const duplicate = { ...f.conversation, id: conversationB, opaqueChatRef: "opaque@lid", displayName: "WhatsApp contact" };
+    let lidConversationKnown = false;
+
+    f.repositories.whatsAppConversation.findFirst.mockImplementation(async ({ where }: any) => {
+      if (where.id === conversationA || where.opaqueChatRef === "123@s.whatsapp.net") return f.conversation;
+      if (where.id === conversationB || (where.opaqueChatRef === "opaque@lid" && lidConversationKnown)) return duplicate;
+      return null;
+    });
+    f.repositories.whatsAppConversation.findMany.mockImplementation(async ({ where }: any) => {
+      if (where.id?.in) return [f.conversation, duplicate].filter((row) => where.id.in.includes(row.id));
+      return [f.conversation];
+    });
+    f.repositories.whatsAppConversation.create.mockImplementation(async ({ data }: any) => {
+      lidConversationKnown = true;
+      return { ...duplicate, ...data, id: conversationB };
+    });
+    f.repositories.whatsAppConversation.update.mockImplementation(async ({ where, data }: any) => ({
+      ...(where.id === conversationB ? duplicate : f.conversation),
+      ...data,
+    }));
+    f.repositories.whatsAppConversationAlias.findMany.mockImplementation(async ({ where }: any) => {
+      if (where.conversationId) return f.aliases.filter((alias: any) => alias.conversationId === where.conversationId);
+      return f.aliases.filter((alias: any) => alias.userId === where.userId && alias.connectionId === where.connectionId && alias.provider === where.provider && (!where.providerRef?.in || where.providerRef.in.includes(alias.providerRef)));
+    });
+
+    await expect(f.service.resolveWhatsAppConversation(userA, { phoneNumber: "+123", displayName: "Rangga" })).resolves.toMatchObject({ id: conversationA });
+    f.repositories.whatsAppDelivery.findFirst.mockResolvedValue(null);
+    f.whatsApp.poll.mockResolvedValue([{ messageId: "runtime-lid-only", chatId: "opaque@lid", senderId: "opaque@lid", body: "first", isGroup: false }]);
+
+    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 1, queued: 0 });
+    expect(f.repositories.whatsAppDelivery.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: conversationB }) });
+    expect(f.mobileEvents.sendToUser).not.toHaveBeenCalled();
+
+    f.repositories.whatsAppDelivery.findFirst.mockResolvedValue(null);
+    f.whatsApp.poll.mockResolvedValue([{ messageId: "runtime-phone-and-lid", chatId: "opaque@lid", senderId: "123@s.whatsapp.net", body: "second", isGroup: false }]);
+    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 1, queued: 1 });
+
+    expect(f.repositories.whatsAppDelivery.create).toHaveBeenLastCalledWith({ data: expect.objectContaining({ conversationId: conversationA }) });
+    expect(f.repositories.whatsAppConversation.delete).toHaveBeenCalledWith({ where: { id: conversationB } });
+    expect(f.repositories.whatsAppDelivery.updateMany).toHaveBeenCalledWith({ where: expect.objectContaining({ conversationId: conversationB }), data: { conversationId: conversationA } });
+    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userA, expect.objectContaining({ conversationId: conversationA }));
+  });
 });
