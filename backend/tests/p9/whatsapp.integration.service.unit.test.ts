@@ -104,10 +104,22 @@ describe("WhatsApp IntegrationService", () => {
 
   it("keeps the persistent Hermes identity bound after BMO metadata disconnect", async () => {
     const f = fixture();
-    f.repositories.integrationConnection.findMany.mockResolvedValue([{ id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "DISCONNECTED" }]);
+    f.repositories.integrationConnection.findMany.mockResolvedValue([{ id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "DISCONNECTED", externalReference: "bridge:bound" }]);
 
     await expect(f.service.connectWhatsApp(userB)).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
     expect(f.whatsApp.connect).not.toHaveBeenCalled();
+  });
+
+  it("allows a new owner to claim an unbound stale pending metadata row", async () => {
+    const f = fixture();
+    const pending = { id: "00000000-0000-4000-8000-000000000009", userId: userB, provider: IntegrationProvider.WHATSAPP, status: "PENDING", externalReference: null };
+    const current = { ...pending, id: connectionA, userId: userA };
+    f.repositories.integrationConnection.findMany.mockResolvedValue([pending]);
+    f.repositories.integrationConnection.findUnique.mockResolvedValue(current);
+    f.repositories.integrationConnection.findUniqueOrThrow.mockResolvedValue(current);
+
+    await expect(f.service.connectWhatsApp(userA)).resolves.toMatchObject({ blocked: false, connection: { status: "CONNECTED" } });
+    expect(f.whatsApp.connect).toHaveBeenCalledWith(userA);
   });
 
   it("deduplicates provider message IDs and rejects ambiguous multi-owner sessions", async () => {

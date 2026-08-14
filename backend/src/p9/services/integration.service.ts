@@ -551,8 +551,10 @@ export class IntegrationService {
 
   async #getConnection(userId: string, provider: IntegrationProvider): Promise<any | null> { return this.options.repositories.integrationConnection.findUnique({ where: { userId_provider: { userId, provider } } }); }
   async #assertWhatsAppBindingAvailable(userId: string): Promise<void> {
-    const rows = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP }, select: { userId: true } });
-    if (rows.some((row: any) => row.userId !== userId)) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp connection is not available");
+    const rows = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP }, select: { userId: true, status: true, externalReference: true } });
+    if (rows.some((row: any) => row.userId !== userId && (row.status === IntegrationStatus.CONNECTED || row.externalReference !== null))) {
+      throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp connection is not available");
+    }
   }
   async #requireConnectedWhatsAppOwner(userId: string): Promise<any> {
     const connection = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);

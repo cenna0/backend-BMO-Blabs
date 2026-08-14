@@ -61,40 +61,86 @@ in the operator shell. Do not paste the token, phone identity, message body,
 conversation response, or raw provider identity into chat/logs.
 
 ```bash
-set -eu
+set -Eeuo pipefail
 API=http://127.0.0.1:3010/api/v1
 : "${BMO_ACCESS_TOKEN:?set locally; never paste this value into Git or chat}"
 : "${BMO_TEST_PHONE:?set locally for recipient-resolution only}"
 : "${BMO_TEST_MESSAGE:?set locally; do not print this value}"
 AUTH=(-H "Authorization: Bearer $BMO_ACCESS_TOKEN" -H 'content-type: application/json')
 
-curl -fsS "$API/integrations/whatsapp/status" "${AUTH[@]}" >/dev/null
-curl -fsS "$API/integrations/whatsapp/conversations?limit=50" "${AUTH[@]}" >/dev/null
+wa_request() {
+  method="$1"
+  path="$2"
+  payload="${3:-}"
+  response_file="$(mktemp)"
+  if [ -n "$payload" ]; then
+    http_code="$(curl -sS -o "$response_file" -w '%{http_code}' \
+      -X "$method" "$API$path" "${AUTH[@]}" --data "$payload")" || {
+      rm -f "$response_file"
+      printf 'backend_request_failed method=%s path=%s transport=true\n' "$method" "$path" >&2
+      return 1
+    }
+  else
+    http_code="$(curl -sS -o "$response_file" -w '%{http_code}' \
+      -X "$method" "$API$path" "${AUTH[@]}")" || {
+      rm -f "$response_file"
+      printf 'backend_request_failed method=%s path=%s transport=true\n' "$method" "$path" >&2
+      return 1
+    }
+  fi
+  case "$http_code" in
+    2??) cat "$response_file"; rm -f "$response_file" ;;
+    *) rm -f "$response_file"; printf 'backend_request_failed method=%s path=%s http=%s\n' "$method" "$path" "$http_code" >&2; return 1 ;;
+  esac
+}
+
+wa_get() { wa_request GET "$1"; }
+wa_post() { wa_request POST "$1" "$2"; }
+wa_patch() { wa_request PATCH "$1" "$2"; }
+
+connect_json="$(wa_post '/integrations/whatsapp/connect' '{}')"
+printf '%s' "$connect_json" | jq -e '.connection.status == "CONNECTED" and .blocked == false' >/dev/null
+unset connect_json
+
+status_json="$(wa_get '/integrations/whatsapp/status')"
+printf '%s' "$status_json" | jq -e '.provider == "whatsapp" and .status == "CONNECTED"' >/dev/null
+unset status_json
+
+conversations_json="$(wa_get '/integrations/whatsapp/conversations?limit=50')"
+printf '%s' "$conversations_json" | jq -e '(.conversations | type) == "array"' >/dev/null
 
 # Have the selected contact send a DM to the paired personal account here.
 # Read only the safe conversation UUID/displayName/type from the response.
 sleep 6
-conversations_json=$(curl -fsS "$API/integrations/whatsapp/conversations?limit=50" "${AUTH[@]}")
-conversation_id=$(printf '%s' "$conversations_json" | jq -r '.conversations[0].id')
+conversations_json="$(wa_get '/integrations/whatsapp/conversations?limit=50')"
+conversation_id="$(printf '%s' "$conversations_json" | jq -er '.conversations[0].id')"
 unset conversations_json
 
 # Configure one selected DM; the API accepts BMO conversation IDs only.
-curl -fsS -X PATCH "$API/integrations/whatsapp/notification-rules" "${AUTH[@]}" \
-  --data "{\"rules\":[{\"scope\":\"ALL\",\"enabled\":false,\"speakOnDevice\":false},{\"scope\":\"CONTACT\",\"conversationId\":\"$conversation_id\",\"enabled\":true,\"speakOnDevice\":false}]}" >/dev/null
+rules_payload="$(jq -n --arg id "$conversation_id" '{rules:[{scope:"ALL",enabled:false,speakOnDevice:false},{scope:"CONTACT",conversationId:$id,enabled:true,speakOnDevice:false}]}')"
+rules_json="$(wa_patch '/integrations/whatsapp/notification-rules' "$rules_payload")"
+printf '%s' "$rules_json" | jq -e --arg id "$conversation_id" '.rules | any(.[]; .scope=="CONTACT" and .conversationId==$id and .enabled==true)' >/dev/null
+unset rules_json rules_payload
 
 # Have the same contact send one more DM. Verify only a metadata event/notification
 # and conversation state through Backend/mobile WS instrumentation.
 
-send_preview=$(curl -fsS -X POST "$API/integrations/whatsapp/send-preview" "${AUTH[@]}" \
-  --data "{\"conversationId\":\"$conversation_id\",\"message\":\"$BMO_TEST_MESSAGE\",\"idempotencyKey\":\"phase26-wa-send-1\"}")
-send_id=$(printf '%s' "$send_preview" | jq -r '.send.id')
+send_payload="$(jq -n --arg id "$conversation_id" --arg message "$BMO_TEST_MESSAGE" '{conversationId:$id,message:$message,idempotencyKey:"phase26-wa-send-1"}')"
+send_preview="$(wa_post '/integrations/whatsapp/send-preview' "$send_payload")"
+send_id="$(printf '%s' "$send_preview" | jq -er '.send.id')"
 unset send_preview
-curl -fsS -X POST "$API/integrations/whatsapp/send-confirm" "${AUTH[@]}" \
-  --data "{\"requestId\":\"$send_id\",\"confirmed\":true}" >/dev/null
+confirm_payload="$(jq -n --arg id "$send_id" '{requestId:$id,confirmed:true}')"
+confirm_json="$(wa_post '/integrations/whatsapp/send-confirm' "$confirm_payload")"
+printf '%s' "$confirm_json" | jq -e '.send.status == "SUCCEEDED"' >/dev/null
+unset confirm_json confirm_payload send_payload
 
 # Resolve an unobserved recipient only if needed; keep the phone value local.
-curl -fsS -X POST "$API/integrations/whatsapp/conversations/resolve" "${AUTH[@]}" \
-  --data "{\"phoneNumber\":\"$BMO_TEST_PHONE\"}" >/dev/null
+resolve_payload="$(jq -n --arg phone "$BMO_TEST_PHONE" '{phoneNumber:$phone}')"
+resolve_json="$(wa_post '/integrations/whatsapp/conversations/resolve' "$resolve_payload")"
+printf '%s' "$resolve_json" | jq -e '.id and (.type == "DM")' >/dev/null
+unset resolve_json resolve_payload
+
+printf 'backend_api_smoke=pass\n'
 ```
 
 For the negative checks, have a second contact send a DM while no enabled
