@@ -135,7 +135,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     client,
     repositories,
     publicBaseUrl: config.publicBaseUrl,
-    ...(config.providerEncryptionKey === undefined ? {} : { providerEncryptionKey: config.providerEncryptionKey }),
+    ...(config.spotifyTokenEncryptionKey === undefined ? {} : { spotifyTokenEncryptionKey: config.spotifyTokenEncryptionKey }),
     ...(config.spotifyClientId === undefined ? {} : { spotifyClientId: config.spotifyClientId }),
     ...(config.spotifyClientSecret === undefined ? {} : { spotifyClientSecret: config.spotifyClientSecret }),
     ...(config.spotifyCallbackUrl === undefined ? {} : { spotifyCallbackUrl: config.spotifyCallbackUrl }),

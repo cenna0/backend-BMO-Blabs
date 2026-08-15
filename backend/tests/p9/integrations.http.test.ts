@@ -31,6 +31,7 @@ function fixture() {
     spotifyDevices: vi.fn().mockResolvedValue([]),
     spotifyActiveDevice: vi.fn().mockResolvedValue(null),
     spotifyPlayback: vi.fn().mockResolvedValue({ code: "NO_ACTIVE_SPOTIFY_DEVICE" }),
+    spotifyPreferredDevice: vi.fn().mockResolvedValue({ device: null }),
     spotifyAction: vi.fn().mockResolvedValue({ id, status: "PENDING_CONFIRMATION" }),
     spotifyCallback: vi.fn().mockResolvedValue({ ok: true }),
     pluginCatalog: vi.fn().mockResolvedValue([]),
@@ -70,6 +71,7 @@ describe("integration HTTP contract", () => {
     expect((await auth(request(f.app).get("/integrations/spotify/devices"))).status).toBe(200);
     expect((await auth(request(f.app).get("/integrations/spotify/active-device"))).status).toBe(200);
     expect((await auth(request(f.app).get("/integrations/spotify/playback"))).status).toBe(200);
+    expect((await auth(request(f.app).put("/integrations/spotify/preferred-device")).send({ deviceId: null })).status).toBe(200);
     expect((await auth(request(f.app).post("/integrations/spotify/actions")).send({ action: "PAUSE", idempotencyKey: "sp-1" })).status).toBe(202);
     expect((await request(f.app).get(`/integrations/spotify/callback?state=${"x".repeat(64)}&code=code`)).status).toBe(200);
     expect((await auth(request(f.app).get("/plugins"))).status).toBe(200);
@@ -80,6 +82,11 @@ describe("integration HTTP contract", () => {
     expect((await request(f.app).get("/plugins")).status).toBe(401);
     expect((await auth(request(f.app).post("/integrations/spotify/actions")).send({ action: "DELETE_ALL", idempotencyKey: "x", userId: "attacker" })).status).toBe(400);
     expect((await auth(request(f.app).patch("/integrations/whatsapp/notification-rules")).send({ rules: [{ scope: "ALL", targetRef: "secret" }] })).status).toBe(400);
+  });
+
+  it("does not require a mobile bearer token on the Spotify callback", async () => {
+    const f = fixture();
+    expect((await request(f.app).get(`/integrations/spotify/callback?state=${"x".repeat(64)}&code=code`)).status).not.toBe(401);
   });
 
   it("accepts a bounded multipart bug report and returns only its receipt", async () => {

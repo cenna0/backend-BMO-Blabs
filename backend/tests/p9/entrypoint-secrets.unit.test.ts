@@ -17,16 +17,19 @@ it("loads protected provider secrets before starting the dropped-privilege child
   const databasePasswordFile = join(directory, "postgres-password");
   const wifiKeyFile = join(directory, "wifi-key");
   const providerKeyFile = join(directory, "provider-key");
+  const spotifyKeyFile = join(directory, "spotify-key");
   const resolverTokenFile = join(directory, "identity-resolver-token");
   await writeFile(databasePasswordFile, "database-password-for-test\n", { mode: 0o600 });
   await writeFile(wifiKeyFile, "wifi-secret-for-test\n", { mode: 0o600 });
   await writeFile(providerKeyFile, "provider-secret-for-test\n", { mode: 0o600 });
+  await writeFile(spotifyKeyFile, "spotify-secret-for-test\n", { mode: 0o600 });
   await writeFile(resolverTokenFile, "resolver-token-for-test-01234567890123456789\n", { mode: 0o600 });
 
   const entrypoint = fileURLToPath(new URL("../../src/p9/entrypoint.ts", import.meta.url));
   const assertion = [
     "if (process.env.P9_WIFI_ENCRYPTION_KEY !== 'wifi-secret-for-test') process.exit(1);",
     "if (process.env.P9_PROVIDER_ENCRYPTION_KEY !== 'provider-secret-for-test') process.exit(1);",
+    "if (process.env.SPOTIFY_TOKEN_ENCRYPTION_KEY !== 'spotify-secret-for-test') process.exit(1);",
     "if (process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN !== 'resolver-token-for-test-01234567890123456789') process.exit(1);",
     "if (!process.env.DATABASE_URL) process.exit(1);",
   ].join(" ");
@@ -37,6 +40,7 @@ it("loads protected provider secrets before starting the dropped-privilege child
       P9_DATABASE_PASSWORD_FILE: databasePasswordFile,
       P9_WIFI_ENCRYPTION_KEY_FILE: wifiKeyFile,
       P9_PROVIDER_ENCRYPTION_KEY_FILE: providerKeyFile,
+      SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE: spotifyKeyFile,
       WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE: resolverTokenFile,
       P9_POSTGRES_USER: "bmo",
       P9_POSTGRES_DB: "bmo",

@@ -307,6 +307,13 @@ function loadP9ProviderEncryptionSecret(): void {
   process.env.P9_PROVIDER_ENCRYPTION_KEY = key;
 }
 
+function loadSpotifyTokenEncryptionSecret(): void {
+  if (process.env.SPOTIFY_TOKEN_ENCRYPTION_KEY || !process.env.SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE) return;
+  const key = readFileSync(process.env.SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE, "utf8").trim();
+  if (!key) throw new Error("Spotify token encryption secret is empty");
+  process.env.SPOTIFY_TOKEN_ENCRYPTION_KEY = key;
+}
+
 function loadWhatsAppIdentityResolverSecret(): void {
   if (process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN || !process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE) return;
   const token = readFileSync(process.env.WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE, "utf8").trim();
@@ -317,6 +324,7 @@ function loadWhatsAppIdentityResolverSecret(): void {
 async function run(): Promise<void> {
   loadP9WifiEncryptionSecret();
   loadP9ProviderEncryptionSecret();
+  loadSpotifyTokenEncryptionSecret();
   loadWhatsAppIdentityResolverSecret();
   const runtime = createBackendRuntime(parseEnv(process.env));
   await runtime.start();

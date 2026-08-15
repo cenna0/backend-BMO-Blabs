@@ -64,6 +64,7 @@ const rawSchema = z.object({
   P9_PAIRING_PEPPER: z.string().optional(),
   P9_WIFI_ENCRYPTION_KEY: z.string().optional(),
   P9_PROVIDER_ENCRYPTION_KEY: z.string().optional(),
+  SPOTIFY_TOKEN_ENCRYPTION_KEY: z.string().optional(),
   SPOTIFY_CLIENT_ID: z.string().min(1).optional(),
   SPOTIFY_CLIENT_SECRET: z.string().min(1).optional(),
   SPOTIFY_CALLBACK_URL: z.string().url().optional(),
@@ -93,6 +94,7 @@ export interface P9Config {
   pairingPepper?: string;
   wifiEncryptionKey?: string | undefined;
   providerEncryptionKey?: string | undefined;
+  spotifyTokenEncryptionKey?: string | undefined;
   spotifyClientId?: string | undefined;
   spotifyClientSecret?: string | undefined;
   spotifyCallbackUrl?: string | undefined;
@@ -142,6 +144,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       pairingTtlSeconds: 600,
       wifiEncryptionKey: undefined,
       providerEncryptionKey: undefined,
+      spotifyTokenEncryptionKey: undefined,
       spotifyClientId: undefined,
       spotifyClientSecret: undefined,
       spotifyCallbackUrl: undefined,
@@ -181,6 +184,7 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     pairingPepper: strongSecret("P9_PAIRING_PEPPER", parsed.P9_PAIRING_PEPPER),
     wifiEncryptionKey: strongSecret("P9_WIFI_ENCRYPTION_KEY", parsed.P9_WIFI_ENCRYPTION_KEY),
     providerEncryptionKey: parsed.P9_PROVIDER_ENCRYPTION_KEY,
+    spotifyTokenEncryptionKey: parsed.SPOTIFY_TOKEN_ENCRYPTION_KEY,
     ...(parsed.SPOTIFY_CLIENT_ID === undefined ? {} : { spotifyClientId: parsed.SPOTIFY_CLIENT_ID }),
     ...(parsed.SPOTIFY_CLIENT_SECRET === undefined ? {} : { spotifyClientSecret: parsed.SPOTIFY_CLIENT_SECRET }),
     ...(parsed.SPOTIFY_CALLBACK_URL === undefined ? {} : { spotifyCallbackUrl: parsed.SPOTIFY_CALLBACK_URL }),

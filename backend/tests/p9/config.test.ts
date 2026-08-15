@@ -44,6 +44,7 @@ describe("P9 configuration", () => {
       pairingPepper: enabled.P9_PAIRING_PEPPER,
       wifiEncryptionKey: enabled.P9_WIFI_ENCRYPTION_KEY,
       providerEncryptionKey: undefined,
+      spotifyTokenEncryptionKey: undefined,
       spotifyClientId: undefined,
       spotifyClientSecret: undefined,
       spotifyCallbackUrl: undefined,
@@ -78,6 +79,10 @@ describe("P9 configuration", () => {
       recoveryIpLimit: 5,
       recoveryEmailLimit: 3,
     });
+  });
+
+  it("accepts a dedicated Spotify token encryption key without reusing provider keys", () => {
+    expect(parseP9Config({ ...enabled, SPOTIFY_TOKEN_ENCRYPTION_KEY: "d".repeat(32) }).spotifyTokenEncryptionKey).toBe("d".repeat(32));
   });
 
   it("rejects avatar storage paths that are relative, root, traversal-normalized, or padded", () => {

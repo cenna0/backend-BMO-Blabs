@@ -54,6 +54,22 @@ describe("SpotifyApiClient", () => {
     expect(requestHeaders?.get("accept")).toBe("application/json");
   });
 
+  it("passes the authenticated account market to search", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ tracks: { items: [] }, artists: { items: [] }, albums: { items: [] }, playlists: { items: [] } }));
+    const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
+
+    await client.search("access-token", "Backburner", ["track"], "ID");
+
+    expect(fetcher.mock.calls[0]?.[0]).toContain("market=ID");
+  });
+
+  it("normalizes the current Spotify account without exposing provider fields", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ id: "spotify-user", country: "ID", product: "premium", email: "secret@example.test" }));
+    const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
+
+    await expect(client.currentUser("access-token")).resolves.toEqual({ userId: "spotify-user", market: "ID", product: "premium" });
+  });
+
   it("maps the explicit playback capability set to allowlisted Spotify endpoints", async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(response({ devices: [{ id: "d1", name: "Laptop", type: "Computer", is_active: true, is_restricted: false, volume_percent: 50, supports_volume: true }] }))
@@ -79,7 +95,6 @@ describe("SpotifyApiClient", () => {
       ["PLAY_TRACK", { uri: "spotify:track:t1" }], ["PLAY_ARTIST", { uri: "spotify:artist:a1" }], ["PLAY_ALBUM", { uri: "spotify:album:al1" }], ["PLAY_PLAYLIST", { uri: "spotify:playlist:p1" }], ["TRANSFER", { deviceId: "d1", play: true }],
       ["SEEK", { positionMs: 12_000 }], ["VOLUME", { volume: 50 }],
       ["SHUFFLE", { state: true }], ["REPEAT", { state: "context" }],
-      ["QUEUE", { uri: "spotify:track:t1" }],
     ] as const) {
       await client.action("access", action, payload);
     }
@@ -97,7 +112,6 @@ describe("SpotifyApiClient", () => {
       "PUT:https://api.spotify.com/v1/me/player/volume?volume_percent=50",
       "PUT:https://api.spotify.com/v1/me/player/shuffle?state=true",
       "PUT:https://api.spotify.com/v1/me/player/repeat?state=context",
-      "POST:https://api.spotify.com/v1/me/player/queue?uri=spotify%3Atrack%3At1",
     ]);
   });
 
@@ -105,9 +119,44 @@ describe("SpotifyApiClient", () => {
     const fetcher = vi.fn().mockResolvedValue(response({ error: "invalid_grant", secret: "provider-secret" }, 401));
     const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
 
-    await expect(client.refreshToken("refresh-token")).rejects.toMatchObject({ status: 401, code: "AUTHORIZATION_REVOKED" });
+    await expect(client.refreshToken("refresh-token")).rejects.toMatchObject({ status: 401, code: "INVALID_GRANT" });
     await expect(client.refreshToken("refresh-token")).rejects.not.toThrow("provider-secret");
     expect(fetcher).toHaveBeenCalled();
     expect(new SpotifyProviderError(503, "PROVIDER_UNAVAILABLE").message).not.toContain("secret");
+  });
+
+  it("distinguishes invalid_grant from an ordinary revoked API access token", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ error: "invalid_grant", error_description: "refresh-secret" }, 400));
+    const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
+
+    await expect(client.refreshToken("refresh-token")).rejects.toMatchObject({ status: 400, code: "INVALID_GRANT" });
+    await expect(client.refreshToken("refresh-token")).rejects.not.toThrow("refresh-secret");
+  });
+
+  it("maps provider playback authorization failures to Premium-required", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ error: { status: 403, message: "Premium required" } }, 403));
+    const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
+
+    await expect(client.action("access-token", "PAUSE", {})).rejects.toMatchObject({ status: 403, code: "PREMIUM_REQUIRED" });
+  });
+
+  it.each([
+    [429, "RATE_LIMITED"],
+    [500, "PROVIDER_UNAVAILABLE"],
+    [504, "PROVIDER_UNAVAILABLE"],
+  ] as const)("maps provider status %s to a safe %s result", async (status, code) => {
+    const fetcher = vi.fn().mockResolvedValue(response({ error: "provider-secret" }, status));
+    const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
+
+    await expect(client.action("access-token", "PAUSE", {})).rejects.toMatchObject({ status, code });
+    await expect(client.action("access-token", "PAUSE", {})).rejects.not.toThrow("provider-secret");
+  });
+
+  it("rejects a track action when the semantic URI is not a Spotify track URI", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response(null, 204));
+    const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
+
+    await expect(client.action("access-token", "PLAY_TRACK", { uri: "https://example.test/track" })).rejects.toMatchObject({ code: "PROVIDER_REQUEST_FAILED" });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });

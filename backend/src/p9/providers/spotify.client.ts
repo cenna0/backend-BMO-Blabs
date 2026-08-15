@@ -13,6 +13,12 @@ export interface SpotifyTokenSet {
   externalReference?: string;
 }
 
+export interface SpotifyCurrentUser {
+  userId: string;
+  market: string | null;
+  product: string | null;
+}
+
 export interface SpotifyDevice {
   id: string;
   name: string;
@@ -51,6 +57,8 @@ export class SpotifyProviderError extends Error {
 
 export type SpotifyProviderErrorCode =
   | "AUTHORIZATION_REVOKED"
+  | "INVALID_GRANT"
+  | "PREMIUM_REQUIRED"
   | "RATE_LIMITED"
   | "PROVIDER_UNAVAILABLE"
   | "INVALID_PROVIDER_RESPONSE"
@@ -85,8 +93,10 @@ function integerField(value: unknown, field: string, minimum = 0): number {
   return Number(value);
 }
 
-function normalizeProviderError(status: number): SpotifyProviderError {
+function normalizeProviderError(status: number, payload?: unknown, tokenRequest = false): SpotifyProviderError {
+  if (tokenRequest && isObject(payload) && payload.error === "invalid_grant") return new SpotifyProviderError(status, "INVALID_GRANT");
   if (status === 401) return new SpotifyProviderError(status, "AUTHORIZATION_REVOKED");
+  if (status === 403) return new SpotifyProviderError(status, "PREMIUM_REQUIRED");
   if (status === 429) return new SpotifyProviderError(status, "RATE_LIMITED");
   if (status >= 500) return new SpotifyProviderError(status, "PROVIDER_UNAVAILABLE");
   return new SpotifyProviderError(status, "PROVIDER_REQUEST_FAILED");
@@ -107,6 +117,18 @@ function parseJsonText(value: string): unknown {
 function normalizeScopes(value: unknown): string[] {
   if (typeof value !== "string") return [];
   return value.split(/\s+/u).filter((scope) => /^[a-z0-9-]+$/u.test(scope)).slice(0, 64);
+}
+
+function spotifyUri(value: unknown, expectedType?: SpotifySearchType): string {
+  if (typeof value !== "string" || value.length > 255) throw new SpotifyProviderError(400, "PROVIDER_REQUEST_FAILED");
+  const match = /^spotify:(track|artist|album|playlist):[A-Za-z0-9]+$/u.exec(value);
+  if (!match || (expectedType !== undefined && match[1] !== expectedType)) throw new SpotifyProviderError(400, "PROVIDER_REQUEST_FAILED");
+  return value;
+}
+
+function deviceId(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 255) throw new SpotifyProviderError(400, "PROVIDER_REQUEST_FAILED");
+  return value;
 }
 
 function normalizeDevice(value: unknown): SpotifyDevice {
@@ -152,15 +174,26 @@ export class SpotifyApiClient {
     return this.#tokenRequest(new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }));
   }
 
-  async search(accessToken: string, query: string, types: SpotifySearchType[] = ["track", "artist", "album", "playlist"]): Promise<SpotifySearchResults> {
+  async search(accessToken: string, query: string, types: SpotifySearchType[] = ["track", "artist", "album", "playlist"], market?: string | null): Promise<SpotifySearchResults> {
     const uniqueTypes = [...new Set(types)];
-    const params = new URLSearchParams({ q: query, type: uniqueTypes.join(","), limit: "10" });
+    const params = new URLSearchParams({ q: query, type: uniqueTypes.join(","), limit: "10", ...(market ? { market } : {}) });
     const payload = await this.#apiRequest(`/search?${params.toString()}`, accessToken, { method: "GET" });
     return {
       tracks: this.#searchItems(payload, "tracks", "track"),
       artists: this.#searchItems(payload, "artists", "artist"),
       albums: this.#searchItems(payload, "albums", "album"),
       playlists: this.#searchItems(payload, "playlists", "playlist"),
+    };
+  }
+
+  async currentUser(accessToken: string): Promise<SpotifyCurrentUser> {
+    const payload = await this.#apiRequest("/me", accessToken, { method: "GET" });
+    if (!isObject(payload)) throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
+    const country = typeof payload.country === "string" && /^[A-Z]{2}$/u.test(payload.country) ? payload.country : null;
+    return {
+      userId: stringField(payload.id, "id"),
+      market: country,
+      product: typeof payload.product === "string" && payload.product.length <= 32 ? payload.product : null,
     };
   }
 
@@ -203,8 +236,8 @@ export class SpotifyApiClient {
       headers: { authorization: encodeBasic(this.options.clientId, this.options.clientSecret), "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
       body,
     });
-    if (!response.ok) throw normalizeProviderError(response.status);
     const payload = await this.#responseJson(response);
+    if (!response.ok) throw normalizeProviderError(response.status, payload, true);
     if (!isObject(payload)) throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
     return {
       accessToken: stringField(payload.access_token, "access_token"),
@@ -225,7 +258,10 @@ export class SpotifyApiClient {
     headers.set("authorization", `Bearer ${accessToken}`);
     headers.set("accept", "application/json");
     const response = await this.#request(endpoint(path), { ...init, headers });
-    if (!response.ok && response.status !== 204) throw normalizeProviderError(response.status);
+    if (!response.ok && response.status !== 204) {
+      const payload = await this.#responseJson(response);
+      throw normalizeProviderError(response.status, payload);
+    }
     return response;
   }
 
@@ -257,22 +293,26 @@ export class SpotifyApiClient {
   }
 
   #mapAction(action: string, payload: Record<string, unknown>): { method: string; path: string; body?: unknown; metadata?: string } {
-    const deviceQuery = payload.deviceId === undefined ? "" : `?device_id=${encodeURIComponent(String(payload.deviceId))}`;
+    const deviceQuery = payload.deviceId === undefined ? "" : `?device_id=${encodeURIComponent(deviceId(payload.deviceId))}`;
     if (action === "RESUME") return { method: "PUT", path: `/me/player/play${deviceQuery}` };
     if (action === "PAUSE") return { method: "PUT", path: `/me/player/pause${deviceQuery}` };
     if (action === "NEXT") return { method: "POST", path: `/me/player/next${deviceQuery}` };
     if (action === "PREVIOUS") return { method: "POST", path: `/me/player/previous${deviceQuery}` };
     if (action === "PLAY" || action === "PLAY_TRACK" || action === "PLAY_ARTIST" || action === "PLAY_ALBUM" || action === "PLAY_PLAYLIST") {
-      const uri = stringField(payload.uri, "uri");
-      const body = action === "PLAY_TRACK" || action === "PLAY" && uri.startsWith("spotify:track:") ? { uris: [uri] } : { context_uri: uri };
+      const expectedType = action === "PLAY_TRACK" ? "track" : action === "PLAY_ARTIST" ? "artist" : action === "PLAY_ALBUM" ? "album" : action === "PLAY_PLAYLIST" ? "playlist" : undefined;
+      const uri = spotifyUri(payload.uri, expectedType);
+      const body = uri.startsWith("spotify:track:") ? { uris: [uri] } : { context_uri: uri };
       return { method: "PUT", path: `/me/player/play${deviceQuery}`, body };
     }
-    if (action === "TRANSFER") return { method: "PUT", path: "/me/player", body: { device_ids: [stringField(payload.deviceId, "deviceId")], play: payload.play === true } };
-    if (action === "QUEUE") return { method: "POST", path: `/me/player/queue?uri=${encodeURIComponent(stringField(payload.uri, "uri"))}${deviceQuery ? `&${deviceQuery.slice(1)}` : ""}` };
+    if (action === "TRANSFER") return { method: "PUT", path: "/me/player", body: { device_ids: [deviceId(payload.deviceId)], play: payload.play === true } };
     if (action === "SEEK") return { method: "PUT", path: `/me/player/seek?position_ms=${integerField(payload.positionMs, "positionMs")}${deviceQuery ? `&${deviceQuery.slice(1)}` : ""}` };
     if (action === "VOLUME") return { method: "PUT", path: `/me/player/volume?volume_percent=${integerField(payload.volume, "volume")}${deviceQuery ? `&${deviceQuery.slice(1)}` : ""}` };
     if (action === "SHUFFLE") return { method: "PUT", path: `/me/player/shuffle?state=${payload.state === true}${deviceQuery ? `&${deviceQuery.slice(1)}` : ""}` };
-    if (action === "REPEAT") return { method: "PUT", path: `/me/player/repeat?state=${encodeURIComponent(stringField(payload.state, "state"))}${deviceQuery ? `&${deviceQuery.slice(1)}` : ""}` };
+    if (action === "REPEAT") {
+      const state = stringField(payload.state, "state");
+      if (state !== "track" && state !== "context" && state !== "off") throw new SpotifyProviderError(400, "PROVIDER_REQUEST_FAILED");
+      return { method: "PUT", path: `/me/player/repeat?state=${encodeURIComponent(state)}${deviceQuery ? `&${deviceQuery.slice(1)}` : ""}` };
+    }
     throw new SpotifyProviderError(400, "PROVIDER_REQUEST_FAILED");
   }
 }

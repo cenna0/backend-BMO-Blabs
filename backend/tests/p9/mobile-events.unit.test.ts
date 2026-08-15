@@ -52,6 +52,7 @@ describe("mobile realtime outbound event contract", () => {
       statusLabel: "MONITORING",
     },
     { event: "integration_status", integration: "spotify", status: "CONNECTED" },
+    { event: "integration_status", integration: "spotify", status: "RECONNECT_REQUIRED" },
     {
       event: "notification",
       id,

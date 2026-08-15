@@ -17,6 +17,10 @@ const whatsappIdentityAliasMigrationPath = new URL(
   "../../prisma/migrations/20260814210000_whatsapp_identity_aliases/migration.sql",
   import.meta.url,
 );
+const spotifyLifecycleMigrationPath = new URL(
+  "../../prisma/migrations/20260815120000_spotify_phase26_lifecycle/migration.sql",
+  import.meta.url,
+);
 
 function sqlTableDefinition(sql: string, tableName: string): string {
   const match = sql.match(new RegExp(`CREATE TABLE "${tableName}" \\(([\\s\\S]*?)\\n\\);`));
@@ -259,7 +263,8 @@ describe("P9 Prisma schema", () => {
     expect(schema).toMatch(/model DeviceTelemetryCurrent[\s\S]*deviceId\s+String\s+@unique/);
     expect(schema).toMatch(/model DeviceLog[\s\S]*@@index\(\[expiresAt\]\)/);
     expect(schema).toMatch(/model OAuthState[\s\S]*stateVerifier\s+String\s+@unique\s+@db\.Char\(64\)/);
-    expect(schema).toMatch(/model SpotifyCredential[\s\S]*accessTokenCiphertext[\s\S]*refreshTokenCiphertext/);
+    expect(schema).toMatch(/model SpotifyCredential[\s\S]*spotifyUserId[\s\S]*accessTokenCiphertext[\s\S]*refreshTokenCiphertext[\s\S]*authorizedAt[\s\S]*preferredDeviceId/);
+    expect(schema).toMatch(/enum IntegrationStatus[\s\S]*RECONNECT_REQUIRED/);
     expect(schema).toMatch(/model PasswordRecovery[\s\S]*requestId\s+String\?\s+@db\.VarChar\(128\)/);
     expect(schema).toMatch(/model DeviceLog[\s\S]*metadata\s+String\?\s+@db\.VarChar\(2000\)/);
     expect(schema).toMatch(/model SpotifyAction[\s\S]*resultCode\s+String\?[\s\S]*resultMetadata\s+String\?/);
@@ -283,6 +288,19 @@ describe("P9 Prisma schema", () => {
     expect(migrationSql).toContain("DeviceWifiConfiguration_secret_shape_ck");
     expect(migrationSql).toContain("DeviceTelemetryCurrent_battery_ck");
     expect(migrationSql).toContain("DeviceSettings_delivery_version_ck");
+  });
+
+  it("declares the additive Spotify lifecycle migration without exposing tokens", async () => {
+    const migrationSql = await readFile(spotifyLifecycleMigrationPath, "utf8");
+    expect(migrationSql).not.toMatch(/DROP\s+(?:COLUMN|TABLE|TYPE)|DELETE\s+FROM/i);
+    expect(migrationSql).toContain('ADD VALUE IF NOT EXISTS \'RECONNECT_REQUIRED\'');
+    expect(migrationSql).toContain('ADD COLUMN "spotifyUserId" VARCHAR(255)');
+    expect(migrationSql).toContain('ADD COLUMN "authorizedAt" TIMESTAMPTZ(3)');
+    expect(migrationSql).toContain('ADD COLUMN "market" VARCHAR(2)');
+    expect(migrationSql).toContain('ADD COLUMN "preferredDeviceId" VARCHAR(255)');
+    expect(migrationSql).toContain('SET "authorizedAt" = "createdAt"');
+    expect(migrationSql).not.toContain("accessToken");
+    expect(migrationSql).not.toContain("refreshToken");
   });
 
   it("detects embedded destructive DDL and migration-time data rewrites", () => {

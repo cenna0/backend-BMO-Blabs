@@ -72,7 +72,7 @@ export const mobileOutboundEventSchema = z.discriminatedUnion("event", [
   z.object({
     event: z.literal("integration_status"),
     integration: z.enum(["whatsapp", "spotify"]),
-    status: z.enum(["CONNECTED", "DISCONNECTED", "PENDING", "ERROR"]),
+    status: z.enum(["CONNECTED", "DISCONNECTED", "PENDING", "ERROR", "RECONNECT_REQUIRED"]),
   }).strict(),
   z.object({
     event: z.literal("notification"),

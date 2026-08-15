@@ -4,6 +4,7 @@ export const P9_REQUIRED_MIGRATIONS = [
   "20260811190000_phase2_application_foundation",
   "20260814120000_whatsapp_conversations",
   "20260814210000_whatsapp_identity_aliases",
+  "20260815120000_spotify_phase26_lifecycle",
 ] as const;
 
 export interface P9MigrationState {

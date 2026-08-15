@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { P9Error } from "../errors.js";
-import { parseBugReportInput, parseSpotifyAction, parseWhatsAppConversationQuery, parseWhatsAppRecipientResolve, parseWhatsAppRulesPatch, whatsappSendConfirmSchema, whatsappSendPreviewSchema } from "../integrations.validation.js";
+import { parseBugReportInput, parseSpotifyAction, parseSpotifySearchQuery, parseWhatsAppConversationQuery, parseWhatsAppRecipientResolve, parseWhatsAppRulesPatch, spotifyPreferredDeviceSchema, whatsappSendConfirmSchema, whatsappSendPreviewSchema } from "../integrations.validation.js";
 import type { IntegrationService } from "../services/integration.service.js";
 import type { AccessTokenService, SessionService } from "../services/session.service.js";
 import { asyncP9, currentAuth, requireAuth } from "./middleware.js";
@@ -31,8 +31,9 @@ export function createIntegrationRouter(integration: IntegrationService, accessT
   router.post("/integrations/spotify/connect", authenticated, asyncP9(async (request, response) => { response.json(await integration.spotifyConnect(currentAuth(request).userId)); }));
   router.get("/integrations/spotify/status", authenticated, asyncP9(async (request, response) => { response.json(await integration.connection(currentAuth(request).userId, "SPOTIFY" as any)); }));
   router.get("/integrations/spotify/search", authenticated, asyncP9(async (request, response) => {
-    const query = queryString(request.query.q);
-    const rawTypes = typeof request.query.type === "string" ? request.query.type.split(",") : undefined;
+    const searchQuery = parseSpotifySearchQuery(request.query);
+    const query = searchQuery.q;
+    const rawTypes = searchQuery.type?.split(",");
     const allowedTypes = new Set(["track", "artist", "album", "playlist"]);
     if (rawTypes?.some((type) => !allowedTypes.has(type))) throw new P9Error("INVALID_INPUT", 400, "Invalid Spotify search type");
     const types = rawTypes?.filter((type): type is "track" | "artist" | "album" | "playlist" => allowedTypes.has(type));
@@ -42,6 +43,7 @@ export function createIntegrationRouter(integration: IntegrationService, accessT
   router.get("/integrations/spotify/devices", authenticated, asyncP9(async (request, response) => { response.json({ devices: await integration.spotifyDevices(currentAuth(request).userId) }); }));
   router.get("/integrations/spotify/active-device", authenticated, asyncP9(async (request, response) => { response.json({ device: await integration.spotifyActiveDevice(currentAuth(request).userId) }); }));
   router.get("/integrations/spotify/playback", authenticated, asyncP9(async (request, response) => { response.json({ playback: await integration.spotifyPlayback(currentAuth(request).userId) }); }));
+  router.put("/integrations/spotify/preferred-device", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); const input = spotifyPreferredDeviceSchema.parse(request.body); response.json(await integration.spotifyPreferredDevice(auth.userId, input.deviceId)); }));
   router.post("/integrations/spotify/actions", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); response.status(202).json({ action: await integration.spotifyAction(auth.userId, parseSpotifyAction(request.body), auth.context.requestId) }); }));
   router.get("/integrations/spotify/callback", asyncP9(async (request, response) => { await integration.spotifyCallback(queryString(request.query.state), typeof request.query.code === "string" ? request.query.code : undefined, typeof request.query.error === "string" ? request.query.error : undefined); response.status(200).send("Spotify connection completed. You may return to BMO."); }));
   router.get("/plugins", authenticated, asyncP9(async (request, response) => { response.json({ items: await integration.pluginCatalog(currentAuth(request).userId) }); }));

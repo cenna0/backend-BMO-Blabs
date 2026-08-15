@@ -4,7 +4,7 @@ import { normalizeSchedule, nextOccurrence } from "../../src/p9/schedule.recurre
 
 describe("Jakarta schedule recurrence", () => {
   it("maps presentation periods to documented Jakarta instants", () => {
-    const normalized = normalizeSchedule({ prompt: "x", frequency: "Once", every: 1, date: "2026-08-15", timeOfDay: "Morning", deliveryTargets: ["MOBILE"] });
+    const normalized = normalizeSchedule({ prompt: "x", frequency: "Once", every: 1, date: "2026-08-15", timeOfDay: "Morning", deliveryTargets: ["MOBILE"] }, new Date("2026-08-14T00:00:00.000Z"));
     expect(normalized.nextRunAt.toISOString()).toBe("2026-08-15T02:00:00.000Z");
     expect(normalized.recurrence).toEqual({ frequency: "Once", every: 1, timeOfDay: "Morning", date: "2026-08-15" });
     expect(normalized.timezone).toBe("Asia/Jakarta");

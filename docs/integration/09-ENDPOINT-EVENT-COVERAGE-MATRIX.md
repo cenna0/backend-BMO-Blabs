@@ -7,7 +7,9 @@ Slice 2A adds the durable source schema behind the target routes below.
 Subsequent Phase 2 source slices register the application routes and event
 boundaries described in this matrix. Migration
 `20260811190000_phase2_application_foundation` is applied to the isolated
-Phase 2.5 candidate only; it has not been applied to production.
+Phase 2.5 candidate only; it has not been applied to production. The additive
+Spotify lifecycle migration `20260815120000_spotify_phase26_lifecycle` is
+source-ready and remains candidate-only until separately authorized.
 
 ## Phase 2.5 candidate acceptance evidence
 
@@ -182,13 +184,14 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | POST | `/api/v1/integrations/whatsapp/conversations/resolve` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed validated international phone resolution/creation; when the private resolver is available, forward/reverse provider mappings are added before candidate lookup, otherwise the phone alias remains conservative; no provider identity projection is performed |
 | GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed authenticated `ALL` DM default plus UUID-scoped `CONTACT`; `GROUP` remains default-disabled and ingestion-independent |
 | POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed conversation-scoped preview and bounded foreign-confirm rejection; outbound resolution uses the server-side canonical mapping and any explicit provider aliases |
-| POST | `/api/v1/integrations/spotify/connect` | `SOURCE_VERIFIED` | Server-side Authorization Code state route; live credentials/callback `BLOCKED_EXTERNAL_SECRET` |
-| GET | `/api/v1/integrations/spotify/callback` | `SOURCE_VERIFIED` | Exact configured redirect and single-use state; tokens stay server-side |
-| GET | `/api/v1/integrations/spotify/status` | `SOURCE_VERIFIED` | Normalized owner-scoped state only |
-| POST | `/api/v1/integrations/spotify/disconnect` | `SOURCE_VERIFIED` | Owner-scoped credential removal |
-| GET | `/api/v1/integrations/spotify/search`, `/.../active-device` | `SOURCE_VERIFIED` | Concrete normalized catalog search and server-derived active-device projection; candidate provider credentials blocked |
-| GET | `/api/v1/integrations/spotify/devices`, `.../playback` | `SOURCE_VERIFIED` | Concrete normalized provider client; no active device result is safe |
-| POST | `/api/v1/integrations/spotify/actions` | `SOURCE_VERIFIED` | Explicit allowlist for search/resolution, track/artist/album/playlist play, pause/resume/skip, transfer, seek, volume, shuffle, repeat, queue, idempotency, and confirmation; live provider blocked |
+| POST | `/api/v1/integrations/spotify/connect` | `SOURCE_READY` | Server-side Authorization Code URL with hashed single-use state; Mobile receives URL only; live credentials `BLOCKED_EXTERNAL_SECRET` |
+| GET | `/api/v1/integrations/spotify/callback` | `SOURCE_READY` | Exact configurable loopback redirect, state ownership/expiry/reuse validation, server-side exchange and encrypted persistence; no bearer token or Caddy exposure |
+| GET | `/api/v1/integrations/spotify/status` | `SOURCE_READY` | Normalized owner-scoped state including `RECONNECT_REQUIRED`; no token/provider payload |
+| POST | `/api/v1/integrations/spotify/disconnect` | `SOURCE_READY` | Owner-scoped credential wipe and disconnected state |
+| GET | `/api/v1/integrations/spotify/search`, `/.../active-device` | `SOURCE_READY` | Bounded market-aware normalized search and server-derived active-device projection; candidate provider credentials blocked |
+| GET | `/api/v1/integrations/spotify/devices`, `.../playback` | `SOURCE_READY` | Safe Connect device/current playback projection; no-device is typed and never fabricated as success |
+| PUT | `/api/v1/integrations/spotify/preferred-device` | `SOURCE_READY` | Owner-scoped safe-device selection/clear; only required device projection is returned |
+| POST | `/api/v1/integrations/spotify/actions` | `SOURCE_READY` | Strict semantic allowlist for search/resolution, track/artist/album/playlist play, pause/resume/skip, transfer, seek, volume, shuffle, and repeat; no queue/arbitrary provider proxy; live provider blocked |
 | GET | `/api/v1/plugins` | `EXISTING_VERIFIED` | Source/test; exactly WhatsApp + Spotify safe status catalog |
 | POST | `/api/v1/support/bug-reports` | `EXISTING_VERIFIED` | Source/test; bounded authenticated multipart, max five images, opaque persistent keys |
 | POST | `/api/v1/voice/preview` | `DEFERRED` | Not registered; last-priority optional surface |

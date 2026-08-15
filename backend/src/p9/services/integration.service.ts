@@ -6,7 +6,7 @@ import { P9Repositories } from "../db/repositories.js";
 import { P9Error } from "../errors.js";
 import { decryptProviderToken, encryptProviderToken } from "../integrations.crypto.js";
 import { parseSpotifyAction, parseWhatsAppRulesPatch } from "../integrations.validation.js";
-import { SpotifyProviderError, type SpotifySearchType } from "../providers/spotify.client.js";
+import { SpotifyProviderError, type SpotifyCurrentUser, type SpotifySearchType } from "../providers/spotify.client.js";
 import type { HermesWhatsAppMessage } from "../providers/hermes-whatsapp.client.js";
 import { HermesWhatsAppProviderError } from "../providers/hermes-whatsapp.client.js";
 import { preferredWhatsAppDestination, type WhatsAppIdentityResolverBoundary } from "../providers/hermes-whatsapp-identity.client.js";
@@ -14,8 +14,9 @@ import type { MobileOutboundEvent } from "../websocket/mobile-events.js";
 
 const OAUTH_TTL_MS = 10 * 60_000;
 const CONFIRMATION_TTL_MS = 5 * 60_000;
-const SPOTIFY_SCOPES = ["user-read-playback-state", "user-modify-playback-state", "user-read-currently-playing", "user-read-private"];
+const SPOTIFY_SCOPES = ["user-read-private", "user-read-playback-state", "user-modify-playback-state", "playlist-read-private"];
 const TOKEN_REFRESH_SKEW_MS = 30_000;
+const SPOTIFY_REFRESH_LIFETIME_MONTHS = 6;
 const ALL_SEARCH_TYPES: SpotifySearchType[] = ["track", "artist", "album", "playlist"];
 
 type PublicConnection = { provider: "whatsapp" | "spotify"; status: string; connectedAt: string | null; scopes: string[] };
@@ -66,7 +67,8 @@ export interface HermesWhatsAppBoundary {
 export interface SpotifyProviderBoundary {
   exchangeCode?(code: string, redirectUri: string): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scopes: string[]; externalReference?: string }>;
   refreshToken?(refreshToken: string): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scopes: string[]; externalReference?: string }>;
-  search?(accessToken: string, query: string, types: SpotifySearchType[]): Promise<unknown>;
+  currentUser?(accessToken: string): Promise<SpotifyCurrentUser>;
+  search?(accessToken: string, query: string, types: SpotifySearchType[], market?: string | null): Promise<unknown>;
   devices?(accessToken: string): Promise<unknown[]>;
   playback?(accessToken: string): Promise<unknown | null>;
   action?(accessToken: string, action: string, payload: Record<string, unknown>): Promise<{ code: string; metadata?: string }>;
@@ -77,7 +79,7 @@ export class IntegrationService {
     client: PrismaClient;
     repositories: P9Repositories;
     publicBaseUrl: string;
-    providerEncryptionKey?: string;
+    spotifyTokenEncryptionKey?: string;
     spotifyClientId?: string;
     spotifyClientSecret?: string;
     spotifyCallbackUrl?: string;
@@ -86,7 +88,11 @@ export class IntegrationService {
     whatsAppProactiveDelivery?: (input: { userId: string; deliveryId: string; deviceId: string; text: string }) => Promise<void>;
     mobileEvents?: MobileEvents;
     spotify?: SpotifyProviderBoundary;
-  }) {}
+  }) {
+    this.#refreshFlights = new Map();
+  }
+
+  #refreshFlights: Map<string, Promise<string>>;
 
   async connection(userId: string, provider: IntegrationProvider): Promise<PublicConnection> {
     const row = await this.options.repositories.integrationConnection.findUnique({ where: { userId_provider: { userId, provider } } });
@@ -326,14 +332,14 @@ export class IntegrationService {
     }
   }
 
-  async spotifyConnect(userId: string): Promise<{ authorizationUrl: string; state: string }> {
+  async spotifyConnect(userId: string): Promise<{ authorizationUrl: string }> {
     if (!this.options.spotify || !this.options.spotifyClientId || !this.options.spotifyClientSecret || !this.options.spotifyCallbackUrl) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
     const redirectUri = this.options.spotifyCallbackUrl;
     const state = randomBytes(32).toString("hex");
     const verifier = createHash("sha256").update(state).digest("hex");
     await this.options.repositories.oAuthState.create({ data: { userId, provider: IntegrationProvider.SPOTIFY, stateVerifier: verifier, redirectUri, expiresAt: new Date(Date.now() + OAUTH_TTL_MS) } });
     const params = new URLSearchParams({ response_type: "code", client_id: this.options.spotifyClientId, redirect_uri: redirectUri, state, scope: SPOTIFY_SCOPES.join(" ") });
-    return { authorizationUrl: `https://accounts.spotify.com/authorize?${params.toString()}`, state };
+    return { authorizationUrl: `https://accounts.spotify.com/authorize?${params.toString()}` };
   }
 
   async spotifyCallback(state: string, code?: string, error?: string): Promise<{ ok: boolean }> {
@@ -345,7 +351,7 @@ export class IntegrationService {
     const used = await this.options.repositories.oAuthState.updateMany({ where: { id: oauth.id, usedAt: null }, data: { usedAt: now } });
     if (used.count !== 1) throw new P9Error("AUTHENTICATION_FAILED", 401, "Invalid OAuth state");
     if (error) throw new P9Error("CONFLICT", 409, "Spotify authorization was denied");
-    if (!code || !this.options.spotify?.exchangeCode || !this.options.providerEncryptionKey) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
+    if (!code || !this.options.spotify?.exchangeCode || !this.options.spotifyTokenEncryptionKey) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
     let tokens: Awaited<ReturnType<NonNullable<SpotifyProviderBoundary["exchangeCode"]>>>;
     try {
       tokens = await this.options.spotify.exchangeCode(code, oauth.redirectUri);
@@ -354,14 +360,37 @@ export class IntegrationService {
       throw new P9Error("SERVICE_UNAVAILABLE", 503, "Spotify authorization is unavailable");
     }
     const connection = await this.#ensureConnection(oauth.userId, IntegrationProvider.SPOTIFY);
-    const key = Buffer.from(this.options.providerEncryptionKey, "base64url");
+    const key = this.#spotifyKey();
     if (key.length !== 32) throw new P9Error("SERVICE_UNAVAILABLE", 503, "Provider encryption is unavailable");
+    let account: SpotifyCurrentUser | undefined;
+    if (this.options.spotify.currentUser) {
+      try {
+        account = await this.options.spotify.currentUser(tokens.accessToken);
+      } catch (error) {
+        throw this.#asP9ProviderError(error);
+      }
+    }
     const access = encryptProviderToken(tokens.accessToken, key);
     const refresh = tokens.refreshToken ? encryptProviderToken(tokens.refreshToken, key) : null;
     await withP9Transaction(this.options.client, async (tx) => {
       const repo = new P9Repositories(tx);
-      await repo.spotifyCredential.upsert({ where: { userId: oauth.userId }, create: { userId: oauth.userId, connectionId: connection.id, provider: IntegrationProvider.SPOTIFY, accessTokenCiphertext: access.ciphertext, accessTokenNonce: access.nonce, accessTokenTag: access.tag, refreshTokenCiphertext: refresh?.ciphertext ?? null, refreshTokenNonce: refresh?.nonce ?? null, refreshTokenTag: refresh?.tag ?? null, keyVersion: access.keyVersion, expiresAt: new Date(now.getTime() + tokens.expiresIn * 1000), scopes: tokens.scopes }, update: { connectionId: connection.id, accessTokenCiphertext: access.ciphertext, accessTokenNonce: access.nonce, accessTokenTag: access.tag, refreshTokenCiphertext: refresh?.ciphertext ?? null, refreshTokenNonce: refresh?.nonce ?? null, refreshTokenTag: refresh?.tag ?? null, keyVersion: access.keyVersion, expiresAt: new Date(now.getTime() + tokens.expiresIn * 1000), scopes: tokens.scopes } });
-      await repo.integrationConnection.update({ where: { id: connection.id }, data: { status: IntegrationStatus.CONNECTED, scopes: tokens.scopes, externalReference: tokens.externalReference ?? null, connectedAt: now } });
+      const current = await repo.spotifyCredential.findUnique({ where: { userId: oauth.userId } });
+      const refreshFields = refresh
+        ? { refreshTokenCiphertext: refresh.ciphertext, refreshTokenNonce: refresh.nonce, refreshTokenTag: refresh.tag }
+        : { refreshTokenCiphertext: current?.refreshTokenCiphertext ?? null, refreshTokenNonce: current?.refreshTokenNonce ?? null, refreshTokenTag: current?.refreshTokenTag ?? null };
+      await repo.spotifyCredential.upsert({ where: { userId: oauth.userId }, create: {
+        userId: oauth.userId, connectionId: connection.id, provider: IntegrationProvider.SPOTIFY,
+        spotifyUserId: account?.userId ?? tokens.externalReference ?? null,
+        accessTokenCiphertext: access.ciphertext, accessTokenNonce: access.nonce, accessTokenTag: access.tag,
+        ...refreshFields, keyVersion: access.keyVersion, expiresAt: new Date(now.getTime() + tokens.expiresIn * 1000),
+        authorizedAt: now, market: account?.market ?? null, preferredDeviceId: current?.preferredDeviceId ?? null, scopes: tokens.scopes,
+      }, update: {
+        connectionId: connection.id, spotifyUserId: account?.userId ?? tokens.externalReference ?? current?.spotifyUserId ?? null,
+        accessTokenCiphertext: access.ciphertext, accessTokenNonce: access.nonce, accessTokenTag: access.tag,
+        ...refreshFields, keyVersion: access.keyVersion, expiresAt: new Date(now.getTime() + tokens.expiresIn * 1000),
+        authorizedAt: now, market: account?.market ?? current?.market ?? null, scopes: tokens.scopes,
+      } });
+      await repo.integrationConnection.update({ where: { id: connection.id }, data: { status: IntegrationStatus.CONNECTED, scopes: tokens.scopes, externalReference: account?.userId ?? tokens.externalReference ?? null, connectedAt: now, disconnectedAt: null } });
     });
     return { ok: true };
   }
@@ -369,14 +398,31 @@ export class IntegrationService {
   async spotifyDisconnect(userId: string): Promise<void> { await this.options.repositories.spotifyCredential.deleteMany({ where: { userId } }); await this.#setStatus(userId, IntegrationProvider.SPOTIFY, IntegrationStatus.DISCONNECTED); }
   async spotifySearch(userId: string, query: string, types: SpotifySearchType[] = ALL_SEARCH_TYPES): Promise<unknown> {
     if (!this.options.spotify?.search) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
-    return this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.search!(accessToken, query, types));
+    const credential = await this.options.repositories.spotifyCredential.findUnique({ where: { userId } });
+    if (!credential) throw new P9Error("CONFLICT", 409, "Spotify is not connected");
+    return this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.search!(accessToken, query, types, credential.market ?? null));
   }
   async spotifyDevices(userId: string): Promise<unknown[]> { return this.#spotifyProviderCall(userId, "devices"); }
   async spotifyActiveDevice(userId: string): Promise<unknown> {
     const devices = await this.spotifyDevices(userId);
     return (devices as Array<{ isActive?: boolean }>).find((device) => device.isActive === true) ?? null;
   }
-  async spotifyPlayback(userId: string): Promise<unknown> { const value = await this.#spotifyProviderCall(userId, "playback"); return value ?? { code: "NO_ACTIVE_SPOTIFY_DEVICE" }; }
+  async spotifyPlayback(userId: string): Promise<unknown> { const value = await this.#spotifyProviderCall(userId, "playback"); return value ?? { code: "NO_ACTIVE_DEVICE" }; }
+
+  async spotifyPreferredDevice(userId: string, deviceId: string | null): Promise<{ device: unknown | null }> {
+    if (!this.options.spotify?.devices || !this.options.spotifyTokenEncryptionKey) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
+    const credential = await this.options.repositories.spotifyCredential.findUnique({ where: { userId } });
+    if (!credential) throw new P9Error("CONFLICT", 409, "Spotify is not connected");
+    if (deviceId === null) {
+      await this.options.repositories.spotifyCredential.update({ where: { userId }, data: { preferredDeviceId: null } });
+      return { device: null };
+    }
+    const devices = await this.spotifyDevices(userId);
+    const selected = (devices as Array<{ id?: unknown }>).find((device) => device.id === deviceId);
+    if (!selected) throw new P9Error("CONFLICT", 409, "Spotify device is unavailable");
+    await this.options.repositories.spotifyCredential.update({ where: { userId }, data: { preferredDeviceId: deviceId } });
+    return { device: selected };
+  }
 
   async spotifyAction(userId: string, input: unknown, requestId?: string): Promise<unknown> {
     const parsed = parseSpotifyAction(input);
@@ -386,7 +432,7 @@ export class IntegrationService {
     const now = await this.options.repositories.databaseNow();
     const row = await this.options.repositories.spotifyAction.create({ data: { userId, connectionId: connection.id, provider: IntegrationProvider.SPOTIFY, action: parsed.action, payload: parsed.payload as Prisma.InputJsonValue, idempotencyKey: parsed.idempotencyKey, status: parsed.confirmed ? SpotifyActionStatus.CONFIRMED : SpotifyActionStatus.PENDING_CONFIRMATION, confirmationExpiresAt: parsed.confirmed ? null : new Date(now.getTime() + CONFIRMATION_TTL_MS) } });
     if (!parsed.confirmed) return this.#publicSpotifyAction(row);
-    if (!this.options.spotify?.action || !this.options.providerEncryptionKey) {
+    if (!this.options.spotify?.action || !this.options.spotifyTokenEncryptionKey) {
       const failed = await this.options.repositories.spotifyAction.update({ where: { id: row.id }, data: { status: SpotifyActionStatus.FAILED, errorCode: "BLOCKED_EXTERNAL_SECRET" } });
       return this.#publicSpotifyAction(failed);
     }
@@ -546,7 +592,7 @@ export class IntegrationService {
   }
 
   async #spotifyProviderCall(userId: string, operation: "devices" | "playback"): Promise<any> {
-    if (!this.options.spotify?.[operation] || !this.options.providerEncryptionKey) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
+    if (!this.options.spotify?.[operation] || !this.options.spotifyTokenEncryptionKey) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
     const credential = await this.options.repositories.spotifyCredential.findUnique({ where: { userId } });
     if (!credential) throw new P9Error("CONFLICT", 409, "Spotify is not connected");
     return this.#withSpotifyToken(userId, (accessToken) => this.options.spotify![operation]!(accessToken));
@@ -566,72 +612,174 @@ export class IntegrationService {
   }
 
   async #accessToken(userId: string, forceRefresh = false): Promise<string> {
-    if (!this.options.providerEncryptionKey) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
+    if (!this.options.spotifyTokenEncryptionKey) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
     const credential = await this.options.repositories.spotifyCredential.findUnique({ where: { userId } });
     if (!credential) throw new P9Error("CONFLICT", 409, "Spotify is not connected");
-    const key = Buffer.from(this.options.providerEncryptionKey, "base64url");
-    if (key.length !== 32) throw new P9Error("SERVICE_UNAVAILABLE", 503, "Provider encryption is unavailable");
+    const key = this.#spotifyKey();
     try {
       const accessToken = decryptProviderToken({ ciphertext: credential.accessTokenCiphertext, nonce: credential.accessTokenNonce, tag: credential.accessTokenTag, keyVersion: credential.keyVersion }, key);
       const now = await this.options.repositories.databaseNow();
       if (!forceRefresh && credential.expiresAt.getTime() > now.getTime() + TOKEN_REFRESH_SKEW_MS) return accessToken;
-      if (!this.options.spotify?.refreshToken || !credential.refreshTokenCiphertext || !credential.refreshTokenNonce || !credential.refreshTokenTag) throw new P9Error("SERVICE_UNAVAILABLE", 503, "Spotify authorization requires reauthentication");
-      const refreshToken = decryptProviderToken({ ciphertext: credential.refreshTokenCiphertext, nonce: credential.refreshTokenNonce, tag: credential.refreshTokenTag, keyVersion: credential.keyVersion }, key);
-      const tokens = await this.options.spotify.refreshToken(refreshToken);
-      const scopes = tokens.scopes.length > 0 ? tokens.scopes : credential.scopes;
-      const refreshedAccess = encryptProviderToken(tokens.accessToken, key);
-      const refreshedToken = tokens.refreshToken ? encryptProviderToken(tokens.refreshToken, key) : null;
-      await this.options.repositories.spotifyCredential.update({ where: { userId }, data: {
-        accessTokenCiphertext: refreshedAccess.ciphertext, accessTokenNonce: refreshedAccess.nonce, accessTokenTag: refreshedAccess.tag,
-        ...(refreshedToken ? { refreshTokenCiphertext: refreshedToken.ciphertext, refreshTokenNonce: refreshedToken.nonce, refreshTokenTag: refreshedToken.tag } : {}),
-        keyVersion: refreshedAccess.keyVersion, expiresAt: new Date(now.getTime() + tokens.expiresIn * 1_000), scopes,
-      } });
-      await this.options.repositories.integrationConnection.updateMany({ where: { userId, provider: IntegrationProvider.SPOTIFY }, data: { status: IntegrationStatus.CONNECTED, scopes } });
-      return tokens.accessToken;
-    } catch {
+      return this.#refreshAccessToken(userId, forceRefresh);
+    } catch (error) {
+      if (error instanceof P9Error) throw error;
       if (forceRefresh) await this.options.repositories.integrationConnection.updateMany({ where: { userId, provider: IntegrationProvider.SPOTIFY }, data: { status: IntegrationStatus.ERROR } });
       throw new P9Error("SERVICE_UNAVAILABLE", 503, "Provider credential is unavailable");
     }
   }
 
+  async #refreshAccessToken(userId: string, forceRefresh: boolean): Promise<string> {
+    const inFlight = this.#refreshFlights.get(userId);
+    if (inFlight) return inFlight;
+    const refresh = this.#refreshAccessTokenOnce(userId, forceRefresh);
+    this.#refreshFlights.set(userId, refresh);
+    try {
+      return await refresh;
+    } finally {
+      if (this.#refreshFlights.get(userId) === refresh) this.#refreshFlights.delete(userId);
+    }
+  }
+
+  async #refreshAccessTokenOnce(userId: string, forceRefresh: boolean): Promise<string> {
+    const decision = await this.#withSpotifyRefreshLock(userId, async (repo) => {
+      const credential = await repo.spotifyCredential.findUnique({ where: { userId } });
+      if (!credential) throw new P9Error("RECONNECT_REQUIRED", 409, "Spotify requires reconnection");
+      const now = await repo.databaseNow();
+      const authorizedAt = credential.authorizedAt ?? credential.createdAt ?? now;
+      const reauthorizationAt = new Date(authorizedAt);
+      reauthorizationAt.setMonth(reauthorizationAt.getMonth() + SPOTIFY_REFRESH_LIFETIME_MONTHS);
+      if (reauthorizationAt.getTime() <= now.getTime()) {
+        return { kind: "RECONNECT" as const, now };
+      }
+      const key = this.#spotifyKey();
+      const currentAccess = decryptProviderToken({ ciphertext: credential.accessTokenCiphertext, nonce: credential.accessTokenNonce, tag: credential.accessTokenTag, keyVersion: credential.keyVersion }, key);
+      if (!forceRefresh && credential.expiresAt.getTime() > now.getTime() + TOKEN_REFRESH_SKEW_MS) return currentAccess;
+      if (!this.options.spotify?.refreshToken || !credential.refreshTokenCiphertext || !credential.refreshTokenNonce || !credential.refreshTokenTag) {
+        return { kind: "RECONNECT" as const, now };
+      }
+      const refreshToken = decryptProviderToken({ ciphertext: credential.refreshTokenCiphertext, nonce: credential.refreshTokenNonce, tag: credential.refreshTokenTag, keyVersion: credential.keyVersion }, key);
+      let tokens: Awaited<ReturnType<NonNullable<SpotifyProviderBoundary["refreshToken"]>>>;
+      try {
+        tokens = await this.options.spotify.refreshToken(refreshToken);
+      } catch (error) {
+        if (error instanceof SpotifyProviderError && error.code === "INVALID_GRANT") {
+          return { kind: "RECONNECT" as const, now };
+        }
+        throw this.#asP9ProviderError(error);
+      }
+      const scopes = tokens.scopes.length > 0 ? tokens.scopes : credential.scopes;
+      const refreshedAccess = encryptProviderToken(tokens.accessToken, key);
+      const refreshedToken = tokens.refreshToken ? encryptProviderToken(tokens.refreshToken, key) : null;
+      await repo.spotifyCredential.update({ where: { userId }, data: {
+        accessTokenCiphertext: refreshedAccess.ciphertext, accessTokenNonce: refreshedAccess.nonce, accessTokenTag: refreshedAccess.tag,
+        ...(refreshedToken ? { refreshTokenCiphertext: refreshedToken.ciphertext, refreshTokenNonce: refreshedToken.nonce, refreshTokenTag: refreshedToken.tag } : {}),
+        keyVersion: refreshedAccess.keyVersion, expiresAt: new Date(now.getTime() + tokens.expiresIn * 1_000), scopes,
+      } });
+      await repo.integrationConnection.updateMany({ where: { userId, provider: IntegrationProvider.SPOTIFY }, data: { status: IntegrationStatus.CONNECTED, scopes } });
+      return { kind: "TOKEN" as const, accessToken: tokens.accessToken };
+    });
+    if (typeof decision === "string") return decision;
+    if (decision.kind === "RECONNECT") {
+      await this.#markSpotifyReconnectRequired(userId, decision.now);
+      throw new P9Error("RECONNECT_REQUIRED", 409, "Spotify requires reconnection");
+    }
+    return decision.accessToken;
+  }
+
+  async #withSpotifyRefreshLock<T>(userId: string, work: (repo: P9Repositories) => Promise<T>): Promise<T> {
+    const client = this.options.client as PrismaClient & { $transaction?: unknown };
+    if (typeof client.$transaction !== "function") return work(this.options.repositories);
+    return withP9Transaction(client as PrismaClient, async (tx) => {
+      const repo = new P9Repositories(tx);
+      await repo.lockUser(userId);
+      return work(repo);
+    });
+  }
+
+  #spotifyKey(): Buffer {
+    if (!this.options.spotifyTokenEncryptionKey) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
+    const key = Buffer.from(this.options.spotifyTokenEncryptionKey, "base64url");
+    if (key.length !== 32) throw new P9Error("SERVICE_UNAVAILABLE", 503, "Provider encryption is unavailable");
+    return key;
+  }
+
+  async #markSpotifyReconnectRequired(userId: string, now: Date): Promise<void> {
+    await this.options.repositories.spotifyCredential.deleteMany({ where: { userId } });
+    await this.options.repositories.integrationConnection.updateMany({ where: { userId, provider: IntegrationProvider.SPOTIFY }, data: {
+      status: IntegrationStatus.RECONNECT_REQUIRED, scopes: [], externalReference: null, connectedAt: null, disconnectedAt: now,
+    } });
+  }
+
   async #executeSpotifyAction(userId: string, action: string, payload: Record<string, unknown>): Promise<{ code: string; metadata?: string }> {
     if (action === "SEARCH") {
       if (!this.options.spotify?.search || typeof payload.query !== "string") throw new P9Error("INVALID_INPUT", 400, "Spotify search query is required");
-      const result = await this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.search!(accessToken, payload.query as string, ALL_SEARCH_TYPES));
+      const result = await this.spotifySearch(userId, payload.query, ALL_SEARCH_TYPES);
       return { code: "SPOTIFY_SEARCH_COMPLETED", metadata: JSON.stringify({ resultCount: Object.values(result as Record<string, unknown>).reduce<number>((total, value) => total + (Array.isArray(value) ? value.length : 0), 0) }).slice(0, 2000) };
-    }
-    if (action === "QUEUE" && typeof payload.uri !== "string" && typeof payload.query === "string") {
-      if (!this.options.spotify?.search) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
-      const results = await this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.search!(accessToken, payload.query as string, ["track"]));
-      const selected = this.#selectSpotifyTarget(results, payload.query as string, "track");
-      if (!selected) throw new P9Error("CONFLICT", 409, "Spotify match not found");
-      return this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.action!(accessToken, "QUEUE", { uri: selected.uri, ...(typeof payload.deviceId === "string" ? { deviceId: payload.deviceId } : {}) }));
     }
     if (action === "PLAY" && typeof payload.uri !== "string" && typeof payload.query === "string") {
       if (!this.options.spotify?.search) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
       const targetType = typeof payload.targetType === "string" && ["track", "artist", "album", "playlist"].includes(payload.targetType) ? payload.targetType as SpotifySearchType : undefined;
-      const results = await this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.search!(accessToken, payload.query as string, targetType ? [targetType] : ALL_SEARCH_TYPES));
+      const results = await this.spotifySearch(userId, payload.query, targetType ? [targetType] : ALL_SEARCH_TYPES);
       const selected = this.#selectSpotifyTarget(results, payload.query as string, targetType);
       if (!selected) throw new P9Error("CONFLICT", 409, "Spotify match not found");
       const resolvedAction = selected.type === "track" ? "PLAY_TRACK" : selected.type === "artist" ? "PLAY_ARTIST" : selected.type === "album" ? "PLAY_ALBUM" : "PLAY_PLAYLIST";
-      return this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.action!(accessToken, resolvedAction, { uri: selected.uri, ...(typeof payload.deviceId === "string" ? { deviceId: payload.deviceId } : {}) }));
+      const device = await this.#resolveSpotifyDevice(userId, payload);
+      return this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.action!(accessToken, resolvedAction, { uri: selected.uri, deviceId: device.id }));
     }
-    return this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.action!(accessToken, action, payload));
+    if (!this.options.spotify?.action) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
+    if (action === "TRANSFER") {
+      const device = await this.#resolveSpotifyDevice(userId, payload, true);
+      const result = await this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.action!(accessToken, action, { ...payload, deviceId: device.id }));
+      if (payload.preferred === true) await this.options.repositories.spotifyCredential.update({ where: { userId }, data: { preferredDeviceId: device.id } });
+      return result;
+    }
+    const needsDevice = ["PLAY", "PLAY_TRACK", "PLAY_ARTIST", "PLAY_ALBUM", "PLAY_PLAYLIST", "PAUSE", "RESUME", "NEXT", "PREVIOUS", "SEEK", "VOLUME", "SHUFFLE", "REPEAT"].includes(action);
+    const device = needsDevice ? await this.#resolveSpotifyDevice(userId, payload) : null;
+    return this.#withSpotifyToken(userId, (accessToken) => this.options.spotify!.action!(accessToken, action, { ...payload, ...(device ? { deviceId: device.id } : {}) }));
+  }
+
+  async #resolveSpotifyDevice(userId: string, payload: Record<string, unknown>, explicitRequired = false): Promise<{ id: string; [key: string]: unknown }> {
+    const devices = await this.spotifyDevices(userId) as Array<{ id?: unknown; name?: unknown; isActive?: unknown }>;
+    const explicitId = typeof payload.deviceId === "string" ? payload.deviceId : undefined;
+    const explicitName = typeof payload.deviceName === "string" ? payload.deviceName.trim().toLocaleLowerCase() : undefined;
+    const explicit = explicitId ? devices.find((device) => device.id === explicitId) : explicitName ? devices.find((device) => typeof device.name === "string" && device.name.trim().toLocaleLowerCase() === explicitName) : undefined;
+    if (explicit && typeof explicit.id === "string") return explicit as { id: string; [key: string]: unknown };
+    if (explicitRequired || explicitId !== undefined || explicitName !== undefined) throw new P9Error("CONFLICT", 409, "Spotify device is unavailable");
+    const credential = await this.options.repositories.spotifyCredential.findUnique({ where: { userId } });
+    if (credential?.preferredDeviceId) {
+      const preferred = devices.find((device) => device.id === credential.preferredDeviceId);
+      if (preferred && typeof preferred.id === "string") return preferred as { id: string; [key: string]: unknown };
+    }
+    const active = devices.find((device) => device.isActive === true);
+    if (active && typeof active.id === "string") return active as { id: string; [key: string]: unknown };
+    throw new P9Error("NO_ACTIVE_DEVICE", 409, "Open Spotify on a phone, laptop, or other device first");
   }
 
   #selectSpotifyTarget(results: unknown, query: string, targetType?: SpotifySearchType): { type: SpotifySearchType; uri: string } | null {
     if (!results || typeof results !== "object") return null;
     const normalizedQuery = query.trim().toLocaleLowerCase();
     const types: SpotifySearchType[] = targetType ? [targetType] : ALL_SEARCH_TYPES;
-    const candidates = types.flatMap((type) => {
+    const candidates = types.flatMap((type, typeIndex) => {
       const values = (results as Record<string, unknown>)[`${type}s`];
-      return Array.isArray(values) ? values.filter((value): value is { name?: string; uri?: string } => typeof value === "object" && value !== null).map((value) => ({ type, uri: typeof value.uri === "string" ? value.uri : "", name: typeof value.name === "string" ? value.name : "" })) : [];
+      return Array.isArray(values) ? values.filter((value): value is { name?: string; uri?: string } => typeof value === "object" && value !== null).slice(0, 10).map((value, index) => ({ type, typeIndex, index, uri: typeof value.uri === "string" ? value.uri : "", name: typeof value.name === "string" ? value.name : "" })) : [];
     }).filter((value) => value.uri.length > 0);
-    return candidates.sort((left, right) => Number(right.name.toLocaleLowerCase() === normalizedQuery) - Number(left.name.toLocaleLowerCase() === normalizedQuery))[0] ?? null;
+    const normalizedTokens = normalizedQuery.split(/\s+/u).filter(Boolean);
+    const score = (name: string): number => {
+      const normalizedName = name.trim().toLocaleLowerCase();
+      if (normalizedName === normalizedQuery) return 0;
+      if (normalizedName.startsWith(normalizedQuery)) return 1;
+      if (normalizedTokens.every((token) => normalizedName.includes(token))) return 2;
+      if (normalizedName.includes(normalizedQuery)) return 3;
+      return 4;
+    };
+    return candidates.sort((left, right) => score(left.name) - score(right.name) || left.typeIndex - right.typeIndex || left.index - right.index)[0] ?? null;
   }
 
   #asP9ProviderError(error: unknown): P9Error {
     if (error instanceof P9Error) return error;
+    if (error instanceof SpotifyProviderError && error.code === "INVALID_GRANT") return new P9Error("RECONNECT_REQUIRED", 409, "Spotify requires reconnection");
+    if (error instanceof SpotifyProviderError && error.code === "PREMIUM_REQUIRED") return new P9Error("PREMIUM_REQUIRED", 403, "Spotify Premium is required for playback control");
+    if (error instanceof SpotifyProviderError && error.code === "RATE_LIMITED") return new P9Error("RATE_LIMITED", 429, "Spotify is temporarily rate limited");
     if (error instanceof SpotifyProviderError && error.code === "AUTHORIZATION_REVOKED") return new P9Error("SERVICE_UNAVAILABLE", 503, "Spotify authorization is unavailable");
     return new P9Error("SERVICE_UNAVAILABLE", 503, "Spotify provider is unavailable");
   }

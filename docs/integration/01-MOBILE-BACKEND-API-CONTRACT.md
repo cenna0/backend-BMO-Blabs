@@ -1058,33 +1058,96 @@ Do not implement Telegram/SMS plugins.
 
 Priority integration.
 
-Implement existing P9 planned contract:
+The Backend is the only Spotify client. Mobile authenticates to BMO and never
+calls Spotify directly. Spotify audio remains on the user's Spotify Connect
+device; it never enters BMO hardware, Audio Service, Piper, Kokoro, or the
+proactive-audio path.
+
+Canonical authenticated routes:
 
 ```text
 POST /api/v1/integrations/spotify/connect
 GET  /api/v1/integrations/spotify/status
 POST /api/v1/integrations/spotify/disconnect
+GET  /api/v1/integrations/spotify/search?q=<bounded-query>&type=track,artist,album,playlist
 GET  /api/v1/integrations/spotify/devices
+GET  /api/v1/integrations/spotify/active-device
 GET  /api/v1/integrations/spotify/playback
+PUT  /api/v1/integrations/spotify/preferred-device
 POST /api/v1/integrations/spotify/actions
 GET  /api/v1/integrations/spotify/callback
 ```
 
-Phase 2.6 extends the candidate-only Spotify read/action surface with:
+`POST /connect` returns only `{ "authorizationUrl": "..." }`. The OAuth
+state is inside that URL and is not returned as a second Mobile field. The
+callback is intentionally unauthenticated at HTTP bearer level: ownership is
+derived only from the validated, hashed, single-use, short-lived OAuth state.
+Tokens and authorization codes never enter Mobile responses or logs.
 
-```text
-GET /api/v1/integrations/spotify/search?q=<bounded-query>&type=track,artist,album,playlist
-GET /api/v1/integrations/spotify/active-device
+`GET /status` returns only:
+
+```json
+{
+  "provider": "spotify",
+  "status": "DISCONNECTED|PENDING|CONNECTED|ERROR|RECONNECT_REQUIRED",
+  "connectedAt": "ISO_TIMESTAMP|null",
+  "scopes": ["user-read-private", "user-read-playback-state", "user-modify-playback-state", "playlist-read-private"]
+}
 ```
 
-The allowlisted action boundary additionally covers explicit track/artist/
-album/playlist playback, transfer/select device, seek, volume, shuffle, repeat,
-queue, and natural-language query resolution. Search results are normalized;
-provider tokens and raw provider payloads never enter mobile responses.
+Search returns bounded normalized track, artist, album, and playlist result
+arrays. Search uses the stored Spotify account market. The deterministic
+resolver may select only an exact/strong bounded normalized result; it does
+not depend on popularity fields.
 
-OAuth callback is server-side and authenticated by exact redirect + single-use OAuth state, not by a mobile bearer token. Mobile must not store Spotify access/refresh tokens. The current server-side Authorization Code flow is the frozen default because the Backend can protect the client secret; if code exchange moves into mobile, PKCE requires a separate contract change.
+The action allowlist is:
 
-Spotify music plays on the user's Spotify device, not the BMO speaker.
+```text
+PLAY, PLAY_TRACK, PLAY_ARTIST, PLAY_ALBUM, PLAY_PLAYLIST,
+RESUME, PAUSE, NEXT, PREVIOUS, SEEK, VOLUME, SHUFFLE, REPEAT, TRANSFER, SEARCH
+```
+
+Action payloads contain only semantic fields: query, Spotify URI, target type,
+device ID/name, seek position, volume 0..100, shuffle state, repeat
+`off|context|track`, transfer play flag, and preferred-device flag. They never
+contain a provider URL, HTTP method, endpoint, headers, token, secret, SQL, or
+raw provider JSON. `QUEUE` is not part of the Phase 2.6 contract.
+
+Preferred-device writes use:
+
+```json
+{ "deviceId": "SPOTIFY_DEVICE_ID|null" }
+```
+
+Device selection precedence is explicit requested device, valid preferred
+device, active device, then a typed `NO_ACTIVE_DEVICE` result. A missing usable
+device never produces a fabricated playback success. Returned device fields
+are safe normalized projections; the device ID is exposed only because the
+Mobile UI needs it for selection.
+
+Playback-control failures use stable BMO-safe results, including
+`RECONNECT_REQUIRED`, `PREMIUM_REQUIRED`, `NO_ACTIVE_DEVICE`, `RATE_LIMITED`,
+and `SERVICE_UNAVAILABLE`. Raw Spotify error bodies never cross the boundary.
+
+The exact scopes are `user-read-private` for account identity/market,
+`user-read-playback-state` for devices/current playback,
+`user-modify-playback-state` for playback control, and
+`playlist-read-private` for resolving the user's private playlists. No
+streaming, email, library-write, playlist-write, or collaborative-playlist
+scope is requested.
+
+Refresh authorization is recorded server-side because Spotify refresh tokens do
+not expose issuance time. At six calendar months after authorization, or on
+`invalid_grant`, the Backend deletes unusable credential state and exposes
+`RECONNECT_REQUIRED`; it does not retry indefinitely. If Spotify returns a new
+refresh token, it replaces the encrypted value atomically. If it omits one, the
+existing encrypted refresh token is preserved.
+
+Hermes may identify a semantic Spotify intent only. Backend binds the current
+authenticated BMO user, validates the same action schema, resolves search and
+devices, and executes the provider call. Hermes receives neither Spotify
+credential nor client secret and never calls Spotify or supplies arbitrary
+provider request material.
 
 ---
 

@@ -168,6 +168,7 @@ enum IntegrationStatus {
   PENDING
   CONNECTED
   ERROR
+  RECONNECT_REQUIRED
 }
 
 enum SpotifyActionStatus {
@@ -841,6 +842,7 @@ model SpotifyCredential {
   userId                 String                @unique @db.Uuid
   connectionId           String                @unique @db.Uuid
   provider               IntegrationProvider   @default(SPOTIFY)
+  spotifyUserId          String?               @db.VarChar(255)
   accessTokenCiphertext  String                @db.Text
   accessTokenNonce       String                @db.VarChar(128)
   accessTokenTag         String                @db.VarChar(128)
@@ -849,6 +851,9 @@ model SpotifyCredential {
   refreshTokenTag        String?               @db.VarChar(128)
   keyVersion             Int
   expiresAt              DateTime              @db.Timestamptz(3)
+  authorizedAt           DateTime              @db.Timestamptz(3)
+  market                 String?               @db.VarChar(2)
+  preferredDeviceId      String?               @db.VarChar(255)
   scopes                 String[]
   createdAt              DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime              @updatedAt @db.Timestamptz(3)

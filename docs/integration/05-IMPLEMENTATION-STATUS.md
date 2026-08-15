@@ -1,7 +1,7 @@
 # Phase 2 Implementation Status
 
 **Audited:** 2026-08-14
-**Last implementation checkpoint:** 2026-08-15 — Phase 2.6 WhatsApp provider identity resolver preparation
+**Last implementation checkpoint:** 2026-08-15 — Spotify Phase 2.6 source implementation and candidate preparation
 **Baseline source:** `feat/vps-mobile-device-integration` / current pushed Phase 2.6 source
 **Documentation branch:** `feat/vps-mobile-device-integration`
 **Authority:** Actual registered source routes, Prisma migrations, and inspected runtime override stale prose.
@@ -14,11 +14,11 @@ Caddy mutation, or provider secret was performed.
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Spotify concrete provider client | `SOURCE_VERIFIED` | Bounded Authorization Code exchange, refresh-token exchange, normalized search/devices/playback, and explicit Web API action mapping. Focused provider/service/HTTP tests passed; full Node 22 Backend suite: `442 passed, 1 skipped`; typecheck passed. |
-| Spotify capability contract | `SOURCE_VERIFIED` | Search/resolution plus track/artist/album/playlist play, resume/pause/next/previous, queue, transfer/select device, active device, current playback, seek, volume, shuffle, and repeat are validated and mapped to Spotify Connect endpoints. |
-| Spotify encrypted persistence/refresh | `SOURCE_VERIFIED` | Existing AES-256-GCM credential envelope is used; expiry-aware refresh preserves an omitted refresh token and retries one provider 401. Unit tests verify ciphertext-only persistence and owner isolation. |
-| Spotify live candidate acceptance | `BLOCKED_EXTERNAL_SECRET` | Client ID/secret, provider encryption key, exact callback registration, and an authorized Spotify account/device are not provisioned. |
-| Spotify callback exposure | `BLOCKED_OPERATOR` | Exact single-path diff is prepared at `ops/caddy/phase26-spotify-candidate-callback.patch` but has not been applied to active Caddy. Candidate remains loopback at `127.0.0.1:3010`. |
+| Spotify concrete provider client | `SOURCE_READY` | Server-side Authorization Code exchange, normalized `/me` market identity, market-aware bounded search, normalized devices/playback, strict semantic URI/action mapping, and typed 401/403/429/5xx handling are implemented and mocked-tested. |
+| Spotify capability contract | `SOURCE_READY` | Search/resolution plus track/artist/album/playlist play, resume/pause/next/previous, transfer/select device, active device, current playback, seek, volume, shuffle, and repeat are mapped to Spotify Connect endpoints; queue is intentionally excluded. |
+| Spotify encrypted persistence/refresh | `SOURCE_READY` | Dedicated `SPOTIFY_TOKEN_ENCRYPTION_KEY` AES-256-GCM storage, Spotify identity/market/authorization timestamp/preferred-device fields, keyed refresh single-flight plus database advisory lock, six-month lifecycle, replacement-token preservation, and invalid-grant wipe/reconnect behavior are implemented and mocked-tested. |
+| Spotify live candidate acceptance | `BLOCKED_EXTERNAL_SECRET` | Client ID/secret, dedicated token-encryption key, exact loopback callback registration, Development Mode allowlisting, and an authorized Premium Spotify account/device are not provisioned. |
+| Spotify callback exposure | `SOURCE_READY` | Candidate callback is configurable as an operator loopback URI forwarded by SSH to VPS `127.0.0.1:3010`; no Caddy route is required or changed. |
 | Hermes WhatsApp runtime boundary | `CANDIDATE_VERIFIED` | Installed Hermes 0.20.0 and the official unchanged Baileys bridge provide loopback `/health`, destructive `/messages`, and `/send`; the paired personal-account session is present and the bridge reports connected. |
 | WhatsApp dedicated transport runtime | `CANDIDATE_VERIFIED` | `bmo-whatsapp-bridge.service` runs as `hermes` on loopback 3001 with bounded crash restart, private stdout/stderr, and no dependency/restart of `hermes-gateway.service`; source now includes reboot enablement. |
 | WhatsApp provider identity resolver | `BLOCKED_OPERATOR` | Source-side resolver, loopback-only systemd unit, protected token contract, forward/reverse mapping parser, refresh-on-request behavior, and Backend fail-closed client tests pass. Installation requires protected operator access to `/home/hermes`/`/opt/bmo/config`; no resolver service has been installed or started from this shell. |
@@ -65,7 +65,7 @@ availability.
 | Chat/Hermes and proactive server lifecycle | `CANDIDATE_VERIFIED` | Candidate chat operations/messages persisted and Hermes responses were stored; `speakOnDevice=false` was accepted without device audio. Schedule worker expiry guard produced one durable `MISSED` run for a forced expired occurrence; generic proactive queue/unit coverage passed. |
 | Wi-Fi server security/lifecycle | `CANDIDATE_VERIFIED` | Candidate-only AES-256-GCM protected key file was mode `0600`, stable across restart, and never logged/returned. Password-bearing and open-network writes/read projection passed; physical apply/rollback remains hardware-gated. |
 | WhatsApp live provider | `BLOCKED_OPERATOR` | Pairing and dedicated bridge are complete and the first real DM exposed the identity defect. The defect is repaired in candidate; final post-fix DM/group/send/owner-reply acceptance still requires the operator to coordinate sanitized traffic. |
-| Spotify live provider | `BLOCKED_EXTERNAL_SECRET` | Client credentials, callback registration, and provider encryption secret are not provisioned or verified; candidate boundary returned sanitized `503`. |
+| Spotify live provider | `BLOCKED_EXTERNAL_SECRET` | Client credentials, exact loopback callback registration, and dedicated token-encryption secret are not provisioned or verified; candidate boundary remains sanitized `503`. |
 | Physical ESP acceptance | `PENDING_PHYSICAL_ESP` | Fake-device server acceptance passed for additive event handling. Firmware, real Wi-Fi application/rollback, telemetry/log emission, settings acknowledgement, and physical proactive playback remain unverified. |
 | Firewall policy inspection | `BLOCKED_OPERATOR` | `ufw status verbose` and `nft list ruleset` require passworded elevated access. Service/listener/Docker/Caddy checks independently show no port 5555 exposure. |
 
@@ -300,8 +300,8 @@ is deliberately deferred to a later slice.
 | Generic proactive playback | `PENDING_PHYSICAL_ESP` | Firmware event handling and physical playback proof absent |
 | WhatsApp adapter/catalog | `SOURCE_VERIFIED` | Concrete loopback Hermes bridge adapter, owner-scoped poller, JID send boundary, metadata-only inbound persistence, and generic proactive enqueue are implemented and tested; live session remains operator-gated |
 | WhatsApp live provider | `BLOCKED_OPERATOR` | Candidate bridge must be configured on loopback port 3001 and the Hermes WhatsApp session must be paired by QR; no session bytes/provider payloads are stored |
-| Spotify adapter/catalog | `SOURCE_VERIFIED` | Concrete server-side Authorization Code client, exact callback URI, single-use OAuthState, encrypted token boundary, refresh lifecycle, normalized search/device/playback/action surfaces, and safe plugin status; tokens never enter mobile |
-| Spotify live OAuth | `BLOCKED_EXTERNAL_SECRET` | Spotify application credentials, protected provider-key secret, and callback registration are not proven |
+| Spotify adapter/catalog | `SOURCE_READY` | Concrete server-side provider adapter, owner-scoped encrypted credentials, semantic action boundary, deterministic resolver, device precedence, safe error projection, and candidate-only OAuth configuration are implemented and tested; live provider remains blocked |
+| Spotify live OAuth | `BLOCKED_EXTERNAL_SECRET` | Spotify application credentials, dedicated token-encryption secret, exact loopback callback registration, Development Mode user allowlist, and Premium account/device are not proven |
 | Bug reports | `EXISTING_VERIFIED` | Source/test tier: authenticated multipart route, bounded description/context, max five image attachments, mode-0600 opaque storage keys, SHA-256 metadata, PostgreSQL receipt, and cleanup on transaction failure |
 | Voice preview | `DEFERRED` | Last-priority optional surface |
 
@@ -325,7 +325,7 @@ is deliberately deferred to a later slice.
 ## Current blockers
 
 1. `BLOCKED_OPERATOR`: Real WhatsApp DM/group/send/owner-reply acceptance remains intentionally paused until the operator requests traffic testing; QR pairing and bridge startup are complete.
-2. `BLOCKED_EXTERNAL_SECRET`: Spotify application credentials, protected provider encryption secret, and callback registration are not proven.
+2. `BLOCKED_EXTERNAL_SECRET`: Spotify application credentials, dedicated token-encryption secret, exact loopback callback registration, Development Mode allowlist, and Premium account/device are not proven.
 3. `PENDING_PHYSICAL_ESP`: first-boot Wi-Fi bootstrap, battery sensing capability, additive events, and physical playback require firmware/bench evidence.
 4. Current UFW/nft rules remain unreadable without passworded elevated privileges. Listener, Docker, and Caddy evidence prove no service currently accepts port 5555; firewall-policy inspection remains an operator evidence gap for final public/private sign-off.
 

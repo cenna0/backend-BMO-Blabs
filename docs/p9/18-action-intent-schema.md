@@ -1,8 +1,8 @@
 # Hermes ↔ Backend Action-Intent Schema
 
-**Status:** `SOURCE_VERIFIED` for validation/provider action payloads; Hermes
-tool binding remains `BLOCKED_OPERATOR` until the installed Hermes intent/tool
-transport is exposed and verified.
+**Status:** `SOURCE_READY` for the Backend semantic validation/provider action
+boundary; the current text-only Hermes transport has no direct provider tool
+call and remains intentionally unable to access Spotify credentials.
 
 Hermes proposes; Backend authenticates, authorizes, validates, confirms, and
 executes. The action schema is versioned and discriminated so unsupported
@@ -31,15 +31,15 @@ principal and rejects a mismatched or expired context.
 ```ts
 type ActionIntent =
   | { kind: "spotify.playback"; payload: {
-      command: "PLAY" | "PLAY_TRACK" | "PLAY_ARTIST" | "PLAY_ALBUM" | "PLAY_PLAYLIST" | "PAUSE" | "RESUME" | "NEXT" | "PREVIOUS" | "TRANSFER" | "SEEK" | "VOLUME" | "SHUFFLE" | "REPEAT" | "QUEUE" | "SEARCH";
+      command: "PLAY" | "PLAY_TRACK" | "PLAY_ARTIST" | "PLAY_ALBUM" | "PLAY_PLAYLIST" | "PAUSE" | "RESUME" | "NEXT" | "PREVIOUS" | "TRANSFER" | "SEEK" | "VOLUME" | "SHUFFLE" | "REPEAT" | "SEARCH";
       query?: string;
       uri?: string;
       targetType?: "track" | "artist" | "album" | "playlist";
-      deviceId?: string;
+      deviceId?: string; deviceName?: string;
       positionMs?: number;
       volume?: number;
       state?: "track" | "context" | "off" | boolean;
-      play?: boolean;
+      play?: boolean; preferred?: boolean;
     }}
   | { kind: "spotify.volume"; payload: { volume: number; deviceId?: string } }
   | { kind: "whatsapp.send"; requested_confirmation: "user_required"; payload: {
@@ -74,3 +74,8 @@ clients cannot select a different timezone in the initial product.
 
 Provider references are opaque and may be omitted. Raw errors and credentials
 do not cross the boundary.
+
+For Spotify, the Backend binds the authenticated BMO user, validates the
+semantic command, resolves the market-aware search/device choice, and executes
+only the allowlisted provider operation. Hermes cannot provide a URL, method,
+Spotify endpoint, headers, token, secret, SQL, or raw provider JSON.

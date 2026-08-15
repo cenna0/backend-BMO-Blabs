@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { encryptProviderToken, decryptProviderToken } from "../../src/p9/integrations.crypto.js";
-import { parseBugReportInput, parseSpotifyAction, parseWhatsAppConversationQuery, parseWhatsAppRecipientResolve, parseWhatsAppRulesPatch, parseWhatsAppSendPreview } from "../../src/p9/integrations.validation.js";
+import { parseBugReportInput, parseSpotifyAction, parseSpotifySearchQuery, parseWhatsAppConversationQuery, parseWhatsAppRecipientResolve, parseWhatsAppRulesPatch, parseWhatsAppSendPreview } from "../../src/p9/integrations.validation.js";
 
 describe("integration boundary validation", () => {
   it("encrypts provider tokens with an authenticated, versioned envelope", () => {
@@ -24,6 +24,14 @@ describe("integration boundary validation", () => {
     expect(parseSpotifyAction({ action: "SEEK", idempotencyKey: "x", payload: { positionMs: 12_000 } })).toMatchObject({ action: "SEEK" });
     expect(parseSpotifyAction({ action: "REPEAT", idempotencyKey: "x", payload: { state: "context" } })).toMatchObject({ action: "REPEAT" });
     expect(() => parseSpotifyAction({ action: "TRANSFER", idempotencyKey: "x", payload: { deviceId: "d1", userId: "attacker" } })).toThrow();
+    expect(() => parseSpotifyAction({ action: "QUEUE", idempotencyKey: "x", payload: { uri: "spotify:track:t1" } })).toThrow();
+    expect(() => parseSpotifyAction({ action: "PLAY_TRACK", idempotencyKey: "x", payload: { uri: "https://example.test/track" } })).toThrow();
+    expect(() => parseSpotifyAction({ action: "PAUSE", idempotencyKey: "x", payload: { deviceId: "d".repeat(256) } })).toThrow();
+  });
+
+  it("bounds Spotify search input", () => {
+    expect(parseSpotifySearchQuery({ q: "Backburner", type: "track" })).toEqual({ q: "Backburner", type: "track" });
+    expect(() => parseSpotifySearchQuery({ q: "x".repeat(201) })).toThrow();
   });
 
   it("enforces WhatsApp target shape, bounds, and strict rules", () => {

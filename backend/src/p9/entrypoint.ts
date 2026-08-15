@@ -26,6 +26,7 @@ function loadDatabaseUrlFromSecret(): void {
 
 loadSecretFromFile("P9_WIFI_ENCRYPTION_KEY", "P9_WIFI_ENCRYPTION_KEY_FILE", "P9 Wi-Fi encryption secret is empty");
 loadSecretFromFile("P9_PROVIDER_ENCRYPTION_KEY", "P9_PROVIDER_ENCRYPTION_KEY_FILE", "P9 provider encryption secret is empty");
+loadSecretFromFile("SPOTIFY_TOKEN_ENCRYPTION_KEY", "SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE", "Spotify token encryption secret is empty");
 loadSecretFromFile("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_ID_FILE", "Spotify client ID secret is empty");
 loadSecretFromFile("SPOTIFY_CLIENT_SECRET", "SPOTIFY_CLIENT_SECRET_FILE", "Spotify client secret is empty");
 loadSecretFromFile("WHATSAPP_IDENTITY_RESOLVER_TOKEN", "WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE", "WhatsApp identity resolver secret is empty");
