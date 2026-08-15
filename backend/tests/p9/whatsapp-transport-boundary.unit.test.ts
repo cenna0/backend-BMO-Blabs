@@ -9,6 +9,7 @@ const backendRoot = join(testsDir, "../..");
 const sourceRoot = join(backendRoot, "src");
 const launcherPath = join(backendRoot, "../ops/whatsapp/bmo-whatsapp-bridge-launcher");
 const unitPath = join(backendRoot, "../ops/whatsapp/systemd/bmo-whatsapp-bridge.service");
+const resolverUnitPath = join(backendRoot, "../ops/whatsapp/systemd/bmo-whatsapp-identity-resolver.service");
 const runbookPath = join(backendRoot, "../ops/whatsapp/README.md");
 
 function sourceFiles(root: string): string[] {
@@ -70,5 +71,11 @@ describe("WhatsApp transport-only boundary", () => {
     expect(runbook).toContain("jq -e '.connection.status == \"CONNECTED\"");
     expect(runbook).toContain("jq -er '.conversations[0].id'");
     expect(runbook).toContain("backend_api_smoke=pass");
+  });
+
+  it("keeps the resolver token argument in the supported separated-value form", () => {
+    const unit = readFileSync(resolverUnitPath, "utf8");
+    expect(unit).toContain("--token-file %d/resolver-token");
+    expect(unit).not.toContain("--token-file=%d/resolver-token");
   });
 });
