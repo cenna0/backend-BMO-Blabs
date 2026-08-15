@@ -9,7 +9,9 @@ boundaries described in this matrix. Migration
 `20260811190000_phase2_application_foundation` is applied to the isolated
 Phase 2.5 candidate only; it has not been applied to production. The additive
 Spotify lifecycle migration `20260815120000_spotify_phase26_lifecycle` is
-source-ready and remains candidate-only until separately authorized.
+source-ready and remains candidate-only until separately authorized. Its
+canonical provider identity column is `spotifyAccountId`; `spotifyProfileId`
+is non-canonical metadata only.
 
 ## Phase 2.5 candidate acceptance evidence
 
@@ -186,8 +188,8 @@ All four current pairing calls require a mobile bearer token. The ESP does not c
 | POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed conversation-scoped preview and bounded foreign-confirm rejection; outbound resolution uses the server-side canonical mapping and any explicit provider aliases |
 | POST | `/api/v1/integrations/spotify/connect` | `SOURCE_READY` | Server-side Authorization Code URL with hashed single-use state; Mobile receives URL only; live credentials `BLOCKED_EXTERNAL_SECRET` |
 | GET | `/api/v1/integrations/spotify/callback` | `SOURCE_READY` | Exact configurable loopback redirect, state ownership/expiry/reuse validation, server-side exchange and encrypted persistence; no bearer token or Caddy exposure |
-| GET | `/api/v1/integrations/spotify/status` | `SOURCE_READY` | Normalized owner-scoped state including `RECONNECT_REQUIRED`; no token/provider payload |
-| POST | `/api/v1/integrations/spotify/disconnect` | `SOURCE_READY` | Owner-scoped credential wipe and disconnected state |
+| GET | `/api/v1/integrations/spotify/status` | `SOURCE_READY` | Normalized owner-scoped state including `RECONNECT_REQUIRED`; canonical `account_id` linking remains server-side; no token/provider payload |
+| POST | `/api/v1/integrations/spotify/disconnect` | `SOURCE_READY` | Owner-scoped credential and provider-identity metadata wipe with disconnected state |
 | GET | `/api/v1/integrations/spotify/search`, `/.../active-device` | `SOURCE_READY` | Bounded market-aware normalized search and server-derived active-device projection; candidate provider credentials blocked |
 | GET | `/api/v1/integrations/spotify/devices`, `.../playback` | `SOURCE_READY` | Safe Connect device/current playback projection; no-device is typed and never fabricated as success |
 | PUT | `/api/v1/integrations/spotify/preferred-device` | `SOURCE_READY` | Owner-scoped safe-device selection/clear; only required device projection is returned |

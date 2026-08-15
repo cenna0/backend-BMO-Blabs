@@ -64,10 +64,22 @@ describe("SpotifyApiClient", () => {
   });
 
   it("normalizes the current Spotify account without exposing provider fields", async () => {
-    const fetcher = vi.fn().mockResolvedValue(response({ id: "spotify-user", country: "ID", product: "premium", email: "secret@example.test" }));
+    const fetcher = vi.fn().mockResolvedValue(response({ account_id: "spotify-account", id: "spotify-profile", country: "ID", product: "premium", email: "secret@example.test" }));
     const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
 
-    await expect(client.currentUser("access-token")).resolves.toEqual({ userId: "spotify-user", market: "ID", product: "premium" });
+    const currentUser = await client.currentUser("access-token");
+    expect(currentUser).toEqual({ accountId: "spotify-account", profileId: "spotify-profile", market: "ID", product: "premium" });
+    const requestHeaders = fetcher.mock.calls[0]?.[1] && new Headers((fetcher.mock.calls[0]?.[1] as RequestInit).headers);
+    expect(requestHeaders?.get("authorization")).toBe("Bearer access-token");
+    expect(requestHeaders?.get("authorization")).not.toContain("spotify-account");
+    expect(JSON.stringify(currentUser)).not.toContain("access-token");
+  });
+
+  it("requires Spotify account_id and never falls back to the mutable profile id", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ id: "spotify-profile", country: "ID", product: "premium" }));
+    const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
+
+    await expect(client.currentUser("access-token")).rejects.toMatchObject({ code: "INVALID_PROVIDER_RESPONSE" });
   });
 
   it("maps the explicit playback capability set to allowlisted Spotify endpoints", async () => {

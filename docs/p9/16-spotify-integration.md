@@ -18,7 +18,9 @@ BMO speaker, Audio Service, Piper, Kokoro, or the device proactive-audio path.
 
 ## Exact scopes
 
-- `user-read-private`: store the Spotify user ID and account market.
+- `user-read-private`: read the Spotify current-user `account_id` and account
+  market. `account_id` is the canonical BMO↔Spotify link; Spotify `id` is
+  retained only as non-canonical server-side profile metadata.
 - `user-read-playback-state`: list devices and read current playback.
 - `user-modify-playback-state`: play, pause, skip, seek, volume, shuffle,
   repeat, and transfer playback.
@@ -34,6 +36,18 @@ The access and refresh tokens are encrypted with AES-256-GCM using the dedicated
 version, expiry, scopes, Spotify account metadata, authorization timestamp, and
 preferred device are persisted. The key is loaded only from a protected secret
 file in candidate/runtime configuration.
+
+The current-user profile's immutable `account_id` is the only durable Spotify
+account-linking identity. The profile `id` may be stored as
+`spotifyProfileId` for provider metadata and diagnostics, but it cannot select
+or authorize a BMO account. Both identity fields remain server-side and are
+never bearer credentials, Mobile response fields, Hermes inputs, or log data.
+
+The callback rejects a profile that has no `account_id`; it never falls back to
+`id`. A repeated authorization with the same `account_id` updates the existing
+BMO user's credential, while an account already linked to another BMO user is
+rejected. Disconnect and reconnect wipe or replace the server-side identity
+metadata together with the credential lifecycle state.
 
 Spotify refresh tokens do not expose issuance time. The Backend stores
 `authorizedAt`, treats six calendar months as the reauthorization deadline, and

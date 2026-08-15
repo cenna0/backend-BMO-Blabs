@@ -29,7 +29,8 @@ function fixture() {
     expiresAt: new Date(now.getTime() - 1),
     authorizedAt: new Date("2026-08-01T00:00:00.000Z"),
     createdAt: new Date("2026-08-01T00:00:00.000Z"),
-    spotifyUserId: "spotify-user",
+    spotifyAccountId: "spotify-account",
+    spotifyProfileId: "spotify-profile",
     market: "ID",
     preferredDeviceId: null,
     scopes: ["user-read-private"],
@@ -37,7 +38,11 @@ function fixture() {
   const repositories: any = {
     databaseNow: vi.fn().mockResolvedValue(now),
     spotifyCredential: {
-      findUnique: vi.fn(async ({ where }: any) => where.userId === userA ? credential : null),
+      findUnique: vi.fn(async ({ where }: any) => {
+        if (where.userId !== undefined) return where.userId === userA ? credential : null;
+        if (where.spotifyAccountId !== undefined) return where.spotifyAccountId === credential.spotifyAccountId ? credential : null;
+        return null;
+      }),
       update: vi.fn(async ({ data }: any) => Object.assign(credential, data)),
       upsert: vi.fn(),
       deleteMany: vi.fn(),
@@ -96,7 +101,7 @@ describe("Spotify IntegrationService", () => {
     await f.service.spotifyDisconnect(userA);
 
     expect(f.repositories.spotifyCredential.deleteMany).toHaveBeenCalledWith({ where: { userId: userA } });
-    expect(f.repositories.integrationConnection.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "DISCONNECTED" }) }));
+    expect(f.repositories.integrationConnection.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "DISCONNECTED", externalReference: null }) }));
   });
 
   it("resolves a natural-language play request to a provider URI before execution", async () => {
@@ -161,7 +166,7 @@ describe("Spotify IntegrationService", () => {
     f.repositories.oAuthState.findFirst.mockResolvedValue({ id: "oauth", userId: userA, redirectUri: "https://api.personalbmo.web.id/api/v1/integrations/spotify/callback", expiresAt: new Date(f.now.getTime() + 60_000), usedAt: null });
     f.repositories.oAuthState.updateMany.mockResolvedValue({ count: 1 });
     f.spotify.exchangeCode = vi.fn().mockResolvedValue({ accessToken: "callback-access", expiresIn: 3600, scopes: ["user-read-private"] });
-    f.spotify.currentUser = vi.fn().mockResolvedValue({ userId: "spotify-user-2", market: "ID", product: "premium" });
+    f.spotify.currentUser = vi.fn().mockResolvedValue({ accountId: "spotify-account-2", profileId: "spotify-profile-2", market: "ID", product: "premium" });
     const transactionClient = { spotifyCredential: f.repositories.spotifyCredential, integrationConnection: f.repositories.integrationConnection };
     const service = new IntegrationService({
       client: { $transaction: async (work: (client: unknown) => Promise<unknown>) => work(transactionClient) } as any,
@@ -178,14 +183,71 @@ describe("Spotify IntegrationService", () => {
     expect(f.spotify.currentUser).toHaveBeenCalledWith("callback-access");
     expect(f.repositories.spotifyCredential.upsert).toHaveBeenCalledWith(expect.objectContaining({
       create: expect.objectContaining({
-        spotifyUserId: "spotify-user-2", authorizedAt: f.now, market: "ID",
+        spotifyAccountId: "spotify-account-2", spotifyProfileId: "spotify-profile-2", authorizedAt: f.now, market: "ID",
         refreshTokenCiphertext: f.credential.refreshTokenCiphertext,
       }),
       update: expect.objectContaining({
-        spotifyUserId: "spotify-user-2", authorizedAt: f.now, market: "ID",
+        spotifyAccountId: "spotify-account-2", spotifyProfileId: "spotify-profile-2", authorizedAt: f.now, market: "ID",
         refreshTokenCiphertext: f.credential.refreshTokenCiphertext,
       }),
     }));
+  });
+
+  it("keeps one BMO connection when Spotify profile id changes for the same account_id", async () => {
+    const f = fixture();
+    f.repositories.oAuthState.findFirst.mockResolvedValue({ id: "oauth", userId: userA, redirectUri: "https://api.personalbmo.web.id/api/v1/integrations/spotify/callback", expiresAt: new Date(f.now.getTime() + 60_000), usedAt: null });
+    f.repositories.oAuthState.updateMany.mockResolvedValue({ count: 1 });
+    f.spotify.exchangeCode.mockResolvedValue({ accessToken: "callback-access", expiresIn: 3600, scopes: ["user-read-private"] });
+    f.spotify.currentUser
+      .mockResolvedValueOnce({ accountId: "spotify-account", profileId: "spotify-profile-old", market: "ID", product: "premium" })
+      .mockResolvedValueOnce({ accountId: "spotify-account", profileId: "spotify-profile-new", market: "ID", product: "premium" });
+    const transactionClient = { spotifyCredential: f.repositories.spotifyCredential, integrationConnection: f.repositories.integrationConnection };
+    const service = new IntegrationService({
+      client: { $transaction: async (work: (client: unknown) => Promise<unknown>) => work(transactionClient) } as any,
+      repositories: f.repositories,
+      publicBaseUrl: "http://127.0.0.1:3010",
+      spotifyTokenEncryptionKey: f.key.toString("base64url"),
+      spotifyClientId: "client-id",
+      spotifyClientSecret: "client-secret",
+      spotifyCallbackUrl: "https://api.personalbmo.web.id/api/v1/integrations/spotify/callback",
+      spotify: f.spotify as any,
+    });
+
+    await service.spotifyCallback("a".repeat(64), "authorization-code");
+    await service.spotifyCallback("a".repeat(64), "authorization-code");
+
+    expect(f.repositories.integrationConnection.create).not.toHaveBeenCalled();
+    expect(f.repositories.spotifyCredential.upsert).toHaveBeenCalledTimes(2);
+    expect(f.repositories.spotifyCredential.upsert.mock.calls.map(([input]: any) => input.where)).toEqual([{ userId: userA }, { userId: userA }]);
+    expect(f.repositories.spotifyCredential.upsert.mock.calls.map(([input]: any) => input.update.spotifyAccountId)).toEqual(["spotify-account", "spotify-account"]);
+    expect(f.repositories.spotifyCredential.upsert.mock.calls[1]?.[0].update.spotifyProfileId).toBe("spotify-profile-new");
+  });
+
+  it("rejects linking an account_id already owned by another BMO user", async () => {
+    const f = fixture();
+    f.repositories.oAuthState.findFirst.mockResolvedValue({ id: "oauth", userId: userA, redirectUri: "https://api.personalbmo.web.id/api/v1/integrations/spotify/callback", expiresAt: new Date(f.now.getTime() + 60_000), usedAt: null });
+    f.repositories.oAuthState.updateMany.mockResolvedValue({ count: 1 });
+    f.spotify.exchangeCode.mockResolvedValue({ accessToken: "callback-access", expiresIn: 3600, scopes: ["user-read-private"] });
+    f.spotify.currentUser.mockResolvedValue({ accountId: "spotify-account", profileId: "spotify-profile", market: "ID", product: "premium" });
+    f.repositories.spotifyCredential.findUnique.mockImplementation(async ({ where }: any) => {
+      if (where.spotifyAccountId === "spotify-account") return { ...f.credential, userId: userB };
+      if (where.userId === userA) return f.credential;
+      return null;
+    });
+    const transactionClient = { spotifyCredential: f.repositories.spotifyCredential, integrationConnection: f.repositories.integrationConnection };
+    const service = new IntegrationService({
+      client: { $transaction: async (work: (client: unknown) => Promise<unknown>) => work(transactionClient) } as any,
+      repositories: f.repositories,
+      publicBaseUrl: "http://127.0.0.1:3010",
+      spotifyTokenEncryptionKey: f.key.toString("base64url"),
+      spotifyClientId: "client-id",
+      spotifyClientSecret: "client-secret",
+      spotifyCallbackUrl: "https://api.personalbmo.web.id/api/v1/integrations/spotify/callback",
+      spotify: f.spotify as any,
+    });
+
+    await expect(service.spotifyCallback("a".repeat(64), "authorization-code")).rejects.toMatchObject({ code: "OWNERSHIP_DENIED" });
+    expect(f.repositories.spotifyCredential.upsert).not.toHaveBeenCalled();
   });
 
   it("forces reauthorization after the six-month refresh-token lifetime", async () => {

@@ -10,11 +10,11 @@ export interface SpotifyTokenSet {
   refreshToken?: string;
   expiresIn: number;
   scopes: string[];
-  externalReference?: string;
 }
 
 export interface SpotifyCurrentUser {
-  userId: string;
+  accountId: string;
+  profileId: string | null;
   market: string | null;
   product: string | null;
 }
@@ -191,7 +191,8 @@ export class SpotifyApiClient {
     if (!isObject(payload)) throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
     const country = typeof payload.country === "string" && /^[A-Z]{2}$/u.test(payload.country) ? payload.country : null;
     return {
-      userId: stringField(payload.id, "id"),
+      accountId: stringField(payload.account_id, "account_id"),
+      profileId: optionalString(payload.id),
       market: country,
       product: typeof payload.product === "string" && payload.product.length <= 32 ? payload.product : null,
     };

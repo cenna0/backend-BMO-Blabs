@@ -1095,6 +1095,12 @@ Tokens and authorization codes never enter Mobile responses or logs.
 }
 ```
 
+Backend links the BMO user to Spotify's immutable `account_id` from the
+current-user profile. Spotify's `id`, when present, is retained only as
+server-side non-canonical profile metadata; neither identity field is returned
+to Mobile, and neither is a bearer credential. A repeated authorization for
+the same `account_id` converges on the existing BMO Spotify connection.
+
 Search returns bounded normalized track, artist, album, and playlist result
 arrays. Search uses the stored Spotify account market. The deterministic
 resolver may select only an exact/strong bounded normalized result; it does
@@ -1129,7 +1135,7 @@ Playback-control failures use stable BMO-safe results, including
 `RECONNECT_REQUIRED`, `PREMIUM_REQUIRED`, `NO_ACTIVE_DEVICE`, `RATE_LIMITED`,
 and `SERVICE_UNAVAILABLE`. Raw Spotify error bodies never cross the boundary.
 
-The exact scopes are `user-read-private` for account identity/market,
+The exact scopes are `user-read-private` for `account_id` identity/market,
 `user-read-playback-state` for devices/current playback,
 `user-modify-playback-state` for playback control, and
 `playlist-read-private` for resolving the user's private playlists. No

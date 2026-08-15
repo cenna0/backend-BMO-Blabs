@@ -65,8 +65,8 @@ export interface HermesWhatsAppBoundary {
 }
 
 export interface SpotifyProviderBoundary {
-  exchangeCode?(code: string, redirectUri: string): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scopes: string[]; externalReference?: string }>;
-  refreshToken?(refreshToken: string): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scopes: string[]; externalReference?: string }>;
+  exchangeCode?(code: string, redirectUri: string): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scopes: string[] }>;
+  refreshToken?(refreshToken: string): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scopes: string[] }>;
   currentUser?(accessToken: string): Promise<SpotifyCurrentUser>;
   search?(accessToken: string, query: string, types: SpotifySearchType[], market?: string | null): Promise<unknown>;
   devices?(accessToken: string): Promise<unknown[]>;
@@ -362,40 +362,42 @@ export class IntegrationService {
     const connection = await this.#ensureConnection(oauth.userId, IntegrationProvider.SPOTIFY);
     const key = this.#spotifyKey();
     if (key.length !== 32) throw new P9Error("SERVICE_UNAVAILABLE", 503, "Provider encryption is unavailable");
-    let account: SpotifyCurrentUser | undefined;
-    if (this.options.spotify.currentUser) {
-      try {
-        account = await this.options.spotify.currentUser(tokens.accessToken);
-      } catch (error) {
-        throw this.#asP9ProviderError(error);
-      }
+    if (!this.options.spotify.currentUser) throw new P9Error("SERVICE_UNAVAILABLE", 503, "Spotify account identity is unavailable");
+    let account: SpotifyCurrentUser;
+    try {
+      account = await this.options.spotify.currentUser(tokens.accessToken);
+    } catch (error) {
+      throw this.#asP9ProviderError(error);
     }
+    if (!account.accountId) throw new P9Error("SERVICE_UNAVAILABLE", 503, "Spotify account identity is unavailable");
     const access = encryptProviderToken(tokens.accessToken, key);
     const refresh = tokens.refreshToken ? encryptProviderToken(tokens.refreshToken, key) : null;
     await withP9Transaction(this.options.client, async (tx) => {
       const repo = new P9Repositories(tx);
+      const accountOwner = await repo.spotifyCredential.findUnique({ where: { spotifyAccountId: account.accountId } });
+      if (accountOwner && accountOwner.userId !== oauth.userId) throw new P9Error("OWNERSHIP_DENIED", 404, "Spotify account is already connected");
       const current = await repo.spotifyCredential.findUnique({ where: { userId: oauth.userId } });
       const refreshFields = refresh
         ? { refreshTokenCiphertext: refresh.ciphertext, refreshTokenNonce: refresh.nonce, refreshTokenTag: refresh.tag }
         : { refreshTokenCiphertext: current?.refreshTokenCiphertext ?? null, refreshTokenNonce: current?.refreshTokenNonce ?? null, refreshTokenTag: current?.refreshTokenTag ?? null };
       await repo.spotifyCredential.upsert({ where: { userId: oauth.userId }, create: {
         userId: oauth.userId, connectionId: connection.id, provider: IntegrationProvider.SPOTIFY,
-        spotifyUserId: account?.userId ?? tokens.externalReference ?? null,
+        spotifyAccountId: account.accountId, spotifyProfileId: account.profileId,
         accessTokenCiphertext: access.ciphertext, accessTokenNonce: access.nonce, accessTokenTag: access.tag,
         ...refreshFields, keyVersion: access.keyVersion, expiresAt: new Date(now.getTime() + tokens.expiresIn * 1000),
         authorizedAt: now, market: account?.market ?? null, preferredDeviceId: current?.preferredDeviceId ?? null, scopes: tokens.scopes,
       }, update: {
-        connectionId: connection.id, spotifyUserId: account?.userId ?? tokens.externalReference ?? current?.spotifyUserId ?? null,
+        connectionId: connection.id, spotifyAccountId: account.accountId, spotifyProfileId: account.profileId,
         accessTokenCiphertext: access.ciphertext, accessTokenNonce: access.nonce, accessTokenTag: access.tag,
         ...refreshFields, keyVersion: access.keyVersion, expiresAt: new Date(now.getTime() + tokens.expiresIn * 1000),
         authorizedAt: now, market: account?.market ?? current?.market ?? null, scopes: tokens.scopes,
       } });
-      await repo.integrationConnection.update({ where: { id: connection.id }, data: { status: IntegrationStatus.CONNECTED, scopes: tokens.scopes, externalReference: account?.userId ?? tokens.externalReference ?? null, connectedAt: now, disconnectedAt: null } });
+      await repo.integrationConnection.update({ where: { id: connection.id }, data: { status: IntegrationStatus.CONNECTED, scopes: tokens.scopes, externalReference: account.accountId, connectedAt: now, disconnectedAt: null } });
     });
     return { ok: true };
   }
 
-  async spotifyDisconnect(userId: string): Promise<void> { await this.options.repositories.spotifyCredential.deleteMany({ where: { userId } }); await this.#setStatus(userId, IntegrationProvider.SPOTIFY, IntegrationStatus.DISCONNECTED); }
+  async spotifyDisconnect(userId: string): Promise<void> { await this.options.repositories.spotifyCredential.deleteMany({ where: { userId } }); await this.#setStatus(userId, IntegrationProvider.SPOTIFY, IntegrationStatus.DISCONNECTED, undefined, true); }
   async spotifySearch(userId: string, query: string, types: SpotifySearchType[] = ALL_SEARCH_TYPES): Promise<unknown> {
     if (!this.options.spotify?.search) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
     const credential = await this.options.repositories.spotifyCredential.findUnique({ where: { userId } });
@@ -805,7 +807,7 @@ export class IntegrationService {
   }
   async #ensureConnection(userId: string, provider: IntegrationProvider): Promise<any> { const current = await this.#getConnection(userId, provider); if (current) return current; return this.options.repositories.integrationConnection.create({ data: { userId, provider, scopes: [], status: IntegrationStatus.DISCONNECTED } }); }
   async #upsertConnection(userId: string, provider: IntegrationProvider, requestId?: string): Promise<any> { const row = await this.#ensureConnection(userId, provider); await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status: IntegrationStatus.PENDING, disconnectedAt: null } }); await this.#audit(this.options.repositories, userId, `${provider.toLowerCase()}.connect`, "integration", row.id, requestId); return this.options.repositories.integrationConnection.findUniqueOrThrow({ where: { id: row.id } }); }
-  async #setStatus(userId: string, provider: IntegrationProvider, status: IntegrationStatus, requestId?: string): Promise<any> { const row = await this.#ensureConnection(userId, provider); const updated = await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status, ...(status === IntegrationStatus.CONNECTED ? { connectedAt: new Date(), disconnectedAt: null } : { disconnectedAt: new Date() }) } }); await this.#audit(this.options.repositories, userId, `${provider.toLowerCase()}.status`, "integration", row.id, requestId); return updated; }
+  async #setStatus(userId: string, provider: IntegrationProvider, status: IntegrationStatus, requestId?: string, clearExternalReference = false): Promise<any> { const row = await this.#ensureConnection(userId, provider); const updated = await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status, ...(status === IntegrationStatus.CONNECTED ? { connectedAt: new Date(), disconnectedAt: null } : { disconnectedAt: new Date() }), ...(clearExternalReference ? { externalReference: null } : {}) } }); await this.#audit(this.options.repositories, userId, `${provider.toLowerCase()}.status`, "integration", row.id, requestId); return updated; }
   #publicSend(row: any) { return { id: row.id, conversationId: row.conversationId ?? null, preview: row.preview, status: row.status, confirmationExpiresAt: row.confirmationExpiresAt.toISOString(), errorCode: row.errorCode ?? null }; }
   #publicSpotifyAction(row: any) { return { id: row.id, action: row.action, status: row.status, confirmationExpiresAt: row.confirmationExpiresAt?.toISOString() ?? null, resultCode: row.resultCode ?? null, errorCode: row.errorCode ?? null }; }
   #audit(repo: P9Repositories, userId: string, eventType: string, resourceType: string, resourceId: string, requestId?: string) { return repo.auditEvent.create({ data: { eventType, outcome: "success", actorType: "user", resourceType, resourceId, userId, ...(requestId ? { requestId } : {}), metadata: {} } }); }

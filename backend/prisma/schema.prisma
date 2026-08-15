@@ -842,7 +842,8 @@ model SpotifyCredential {
   userId                 String                @unique @db.Uuid
   connectionId           String                @unique @db.Uuid
   provider               IntegrationProvider   @default(SPOTIFY)
-  spotifyUserId          String?               @db.VarChar(255)
+  spotifyAccountId       String?               @unique @db.VarChar(255)
+  spotifyProfileId       String?               @db.VarChar(255)
   accessTokenCiphertext  String                @db.Text
   accessTokenNonce       String                @db.VarChar(128)
   accessTokenTag         String                @db.VarChar(128)

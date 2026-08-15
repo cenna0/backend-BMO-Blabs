@@ -263,7 +263,7 @@ describe("P9 Prisma schema", () => {
     expect(schema).toMatch(/model DeviceTelemetryCurrent[\s\S]*deviceId\s+String\s+@unique/);
     expect(schema).toMatch(/model DeviceLog[\s\S]*@@index\(\[expiresAt\]\)/);
     expect(schema).toMatch(/model OAuthState[\s\S]*stateVerifier\s+String\s+@unique\s+@db\.Char\(64\)/);
-    expect(schema).toMatch(/model SpotifyCredential[\s\S]*spotifyUserId[\s\S]*accessTokenCiphertext[\s\S]*refreshTokenCiphertext[\s\S]*authorizedAt[\s\S]*preferredDeviceId/);
+    expect(schema).toMatch(/model SpotifyCredential[\s\S]*spotifyAccountId\s+String\?\s+@unique[\s\S]*spotifyProfileId[\s\S]*accessTokenCiphertext[\s\S]*refreshTokenCiphertext[\s\S]*authorizedAt[\s\S]*preferredDeviceId/);
     expect(schema).toMatch(/enum IntegrationStatus[\s\S]*RECONNECT_REQUIRED/);
     expect(schema).toMatch(/model PasswordRecovery[\s\S]*requestId\s+String\?\s+@db\.VarChar\(128\)/);
     expect(schema).toMatch(/model DeviceLog[\s\S]*metadata\s+String\?\s+@db\.VarChar\(2000\)/);
@@ -294,7 +294,10 @@ describe("P9 Prisma schema", () => {
     const migrationSql = await readFile(spotifyLifecycleMigrationPath, "utf8");
     expect(migrationSql).not.toMatch(/DROP\s+(?:COLUMN|TABLE|TYPE)|DELETE\s+FROM/i);
     expect(migrationSql).toContain('ADD VALUE IF NOT EXISTS \'RECONNECT_REQUIRED\'');
-    expect(migrationSql).toContain('ADD COLUMN "spotifyUserId" VARCHAR(255)');
+    expect(migrationSql).toContain('ADD COLUMN "spotifyAccountId" VARCHAR(255)');
+    expect(migrationSql).toContain('ADD COLUMN "spotifyProfileId" VARCHAR(255)');
+    expect(migrationSql).toContain('CREATE UNIQUE INDEX "SpotifyCredential_spotifyAccountId_key"');
+    expect(migrationSql).toContain('SpotifyCredential_spotifyAccountId_ck');
     expect(migrationSql).toContain('ADD COLUMN "authorizedAt" TIMESTAMPTZ(3)');
     expect(migrationSql).toContain('ADD COLUMN "market" VARCHAR(2)');
     expect(migrationSql).toContain('ADD COLUMN "preferredDeviceId" VARCHAR(255)');
