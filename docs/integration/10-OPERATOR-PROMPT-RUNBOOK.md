@@ -33,25 +33,93 @@ until the operator completes these steps one at a time:
 
 1. Create/configure a Spotify Developer Dashboard application in Development
    Mode with the exact scopes recorded in `docs/p9/16-spotify-integration.md`.
-2. Register the exact candidate redirect URI
-   `http://127.0.0.1:<operator-port>/api/v1/integrations/spotify/callback`.
-   Do not register a guessed path, public VPS URL, or production redirect for
-   this candidate checkpoint.
+2. Register exactly:
+   `http://127.0.0.1:4310/api/v1/integrations/spotify/callback`.
+   Do not register a guessed path, public VPS URL, or production redirect.
 3. Add the intended Spotify account to the Development Mode user allowlist if
    the Dashboard requires it. Playback acceptance requires Spotify Premium.
-4. Create three protected files outside Git: Spotify client ID, Spotify client
-   secret, and a fresh 32-byte base64url Spotify token-encryption key. Deliver
-   their file paths to the candidate-only Compose overlay through environment
-   variables, not their contents.
-5. Start the operator SSH local tunnel from the chosen local port to VPS
-   `127.0.0.1:3010`. Do not expose PostgreSQL, Hermes, Audio Service, Spotify
-   secrets, or the Backend listener publicly.
-6. After a separate explicit authorization, recreate only the isolated
-   candidate Backend with the immutable image and candidate overlay, apply the
-   candidate migration, and verify the sanitized health/status response.
-7. Perform live OAuth and playback acceptance only after recording the
-   candidate image SHA, migration state, redirect URI, allowlist state, and
-   protected-secret file permissions. Return sanitized results only.
+4. Use these protected host paths outside Git:
+
+   ```text
+   /opt/bmo/config/p9.1/spotify-client-id
+   /opt/bmo/config/p9.1/spotify-client-secret
+   /opt/bmo/config/p9.1/spotify-token-encryption-key
+   ```
+
+   After a separate authorization to provision secrets, create the directory
+   and empty mode-0600 files without putting values in shell arguments or
+   history:
+
+   ```bash
+   umask 077
+   install -d -m 0700 /opt/bmo/config/p9.1
+   install -m 0600 /dev/null /opt/bmo/config/p9.1/spotify-client-id
+   install -m 0600 /dev/null /opt/bmo/config/p9.1/spotify-client-secret
+   install -m 0600 /dev/null /opt/bmo/config/p9.1/spotify-token-encryption-key
+   ```
+
+   Populate the files only through the protected operator secret-delivery
+   mechanism. Never paste their contents into chat, Git, Compose, an env file,
+   or a command line.
+5. Export paths, not secret values, and verify the exact callback and file
+   permissions:
+
+   ```bash
+   export SPOTIFY_CLIENT_ID_FILE=/opt/bmo/config/p9.1/spotify-client-id
+   export SPOTIFY_CLIENT_SECRET_FILE=/opt/bmo/config/p9.1/spotify-client-secret
+   export SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE=/opt/bmo/config/p9.1/spotify-token-encryption-key
+   export SPOTIFY_CALLBACK_URL=http://127.0.0.1:4310/api/v1/integrations/spotify/callback
+   /opt/bmo/app/ops/spotify/verify-secret-files.sh
+   ```
+
+6. Before any candidate change, render the candidate-only Compose files and
+   inspect only sanitized configuration:
+
+   ```bash
+   export P9_COMPOSE_ENV_FILE=/opt/bmo/config/p9.1/compose.env
+   export P9_CANDIDATE_IMAGE=bmo-p9.1-candidate:spotify-phase26-<final-sha>
+   docker compose --project-name bmo-p9-1 \
+     --env-file "$P9_COMPOSE_ENV_FILE" \
+     -f /opt/bmo/app/p9.1-compose.yml \
+     -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
+     config
+   ```
+
+7. After a separate explicit authorization, start only the isolated candidate
+   PostgreSQL service, apply the candidate migration, then recreate only its
+   Backend from the immutable image:
+
+   ```bash
+   docker compose --project-name bmo-p9-1 \
+     --env-file "$P9_COMPOSE_ENV_FILE" \
+     -f /opt/bmo/app/p9.1-compose.yml \
+     -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
+     up -d postgres
+   docker compose --project-name bmo-p9-1 \
+     --env-file "$P9_COMPOSE_ENV_FILE" \
+     -f /opt/bmo/app/p9.1-compose.yml \
+     -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
+     run --rm --no-deps backend npm run prisma:migrate:deploy
+   docker compose --project-name bmo-p9-1 \
+     --env-file "$P9_COMPOSE_ENV_FILE" \
+     -f /opt/bmo/app/p9.1-compose.yml \
+     -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
+     up -d --no-build --force-recreate backend
+   ```
+
+8. Start the operator-side tunnel from laptop port `4310` to the candidate
+   Backend loopback port `3010`:
+
+   ```bash
+   ssh -N -T -o ExitOnForwardFailure=yes \
+     -L 4310:127.0.0.1:3010 <operator>@<vps-host>
+   ```
+
+   Do not expose PostgreSQL, Hermes, Audio Service, Spotify secrets, or the
+   Backend listener publicly. Perform live OAuth and playback acceptance only
+   after recording the candidate image SHA, migration state, exact redirect,
+   allowlist state, and protected-file permission result. Return sanitized
+   results only.
 
 Never send or record the client secret, encryption key, OAuth code, access
 token, refresh token, provider error body, or secret file contents.

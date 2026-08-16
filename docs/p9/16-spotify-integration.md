@@ -69,7 +69,7 @@ response.
 Candidate OAuth uses an exact operator loopback redirect, for example:
 
 ```text
-http://127.0.0.1:<operator-port>/api/v1/integrations/spotify/callback
+http://127.0.0.1:4310/api/v1/integrations/spotify/callback
 ```
 
 The operator forwards that local port through SSH to VPS `127.0.0.1:3010`.
