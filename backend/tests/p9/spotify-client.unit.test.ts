@@ -6,6 +6,10 @@ function response(body: unknown, status = 200): Response {
   return new Response(status === 204 ? null : JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
+function emptyResponse(status: number): Response {
+  return new Response(null, { status });
+}
+
 describe("SpotifyApiClient", () => {
   it("exchanges an authorization code using the confidential server client", async () => {
     const fetcher = vi.fn().mockResolvedValue(response({
@@ -150,6 +154,21 @@ describe("SpotifyApiClient", () => {
     const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
 
     await expect(client.action("access-token", "PAUSE", {})).rejects.toMatchObject({ status: 403, code: "PREMIUM_REQUIRED" });
+  });
+
+  it.each([204, 200, 201, 202, 206])("accepts PAUSE when Spotify returns successful %s with an empty body", async (status) => {
+    const fetcher = vi.fn().mockResolvedValue(emptyResponse(status));
+    const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
+
+    await expect(client.action("access-token", "PAUSE", {})).resolves.toEqual({ code: "SPOTIFY_COMMAND_ACCEPTED" });
+  });
+
+  it("continues to normalize a non-2xx PAUSE response as a safe provider error", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ error: { status: 403, message: "Premium required", secret: "provider-secret" } }, 403));
+    const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
+
+    await expect(client.action("access-token", "PAUSE", {})).rejects.toMatchObject({ status: 403, code: "PREMIUM_REQUIRED" });
+    await expect(client.action("access-token", "PAUSE", {})).rejects.not.toThrow("provider-secret");
   });
 
   it.each([

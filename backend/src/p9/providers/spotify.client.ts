@@ -227,7 +227,7 @@ export class SpotifyApiClient {
 
   async action(accessToken: string, action: string, payload: Record<string, unknown>): Promise<{ code: string; metadata?: string }> {
     const mapped = this.#mapAction(action, payload);
-    await this.#apiRequest(mapped.path, accessToken, { method: mapped.method, ...(mapped.body === undefined ? {} : { body: JSON.stringify(mapped.body), headers: { "content-type": "application/json" } }) });
+    await this.#apiResponse(mapped.path, accessToken, { method: mapped.method, ...(mapped.body === undefined ? {} : { body: JSON.stringify(mapped.body), headers: { "content-type": "application/json" } }) });
     return { code: "SPOTIFY_COMMAND_ACCEPTED", ...(mapped.metadata === undefined ? {} : { metadata: mapped.metadata }) };
   }
 
