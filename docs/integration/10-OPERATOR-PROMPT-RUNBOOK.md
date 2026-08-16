@@ -25,20 +25,36 @@ Only the operator may supply or authorize:
 
 Send secrets out-of-band. Never paste them into chat, Git, logs, or documentation.
 
-## 3. Spotify Phase 2.6 candidate checkpoint
+## 3. Spotify Phase 2.6 combined candidate checkpoint
 
 The source/candidate implementation may be built and the candidate migration
 may be applied only to the isolated candidate project. Live OAuth is blocked
-until the operator completes these steps one at a time:
+until the operator completes these steps one at a time. No command in this
+section was executed by the source-wiring task.
 
-1. Create/configure a Spotify Developer Dashboard application in Development
+1. The current candidate uses `/tmp/bmo-p9-1-validation-20260804/compose.env`.
+   Persist it later, only after separate operator authorization, at the one
+   canonical path `/opt/bmo/config/p9.1/compose.env` without printing contents:
+
+   ```bash
+   umask 077
+   install -d -o bmo-admin -g bmo-admin -m 0700 /opt/bmo/config/p9.1
+   install -o bmo-admin -g bmo-admin -m 0600 \
+     /tmp/bmo-p9-1-validation-20260804/compose.env \
+     /opt/bmo/config/p9.1/compose.env
+   stat -c 'owner=%U:%G mode=%a path=%n' /opt/bmo/config/p9.1/compose.env
+   ```
+
+   The repository does not contain either env file. Do not use `cat`,
+   `printenv`, `env`, shell tracing, or any command that prints env contents.
+2. Create/configure a Spotify Developer Dashboard application in Development
    Mode with the exact scopes recorded in `docs/p9/16-spotify-integration.md`.
-2. Register exactly:
+3. Register exactly:
    `http://127.0.0.1:4310/api/v1/integrations/spotify/callback`.
    Do not register a guessed path, public VPS URL, or production redirect.
-3. Add the intended Spotify account to the Development Mode user allowlist if
+4. Add the intended Spotify account to the Development Mode user allowlist if
    the Dashboard requires it. Playback acceptance requires Spotify Premium.
-4. Use these protected host paths outside Git:
+5. Use these protected host paths outside Git:
 
    ```text
    /opt/bmo/config/p9.1/spotify-client-id
@@ -46,69 +62,70 @@ until the operator completes these steps one at a time:
    /opt/bmo/config/p9.1/spotify-token-encryption-key
    ```
 
-   After a separate authorization to provision secrets, create the directory
-   and empty mode-0600 files without putting values in shell arguments or
-   history:
-
-   ```bash
-   umask 077
-   install -d -m 0700 /opt/bmo/config/p9.1
-   install -m 0600 /dev/null /opt/bmo/config/p9.1/spotify-client-id
-   install -m 0600 /dev/null /opt/bmo/config/p9.1/spotify-client-secret
-   install -m 0600 /dev/null /opt/bmo/config/p9.1/spotify-token-encryption-key
-   ```
-
-   Populate the files only through the protected operator secret-delivery
+   After separate authorization to provision secrets, create mode-0600 files
+   and populate them only through the protected operator secret-delivery
    mechanism. Never paste their contents into chat, Git, Compose, an env file,
    or a command line.
-5. Export paths, not secret values, and verify the exact callback and file
-   permissions:
+6. Export paths, not secret values, and verify the exact env/secret contracts:
 
    ```bash
+   export P9_COMPOSE_ENV_FILE=/opt/bmo/config/p9.1/compose.env
    export SPOTIFY_CLIENT_ID_FILE=/opt/bmo/config/p9.1/spotify-client-id
    export SPOTIFY_CLIENT_SECRET_FILE=/opt/bmo/config/p9.1/spotify-client-secret
    export SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE=/opt/bmo/config/p9.1/spotify-token-encryption-key
    export SPOTIFY_CALLBACK_URL=http://127.0.0.1:4310/api/v1/integrations/spotify/callback
+   /opt/bmo/app/ops/spotify/verify-candidate-env.sh
    /opt/bmo/app/ops/spotify/verify-secret-files.sh
    ```
 
-6. Before any candidate change, render the candidate-only Compose files and
-   inspect only sanitized configuration:
+7. Set the immutable candidate image reference and render the complete
+   combined Backend composition. Both provider overrides are required here:
 
    ```bash
-   export P9_COMPOSE_ENV_FILE=/opt/bmo/config/p9.1/compose.env
    export P9_CANDIDATE_IMAGE=bmo-p9.1-candidate:spotify-phase26-<final-sha>
    docker compose --project-name bmo-p9-1 \
      --env-file "$P9_COMPOSE_ENV_FILE" \
      -f /opt/bmo/app/p9.1-compose.yml \
+     -f /opt/bmo/app/ops/whatsapp/p9.1-identity-resolver.override.yml \
      -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
      config
    ```
 
-7. After a separate explicit authorization, start only the isolated candidate
-   PostgreSQL service, apply the candidate migration, then recreate only its
-   Backend from the immutable image:
+8. After separate explicit authorization, start only candidate PostgreSQL
+   using the base file. The provider overrides are unnecessary for PostgreSQL:
 
    ```bash
    docker compose --project-name bmo-p9-1 \
      --env-file "$P9_COMPOSE_ENV_FILE" \
      -f /opt/bmo/app/p9.1-compose.yml \
-     -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
      up -d postgres
+   ```
+
+9. Apply Prisma migration with the base file only. The one-shot Prisma command
+   needs database/password wiring and does not execute WhatsApp or Spotify
+   provider runtime behavior:
+
+   ```bash
    docker compose --project-name bmo-p9-1 \
      --env-file "$P9_COMPOSE_ENV_FILE" \
      -f /opt/bmo/app/p9.1-compose.yml \
-     -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
      run --rm --no-deps backend npm run prisma:migrate:deploy
+   ```
+
+10. Recreate only the candidate Backend with both overrides so the verified
+    WhatsApp resolver and Spotify secrets remain present:
+
+   ```bash
    docker compose --project-name bmo-p9-1 \
      --env-file "$P9_COMPOSE_ENV_FILE" \
      -f /opt/bmo/app/p9.1-compose.yml \
+     -f /opt/bmo/app/ops/whatsapp/p9.1-identity-resolver.override.yml \
      -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
      up -d --no-build --force-recreate backend
    ```
 
-8. Start the operator-side tunnel from laptop port `4310` to the candidate
-   Backend loopback port `3010`:
+11. Start the operator-side tunnel from laptop port `4310` to candidate
+    Backend loopback port `3010`:
 
    ```bash
    ssh -N -T -o ExitOnForwardFailure=yes \
