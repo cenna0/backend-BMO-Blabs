@@ -263,4 +263,3 @@
   ```
 
   The final report must distinguish source readiness from candidate runtime readiness and external-provider/operator blocking. It must state `production changed=no` and must not claim live Spotify verification.
-

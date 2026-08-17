@@ -16,4 +16,3 @@ export function rejectUnclaimedWebSocketUpgrade(socket: Duplex): void {
     socket.destroy();
   });
 }
-
