@@ -242,13 +242,9 @@ class ComposePackagingTests(unittest.TestCase):
             self._bind_mounts(backend),
             {
                 "/opt/bmo/temp/audio": ("/opt/bmo/temp/audio", False),
-                "/opt/bmo/data/avatars": ("/opt/bmo/data/avatars", False),
             },
         )
-        self.assertEqual(
-            backend["environment"]["AVATAR_STORAGE_DIR"],
-            "/opt/bmo/data/avatars",
-        )
+        self.assertNotIn("AVATAR_STORAGE_DIR", backend["environment"])
         self.assertEqual(
             self._bind_mounts(audio),
             {

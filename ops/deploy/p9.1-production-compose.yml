@@ -1,0 +1,155 @@
+name: bmo-production-p9
+
+services:
+  postgres:
+    image: postgres:16.14-alpine3.22@sha256:786dab398303b8ce7cb76b407bb21ef2e4dfbbbd4c6abcf3d29b3130467ffdbc
+    environment:
+      POSTGRES_DB: ${P9_POSTGRES_DB:-bmo}
+      POSTGRES_USER: ${P9_POSTGRES_USER:-bmo}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - source: postgres_password
+        target: postgres_password
+        mode: 0400
+    command:
+      - postgres
+      - -c
+      - max_connections=20
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
+    volumes:
+      - type: bind
+        source: ${P9_POSTGRES_DATA_DIR:-/opt/bmo/data/postgres}
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+      - type: volume
+        source: p9_production_postgres_socket
+        target: /var/run/postgresql
+    networks:
+      - p9_private
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: "1.0"
+    pids_limit: 128
+    read_only: false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  backend:
+    image: ${P9_PRODUCTION_IMAGE:?Set P9_PRODUCTION_IMAGE to the verified production image tag}
+    env_file:
+      - path: ${P9_PRODUCTION_BACKEND_ENV_FILE:-/opt/bmo/config/p9.1/backend.env}
+        required: true
+    environment:
+      NODE_ENV: production
+      BACKEND_HOST: 127.0.0.1
+      BACKEND_PORT: "3000"
+      TRUST_PROXY_HOPS: "1"
+      PUBLIC_BASE_URL: https://api.personalbmo.web.id
+      HERMES_API_URL: http://127.0.0.1:8642
+      AUDIO_SERVICE_URL: http://127.0.0.1:8001
+      WHATSAPP_BRIDGE_URL: http://127.0.0.1:3001
+      WHATSAPP_IDENTITY_RESOLVER_URL: http://127.0.0.1:3002
+      SPOTIFY_CALLBACK_URL: https://api.personalbmo.web.id/api/v1/integrations/spotify/callback
+      HARDWARE_TEST_MODE: "false"
+      P9_ENABLED: "true"
+      P9_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
+      P9_POSTGRES_USER: ${P9_POSTGRES_USER:-bmo}
+      P9_POSTGRES_DB: ${P9_POSTGRES_DB:-bmo}
+      P9_POSTGRES_SOCKET_DIR: /var/run/postgresql
+      P9_WIFI_ENCRYPTION_KEY_FILE: /run/secrets/wifi_encryption_key
+      WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE: /run/secrets/whatsapp_identity_resolver_token
+      SPOTIFY_CLIENT_ID_FILE: /run/secrets/spotify_client_id
+      SPOTIFY_CLIENT_SECRET_FILE: /run/secrets/spotify_client_secret
+      SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE: /run/secrets/spotify_token_encryption_key
+      AVATAR_STORAGE_DIR: /opt/bmo/data/avatars
+      BUG_REPORT_STORAGE_DIR: /opt/bmo/data/bug-reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+    network_mode: host
+    secrets:
+      - source: postgres_password
+        target: postgres_password
+        mode: 0400
+      - source: wifi_encryption_key
+        target: wifi_encryption_key
+        mode: 0400
+      - source: whatsapp_identity_resolver_token
+        target: whatsapp_identity_resolver_token
+        mode: 0400
+      - source: spotify_client_id
+        target: spotify_client_id
+        mode: 0400
+      - source: spotify_client_secret
+        target: spotify_client_secret
+        mode: 0400
+      - source: spotify_token_encryption_key
+        target: spotify_token_encryption_key
+        mode: 0400
+    volumes:
+      - type: volume
+        source: p9_production_postgres_socket
+        target: /var/run/postgresql
+        read_only: true
+      - type: bind
+        source: /opt/bmo/temp/audio
+        target: /opt/bmo/temp/audio
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${P9_AVATAR_DATA_DIR:-/opt/bmo/data/avatars}
+        target: /opt/bmo/data/avatars
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${P9_BUG_REPORT_DATA_DIR:-/opt/bmo/data/bug-reports}
+        target: /opt/bmo/data/bug-reports
+        bind:
+          create_host_path: false
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: "1.0"
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_READ_SEARCH
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+networks:
+  p9_private:
+    internal: true
+
+volumes:
+  p9_production_postgres_socket:
+
+secrets:
+  postgres_password:
+    file: ${P9_POSTGRES_PASSWORD_FILE:?Set P9_POSTGRES_PASSWORD_FILE outside Git}
+  wifi_encryption_key:
+    file: ${P9_WIFI_ENCRYPTION_KEY_FILE:?Set P9_WIFI_ENCRYPTION_KEY_FILE outside Git}
+  whatsapp_identity_resolver_token:
+    file: ${P9_WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE:?Set P9_WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE outside Git}
+  spotify_client_id:
+    file: ${SPOTIFY_CLIENT_ID_FILE:?Set SPOTIFY_CLIENT_ID_FILE outside Git}
+  spotify_client_secret:
+    file: ${SPOTIFY_CLIENT_SECRET_FILE:?Set SPOTIFY_CLIENT_SECRET_FILE outside Git}
+  spotify_token_encryption_key:
+    file: ${SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE:?Set SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE outside Git}

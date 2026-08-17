@@ -15,16 +15,10 @@ services:
       HERMES_API_URL: http://127.0.0.1:8642
       AUDIO_SERVICE_URL: http://127.0.0.1:8001
       HARDWARE_TEST_MODE: "false"
-      AVATAR_STORAGE_DIR: /opt/bmo/data/avatars
     volumes:
       - type: bind
         source: /opt/bmo/temp/audio
         target: /opt/bmo/temp/audio
-        bind:
-          create_host_path: false
-      - type: bind
-        source: /opt/bmo/data/avatars
-        target: /opt/bmo/data/avatars
         bind:
           create_host_path: false
     read_only: true
