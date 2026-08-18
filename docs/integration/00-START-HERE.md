@@ -1,16 +1,18 @@
 # BMO Mobile Integration — Current Production Entry Point
 
 **Audited:** 2026-08-18
-**Source of truth:** Git `main` at `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`
+**Source status:** Code-only enrollment exists in reviewed source.
 **Production state:** P9 Backend and PostgreSQL are live and healthy.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Physical status:** `PENDING_PHYSICAL_ESP`.
 
 This is the current onboarding page for the Mobile team. Do not use old
 candidate handoffs as a production guide.
 
-The code-only enrollment implementation is on feature branch
-`feat/pairing-code-only-enrollment`; production remains at the six-migration
-baseline until explicit deployment approval. Physical firmware acceptance is
-still `PENDING_PHYSICAL_ESP`.
+The code-only enrollment implementation is present in reviewed source but is
+not deployed. Production remains at the six-migration baseline until explicit
+deployment approval; physical firmware acceptance remains
+`PENDING_PHYSICAL_ESP`.
 
 ## Read in this order
 

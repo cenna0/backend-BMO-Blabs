@@ -301,6 +301,61 @@ describe("P1 WebSocket contract", () => {
     expect(onPairingModeRequest).toHaveBeenCalledWith("bmo-001", sha256Hex("test-device-secret"));
   });
 
+  it("delivers delayed unbound pairing code to the replacement current socket", async () => {
+    let releaseA!: (event: PairingCodeEvent) => void;
+    const delayedEnrollment = new Promise<PairingCodeEvent>((resolve) => {
+      releaseA = resolve;
+    });
+    const onDeviceNotBound = vi.fn()
+      .mockImplementationOnce(() => delayedEnrollment)
+      .mockResolvedValueOnce(undefined);
+    const runtime = await startRuntime({
+      resolveApplicationDevice: vi.fn().mockResolvedValue(null),
+      authorizeApplicationDevice: vi.fn().mockResolvedValue(false),
+      onDeviceNotBound,
+    });
+
+    const socketA = await connect(runtime.url);
+    const authenticatedA = nextJson(socketA);
+    authenticate(socketA);
+    await expect(authenticatedA).resolves.toMatchObject({ event: "authenticated", status: "ok" });
+
+    const messagesA: Record<string, unknown>[] = [];
+    socketA.on("message", (data) => {
+      messagesA.push(JSON.parse(data.toString()) as Record<string, unknown>);
+    });
+    await expect.poll(() => onDeviceNotBound.mock.calls.length).toBe(1);
+
+    const socketAClosed = nextClose(socketA);
+    const socketB = await connect(runtime.url);
+    const authenticatedB = nextJson(socketB);
+    authenticate(socketB);
+    await expect(authenticatedB).resolves.toMatchObject({ event: "authenticated", status: "ok" });
+    await expect(socketAClosed).resolves.toMatchObject({ code: 1000 });
+    await expect.poll(() => onDeviceNotBound.mock.calls.length).toBe(2);
+
+    await expect(runtime.socketServer.sendAdditiveEvent("bmo-001", {
+      event: "device_settings",
+      version: 1,
+      settings: { playback_volume: 50 },
+    })).resolves.toBe(false);
+
+    const pairingOnB = nextJson(socketB);
+    releaseA({
+      event: "pairing_code",
+      code: "123456",
+      expires_at: "2026-08-18T12:10:00.000Z",
+    });
+
+    await expect(pairingOnB).resolves.toEqual({
+      event: "pairing_code",
+      code: "123456",
+      expires_at: "2026-08-18T12:10:00.000Z",
+    });
+    expect(onDeviceNotBound).toHaveBeenCalledTimes(2);
+    expect(messagesA.some((message) => message.event === "pairing_code")).toBe(false);
+  });
+
   it("keeps the claimed socket unbound until hardware reconnects and authenticates", async () => {
     const binding = {
       deviceId: "00000000-0000-4000-8000-000000000001",

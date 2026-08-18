@@ -2,7 +2,10 @@
 
 **Version:** 3.0.0
 **Audited:** 2026-08-18
-**Canonical source:** `main` at `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`
+**Source status:** Code-only enrollment exists in reviewed source.
+**Production status:** NOT YET DEPLOYED.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Physical status:** `PENDING_PHYSICAL_ESP`.
 **Production base URL:** `https://api.personalbmo.web.id`
 **REST base path:** `/api/v1`
 **Canonical companion:** `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`
@@ -10,8 +13,9 @@
 This is the one primary Mobile contract. It describes the approved Backend
 contract; production verification is labeled per route. The matrix is the
 source-derived inventory for every registered Mobile API route and Mobile
-WebSocket event. The code-only enrollment route is implemented on the feature
-branch but is not production-promoted by this change.
+WebSocket event. The code-only enrollment route is implemented in reviewed
+source but is not deployed; this contract does not claim production
+verification for the new pairing flow.
 
 ## Boundaries
 
@@ -276,9 +280,12 @@ rate limits return `429 RATE_LIMITED`.
 }
 ```
 
-Mobile must never request, store, or submit `DEVICE_TOKEN`, `hardwareId`,
-`deviceName`, or `deviceCredential`. The Device name defaults to `BMO`; Mobile
-may rename it after success through the existing device settings API.
+Mobile must not supply `hardwareId` as a pairing input. `hardwareId` is a
+non-secret device identifier and may appear in normal `SafeDevice` responses.
+Mobile pairing must never receive, store, or submit `DEVICE_TOKEN`,
+`deviceCredential`, or `tokenHash`. The Device name defaults to `BMO`; Mobile
+may rename it after success through the existing device settings API. The
+claim body remains strictly `{ "code": "123456" }`.
 
 Device routes:
 

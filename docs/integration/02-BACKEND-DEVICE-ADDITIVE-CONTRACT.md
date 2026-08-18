@@ -9,9 +9,10 @@ implemented in the promoted P9 runtime. Firmware behavior and real-device
 acceptance remain `PENDING_PHYSICAL_ESP`; this document must not be read as
 evidence that an ESP32 supports the new events.
 
-**Current production:** The existing Backend/runtime is `PRODUCTION_VERIFIED`
-at main `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`. The code-only enrollment
-implementation is branch-scoped until deployment approval. The physical
+**Current lifecycle:** Code-only enrollment exists in reviewed source but is
+NOT YET DEPLOYED. Migration
+`20260818110000_pairing_code_only_enrollment` is NOT YET APPLIED IN PRODUCTION.
+Physical firmware acceptance remains `PENDING_PHYSICAL_ESP`. The physical
 contract remains separate from Mobile `/api/v1/ws` and existing hardware
 `/ws` voice behavior.
 
@@ -88,8 +89,11 @@ Backend → ESP32: `pairing_code`
 }
 ```
 
-The event is sent only on the already authenticated hardware socket. Firmware
-displays the six digits and clears them at expiry.
+The event is sent through the pairing-only current-device sender to the
+registry's current socket authenticated with the same hardware identity. This
+also delivers a delayed issuance result to a replacement socket without
+widening owner-specific event delivery. Firmware displays the six digits and
+clears them at expiry.
 
 ESP32 → Backend: `pairing_mode_request`
 

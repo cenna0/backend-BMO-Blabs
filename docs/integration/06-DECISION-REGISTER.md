@@ -2,7 +2,7 @@
 
 **Frozen:** 2026-08-11
 
-**Current update:** Decisions INT-061 through INT-065 below record the
+**Current update:** Decisions INT-061 through INT-067 below record the
 post-promotion production and Mobile documentation state. Older entries retain
 their historical meaning unless explicitly superseded.
 
@@ -45,6 +45,7 @@ their historical meaning unless explicitly superseded.
 | INT-064 | Mobile calls only the Backend. Hermes, PostgreSQL, Audio, WhatsApp bridge/resolver, Spotify Web API, and hardware `/ws` remain internal or separate boundaries. | Keep credentials, provider protocols, and physical-device ownership server-side. |
 | INT-065 (supersedes INT-041) | Current Mobile integration status vocabulary is exactly `PRODUCTION_VERIFIED`, `IMPLEMENTED`, `PARTIALLY_IMPLEMENTED`, `NOT_IMPLEMENTED`, `OUT_OF_SCOPE`, `BLOCKED`, and `PENDING_PHYSICAL_ESP`. `EXISTING_VERIFIED`, `READY_TO_IMPLEMENT`, and `DEFERRED` remain historical freeze labels only and must not be used in current Mobile status tables. | Align the current status file and maintenance protocol while preserving INT-041 as historical evidence. |
 | INT-066 (supersedes INT-044) | Ordinary Mobile pairing is code-only: authenticated unbound hardware receives a short-lived six-digit code over `/ws`; Mobile calls `POST /api/v1/pairing/claim` with `{code}` only. Backend stores a durable HardwareEnrollment with trusted `hardwareId` and SHA-256 token digest, creates Device only after claim, and never accepts Mobile `DEVICE_TOKEN`/`deviceCredential`. | Keep the physical credential inside hardware ↔ Backend, remove credential provenance ambiguity, preserve first-valid-claim MVP semantics, and leave physical firmware acceptance as `PENDING_PHYSICAL_ESP`. |
+| INT-067 | Code-only pairing intentionally has no per-enrollment failed-code counter in the MVP. An arbitrary wrong `{code}` that matches no active enrollment cannot be attributed to one hardware enrollment; a code matching an active enrollment is the possession factor and is a successful claim. | Preserve the locked code-only UX and keep authenticated-user, user/session/IP rate limits, 600-second TTL, active-code uniqueness, one-time consumption, immediate replacement invalidation, generic invalid/expired errors, and first-valid-claim semantics. Do not add `pairingId`, per-enrollment attempt fields, or a Prisma/migration change for this decision. |
 | INT-047 | Prisma Studio on `*:5555` is a security blocker and is not part of declared production architecture. | Close before Phase 2/deploy. |
 | INT-048 | `docs/product/BMO-BY-BLABS-PRD-v1.4.0.md` is the current integration PRD; v1.2.4 remains the locked historical product baseline. | Keeps verifier-protected history intact. |
 

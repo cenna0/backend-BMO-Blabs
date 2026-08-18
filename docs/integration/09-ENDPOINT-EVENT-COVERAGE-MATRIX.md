@@ -2,9 +2,10 @@
 
 **Audited:** 2026-08-18
 **Source:** backend/src/p9/http/*.ts, backend/src/p9/websocket/mobile-events.ts, backend/src/p9/websocket/mobile-websocket.server.ts
-**Main:** 6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a
-**Production:** P9 base promoted and live; code-only enrollment remains
-branch-scoped and is not production-verified
+**Source status:** Code-only enrollment exists in reviewed source.
+**Production status:** Code-only enrollment is NOT YET DEPLOYED.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Physical status:** `PENDING_PHYSICAL_ESP`.
 
 ## Counting rule
 

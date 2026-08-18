@@ -1,8 +1,11 @@
 # Mobile / P9 Implementation Status
 
 **Audited:** 2026-08-18
-**Canonical main:** `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`
+**Source status:** Code-only enrollment exists in reviewed source.
 **Production state:** `PRODUCTION_VERIFIED` — P9 Backend and PostgreSQL are live.
+**Production status for code-only enrollment:** NOT YET DEPLOYED.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Physical status:** `PENDING_PHYSICAL_ESP`.
 
 This document separates implementation from production verification. A route
 can be implemented and promoted while a provider action, physical device
@@ -41,10 +44,10 @@ Production migrations, in order:
 20260815120000_spotify_phase26_lifecycle
 ```
 
-The code-only enrollment implementation adds migration
-`20260818110000_pairing_code_only_enrollment` on the feature branch. It has
-not been applied to production; production remains at the six migrations
-listed above until deployment approval.
+The reviewed code-only enrollment implementation adds migration
+`20260818110000_pairing_code_only_enrollment`. It has not been deployed or
+applied to production; production remains at the six migrations listed above
+until deployment approval.
 
 ## Mobile API implementation
 
@@ -91,7 +94,7 @@ listed above until deployment approval.
 - `/livez` and `/readyz` are internal health routes; the public `/health` route is the public smoke endpoint.
 - `rvc=unavailable` is the accepted readiness degradation; it does not block Mobile API use.
 - No candidate project, candidate port `3010`, candidate callback, or `/tmp/bmo-p9-1-validation-*` path is part of production.
-- The code-only enrollment migration is pending deployment approval on the feature branch. Do not rerun the six production migrations or apply migration #7 as Mobile integration work.
+- The code-only enrollment source is reviewed but not deployed. Do not rerun the six production migrations or apply migration #7 as Mobile integration work.
 - `integration_status`, `device_status`, `voice_processing_status`, `wifi_configuration_status`, and `notification` are schema-defined outbound events with no direct current `sendToUser` emitter; Mobile must use REST state/fallbacks and must not require those events.
 - `chat_thinking`, `chat_message`, `proactive_delivery_status`, `schedule_status`, and `whatsapp_notification` have direct current runtime emitters.
 - Spotify OAuth has no application deep-link callback in the current source: Mobile opens `authorizationUrl`, the browser receives the Backend callback, and Mobile polls `/integrations/spotify/status` after returning to the app.

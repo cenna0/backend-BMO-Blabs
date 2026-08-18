@@ -2,13 +2,17 @@
 
 **Last updated:** 2026-08-18
 **Current executable boundary:** Mobile application integration against the live production P9 Backend.
-**Canonical source:** Git `main` at `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`.
+**Source status:** Code-only enrollment exists in reviewed source.
+**Production status:** NOT YET DEPLOYED.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Physical status:** `PENDING_PHYSICAL_ESP`.
 
 P9 production promotion, PostgreSQL bootstrap, the six migrations, backups,
 Backend cutover, source closure, and main fast-forward are complete. Do not
 repeat promotion, the six production migrations, candidate acceptance, or
-runtime cleanup as part of Mobile integration. The code-only enrollment
-feature migration remains pending deployment approval on its feature branch.
+runtime cleanup as part of Mobile integration. The reviewed code-only
+enrollment source and migration remain outside production until explicit
+deployment approval.
 
 ## Mobile starting point
 

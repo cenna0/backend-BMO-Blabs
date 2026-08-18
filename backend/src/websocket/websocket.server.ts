@@ -317,7 +317,7 @@ export class DeviceWebSocketServer {
     if (this.options.registry.isAuthenticated(deviceId, socket)) {
       try {
         const event = await this.options.onDeviceNotBound?.(deviceId, tokenHash);
-        if (event && this.options.registry.isAuthenticated(deviceId, socket)) this.#send(socket, event);
+        if (event) this.sendPairingEvent(deviceId, event);
       } catch {
         // Diagnostics must not create an unhandled rejection on this detached task.
       }

@@ -2,11 +2,12 @@
 
 **Effective:** 2026-08-11
 
-**Current production note:** P9 production is complete and the Mobile package
-is current at main `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`. The code-only
-enrollment implementation is branch-scoped until deployment approval;
-promotion and migration instructions in historical documents must not be
-treated as completed production work.
+**Current lifecycle note:** Code-only enrollment exists in reviewed source but
+is NOT YET DEPLOYED. Migration
+`20260818110000_pairing_code_only_enrollment` is NOT YET APPLIED IN PRODUCTION.
+Physical firmware acceptance remains `PENDING_PHYSICAL_ESP`. Promotion and
+migration instructions in historical documents must not be treated as
+completed production work.
 
 ## 1. Authority order
 
