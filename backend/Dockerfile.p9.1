@@ -32,5 +32,5 @@ COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/prisma ./prisma
 
 ENTRYPOINT ["node", "dist/src/p9/entrypoint.js"]
-HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=6 CMD ["node", "-e", "fetch('http://127.0.0.1:3010/livez').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"]
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=6 CMD ["node", "-e", "const port = process.env.BACKEND_PORT || '3000'; fetch('http://127.0.0.1:' + port + '/livez').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"]
 CMD ["node", "dist/src/server.js"]

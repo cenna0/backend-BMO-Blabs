@@ -17,6 +17,8 @@ VOICE_COMPOSE_FILE = ROOT / "docker-compose.yml"
 RUNBOOK = ROOT / "docs" / "operations" / "PRODUCTION-P9-RUNTIME-DEFINITION.md"
 COMPOSE_TEMPLATE = ROOT / "ops" / "deploy" / "p9.1-production.compose.env.example"
 BACKEND_TEMPLATE = ROOT / "ops" / "deploy" / "p9.1-production.backend.env.example"
+P9_DOCKERFILE = ROOT / "backend" / "Dockerfile.p9.1"
+CANDIDATE_COMPOSE_FILE = ROOT / "p9.1-compose.yml"
 
 
 EXPECTED_MIGRATIONS = [
@@ -103,6 +105,23 @@ class P9ProductionPackagingTests(unittest.TestCase):
         self.assertEqual(backend["environment"]["BACKEND_HOST"], "127.0.0.1")
         self.assertEqual(backend["environment"]["BACKEND_PORT"], "3000")
         self.assertNotIn("ports", backend)
+
+    def test_p9_healthcheck_follows_backend_port_with_safe_production_fallback(self) -> None:
+        dockerfile = P9_DOCKERFILE.read_text(encoding="utf-8")
+        healthcheck = next(
+            line for line in dockerfile.splitlines() if line.startswith("HEALTHCHECK ")
+        )
+
+        self.assertIn("process.env.BACKEND_PORT", healthcheck)
+        self.assertIn("3000", healthcheck)
+        self.assertIn("/livez", healthcheck)
+        self.assertNotIn("127.0.0.1:3010", healthcheck)
+
+    def test_same_p9_image_contract_supports_production_and_candidate_ports(self) -> None:
+        candidate_compose = CANDIDATE_COMPOSE_FILE.read_text(encoding="utf-8")
+
+        self.assertEqual(self.config["services"]["backend"]["environment"]["BACKEND_PORT"], "3000")
+        self.assertRegex(candidate_compose, r'(?m)^\s+BACKEND_PORT: "3010"$')
 
     def test_postgres_is_private_and_persistent(self) -> None:
         postgres = self.config["services"]["postgres"]
