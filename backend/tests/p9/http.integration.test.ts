@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import WebSocket from "ws";
 
 type JsonObject = Record<string, any>;
 
@@ -12,6 +13,9 @@ const configuredEmailA = process.env.P9_TEST_EMAIL_A;
 const configuredEmailB = process.env.P9_TEST_EMAIL_B;
 const configuredEmailC = process.env.P9_TEST_EMAIL_C;
 const password = process.env.P9_TEST_PASSWORD;
+const hardwareWsUrl = (process.env.P9_TEST_HARDWARE_WS_URL ?? baseUrl.replace(/\/api\/v1$/u, "")).replace(/^http/u, "ws") + "/ws";
+const hardwareDeviceId = process.env.P9_TEST_DEVICE_ID ?? "bmo-001";
+const hardwareDeviceToken = process.env.P9_TEST_DEVICE_TOKEN ?? "test-device-secret";
 
 async function callApi(path: string, init: RequestInit = {}): Promise<{ status: number; body: JsonObject | undefined }> {
   const headers = new Headers(init.headers);
@@ -38,6 +42,34 @@ function get(path: string, accessToken?: string) {
 function required(value: unknown): JsonObject {
   expect(value).toBeDefined();
   return value as JsonObject;
+}
+
+async function requestHardwarePairingCode(): Promise<string> {
+  const socket = new WebSocket(hardwareWsUrl);
+  return new Promise((resolve, reject) => {
+    const finish = (error?: Error, code?: string) => {
+      socket.removeAllListeners();
+      if (socket.readyState === WebSocket.OPEN) socket.close();
+      if (error) reject(error);
+      else resolve(code!);
+    };
+    socket.once("error", (error) => finish(error));
+    socket.on("message", (data) => {
+      const message = JSON.parse(data.toString()) as JsonObject;
+      if (message.event === "authentication_failed") {
+        finish(new Error("hardware authentication failed"));
+      } else if (message.event === "pairing_code") {
+        finish(undefined, String(message.code));
+      }
+    });
+    socket.once("open", () => {
+      socket.send(JSON.stringify({
+        event: "authenticate",
+        device_id: hardwareDeviceId,
+        device_token: hardwareDeviceToken,
+      }));
+    });
+  });
 }
 
 describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
@@ -129,46 +161,15 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     expect(fixedUserSettings.status).toBe(200);
     expect(required(fixedUserSettings.body).settings).toMatchObject({ responseLength: "brief", timezone: "Asia/Jakarta" });
 
-    const firstChallenge = await json("POST", "/pairing/challenges", {}, accessLogin);
-    expect(firstChallenge.status).toBe(201);
-    const firstChallengeBody = required(firstChallenge.body);
-    const firstPairingId = String(firstChallengeBody.pairingId);
-    const firstCode = String(firstChallengeBody.code);
+    const firstCode = await requestHardwarePairingCode();
     expect(firstCode).toMatch(/^\d{6}$/);
 
     const wrongCode = firstCode === "000000" ? "000001" : "000000";
-    const failedAttempts = await Promise.all(
-      Array.from({ length: 5 }, (_, index) => json("POST", `/pairing/${firstPairingId}/claim`, {
-        code: wrongCode,
-        hardwareId: `hw-failed-${suffix}-${index}`,
-        deviceName: "Failed Device",
-        deviceCredential: `failed-device-credential-${index}-012345`,
-      }, accessLogin)),
-    );
-    expect(failedAttempts.map((result) => result.status)).toEqual([409, 409, 409, 409, 409]);
-    const failedPairingStatus = await get(`/pairing/${firstPairingId}`, accessLogin);
-    expect(failedPairingStatus.body?.pairing).toMatchObject({ status: "failed", attemptCount: 5 });
-
-    const secondChallenge = await json("POST", "/pairing/challenges", {}, accessLogin);
-    expect(secondChallenge.status).toBe(201);
-    const secondChallengeBody = required(secondChallenge.body);
-    const secondPairingId = String(secondChallengeBody.pairingId);
-    const secondCode = String(secondChallengeBody.code);
-    expect((await get(`/pairing/${firstPairingId}`, accessLogin)).body?.pairing?.status).toBe("failed");
+    expect((await json("POST", "/pairing/claim", { code: wrongCode }, accessLogin)).status).toBe(409);
 
     const concurrentClaims = await Promise.all([
-      json("POST", `/pairing/${secondPairingId}/claim`, {
-        code: secondCode,
-        hardwareId: `hw-${suffix}`,
-        deviceName: "P9 Device",
-        deviceCredential: "device-credential-0123456789",
-      }, accessLogin),
-      json("POST", `/pairing/${secondPairingId}/claim`, {
-        code: secondCode,
-        hardwareId: `hw-race-${suffix}`,
-        deviceName: "Race Device",
-        deviceCredential: "race-device-credential-0123456789",
-      }, accessLogin),
+      json("POST", "/pairing/claim", { code: firstCode }, accessLogin),
+      json("POST", "/pairing/claim", { code: firstCode }, accessLogin),
     ]);
     expect(concurrentClaims.map((result) => result.status).sort()).toEqual([201, 409]);
     const claim = concurrentClaims.find((result) => result.status === 201)!;
@@ -176,15 +177,12 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     expect(claim.status).toBe(201);
     const device = required(required(claim.body).device);
     const deviceId = String(device.id);
+    expect(device.name).toBe("BMO");
     expect(JSON.stringify(claim.body)).not.toMatch(/tokenHash|deviceCredential/);
 
-    const replayClaim = await json("POST", `/pairing/${secondPairingId}/claim`, {
-      code: secondCode,
-      hardwareId: `hw-replay-${suffix}`,
-      deviceName: "Replay Device",
-      deviceCredential: "replay-device-credential-012345",
-    }, accessLogin);
+    const replayClaim = await json("POST", "/pairing/claim", { code: firstCode }, accessLogin);
     expect(replayClaim.status).toBe(409);
+    expect((await json("POST", "/pairing/challenges", {}, accessLogin)).status).toBe(404);
 
     const devices = await get("/devices", accessLogin);
     expect(devices.status).toBe(200);
@@ -230,7 +228,7 @@ describe.skipIf(!integration)("P9.1 candidate HTTP acceptance", () => {
     const accessB = String(required(required(registrationB.body).session).accessToken);
     expect((await get(`/devices/${deviceId}`, accessB)).status).toBe(404);
     expect((await get(`/settings/devices/${deviceId}`, accessB)).status).toBe(404);
-    expect((await get(`/pairing/${secondPairingId}`, accessB)).status).toBe(404);
+    expect((await get("/pairing/legacy-id", accessB)).status).toBe(404);
     expect((await json("POST", "/auth/logout", {}, accessB)).status).toBe(204);
     expect((await get("/me", accessB)).status).toBe(401);
     const loginB = await json("POST", "/auth/login", { email: emailB, password });

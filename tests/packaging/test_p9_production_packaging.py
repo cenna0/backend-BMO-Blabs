@@ -28,6 +28,10 @@ EXPECTED_MIGRATIONS = [
     "20260815120000_spotify_phase26_lifecycle",
 ]
 
+PENDING_FEATURE_MIGRATIONS = [
+    "20260818110000_pairing_code_only_enrollment",
+]
+
 
 class P9ProductionPackagingTests(unittest.TestCase):
     @classmethod
@@ -180,15 +184,15 @@ class P9ProductionPackagingTests(unittest.TestCase):
         self.assertIn("https://api.personalbmo.web.id/api/v1/integrations/spotify/callback", backend_template)
         self.assertIn("sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241", runbook)
 
-    def test_frozen_sha_contains_exactly_six_expected_migrations(self) -> None:
+    def test_frozen_sha_contains_production_and_explicitly_pending_migrations(self) -> None:
         migrations = sorted(
             path.name
             for path in (ROOT / "backend" / "prisma" / "migrations").iterdir()
             if path.is_dir()
         )
-        self.assertEqual(migrations, EXPECTED_MIGRATIONS)
+        self.assertEqual(migrations, sorted(EXPECTED_MIGRATIONS + PENDING_FEATURE_MIGRATIONS))
         manifest = (ROOT / "backend" / "src" / "p9" / "migration-manifest.ts").read_text(encoding="utf-8")
-        for migration in EXPECTED_MIGRATIONS:
+        for migration in EXPECTED_MIGRATIONS + PENDING_FEATURE_MIGRATIONS:
             self.assertIn(f'"{migration}"', manifest)
 
 

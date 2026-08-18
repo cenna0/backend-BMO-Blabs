@@ -5,7 +5,7 @@ import type { P9Config } from "../config.js";
 import type { P9Repositories } from "../db/repositories.js";
 import { AuthService } from "../services/auth.service.js";
 import { DeviceService } from "../services/device.service.js";
-import { PairingService } from "../services/pairing.service.js";
+import { HardwareEnrollmentService } from "../services/hardware-enrollment.service.js";
 import { SessionService, AccessTokenService } from "../services/session.service.js";
 import { SettingsService } from "../services/settings.service.js";
 import { UserService } from "../services/user.service.js";
@@ -38,7 +38,7 @@ export interface P9RouterServices {
   sessions: SessionService;
   users: UserService;
   devices: DeviceService;
-  pairing: PairingService;
+  pairing: HardwareEnrollmentService;
   settings: SettingsService;
   accessTokens: AccessTokenService;
   repositories: P9Repositories;

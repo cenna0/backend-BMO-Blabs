@@ -96,13 +96,34 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
       resolveApplicationDevice: (deviceId: string, deviceToken: string) =>
         p9.resolveDeviceBinding(deviceId, deviceToken),
       authorizeApplicationDevice: (binding) => p9.authorizeDeviceBinding(binding),
-      onDeviceNotBound: (deviceId: string) => {
+      onDeviceNotBound: async (deviceId: string, tokenHash: string) => {
         logger.warn({ device_id: deviceId, diagnostic: "DEVICE_NOT_BOUND" }, "device has no application binding");
+        const enrollment = await p9.issueHardwareEnrollment(deviceId, tokenHash);
+        if (!enrollment) return;
+        return {
+          event: "pairing_code" as const,
+          code: enrollment.code,
+          expires_at: enrollment.expiresAt.toISOString(),
+        };
+      },
+      onPairingModeRequest: async (deviceId: string, tokenHash: string) => {
+        const enrollment = await p9.issueHardwareEnrollment(deviceId, tokenHash);
+        if (!enrollment) return;
+        return {
+          event: "pairing_code" as const,
+          code: enrollment.code,
+          expires_at: enrollment.expiresAt.toISOString(),
+        };
       },
     }),
     onPlaybackDone: (deviceId, requestId) => removeOutput(deviceId, requestId, false),
     onPlaybackFailed: (deviceId, requestId) => removeOutput(deviceId, requestId, true),
   });
+  if (p9) {
+    p9.setHardwareEventSender({
+      send: (deviceId, event) => sockets.sendPairingEvent(deviceId, event),
+    });
+  }
   if (p9) {
     p9.settings.setDeviceSettingsChanged((userId, deviceId) => p9.deviceAdditions.syncSettings(userId, deviceId));
     p9.deviceAdditions.setDeviceEventSender({

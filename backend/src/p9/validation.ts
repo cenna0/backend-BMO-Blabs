@@ -72,6 +72,10 @@ const deviceSettingsSchema = z
   })
   .strict();
 
+const pairingClaimSchema = z.object({
+  code: z.string().regex(/^\d{6}$/u),
+}).strict();
+
 export interface QuietHours {
   start: string;
   end: string;
@@ -150,4 +154,8 @@ export function parseDeviceSettings(value: unknown): z.infer<typeof deviceSettin
     ...parsed,
     quietHours: parsed.quietHours === undefined ? undefined : parseQuietHours(parsed.quietHours),
   };
+}
+
+export function parsePairingClaim(value: unknown): { code: string } {
+  return pairingClaimSchema.parse(value);
 }

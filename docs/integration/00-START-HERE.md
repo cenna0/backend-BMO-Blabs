@@ -1,11 +1,16 @@
 # BMO Mobile Integration — Current Production Entry Point
 
 **Audited:** 2026-08-18
-**Source of truth:** Git `main` at `e4f87ca5faf81e1c495c2719f3bb19b056340657`
+**Source of truth:** Git `main` at `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`
 **Production state:** P9 Backend and PostgreSQL are live and healthy.
 
 This is the current onboarding page for the Mobile team. Do not use old
 candidate handoffs as a production guide.
+
+The code-only enrollment implementation is on feature branch
+`feat/pairing-code-only-enrollment`; production remains at the six-migration
+baseline until explicit deployment approval. Physical firmware acceptance is
+still `PENDING_PHYSICAL_ESP`.
 
 ## Read in this order
 
@@ -67,10 +72,9 @@ Only the Backend is a Mobile integration boundary. Spotify/provider access and
 refresh tokens, OAuth state, resolver/provider/session internals, and internal
 service keys remain server-side. The Mobile app necessarily holds the BMO
 application access and refresh tokens, submits the Wi-Fi password to the
-Backend, and may submit `deviceCredential` for pairing if its external
-provenance is resolved. Wi-Fi passwords are never returned in Backend
-responses, and pairing `deviceCredential` is never returned and is hashed
-before persistence.
+Backend, and submits only the six-digit pairing code. Wi-Fi passwords are
+never returned in Backend responses, and the physical `DEVICE_TOKEN` remains
+inside the hardware ↔ Backend boundary.
 
 ## Integration order
 
@@ -80,12 +84,11 @@ state:
 1. API client, `X-Request-Id`, and the common error envelope.
 2. Registration, login, access/refresh session persistence, logout, and recovery.
 3. `/me`, profile, avatar, user settings, and personalization.
-4. Resolve `PAIRING_MOBILE_INPUT_SOURCE_NEEDS_REVIEW` before implementing the
-   end-to-end six-digit BMO pairing UX. Pairing is currently
-   `PARTIALLY_IMPLEMENTED` at the external input boundary because the Backend
-   does not define how Mobile obtains `hardwareId`, `deviceName`, or
-   `deviceCredential`; device list/detail/unpair and device settings remain
-   separable work where their implemented APIs permit.
+4. Integrate code-only six-digit pairing: authenticated unbound hardware
+   receives `pairing_code` over `/ws`; Mobile submits only `{code}` to
+   `POST /api/v1/pairing/claim`; Backend creates the Device from its durable
+   trusted enrollment. Physical firmware support remains
+   `PENDING_PHYSICAL_ESP`.
 5. Mobile WebSocket authentication, heartbeat, reconnect, and event dispatch.
 6. Chat sessions, history, idempotent message submission, and WebSocket updates.
 7. Memory records, candidates, summaries, forget/delete/export operations.

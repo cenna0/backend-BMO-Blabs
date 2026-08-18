@@ -5,8 +5,13 @@ import { P9_REQUIRED_MIGRATIONS } from "../../src/p9/migration-manifest.js";
 
 const schemaPath = new URL("../../prisma/schema.prisma", import.meta.url);
 const phase2MigrationName = "20260811190000_phase2_application_foundation";
+const pairingEnrollmentMigrationName = "20260818110000_pairing_code_only_enrollment";
 const phase2MigrationPath = new URL(
   `../../prisma/migrations/${phase2MigrationName}/migration.sql`,
+  import.meta.url,
+);
+const pairingEnrollmentMigrationPath = new URL(
+  `../../prisma/migrations/${pairingEnrollmentMigrationName}/migration.sql`,
   import.meta.url,
 );
 const whatsappConversationMigrationPath = new URL(
@@ -89,6 +94,8 @@ const expectedMappedForeignKeys = [
   ["ProactiveDelivery", "device", "ProactiveDelivery_device_owner_fkey"],
   ["DeliveryAttempt", "delivery", "DeliveryAttempt_delivery_owner_fkey"],
   ["DeliveryAttempt", "device", "DeliveryAttempt_device_owner_fkey"],
+  ["HardwareEnrollment", "claimedUser", "HardwareEnrollment_claimedUser_fkey"],
+  ["HardwareEnrollment", "claimedDevice", "HardwareEnrollment_claimedDevice_fkey"],
   ["SpotifyCredential", "connection", "SpotifyCredential_connection_owner_provider_fkey"],
   ["SpotifyAction", "connection", "SpotifyAction_connection_owner_provider_fkey"],
   [
@@ -124,6 +131,7 @@ describe("P9 Prisma schema", () => {
       "RefreshToken",
       "Device",
       "DevicePairing",
+      "HardwareEnrollment",
       "UserSettings",
       "DeviceSettings",
       "AuditEvent",
@@ -163,7 +171,13 @@ describe("P9 Prisma schema", () => {
     const schema = await readFile(schemaPath, "utf8");
     expect(schema).toMatch(/email\s+String\s+@unique/);
     expect(schema).toMatch(/tokenHash\s+String\s+@unique/);
-    expect(schema).toMatch(/hardwareId\s+String\s+@unique/);
+    expect(schema).toMatch(/hardwareId\s+String\s+@db\.VarChar\(128\)/);
+    expect(schema).not.toMatch(/hardwareId\s+String\s+@unique/);
+    expect(schema).toMatch(/enum HardwareEnrollmentStatus[\s\S]*ISSUED[\s\S]*CLAIMED[\s\S]*EXPIRED[\s\S]*REVOKED[\s\S]*INVALIDATED/);
+    const enrollment = prismaModelDefinition(schema, "HardwareEnrollment");
+    expect(enrollment).toMatch(/tokenHash\s+String\s+@db\.Char\(64\)/);
+    expect(enrollment).toMatch(/codeHash\s+String\s+@db\.Char\(64\)/);
+    expect(enrollment).not.toMatch(/attemptCount/);
     expect(schema).toMatch(/codeHash\s+String/);
     expect(schema).not.toMatch(/password\s+String/);
     expect(schema).not.toMatch(/refreshToken\s+String/);
@@ -178,10 +192,20 @@ describe("P9 Prisma schema", () => {
     expect(schema).toMatch(/EXPIRED/);
     expect(schema).toMatch(/REVOKED/);
     expect(schema).toMatch(/INVALIDATED/);
-    expect(schema).toMatch(/FAILED/);
     expect(schema).toMatch(/playbackVolume\s+Int/);
     expect(schema).toMatch(/speechSpeed\s+Float/);
     expect(schema).toMatch(/voiceProfileId\s+String/);
+  });
+
+  it("declares the code-only enrollment migration and active uniqueness boundaries", async () => {
+    const migrationSql = await readFile(pairingEnrollmentMigrationPath, "utf8");
+    expect(migrationSql).toContain('CREATE TABLE "HardwareEnrollment"');
+    expect(migrationSql).toContain('CREATE UNIQUE INDEX "HardwareEnrollment_active_hardware_key"');
+    expect(migrationSql).toContain('CREATE UNIQUE INDEX "HardwareEnrollment_active_code_key"');
+    expect(migrationSql).toContain('CREATE UNIQUE INDEX "Device_active_hardware_key"');
+    expect(migrationSql).toContain('WHERE "status" = \'ISSUED\';');
+    expect(migrationSql).toContain('WHERE "status" IN (\'PENDING\', \'ACTIVE\');');
+    expect(migrationSql).not.toMatch(/DELETE\s+FROM|UPDATE\s+"/i);
   });
 
   it("declares database-enforced identity, ownership, family, and setting invariants", async () => {

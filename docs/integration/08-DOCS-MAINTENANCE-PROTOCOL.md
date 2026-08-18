@@ -3,9 +3,10 @@
 **Effective:** 2026-08-11
 
 **Current production note:** P9 production is complete and the Mobile package
-is current at main `e4f87ca5faf81e1c495c2719f3bb19b056340657`. Promotion and
-migration instructions in historical documents must not be treated as pending
-work.
+is current at main `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`. The code-only
+enrollment implementation is branch-scoped until deployment approval;
+promotion and migration instructions in historical documents must not be
+treated as completed production work.
 
 ## 1. Authority order
 

@@ -12,6 +12,10 @@ export class P9Repositories {
     await this.db.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
   }
 
+  async lockHardwareEnrollment(hardwareId: string): Promise<void> {
+    await this.db.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`hardware-enrollment:${hardwareId}`}, 0))`;
+  }
+
   async databaseNow(): Promise<Date> {
     const rows = await this.db.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS "now"`;
     const now = rows[0]?.now;
@@ -362,6 +366,10 @@ export class P9Repositories {
 
   get devicePairing() {
     return this.db.devicePairing;
+  }
+
+  get hardwareEnrollment() {
+    return this.db.hardwareEnrollment;
   }
 
   get userSettings() {

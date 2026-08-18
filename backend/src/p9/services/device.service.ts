@@ -1,5 +1,4 @@
 import type { PrismaClient } from "../../generated/prisma/client.js";
-import { sha256Hex } from "../crypto.js";
 import { withP9Transaction } from "../db/client.js";
 import { P9Repositories } from "../db/repositories.js";
 import { P9Error } from "../errors.js";
@@ -11,7 +10,7 @@ export interface ClaimedDeviceInput {
   userId: string;
   hardwareId: string;
   name: string;
-  deviceCredential: string;
+  tokenHash: string;
 }
 
 export function publicDevice(device: {
@@ -55,7 +54,7 @@ export class DeviceService {
         userId: input.userId,
         hardwareId: input.hardwareId,
         name: input.name,
-        tokenHash: sha256Hex(input.deviceCredential),
+        tokenHash: input.tokenHash,
         status: "ACTIVE",
         pairedAt: new Date(),
         settings: { create: { displayName: input.name, defaultDevice: activeCount === 0 } },
@@ -68,14 +67,16 @@ export class DeviceService {
     if (!isUuid(deviceId)) throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
     await withP9Transaction(this.client, async (transaction) => {
       const repositories = new P9Repositories(transaction);
-      await repositories.lockUser(userId);
       const device = await repositories.device.findFirst({ where: { id: deviceId, userId, status: "ACTIVE" }, include: { settings: true } });
       if (!device) throw new P9Error("OWNERSHIP_DENIED", 404, "Device not found");
+      await repositories.lockHardwareEnrollment(device.hardwareId);
+      await repositories.lockUser(userId);
       const now = new Date();
       await repositories.device.update({ where: { id: deviceId }, data: { status: "REVOKED", revokedAt: now } });
       await repositories.session.updateMany({ where: { clientDeviceId: deviceId, revokedAt: null }, data: { revokedAt: now, revokedReason: "device_unpaired" } });
       await repositories.refreshToken.updateMany({ where: { session: { clientDeviceId: deviceId }, revokedAt: null }, data: { revokedAt: now } });
       await repositories.devicePairing.updateMany({ where: { deviceId, status: "ISSUED" }, data: { status: "REVOKED", revokedAt: now } });
+      await repositories.hardwareEnrollment.updateMany({ where: { hardwareId: device.hardwareId, status: "ISSUED" }, data: { status: "INVALIDATED" } });
       if (device.settings?.defaultDevice) {
         await repositories.deviceSettings.update({ where: { deviceId }, data: { defaultDevice: false } });
         const replacement = await repositories.device.findFirst({ where: { userId, status: "ACTIVE", id: { not: deviceId } }, orderBy: { createdAt: "asc" } });

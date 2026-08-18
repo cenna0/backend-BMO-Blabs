@@ -2,12 +2,13 @@
 
 **Last updated:** 2026-08-18
 **Current executable boundary:** Mobile application integration against the live production P9 Backend.
-**Canonical source:** Git `main` at `e4f87ca5faf81e1c495c2719f3bb19b056340657`.
+**Canonical source:** Git `main` at `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`.
 
 P9 production promotion, PostgreSQL bootstrap, the six migrations, backups,
 Backend cutover, source closure, and main fast-forward are complete. Do not
-repeat promotion, migrations, candidate acceptance, or runtime cleanup as part
-of Mobile integration.
+repeat promotion, the six production migrations, candidate acceptance, or
+runtime cleanup as part of Mobile integration. The code-only enrollment
+feature migration remains pending deployment approval on its feature branch.
 
 ## Mobile starting point
 
@@ -34,9 +35,9 @@ private dependencies. Real RVC inference is not verified.
    explicit route authentication, pagination, and idempotency rules.
 2. Implement registration, login, refresh, logout, recovery, profile, avatar,
    user settings, and personalization.
-3. Integrate six-digit pairing only after the unresolved provenance of
-   `hardwareId`, `deviceName`, and `deviceCredential` is defined. The current
-   Backend does not provide a Mobile discovery/BLE/QR handoff for those values.
+3. Integrate code-only six-digit pairing. The physical BMO receives
+   `pairing_code` over its authenticated `/ws`; Mobile submits only `{code}` to
+   `POST /api/v1/pairing/claim` and may rename the resulting Device afterward.
 4. Implement device list/detail/unpair, both device-settings PATCH aliases,
    Wi-Fi desired-state UI, and REST diagnostics.
 5. Add `/api/v1/ws` lifecycle handling, including `authenticate`, reconnect,
@@ -51,8 +52,9 @@ WhatsApp bridge/resolver, Spotify Web API, or the hardware `/ws` protocol.
 
 ## Explicit remaining boundaries
 
-- `PAIRING_MOBILE_INPUT_SOURCE_NEEDS_REVIEW` blocks a fully specified pairing
-  UX until hardware input provenance is defined.
+- Backend code-only pairing is implemented; physical firmware display,
+  reissue, completion handling, and real-device acceptance remain
+  `PENDING_PHYSICAL_ESP`.
 - Physical ESP Wi-Fi/log/telemetry/settings/proactive behavior remains
   `PENDING_PHYSICAL_ESP`.
 - WhatsApp provider send/inbound acceptance and Spotify provider action/OAuth

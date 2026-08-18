@@ -9,9 +9,11 @@ implemented in the promoted P9 runtime. Firmware behavior and real-device
 acceptance remain `PENDING_PHYSICAL_ESP`; this document must not be read as
 evidence that an ESP32 supports the new events.
 
-**Current production:** Backend source/runtime is `PRODUCTION_VERIFIED` at
-main `e4f87ca5faf81e1c495c2719f3bb19b056340657`. The physical contract remains
-separate from Mobile `/api/v1/ws` and existing hardware `/ws` voice behavior.
+**Current production:** The existing Backend/runtime is `PRODUCTION_VERIFIED`
+at main `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`. The code-only enrollment
+implementation is branch-scoped until deployment approval. The physical
+contract remains separate from Mobile `/api/v1/ws` and existing hardware
+`/ws` voice behavior.
 
 ---
 
@@ -66,6 +68,76 @@ If no active owned application device can be bound:
 - Backend must not deliver owner-specific Wi-Fi credentials/settings/proactive content;
 - Backend records a safe `DEVICE_NOT_BOUND` diagnostic;
 - do not rotate the currently deployed physical-device credential as an implicit fix.
+
+## 1.2 Code-only hardware enrollment
+
+When an authenticated hardware session has no active application binding,
+Backend creates a durable `HardwareEnrollment` containing the hardware ID and
+the SHA-256 digest of the authenticated `DEVICE_TOKEN`. The raw token is never
+persisted or sent to Mobile. The enrollment stores only a keyed digest of the
+six-digit code and expires after 600 seconds. A replacement invalidates the
+previous enrollment.
+
+Backend → ESP32: `pairing_code`
+
+```json
+{
+  "event": "pairing_code",
+  "code": "123456",
+  "expires_at": "2026-08-18T12:10:00.000Z"
+}
+```
+
+The event is sent only on the already authenticated hardware socket. Firmware
+displays the six digits and clears them at expiry.
+
+ESP32 → Backend: `pairing_mode_request`
+
+```json
+{
+  "event": "pairing_mode_request"
+}
+```
+
+This is accepted only after hardware authentication and requests a replacement
+code when the firmware explicitly needs one after expiry or reconnect. The
+normal unbound-authentication path already issues a code automatically, so
+firmware must not loop by immediately requesting another code. Repeated
+requests are debounced by firmware and rate-limited by Backend (5 seconds
+between hardware reissues and 6 in 15 minutes).
+
+Backend → ESP32: `pairing_completed`
+
+```json
+{
+  "event": "pairing_completed",
+  "status": "ok"
+}
+```
+
+Mobile claims through `POST /api/v1/pairing/claim` with only `{ "code":
+"123456" }`. Backend creates the Device from the trusted enrollment identity,
+defaults its name to `BMO`, and sends `pairing_completed` on the currently
+authenticated hardware socket when it is connected.
+
+The socket that received `pairing_completed` was authenticated before the
+claim while hardware was unbound. It is not promoted in place and must not be
+treated as application-bound. Firmware MUST clear pairing UI, close that WSS
+`/ws` session, and reconnect using the unchanged `DEVICE_ID` and
+`DEVICE_TOKEN`. On the new authenticated session, Backend resolves the new
+ACTIVE Device and normal application-bound settings, Wi-Fi, and proactive
+behavior resumes. Owner-specific additive events remain blocked on the old
+socket and are available only after this normal reconnect/authentication
+binding step. Firmware support and physical acceptance remain
+`PENDING_PHYSICAL_ESP`.
+
+If the claim commits after the old socket has disconnected, `pairing_completed`
+may not be delivered on that socket. After reconnect/authentication resolves
+the ACTIVE Device, firmware that still shows pairing incomplete sends exactly
+one `pairing_mode_request`. Because the reconnect is already application-bound,
+Backend answers with `pairing_completed` directly. This is conditional recovery
+for a missed completion, not an unconditional request after every
+authentication; firmware must not loop on it.
 
 ---
 

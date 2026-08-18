@@ -29,6 +29,14 @@ enum PairingStatus {
   FAILED
 }
 
+enum HardwareEnrollmentStatus {
+  ISSUED
+  CLAIMED
+  EXPIRED
+  REVOKED
+  INVALIDATED
+}
+
 enum ResponseLength {
   BRIEF
   STANDARD
@@ -237,6 +245,7 @@ model User {
   sessions                  Session[]
   devices                   Device[]
   pairings                  DevicePairing[]
+  hardwareEnrollments      HardwareEnrollment[] @relation("HardwareEnrollmentClaimUser")
   userSettings              UserSettings?
   auditEvents               AuditEvent[]
   passwordRecoveries        PasswordRecovery[]
@@ -341,7 +350,7 @@ model RefreshToken {
 model Device {
   id                  String                    @id @default(uuid()) @db.Uuid
   userId              String                    @db.Uuid
-  hardwareId          String                    @unique @db.VarChar(128)
+  hardwareId          String                    @db.VarChar(128)
   name                String                    @db.VarChar(120)
   tokenHash           String                    @db.Char(64)
   status              DeviceStatus              @default(PENDING)
@@ -353,6 +362,7 @@ model Device {
   user                User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
   clientSessions      Session[]                 @relation("SessionClientDevice")
   pairings            DevicePairing[]
+  hardwareEnrollments HardwareEnrollment[]      @relation("HardwareEnrollmentClaimDevice")
   settings            DeviceSettings?
   auditEvents         AuditEvent[]
   chatSessions        ChatSession[]             @relation("ChatSessionDevice")
@@ -365,6 +375,7 @@ model Device {
   logs                DeviceLog[]
 
   @@unique([id, userId])
+  @@index([hardwareId, status])
   @@index([userId, status])
 }
 
@@ -387,6 +398,26 @@ model DevicePairing {
 
   @@index([userId, status, expiresAt])
   @@index([codeHash, status])
+}
+
+model HardwareEnrollment {
+  id              String                   @id @default(uuid()) @db.Uuid
+  hardwareId      String                   @db.VarChar(128)
+  tokenHash       String                   @db.Char(64)
+  codeHash        String                   @db.Char(64)
+  status          HardwareEnrollmentStatus @default(ISSUED)
+  expiresAt       DateTime                 @db.Timestamptz(3)
+  claimedAt       DateTime?                @db.Timestamptz(3)
+  claimedUserId   String?                  @db.Uuid
+  claimedDeviceId String?                  @db.Uuid
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime                 @updatedAt @db.Timestamptz(3)
+  claimedUser     User?                    @relation("HardwareEnrollmentClaimUser", fields: [claimedUserId], references: [id], onDelete: SetNull, map: "HardwareEnrollment_claimedUser_fkey")
+  claimedDevice   Device?                  @relation("HardwareEnrollmentClaimDevice", fields: [claimedDeviceId], references: [id], onDelete: SetNull, map: "HardwareEnrollment_claimedDevice_fkey")
+
+  @@index([hardwareId, status, expiresAt])
+  @@index([codeHash, status])
+  @@index([claimedUserId, createdAt])
 }
 
 model UserSettings {

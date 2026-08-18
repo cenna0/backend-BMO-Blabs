@@ -2,13 +2,14 @@
 
 **Audited:** 2026-08-18
 **Source:** backend/src/p9/http/*.ts, backend/src/p9/websocket/mobile-events.ts, backend/src/p9/websocket/mobile-websocket.server.ts
-**Main:** e4f87ca5faf81e1c495c2719f3bb19b056340657
-**Production:** P9 promoted and live
+**Main:** 6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a
+**Production:** P9 base promoted and live; code-only enrollment remains
+branch-scoped and is not production-verified
 
 ## Counting rule
 
-The source registers 86 literal P9 HTTP routes. This Mobile inventory contains
-82 routes: every P9 route except the three internal /ops/db/* routes and the
+The source registers 83 literal P9 HTTP routes. This Mobile inventory contains
+79 routes: every P9 route except the three internal /ops/db/* routes and the
 Spotify provider callback. The two authenticated WhatsApp QR setup routes are
 included so they cannot become undocumented, but are marked OUT_OF_SCOPE for
 the Mobile UI. The Spotify callback is documented separately as a provider
@@ -88,27 +89,24 @@ Auth is explicit per route row: `PUBLIC`, `BEARER`, or `OPERATOR_BEARER`.
 | 59 | GET | /api/v1/memory/summary | BEARER | no body | {summary} / 200 | safe read | PRODUCTION_VERIFIED |
 | 60 | POST | /api/v1/memory/summary/regenerate | BEARER | {idempotencyKey} | {summary,generation} / 202 | idempotent action | PRODUCTION_VERIFIED; runtime status not_configured |
 | 61 | POST | /api/v1/memory/summary/feedback | BEARER | {idempotencyKey,feedback} | {summary} / 200 | idempotent action | PRODUCTION_VERIFIED |
-| 62 | POST | /api/v1/pairing/challenges | BEARER | no body | {pairingId,code,expiresAt} / 201 | new challenge invalidates prior | PRODUCTION_VERIFIED |
-| 63 | GET | /api/v1/pairing/:pairingId | BEARER | UUID path | {pairing} / 200 | read may expire stale challenge | PRODUCTION_VERIFIED |
-| 64 | POST | /api/v1/pairing/:pairingId/claim | BEARER | {code,hardwareId,deviceName,deviceCredential} | {device} / 201 | five-attempt replay/expiry guard | PRODUCTION_VERIFIED |
-| 65 | POST | /api/v1/pairing/:pairingId/revoke | BEARER | UUID path | empty / 204 | issued challenge revoke | PRODUCTION_VERIFIED |
-| 66 | GET | /api/v1/settings/personalization | BEARER | no body | seven-field object / 200 | safe read/upsert | PRODUCTION_VERIFIED |
-| 67 | PATCH | /api/v1/settings/personalization | BEARER | strict non-empty seven-field patch | seven-field object / 200 | owner-scoped write | PRODUCTION_VERIFIED |
-| 68 | PATCH | /api/v1/me/profile | BEARER | strict non-empty {displayName?,username?} | {user} / 200 | owner-scoped write; username conflict 409 | PRODUCTION_VERIFIED |
-| 69 | POST | /api/v1/me/avatar | BEARER | multipart one file; JPEG/PNG/WebP, max 5 MiB | {avatarUrl} / 200 | upload admission/rate limits | PRODUCTION_VERIFIED |
-| 70 | GET | /media/avatars/:fileName | PUBLIC | UUID .webp filename; no bearer required | WebP bytes / 200 | immutable cache read | PRODUCTION_VERIFIED |
-| 71 | GET | /api/v1/schedules | BEARER | limit 1..100, default 50, timestamp/UUID cursor | {schedules,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
-| 72 | POST | /api/v1/schedules | BEARER | Daily/Weekly/Once strict union | {schedule} / 201 | no key; new schedule | PRODUCTION_VERIFIED |
-| 73 | GET | /api/v1/schedules/:id | BEARER | UUID path | {schedule} / 200 | safe read | PRODUCTION_VERIFIED |
-| 74 | PATCH | /api/v1/schedules/:id | BEARER | current version plus mutable fields | {schedule} / 200 | optimistic version; 409 stale | PRODUCTION_VERIFIED |
-| 75 | POST | /api/v1/schedules/:id/pause | BEARER | {version} | {schedule} / 200 | optimistic version | PRODUCTION_VERIFIED |
-| 76 | POST | /api/v1/schedules/:id/resume | BEARER | {version} | {schedule} / 200 | optimistic version | PRODUCTION_VERIFIED |
-| 77 | DELETE | /api/v1/schedules/:id | BEARER | {version} | empty / 204 | durable cancel, optimistic version | PRODUCTION_VERIFIED |
-| 78 | GET | /api/v1/schedule-runs | BEARER | limit, cursor, optional scheduleId | {runs,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
-| 79 | GET | /api/v1/settings/user | BEARER | no body | user settings / 200 | safe read | PRODUCTION_VERIFIED |
-| 80 | PATCH | /api/v1/settings/user | BEARER | strict optional settings patch | user settings / 200 | owner-scoped write | PRODUCTION_VERIFIED |
-| 81 | GET | /api/v1/settings/devices/:deviceId | BEARER | UUID path | device settings / 200 | safe read | PRODUCTION_VERIFIED |
-| 82 | PATCH | /api/v1/settings/devices/:deviceId | BEARER | strict device settings patch | device settings / 200 | owner-scoped write | PRODUCTION_VERIFIED |
+| 62 | POST | /api/v1/pairing/claim | BEARER | strict {code: six digits} | {device} / 201; generic unusable-code 409; rate limit 429 | single-use transaction; user/session/IP limits | IMPLEMENTED; physical completion PENDING_PHYSICAL_ESP |
+| 63 | GET | /api/v1/settings/personalization | BEARER | no body | seven-field object / 200 | safe read/upsert | PRODUCTION_VERIFIED |
+| 64 | PATCH | /api/v1/settings/personalization | BEARER | strict non-empty seven-field patch | seven-field object / 200 | owner-scoped write | PRODUCTION_VERIFIED |
+| 65 | PATCH | /api/v1/me/profile | BEARER | strict non-empty {displayName?,username?} | {user} / 200 | owner-scoped write; username conflict 409 | PRODUCTION_VERIFIED |
+| 66 | POST | /api/v1/me/avatar | BEARER | multipart one file; JPEG/PNG/WebP, max 5 MiB | {avatarUrl} / 200 | upload admission/rate limits | PRODUCTION_VERIFIED |
+| 67 | GET | /media/avatars/:fileName | PUBLIC | UUID .webp filename; no bearer required | WebP bytes / 200 | immutable cache read | PRODUCTION_VERIFIED |
+| 68 | GET | /api/v1/schedules | BEARER | limit 1..100, default 50, timestamp/UUID cursor | {schedules,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
+| 69 | POST | /api/v1/schedules | BEARER | Daily/Weekly/Once strict union | {schedule} / 201 | no key; new schedule | PRODUCTION_VERIFIED |
+| 70 | GET | /api/v1/schedules/:id | BEARER | UUID path | {schedule} / 200 | safe read | PRODUCTION_VERIFIED |
+| 71 | PATCH | /api/v1/schedules/:id | BEARER | current version plus mutable fields | {schedule} / 200 | optimistic version; 409 stale | PRODUCTION_VERIFIED |
+| 72 | POST | /api/v1/schedules/:id/pause | BEARER | {version} | {schedule} / 200 | optimistic version | PRODUCTION_VERIFIED |
+| 73 | POST | /api/v1/schedules/:id/resume | BEARER | {version} | {schedule} / 200 | optimistic version | PRODUCTION_VERIFIED |
+| 74 | DELETE | /api/v1/schedules/:id | BEARER | {version} | empty / 204 | durable cancel, optimistic version | PRODUCTION_VERIFIED |
+| 75 | GET | /api/v1/schedule-runs | BEARER | limit, cursor, optional scheduleId | {runs,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
+| 76 | GET | /api/v1/settings/user | BEARER | no body | user settings / 200 | safe read | PRODUCTION_VERIFIED |
+| 77 | PATCH | /api/v1/settings/user | BEARER | strict optional settings patch | user settings / 200 | owner-scoped write | PRODUCTION_VERIFIED |
+| 78 | GET | /api/v1/settings/devices/:deviceId | BEARER | UUID path | device settings / 200 | safe read | PRODUCTION_VERIFIED |
+| 79 | PATCH | /api/v1/settings/devices/:deviceId | BEARER | strict device settings patch | device settings / 200 | owner-scoped write | PRODUCTION_VERIFIED |
 
 The two registered device-settings PATCH routes are aliases to the same
 `SettingsService.updateDeviceSettings` behavior and remain separately
@@ -172,12 +170,14 @@ The hardware contract remains wss://api.personalbmo.web.id/ws with
 device_id/device_token, existing raw-WAV voice, and MP3 playback events. It is
 not interchangeable with Mobile /api/v1/ws. Additive Wi-Fi, telemetry, log,
 settings, and proactive events remain PENDING_PHYSICAL_ESP until firmware and
-real-device evidence exist.
+real-device evidence exist. Pairing adds `pairing_code`,
+`pairing_mode_request`, and `pairing_completed`; these are Backend-implemented
+but remain PENDING_PHYSICAL_ESP for firmware acceptance.
 
 ## Coverage result
 
 ~~~
-MOBILE_ROUTE_SOURCE_COUNT=82
+MOBILE_ROUTE_SOURCE_COUNT=79
 MOBILE_WS_EVENT_SOURCE_COUNT=12
 MOBILE_ROUTE_DOC_COVERAGE=100%
 MOBILE_WS_EVENT_DOC_COVERAGE=100%

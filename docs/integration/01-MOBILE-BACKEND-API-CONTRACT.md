@@ -2,17 +2,16 @@
 
 **Version:** 3.0.0
 **Audited:** 2026-08-18
-**Canonical source:** `main` at `e4f87ca5faf81e1c495c2719f3bb19b056340657`
+**Canonical source:** `main` at `6f6a6b88b6f85166b92ad58e6f954a4b1c2c206a`
 **Production base URL:** `https://api.personalbmo.web.id`
 **REST base path:** `/api/v1`
 **Canonical companion:** `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`
 
-This is the one primary Mobile contract. It describes the Backend that is
-currently promoted to production. The matrix is the source-derived inventory
-for every registered Mobile API route and Mobile WebSocket event. Registered
-REST routes in this contract are `PRODUCTION_VERIFIED`; explicit gaps such as
-missing physical input provenance and schema-only WebSocket events are called
-out separately rather than implied by route registration.
+This is the one primary Mobile contract. It describes the approved Backend
+contract; production verification is labeled per route. The matrix is the
+source-derived inventory for every registered Mobile API route and Mobile
+WebSocket event. The code-only enrollment route is implemented on the feature
+branch but is not production-promoted by this change.
 
 ## Boundaries
 
@@ -29,12 +28,10 @@ Service, WhatsApp bridge/resolver, Spotify Web API, or the hardware socket.
 The Backend owns authentication, authorization, persistence, provider calls,
 and the translation between Mobile and internal services. Spotify/provider
 access and refresh tokens, OAuth state, resolver/provider/session internals,
-and internal service keys are server-side only. Mobile holds the BMO
-application access and refresh tokens, submits the Wi-Fi password to the
-Backend, and may submit `deviceCredential` for pairing if its external
-provenance is resolved. Wi-Fi passwords are never returned by Backend
-responses; pairing `deviceCredential` is never returned and is hashed before
-persistence.
+device credentials, and internal service keys are server-side only. Mobile
+holds the BMO application access and refresh tokens and submits the Wi-Fi
+password to the Backend. Wi-Fi passwords are never returned by Backend
+responses; the physical `DEVICE_TOKEN` never enters the Mobile contract.
 
 ## Common contract
 
@@ -51,7 +48,7 @@ token bearer header: `POST /api/v1/auth/register`, `POST
 /api/v1/auth/login`, `POST /api/v1/auth/password/recovery/verify`, `POST
 /api/v1/auth/password/recovery/reset`, and `POST /api/v1/auth/refresh`. The
 avatar media route `GET /media/avatars/:fileName` is also public. Every other
-route in the 82-route Mobile inventory requires a bearer access token, except
+route in the 79-route Mobile inventory requires a bearer access token, except
 the authenticated WhatsApp QR setup routes, which are `OPERATOR_BEARER` and
 `OUT_OF_SCOPE` for Mobile UI. The provider browser callback is outside the
 Mobile inventory and is separately public.
@@ -258,39 +255,30 @@ the current voice projection `{ model: "en_GB-semaine-medium", speaker:
 ## Pairing and devices
 
 There is one six-digit BMO pairing flow. There is no robot QR pairing route.
-The ESP32 does not claim through `/ws`; the Mobile bearer session calls the
-claim route with the approved out-of-band hardware credential.
-
-`PAIRING_MOBILE_INPUT_SOURCE_NEEDS_REVIEW`: the current Backend source defines
-the claim body and validates `hardwareId`, `deviceName`, and
-`deviceCredential`, but does not define a Mobile-accessible discovery,
-provisioning, BLE, QR, invitation, or device-credential handoff flow for those
-values. The six-digit `code` comes from the challenge response; the other three
-values must currently be supplied through an external hardware/operator
-process that is not specified by this Backend contract. Do not present pairing
-as a fully implementable Mobile UX until that input provenance is defined.
+The authenticated physical BMO receives the code over the existing `/ws`
+connection. Mobile submits only that code; the Backend resolves the trusted
+hardware identity and credential digest from its durable enrollment.
 
 ```text
-POST /api/v1/pairing/challenges                         → 201 { pairingId, code, expiresAt }
-GET  /api/v1/pairing/:pairingId                        → 200 { pairing }
-POST /api/v1/pairing/:pairingId/claim                  → 201 { device }
-POST /api/v1/pairing/:pairingId/revoke                 → 204
+POST /api/v1/pairing/claim                             → 201 { device }
 ```
 
-The challenge is a six-digit code, expires after the configured 600-second
-TTL, and allows at most five failed attempts. A new challenge invalidates
-previous issued challenges. Pairing status is `{ id, status, expiresAt,
-attemptCount }`; status is lower-case (`issued`, `claimed`, `expired`,
-`failed`, `revoked`, or `invalidated`). Claim body:
+The Backend creates a durable `HardwareEnrollment` after authenticated
+unbound hardware connects. The six-digit code expires after the configured
+600-second TTL. A replacement invalidates the previous enrollment and code.
+Codes are stored only as keyed digests. Unknown, expired, replaced, or
+consumed codes return the same `409 PAIRING_CODE_INVALID_OR_EXPIRED` response;
+rate limits return `429 RATE_LIMITED`.
 
 ```json
 {
-  "code":"123456",
-  "hardwareId":"<1-128 chars>",
-  "deviceName":"BMO",
-  "deviceCredential":"<16-256 chars, supplied out of band>"
+  "code":"123456"
 }
 ```
+
+Mobile must never request, store, or submit `DEVICE_TOKEN`, `hardwareId`,
+`deviceName`, or `deviceCredential`. The Device name defaults to `BMO`; Mobile
+may rename it after success through the existing device settings API.
 
 Device routes:
 

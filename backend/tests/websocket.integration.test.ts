@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
 
 import { RequestStore } from "../src/domain/request-store.js";
+import { sha256Hex } from "../src/p9/crypto.js";
 import { DeviceRegistry } from "../src/websocket/device-registry.js";
+import type { PairingCodeEvent } from "../src/websocket/events.js";
 import { DeviceWebSocketServer } from "../src/websocket/websocket.server.js";
 
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
@@ -30,7 +32,8 @@ async function startRuntime(options: {
     userId: string;
     hardwareId: string;
   }) => Promise<boolean>;
-  onDeviceNotBound?: (deviceId: string) => void | Promise<void>;
+  onDeviceNotBound?: (deviceId: string, tokenHash: string) => PairingCodeEvent | void | Promise<PairingCodeEvent | void>;
+  onPairingModeRequest?: (deviceId: string, tokenHash: string) => PairingCodeEvent | void | Promise<PairingCodeEvent | void>;
 } = {}) {
   const httpServer = createServer();
   const requestStore = new RequestStore();
@@ -52,6 +55,9 @@ async function startRuntime(options: {
     }),
     ...(options.onDeviceNotBound === undefined ? {} : {
       onDeviceNotBound: options.onDeviceNotBound,
+    }),
+    ...(options.onPairingModeRequest === undefined ? {} : {
+      onPairingModeRequest: options.onPairingModeRequest,
     }),
   });
 
@@ -242,6 +248,191 @@ describe("P1 WebSocket contract", () => {
     await expect.poll(() => onDeviceNotBound.mock.calls.length).toBe(1);
     expect(socket.readyState).toBe(WebSocket.OPEN);
     await expect(runtime.socketServer.authorizeApplicationBinding("bmo-001")).resolves.toBeNull();
+  });
+
+  it("does not issue pairing state when the application binding lookup fails", async () => {
+    const onDeviceNotBound = vi.fn();
+    const runtime = await startRuntime({
+      resolveApplicationDevice: vi.fn().mockRejectedValue(new Error("database unavailable")),
+      onDeviceNotBound,
+    });
+    const socket = await connect(runtime.url);
+    const authenticated = nextJson(socket);
+    authenticate(socket);
+
+    await expect(authenticated).resolves.toMatchObject({ event: "authenticated", status: "ok" });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(onDeviceNotBound).not.toHaveBeenCalled();
+    expect(socket.readyState).toBe(WebSocket.OPEN);
+  });
+
+  it("sends pairing code only after trusted hardware authentication and supports reissue requests", async () => {
+    const onDeviceNotBound = vi.fn().mockResolvedValue({
+      event: "pairing_code",
+      code: "123456",
+      expires_at: "2026-08-18T12:10:00.000Z",
+    });
+    const onPairingModeRequest = vi.fn().mockResolvedValue({
+      event: "pairing_code",
+      code: "654321",
+      expires_at: "2026-08-18T12:10:00.000Z",
+    });
+    const runtime = await startRuntime({
+      resolveApplicationDevice: vi.fn().mockResolvedValue(null),
+      onDeviceNotBound,
+      onPairingModeRequest,
+    });
+    const socket = await connect(runtime.url);
+    const messages = nextJsonMessages(socket, 2);
+    authenticate(socket);
+
+    await expect(messages).resolves.toEqual([
+      expect.objectContaining({ event: "authenticated", status: "ok" }),
+      { event: "pairing_code", code: "123456", expires_at: "2026-08-18T12:10:00.000Z" },
+    ]);
+    expect(onDeviceNotBound).toHaveBeenCalledWith("bmo-001", sha256Hex("test-device-secret"));
+
+    socket.send(JSON.stringify({ event: "pairing_mode_request" }));
+    await expect(nextJson(socket)).resolves.toEqual({
+      event: "pairing_code",
+      code: "654321",
+      expires_at: "2026-08-18T12:10:00.000Z",
+    });
+    expect(onPairingModeRequest).toHaveBeenCalledWith("bmo-001", sha256Hex("test-device-secret"));
+  });
+
+  it("keeps the claimed socket unbound until hardware reconnects and authenticates", async () => {
+    const binding = {
+      deviceId: "00000000-0000-4000-8000-000000000001",
+      userId: "00000000-0000-4000-8000-000000000010",
+      hardwareId: "bmo-001",
+    };
+    let activeBinding: typeof binding | null = null;
+    const resolveApplicationDevice = vi.fn(async () => activeBinding);
+    const authorizeApplicationDevice = vi.fn().mockResolvedValue(true);
+    const onDeviceNotBound = vi.fn().mockResolvedValue({
+      event: "pairing_code",
+      code: "123456",
+      expires_at: "2026-08-18T12:10:00.000Z",
+    });
+    const runtime = await startRuntime({
+      resolveApplicationDevice,
+      authorizeApplicationDevice,
+      onDeviceNotBound,
+    });
+    const oldSocket = await connect(runtime.url);
+    const oldMessages = nextJsonMessages(oldSocket, 2);
+    authenticate(oldSocket);
+    await oldMessages;
+
+    await expect(runtime.socketServer.authorizeApplicationBinding("bmo-001")).resolves.toBeNull();
+    await expect(runtime.socketServer.sendAdditiveEvent("bmo-001", {
+      event: "device_settings",
+      version: 1,
+      settings: { playback_volume: 50 },
+    })).resolves.toBe(false);
+
+    const completed = nextJson(oldSocket);
+    expect(runtime.socketServer.sendPairingEvent("bmo-001", {
+      event: "pairing_completed",
+      status: "ok",
+    })).toBe(true);
+    await expect(completed).resolves.toEqual({ event: "pairing_completed", status: "ok" });
+    await expect(runtime.socketServer.authorizeApplicationBinding("bmo-001")).resolves.toBeNull();
+
+    const oldClosed = nextClose(oldSocket);
+    oldSocket.close();
+    await oldClosed;
+
+    activeBinding = binding;
+    const newSocket = await connect(runtime.url);
+    const newAuthenticated = nextJson(newSocket);
+    authenticate(newSocket);
+    await expect(newAuthenticated).resolves.toMatchObject({ event: "authenticated", status: "ok" });
+    await expect.poll(() => runtime.socketServer.authorizeApplicationBinding("bmo-001")).toEqual(binding);
+    await expect(runtime.socketServer.sendAdditiveEvent("bmo-001", {
+      event: "device_settings",
+      version: 2,
+      settings: { playback_volume: 55 },
+    })).resolves.toBe(true);
+    expect(authorizeApplicationDevice).toHaveBeenCalledWith(binding);
+  });
+
+  it("recovers a missed pairing completion through one bound reconnect request", async () => {
+    const binding = {
+      deviceId: "00000000-0000-4000-8000-000000000001",
+      userId: "00000000-0000-4000-8000-000000000010",
+      hardwareId: "bmo-001",
+    };
+    let activeBinding: typeof binding | null = null;
+    const onPairingModeRequest = vi.fn().mockResolvedValue({
+      event: "pairing_code",
+      code: "654321",
+      expires_at: "2026-08-18T12:10:00.000Z",
+    });
+    const runtime = await startRuntime({
+      resolveApplicationDevice: vi.fn(async () => activeBinding),
+      authorizeApplicationDevice: vi.fn().mockResolvedValue(true),
+      onDeviceNotBound: vi.fn().mockResolvedValue({
+        event: "pairing_code",
+        code: "123456",
+        expires_at: "2026-08-18T12:10:00.000Z",
+      }),
+      onPairingModeRequest,
+    });
+    const oldSocket = await connect(runtime.url);
+    const oldMessages = nextJsonMessages(oldSocket, 2);
+    authenticate(oldSocket);
+    await oldMessages;
+
+    const oldClosed = nextClose(oldSocket);
+    oldSocket.close();
+    await oldClosed;
+    expect(runtime.socketServer.sendPairingEvent("bmo-001", {
+      event: "pairing_completed",
+      status: "ok",
+    })).toBe(false);
+
+    activeBinding = binding;
+    const reconnected = await connect(runtime.url);
+    const authenticated = nextJson(reconnected);
+    authenticate(reconnected);
+    await expect(authenticated).resolves.toMatchObject({ event: "authenticated", status: "ok" });
+    await expect.poll(() => runtime.socketServer.authorizeApplicationBinding("bmo-001")).toEqual(binding);
+
+    reconnected.send(JSON.stringify({ event: "pairing_mode_request" }));
+    await expect(nextJson(reconnected)).resolves.toEqual({ event: "pairing_completed", status: "ok" });
+    expect(onPairingModeRequest).not.toHaveBeenCalled();
+    await expect(runtime.socketServer.sendAdditiveEvent("bmo-001", {
+      event: "device_settings",
+      version: 3,
+      settings: { playback_volume: 60 },
+    })).resolves.toBe(true);
+  });
+
+  it("does not issue pairing code for a bound device and acknowledges pairing mode as complete", async () => {
+    const onDeviceNotBound = vi.fn();
+    const onPairingModeRequest = vi.fn();
+    const runtime = await startRuntime({
+      resolveApplicationDevice: vi.fn().mockResolvedValue({
+        deviceId: "00000000-0000-4000-8000-000000000001",
+        userId: "00000000-0000-4000-8000-000000000010",
+        hardwareId: "bmo-001",
+      }),
+      authorizeApplicationDevice: vi.fn().mockResolvedValue(true),
+      onDeviceNotBound,
+      onPairingModeRequest,
+    });
+    const socket = await connect(runtime.url);
+    const authenticated = nextJson(socket);
+    authenticate(socket);
+    await expect(authenticated).resolves.toMatchObject({ event: "authenticated", status: "ok" });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    socket.send(JSON.stringify({ event: "pairing_mode_request" }));
+    await expect(nextJson(socket)).resolves.toEqual({ event: "pairing_completed", status: "ok" });
+    expect(onDeviceNotBound).not.toHaveBeenCalled();
+    expect(onPairingModeRequest).not.toHaveBeenCalled();
   });
 
   it("contains a rejected unbound diagnostic callback without an unhandled rejection", async () => {

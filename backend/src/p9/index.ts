@@ -4,7 +4,7 @@ import type { P9Config } from "./config.js";
 import { AuthService } from "./services/auth.service.js";
 import { DeviceService } from "./services/device.service.js";
 import { InvitationService } from "./services/invitation.service.js";
-import { PairingService } from "./services/pairing.service.js";
+import { HardwareEnrollmentService, type HardwareEnrollmentEventSender } from "./services/hardware-enrollment.service.js";
 import { AccessTokenService, SessionService } from "./services/session.service.js";
 import { SettingsService } from "./services/settings.service.js";
 import { UserService } from "./services/user.service.js";
@@ -41,6 +41,8 @@ export interface P9Runtime {
   reconcileAvatars(): Promise<AvatarReconciliationResult>;
   resolveDeviceBinding(hardwareId: string, deviceToken: string): Promise<ApplicationDeviceBinding | null>;
   authorizeDeviceBinding(binding: ApplicationDeviceBinding): Promise<boolean>;
+  issueHardwareEnrollment(hardwareId: string, tokenHash: string): ReturnType<HardwareEnrollmentService["issueForHardware"]>;
+  setHardwareEventSender(sender: HardwareEnrollmentEventSender): void;
   authenticateMobileSocket(accessToken: string): Promise<{
     userId: string;
     sessionId: string;
@@ -101,7 +103,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   const auth = new AuthService({ client, repositories, invitations, sessions, publicBaseUrl: config.publicBaseUrl });
   const users = new UserService(repositories, config.publicBaseUrl);
   const devices = new DeviceService(client, repositories);
-  const pairing = new PairingService({ client, repositories, pepper: config.pairingPepper, ttlSeconds: config.pairingTtlSeconds });
+  const pairing = new HardwareEnrollmentService({ client, pepper: config.pairingPepper, ttlSeconds: config.pairingTtlSeconds });
   const settings = new SettingsService(client, repositories);
   const recovery = new RecoveryService(client, repositories, {
     ttlSeconds: config.recoveryTokenTtlSeconds,
@@ -172,6 +174,8 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     reconcileAvatars: () => avatars.reconcile(),
     resolveDeviceBinding: (hardwareId, deviceToken) => deviceBinding.resolve(hardwareId, deviceToken),
     authorizeDeviceBinding: (binding) => deviceBinding.isActive(binding),
+    issueHardwareEnrollment: (hardwareId, tokenHash) => pairing.issueForHardware({ hardwareId, tokenHash }),
+    setHardwareEventSender: (sender) => pairing.setHardwareEventSender(sender),
     authenticateMobileSocket: (accessToken) =>
       authenticateMobileAccessToken(accessTokens, sessions, accessToken),
     checkReadiness: () => checkP9Readiness(repositories),

@@ -47,6 +47,9 @@ export const inboundEventSchema = z.discriminatedUnion("event", [
     event: z.literal("device_settings_applied"),
     version: z.number().int().positive(),
   }).strict(),
+  z.object({
+    event: z.literal("pairing_mode_request"),
+  }).strict(),
 ]);
 
 export type InboundEvent = z.infer<typeof inboundEventSchema>;
@@ -92,7 +95,13 @@ export type OutboundEvent =
       security: "OPEN" | "WPA_PSK";
       password?: string;
     }
-  | { event: "device_settings"; version: number; settings: { playback_volume: number } };
+  | { event: "device_settings"; version: number; settings: { playback_volume: number } }
+  | { event: "pairing_code"; code: string; expires_at: string }
+  | { event: "pairing_completed"; status: "ok" };
+
+export type PairingCodeEvent = Extract<OutboundEvent, { event: "pairing_code" }>;
+export type PairingCompletedEvent = Extract<OutboundEvent, { event: "pairing_completed" }>;
+export type PairingBypassEvent = PairingCodeEvent | PairingCompletedEvent;
 
 export const outboundEventSchema = z.discriminatedUnion("event", [
   z.object({
@@ -106,4 +115,6 @@ export const outboundEventSchema = z.discriminatedUnion("event", [
   z.object({ event: z.literal("request_failed"), request_id: uuidV4, code: z.enum(["NO_SPEECH", "INVALID_AUDIO", "STT_FAILED", "HERMES_FAILED", "TTS_FAILED", "AUDIO_EXPIRED", "PIPELINE_TIMEOUT", "INTERNAL_ERROR"]), recoverable: z.literal(true) }).strict(),
   z.object({ event: z.literal("wifi_configuration"), configuration_id: uuidV4, ssid: z.string().min(1).max(32), security: z.enum(["OPEN", "WPA_PSK"]), password: z.string().min(8).max(63).optional() }).strict(),
   z.object({ event: z.literal("device_settings"), version: z.number().int().positive(), settings: z.object({ playback_volume: z.number().int().min(0).max(100) }).strict() }).strict(),
+  z.object({ event: z.literal("pairing_code"), code: z.string().regex(/^\d{6}$/u), expires_at: z.string().datetime({ offset: true }) }).strict(),
+  z.object({ event: z.literal("pairing_completed"), status: z.literal("ok") }).strict(),
 ]);
