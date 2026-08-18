@@ -1,532 +1,334 @@
-# BMO Mobile ↔ Backend API Service Contract
+# BMO Mobile ↔ Backend API Contract
 
-**Version:** 2.0.0
-**Date:** 2026-08-11
-**Base path:** `/api/v1`
-**Timezone:** `Asia/Jakarta`
+**Version:** 3.0.0
+**Audited:** 2026-08-18
+**Canonical source:** `main` at `e4f87ca5faf81e1c495c2719f3bb19b056340657`
+**Production base URL:** `https://api.personalbmo.web.id`
+**REST base path:** `/api/v1`
+**Canonical companion:** `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`
 
-**Contract state:** `READY_TO_IMPLEMENT` except surfaces explicitly marked otherwise. This is the Phase 2 target contract, not a claim that all routes are registered or public today.
+This is the one primary Mobile contract. It describes the Backend that is
+currently promoted to production. The matrix is the source-derived inventory
+for every registered Mobile API route and Mobile WebSocket event. Registered
+REST routes in this contract are `PRODUCTION_VERIFIED`; explicit gaps such as
+missing physical input provenance and schema-only WebSocket events are called
+out separately rather than implied by route registration.
 
-This document defines the **Backend API service** surface the mobile app should consume. In the wider project, “backend” means the entire VPS platform; this file intentionally covers only the mobile-facing API service contract.
+## Boundaries
 
-## Audited current availability
+```text
+Mobile REST:       https://api.personalbmo.web.id/api/v1
+Mobile WebSocket:  wss://api.personalbmo.web.id/api/v1/ws
+Hardware WebSocket:wss://api.personalbmo.web.id/ws
+```
 
-At freeze SHA `d638b20c381c676136c94524a38a1def5d70e565`:
+Mobile must use the public HTTPS/WSS URLs. It must not use `127.0.0.1`, VPS
+ports, port `3010`, candidate Compose resources, Hermes, PostgreSQL, Audio
+Service, WhatsApp bridge/resolver, Spotify Web API, or the hardware socket.
 
-- P9.1 source/private candidate implements invitation-based register, login, refresh, logout, logout-all, `/me`, four six-digit pairing routes, device list/detail/unpair, and user/device settings;
-- those P9.1 routes are not enabled in the production Backend API service and return `404` publicly;
-- current registration still requires `invitationToken` and does not accept DOB;
-- every other route in this file is absent;
-- exact per-route state is authoritative in `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`.
+The Backend owns authentication, authorization, persistence, provider calls,
+and the translation between Mobile and internal services. Spotify/provider
+access and refresh tokens, OAuth state, resolver/provider/session internals,
+and internal service keys are server-side only. Mobile holds the BMO
+application access and refresh tokens, submits the Wi-Fi password to the
+Backend, and may submit `deviceCredential` for pairing if its external
+provenance is resolved. Wi-Fi passwords are never returned by Backend
+responses; pairing `deviceCredential` is never returned and is hashed before
+persistence.
 
-Slice 2B source now implements the account/profile/recovery/avatar and
-personalization routes in sections 2, 3, and 5. This is source and automated
-review-candidate evidence plus Phase 2.5 private candidate acceptance: the
-candidate now runs the migrated Phase 2 image on its isolated DB, while public
-production remains unchanged. The live-provider and physical-ESP limitations
-remain as recorded in the matrix.
+## Common contract
 
-The earlier freeze wording in this section is historical entry-state evidence.
-The current candidate identity, migration, runtime, and acceptance result are
-authoritative in `05-IMPLEMENTATION-STATUS.md`.
+### Authentication
 
-`EXISTING_VERIFIED` in the matrix means verified at the stated availability tier; it does not imply public availability.
-
----
-
-# 1. Global conventions
-
-## Authentication
-
-Authenticated REST requests:
+Authenticated REST requests use:
 
 ```http
 Authorization: Bearer <accessToken>
 ```
 
-Access token remains short-lived. Refresh token remains opaque and rotated.
+The following Mobile inventory routes are public and do not require an access
+token bearer header: `POST /api/v1/auth/register`, `POST
+/api/v1/auth/login`, `POST /api/v1/auth/password/recovery/verify`, `POST
+/api/v1/auth/password/recovery/reset`, and `POST /api/v1/auth/refresh`. The
+avatar media route `GET /media/avatars/:fileName` is also public. Every other
+route in the 82-route Mobile inventory requires a bearer access token, except
+the authenticated WhatsApp QR setup routes, which are `OPERATOR_BEARER` and
+`OUT_OF_SCOPE` for Mobile UI. The provider browser callback is outside the
+Mobile inventory and is separately public.
 
-## Request IDs
+The access token is short-lived. The refresh token is opaque, rotated, and is
+sent only to `POST /api/v1/auth/refresh`. An invalid, expired, revoked, or
+missing bearer token returns `401` with:
 
-Client may send:
-
-```http
-X-Request-Id: <safe-string>
+```json
+{"error":"AUTHENTICATION_FAILED"}
 ```
 
-Backend should echo it when present.
+### Request IDs
 
-## Errors
+Mobile may send `X-Request-Id` containing 1–128 characters matching
+`[A-Za-z0-9._:-]+`. The Backend returns the accepted or generated value in the
+same response header. It is an observability identifier, not an idempotency
+key.
+
+### Errors
+
+Validation and domain failures use this safe envelope:
+
+```json
+{"error":"ERROR_CODE","message":"safe optional message"}
+```
+
+Malformed JSON/body or Zod validation is `400 INVALID_INPUT`; authentication
+failure is `401 AUTHENTICATION_FAILED`; ownership failures are normally
+`404 OWNERSHIP_DENIED`; state/version conflicts are `409 CONFLICT`; rate
+limits are `429 RATE_LIMITED`; unavailable providers/services are `503`.
+Unexpected failures are `500 INTERNAL_ERROR`. The Backend never returns stack
+traces, provider bodies, tokens, passwords, or device credentials.
+
+### Identifiers, time, and pagination
+
+- IDs are UUID strings unless a route explicitly says otherwise.
+- Timestamps are ISO-8601 strings with an offset; production uses UTC serialization.
+- Cursor responses use `nextCursor: string | null`.
+- List limits are bounded by the route; the matrix records each route family.
+- A retry is safe only where the route defines an idempotency key or the operation is a read.
+
+## Authentication and account
+
+### `POST /api/v1/auth/register` — `201`
+
+Body, strict:
 
 ```json
 {
-  "error": "ERROR_CODE",
-  "message": "safe optional message"
+  "email":"user@example.com",
+  "password":"at-least-12-characters",
+  "displayName":"Cenna",
+  "dateOfBirth":"2004-05-19",
+  "invitationToken":"optional-legacy-token"
 }
 ```
 
-Never leak stack traces, provider secrets, device tokens, Wi-Fi passwords, refresh tokens, or internal provider bodies.
+`email` is normalized; `password` is 12–256 characters; `displayName` is
+optional and 1–120 characters; `dateOfBirth` is required, `YYYY-MM-DD`, a real
+calendar date, and not future. `invitationToken` is optional compatibility
+input, not a Mobile prerequisite.
 
----
+Success is `{ user: SafeUser, session: Session }`. A duplicate account is
+`409 CONFLICT`.
 
-# 2. Authentication
-
-## 2.1 Register
-
-### `POST /api/v1/auth/register`
-
-This integration changes the Phase 2 product path from current invitation-required registration to self-service email/password registration. Invitation tables/operator tooling may remain, but mobile registration must not require an invitation.
-
-Request:
+### `POST /api/v1/auth/login` — `200`
 
 ```json
 {
-  "email": "user@example.com",
-  "password": "minimum 12 characters",
-  "displayName": "Cenna",
-  "dateOfBirth": "2004-05-19"
+  "email":"user@example.com",
+  "password":"password",
+  "clientDeviceId":"optional-device-uuid"
 }
 ```
 
-Rules:
+`clientDeviceId` is optional and must be a UUID. Success is `{ user, session }`;
+invalid credentials and malformed login input are intentionally indistinguishable
+`401 AUTHENTICATION_FAILED`.
 
-- normalize email;
-- unique email;
-- password Argon2id;
-- `dateOfBirth` required for current MVP password-recovery flow;
-- date must be a valid calendar date and not future;
-- do not return date of birth in the normal `SafeUser`.
-
-Success `201`:
+### Session object
 
 ```json
 {
-  "user": {
-    "id": "<uuid>",
-    "email": "user@example.com",
-    "displayName": "Cenna",
-    "username": null,
-    "avatarUrl": null,
-    "createdAt": "<ISO-8601>"
-  },
-  "session": {
-    "sessionId": "<uuid>",
-    "accessToken": "<jwt>",
-    "refreshToken": "<opaque>",
-    "accessTokenExpiresAt": "<ISO-8601>",
-    "refreshTokenExpiresAt": "<ISO-8601>"
-  }
+  "sessionId":"<uuid>",
+  "accessToken":"<jwt>",
+  "refreshToken":"<opaque>",
+  "accessTokenExpiresAt":"<ISO-8601>",
+  "refreshTokenExpiresAt":"<ISO-8601>"
 }
 ```
 
-Existing invitation data/schema may be retained for backwards compatibility/ops, but `invitationToken` is not required by mobile registration.
-
-## 2.2 Login
-
-Preserve the existing P9.1 semantics while activating them through the production Backend API service:
-
-```http
-POST /api/v1/auth/login
-```
-
-Request:
-
-```json
-{
-  "email": "user@example.com",
-  "password": "..."
-}
-```
-
-## 2.3 Refresh / logout
-
-Keep existing:
+### Session routes
 
 ```text
-POST /api/v1/auth/refresh
-POST /api/v1/auth/logout
-POST /api/v1/auth/logout-all
-GET  /api/v1/me
+POST /api/v1/auth/refresh       body { refreshToken }                         → 200 { session }
+POST /api/v1/auth/logout        bearer, no required body                      → 204
+POST /api/v1/auth/logout-all    bearer, no required body                      → 204
+GET  /api/v1/me                 bearer                                        → 200 { user }
 ```
 
-Login may populate the existing Prisma `Session.clientDeviceId` only for an
-active device owned by the authenticated user. Issuance and unpair serialize on
-the same per-user transaction lock, so validation and session/token creation
-cannot race device revocation. Pre-pairing registration/login may keep the field
-null; logout, logout-all, refresh rotation, and replay-family revocation remain
-the other verified controls.
+Refresh rotates the token and revokes replay families when reuse is detected.
+Logout revokes the current session; logout-all revokes all user sessions.
 
-## 2.4 Forgot password using date of birth
+### Password recovery
 
-Use a two-step reset flow so a successful date-of-birth check does not directly mutate the password.
+```text
+POST /api/v1/auth/password/recovery/verify
+body: { email, dateOfBirth }                         → 200 { recoveryToken, expiresAt }
 
-### `POST /api/v1/auth/password/recovery/verify`
+POST /api/v1/auth/password/recovery/reset
+body: { recoveryToken, newPassword }                 → 204
+```
 
-Request:
+The recovery token is opaque, single-use, hashed at rest, and expires after
+the configured 600-second window. Verification is enumeration-safe and
+rate-limited by IP and normalized email. Reset requires a 12–256 character
+password and revokes existing sessions. This is an MVP recovery factor, not
+MFA.
+
+## User profile, avatar, and settings
+
+`SafeUser` is exactly:
 
 ```json
 {
-  "email": "user@example.com",
-  "dateOfBirth": "2004-05-19"
+  "id":"<uuid>",
+  "email":"user@example.com",
+  "displayName":"Cenna|null",
+  "username":"cenna|null",
+  "avatarUrl":"https://api.personalbmo.web.id/media/avatars/<uuid>.webp|null",
+  "createdAt":"<ISO-8601>"
 }
 ```
 
-Success `200`:
-
-```json
-{
-  "recoveryToken": "<short-lived-single-use-opaque-token>",
-  "expiresAt": "<ISO-8601>"
-}
-```
-
-Security:
-
-- generic failure response for unknown email vs wrong date;
-- aggressively rate-limit per IP + normalized email;
-- recovery token TTL baseline 10 minutes;
-- store only hash of recovery token;
-- one-time use;
-- successful password reset revokes all existing sessions.
-
-### `POST /api/v1/auth/password/recovery/reset`
-
-Request:
-
-```json
-{
-  "recoveryToken": "<opaque>",
-  "newPassword": "minimum 12 characters"
-}
-```
-
-Success:
-
-```http
-204 No Content
-```
-
-This is an MVP recovery factor and must be documented as weaker than production-grade multi-factor recovery.
-
----
-
-# 3. Profile
-
-## 3.1 SafeUser
-
-Canonical mobile-safe user:
-
-```json
-{
-  "id": "<uuid>",
-  "email": "user@example.com",
-  "displayName": "Cenna",
-  "username": "cenna",
-  "avatarUrl": "https://api.personalbmo.web.id/media/avatars/<opaque-id>.webp",
-  "createdAt": "<ISO-8601>"
-}
-```
-
-Do not add phone or subscription fields in this scope.
-
-## 3.2 Update profile
-
-```http
+```text
 PATCH /api/v1/me/profile
+body: { displayName?: string|null, username?: string }       → 200 { user }
 ```
 
-Partial request:
-
-```json
-{
-  "displayName": "Cenna",
-  "username": "cenna"
-}
-```
-
-Rules:
-
-- username normalized case-insensitively;
-- unique;
-- allowed baseline: `a-z`, `0-9`, `_`, `.`;
-- length baseline 3–30.
-
-## 3.3 Avatar
-
-```http
-POST /api/v1/me/avatar
-Content-Type: multipart/form-data
-```
-
-Field:
+The body is strict and non-empty. `username` is normalized NFKC/lowercase and
+must match `[a-z0-9_.]{3,30}`. Duplicate usernames return `409 CONFLICT`.
 
 ```text
-file
+POST /api/v1/me/avatar                                      → 200 { avatarUrl }
+GET  /media/avatars/<uuid>.webp                             → 200 image/webp
 ```
 
-Baseline:
+Avatar upload is authenticated `multipart/form-data` with one `file`; accepted
+MIME types are JPEG, PNG, and WebP; the configured maximum is 5 MiB. The server
+transcodes to WebP and publishes an opaque UUID key. The GET path accepts only
+that UUID plus `.webp`, returns `image/webp`, `nosniff`, and immutable caching,
+and never lists directories.
 
-- JPEG/PNG/WebP;
-- max 5 MB;
-- transcode/store as safe image type where practical;
-- opaque filename;
-- no user-controlled filesystem path;
-- persistent VPS media directory;
-- no directory listing.
-
-Return:
-
-```json
-{
-  "avatarUrl": "https://api.personalbmo.web.id/media/avatars/<opaque-id>.webp"
-}
-```
-
-Avatar retrieval uses the URL returned by the API:
-
-```http
-GET /media/avatars/:opaqueId.webp
-```
-
-This route is intentionally outside `/api/v1`, serves only a transcoded safe
-image by opaque identifier, and must not expose directory listing or an
-original user filename.
-
----
-
-# 4. User settings
-
-Preserve the existing P9.1 fields and semantics when these candidate-only routes are integrated into production:
+User settings:
 
 ```text
 GET   /api/v1/settings/user
 PATCH /api/v1/settings/user
 ```
 
-Existing fields remain:
+Body fields are optional and strict: `language` (2–16 characters),
+`responseLength` (`brief|standard|detailed`), and
+`automaticMemoryCandidates` (boolean). The response is:
 
-```text
-language
-responseLength
-automaticMemoryCandidates
-timezone (server-enforced in response)
+```json
+{"language":"en","responseLength":"standard","automaticMemoryCandidates":true,"timezone":"Asia/Jakarta"}
 ```
 
----
-
-# 5. Personalization
+Personalization:
 
 ```text
 GET   /api/v1/settings/personalization
 PATCH /api/v1/settings/personalization
 ```
 
-Response/body shape:
+Fields are `baseStyleTone`, `warmth`, `enthusiasm`, `headerAndLists`, and
+`emoji` (trimmed strings, max 32), `fastAnswers` (boolean), and
+`customInstructions` (max 4,000). PATCH is strict and non-empty. Defaults are
+`default` for the five text fields, `false` for `fastAnswers`, and an empty
+custom instruction string.
 
-```json
-{
-  "baseStyleTone": "default",
-  "warmth": "default",
-  "enthusiasm": "default",
-  "headerAndLists": "default",
-  "emoji": "default",
-  "fastAnswers": false,
-  "customInstructions": ""
-}
-```
-
-Rules:
-
-- strict body;
-- bounded strings;
-- custom instructions max baseline 4000 chars;
-- Backend owns persistence;
-- a later chat/voice slice will apply allowed personalization to Hermes context;
-- user custom instructions cannot override system/security rules.
-
-Slice 2B owns strict persistence and retrieval only; Hermes context integration
-is not present yet.
-
-No ESP32 protocol change is required.
-
----
-
-# 6. Pairing — existing 6-digit flow
-
-Preserve the actual implemented P9.1 route contract and align mobile to it:
+Device settings:
 
 ```text
-POST /api/v1/pairing/challenges
-GET  /api/v1/pairing/:pairingId
-POST /api/v1/pairing/:pairingId/claim
-POST /api/v1/pairing/:pairingId/revoke
-```
-
-Expected mobile flow:
-
-```text
-authenticated mobile user
-→ POST /pairing/challenges
-→ show 6-digit code
-→ authenticated owner submits the claim route with the pairing ID, code, hardware identity/name, and existing device credential obtained through the approved out-of-band hardware handoff
-→ mobile polls GET /pairing/:pairingId
-→ claimed device appears in /devices
-```
-
-The frozen current claim body is:
-
-```json
-{
-  "code": "123456",
-  "hardwareId": "<must equal the physical device_id used by /ws>",
-  "deviceName": "BMO",
-  "deviceCredential": "<existing out-of-band credential>"
-}
-```
-
-All four current pairing routes require a mobile bearer session. The ESP does not currently claim a pairing over `/ws`. Phase 2 must not invent or expose a new device credential in the mobile UI; it must either use the approved out-of-band handoff or add a separately reviewed device-side claim flow.
-
-Current claim validation is also frozen for regression: `hardwareId` is 1–128
-characters after non-empty trimming, `deviceName` is 1–120, and
-`deviceCredential` is 16–256 characters.
-
-Rules:
-
-- use the **actual current TypeScript implementation** as route/field truth if older docs disagree;
-- do not silently change device credential semantics while current physical pairing is still being debugged;
-- preserve TTL/rate-limit/attempt behavior already implemented;
-- pairing regression is P0 because current hardware integration depends on it.
-
----
-
-# 7. Devices
-
-Preserve the existing P9.1 routes when they are integrated into production:
-
-```text
-GET   /api/v1/devices
-GET   /api/v1/devices/:deviceId
+PATCH /api/v1/devices/:deviceId/settings
 GET   /api/v1/settings/devices/:deviceId
 PATCH /api/v1/settings/devices/:deviceId
-POST  /api/v1/devices/:deviceId/unpair
 ```
 
-## Device status
+Both PATCH routes call the same `SettingsService.updateDeviceSettings` service
+with the same owner check and request body. They are currently registered
+aliases; source and tests do not designate one as deprecated or canonical.
+Mobile may use either PATCH route, while the GET route is available under the
+`/settings/devices` family.
 
-```http
-GET /api/v1/devices/:deviceId/status
+Supported fields are `displayName`, `defaultDevice`, `playbackVolume` 0–100,
+`quietHours { start, end, timezone } | null`, `notificationBehavior`
+(`all|important|none`), `voiceProfileId` (`prudence`), `speechSpeed` 0.85–1.15,
+and `enabled`. Responses also include fixed `timezone: "Asia/Jakarta"` and
+the current voice projection `{ model: "en_GB-semaine-medium", speaker:
+"prudence", speakerId: 0 }`.
+
+## Pairing and devices
+
+There is one six-digit BMO pairing flow. There is no robot QR pairing route.
+The ESP32 does not claim through `/ws`; the Mobile bearer session calls the
+claim route with the approved out-of-band hardware credential.
+
+`PAIRING_MOBILE_INPUT_SOURCE_NEEDS_REVIEW`: the current Backend source defines
+the claim body and validates `hardwareId`, `deviceName`, and
+`deviceCredential`, but does not define a Mobile-accessible discovery,
+provisioning, BLE, QR, invitation, or device-credential handoff flow for those
+values. The six-digit `code` comes from the challenge response; the other three
+values must currently be supplied through an external hardware/operator
+process that is not specified by this Backend contract. Do not present pairing
+as a fully implementable Mobile UX until that input provenance is defined.
+
+```text
+POST /api/v1/pairing/challenges                         → 201 { pairingId, code, expiresAt }
+GET  /api/v1/pairing/:pairingId                        → 200 { pairing }
+POST /api/v1/pairing/:pairingId/claim                  → 201 { device }
+POST /api/v1/pairing/:pairingId/revoke                 → 204
 ```
 
-Response:
+The challenge is a six-digit code, expires after the configured 600-second
+TTL, and allows at most five failed attempts. A new challenge invalidates
+previous issued challenges. Pairing status is `{ id, status, expiresAt,
+attemptCount }`; status is lower-case (`issued`, `claimed`, `expired`,
+`failed`, `revoked`, or `invalidated`). Claim body:
 
 ```json
 {
-  "deviceId": "<uuid>",
-  "online": true,
-  "statusLabel": "Online",
-  "lastSeenAt": "<ISO-8601>",
-  "wifi": {
-    "connected": true,
-    "rssi": -57,
-    "label": "Good"
-  },
-  "battery": {
-    "supported": false,
-    "percent": null
-  }
+  "code":"123456",
+  "hardwareId":"<1-128 chars>",
+  "deviceName":"BMO",
+  "deviceCredential":"<16-256 chars, supplied out of band>"
 }
 ```
 
-`battery.supported=false` until hardware confirms reliable telemetry.
+Device routes:
 
----
-
-# 8. Wi-Fi configuration
-
-Backend owns the persisted remote Wi-Fi configuration lifecycle.
-
-## Read metadata
-
-```http
-GET /api/v1/devices/:deviceId/wifi
+```text
+GET  /api/v1/devices                              → 200 { devices: SafeDevice[] }
+GET  /api/v1/devices/:deviceId                    → 200 { device: SafeDevice }
+POST /api/v1/devices/:deviceId/unpair             → 204
 ```
 
-Never return plaintext password.
+`SafeDevice` is `{ id, hardwareId, name, status, pairedAt, lastSeenAt }`.
+Unpair revokes the device and sessions bound to it. The source does **not**
+register `/api/v1/devices/:deviceId/status`; that proposed route is
+`NOT_IMPLEMENTED`. Device status is exposed through the Mobile WebSocket event
+when a producer has current status data.
 
-Response:
+## Wi-Fi and diagnostics
 
-```json
-{
-  "configurationId": "<uuid>|null",
-  "ssid": "Home WiFi",
-  "security": "OPEN|WPA_PSK",
-  "hasPassword": true,
-  "status": "PENDING|DELIVERED|APPLYING|CONNECTED|FAILED|ROLLED_BACK|SUPERSEDED",
-  "updatedAt": "<ISO-8601>"
-}
+```text
+GET    /api/v1/devices/:deviceId/wifi             → 200 { wifi } | null
+PUT    /api/v1/devices/:deviceId/wifi             → 202 { wifi }
+DELETE /api/v1/devices/:deviceId/wifi             → 204
+GET    /api/v1/devices/:deviceId/logs             → 200 { logs }
+GET    /api/v1/devices/:deviceId/telemetry        → 200 { telemetry }
 ```
 
-## Create/update configuration
+Wi-Fi PUT is strict `{ ssid, password? }`: SSID is 1–32 characters; password
+is optional for `OPEN`, otherwise 8–63 characters. The response never contains
+the password or ciphertext and has `{ configurationId, ssid, security,
+hasPassword, status, updatedAt }`. Status is `PENDING`, `DELIVERED`,
+`APPLYING`, `CONNECTED`, `FAILED`, `ROLLED_BACK`, or `SUPERSEDED`. Backend
+stores the password encrypted and uses latest-write-wins for non-terminal
+configurations. Physical application remains `PENDING_PHYSICAL_ESP`.
 
-```http
-PUT /api/v1/devices/:deviceId/wifi
-```
+`logs` accepts query `limit` 1–100, default 50. `telemetry` is the current
+sanitized device projection. The physical device must never send credentials,
+passwords, or provider data in logs or telemetry.
 
-Password is optional for open networks.
-
-Request protected network:
-
-```json
-{
-  "ssid": "Home WiFi",
-  "password": "secret"
-}
-```
-
-Open network:
-
-```json
-{
-  "ssid": "Cafe Guest"
-}
-```
-
-Behavior:
-
-1. validate owner/device;
-2. encrypt password at rest, do not hash it;
-3. save a new versioned configuration;
-4. use **latest-write-wins** for non-terminal pending configurations: a newer configuration supersedes an older unsent/pending configuration;
-5. if ESP32 is online/authenticated and bound to the application device, deliver the additive device event;
-6. if offline, leave the latest configuration pending and deliver after reconnect;
-7. return status.
-
-The encrypted password may be retained after successful connection because this release explicitly supports changing/re-applying device Wi-Fi from the app. It must never be returned by GET endpoints or logs.
-
-Success:
-
-```json
-{
-  "configurationId": "<uuid>",
-  "status": "PENDING"
-}
-```
-
-## Forget remote stored config
-
-```http
-DELETE /api/v1/devices/:deviceId/wifi
-```
-
-This removes Backend's stored configuration only after applying appropriate product rules. It must not silently factory-reset the device.
-
----
-
-# 9. Chat
-
-Backend is the authority. Mobile must never call Hermes directly.
-
-## REST
+## Chat
 
 ```text
 GET    /api/v1/chat/sessions
@@ -537,274 +339,161 @@ DELETE /api/v1/chat/sessions/:sessionId
 POST   /api/v1/chat/messages/:messageId/feedback
 ```
 
-Create session:
+Create body is strict `{ temporary?: boolean }` and returns `201 { session }`.
+Session is `{ id, temporary, title, lastMessageAt, createdAt, updatedAt }`.
+
+Message history accepts `limit` 1–100 (default 50) and an unsigned positive
+64-bit `cursor`; it returns `{ messages, nextCursor }`. A message is
+`{ id, sender: "user"|"assistant"|"system", text, createdAt, cursor? }`.
+History is the authoritative recovery source when the WebSocket is delayed or
+disconnected.
+
+Message submission is strict:
 
 ```json
 {
-  "temporary": false
+  "idempotencyKey":"<uuid>",
+  "text":"Hello BMO",
+  "speakOnDevice":false,
+  "deviceId":"<optional-owned-device-uuid>"
 }
 ```
 
-Send message:
+It returns `202` with `{ userMessage, assistant: { status, operationId } }`.
+The first request creates one durable operation; a retry with the same
+idempotency key replays the existing operation/result. `text` is 1–16,384
+characters. `speakOnDevice` defaults to `false`; `true` currently returns
+`503 SERVICE_UNAVAILABLE` because physical proactive delivery is not available
+to this REST path. Mobile should send `false`.
+
+Feedback body is `{ rating: "positive"|"negative", reason?: string }`, with a
+maximum 500-character reason, and returns `200 { feedback }`.
+
+The Backend, not Mobile, calls Hermes. No Hermes URL, key, prompt-injection
+boundary, provider response, or audio stream is exposed.
+
+## Mobile WebSocket
+
+Endpoint: `wss://api.personalbmo.web.id/api/v1/ws`.
+
+The upgrade path must be exact and must not contain a query string. The client
+sends exactly one pre-auth JSON message within 5 seconds:
 
 ```json
-{
-  "idempotencyKey": "<client-uuid>",
-  "text": "Halo BMO",
-  "speakOnDevice": false,
-  "deviceId": "<optional paired device uuid>"
-}
+{"event":"authenticate","accessToken":"<accessToken>"}
 ```
 
-`speakOnDevice` defaults to `false`. This prevents normal mobile chat from unexpectedly making the physical robot speak. Mobile may explicitly set it to `true`.
-
-First valid submission returns `202 Accepted` after the user message/idempotency record is safely created:
+The server verifies the JWT, active session, and expiry, then sends:
 
 ```json
-{
-  "userMessage": {
-    "id": "<uuid>",
-    "sender": "user",
-    "text": "Halo BMO",
-    "createdAt": "<ISO-8601>"
-  },
-  "assistant": {
-    "status": "processing",
-    "operationId": "<uuid>"
-  }
-}
+{"event":"authenticated","status":"ok","userId":"<uuid>"}
 ```
 
-A retry with the same idempotency key must return the existing operation/result instead of generating a second Hermes response.
+An expired token closes with `4410 ACCESS_TOKEN_EXPIRED`; an invalid session
+closes with `4403 INVALID_SESSION`; timeout or invalid pre-auth data uses
+`4408 AUTHENTICATION_TIMEOUT` or `4401 AUTHENTICATION_REQUIRED`.
+After authentication, an unexpected client message closes the socket rather
+than becoming a command channel. Native server ping is every 60 seconds and
+two missed pongs terminate the connection. Maximum WebSocket payload is 32 KiB.
 
-Backend flow:
+On disconnect or token expiry, refresh through REST and reconnect; never send a
+refresh token over WebSocket. The server permits multiple sockets for a user.
 
-```text
-authenticate
-→ validate ownership
-→ persist user message + idempotency state
-→ HTTP 202
-→ emit chat_thinking
-→ assemble chat + memory + settings context
-→ Hermes internal call
-→ persist assistant message
-→ emit chat_message
-→ optionally synthesize proactive audio
-→ queue/deliver to physical BMO
-```
+Server event schemas are defined exactly in `mobile-events.ts` and summarized
+below. This stream carries bounded status/events, not token-by-token LLM text
+and not audio. Each event has an evidence label:
 
-If the mobile WebSocket is unavailable, the app recovers through `GET .../messages`; realtime delivery is an optimization, not the only source of truth.
-
-Do not expose Hermes URL/key.
-
----
-
-# 10. Mobile realtime WebSocket
-
-Endpoint:
-
-```text
-WSS /api/v1/ws
-```
-
-Mobile opens the socket, then authenticates within 5 seconds:
+- `RUNTIME_PROTOCOL`: `authenticate` and `authenticated` are required socket
+  lifecycle messages.
+- `RUNTIME_EMITTED`: `chat_thinking`, `chat_message`,
+  `proactive_delivery_status`, `schedule_status`, and
+  `whatsapp_notification` have direct current `sendToUser` emitters.
+- `SCHEMA_DEFINED_NO_CURRENT_EMITTER`: `device_status`,
+  `voice_processing_status`, `wifi_configuration_status`,
+  `integration_status`, and `notification` are strict forward-compatible
+  schemas with no direct current `sendToUser` emitter found. Mobile may accept
+  them defensively, but must not require them for current UX; use REST state and
+  reconnect reads as the fallback.
 
 ```json
-{
-  "event": "authenticate",
-  "accessToken": "<accessToken>"
-}
-```
-
-Success:
-
-```json
-{
-  "event": "authenticated",
-  "status": "ok",
-  "userId": "<uuid>"
-}
-```
-
-Do not put access tokens in the URL query string.
-
-Baseline heartbeat:
-
-- server native ping every 60 seconds;
-- reconnect on disconnect;
-- re-authenticate on reconnect.
-
-Mobile realtime events:
-
-```text
-chat_thinking
-chat_message
-device_status
-voice_processing_status
-wifi_configuration_status
-proactive_delivery_status
-schedule_status
-integration_status
-notification
-```
-
-This is **event streaming**, not token-by-token assistant text streaming and not audio streaming.
-
-Example:
-
-```json
-{
-  "event": "chat_thinking",
-  "sessionId": "<uuid>",
-  "messageId": "<uuid>"
-}
+{"event":"chat_thinking","sessionId":"<uuid>","messageId":"<uuid>"}
 ```
 
 ```json
-{
-  "event": "chat_message",
-  "sessionId": "<uuid>",
-  "message": {
-    "id": "<uuid>",
-    "sender": "assistant",
-    "text": "Hi!",
-    "createdAt": "<ISO-8601>"
-  }
-}
-```
-
-
-Physical-device voice status may be mirrored to mobile without exposing the device audio URL:
-
-```json
-{
-  "event": "voice_processing_status",
-  "deviceId": "<device uuid>",
-  "requestId": "<voice request uuid>",
-  "status": "thinking|audio_ready|completed|failed",
-  "errorCode": null
-}
-```
-
-Mobile does not receive the ESP32 device token and does not need the ephemeral MP3 URL merely to display status.
-
-Access-token expiry rule:
-
-- the mobile socket is valid only while the authenticated access token is valid;
-- at/after token expiry the server closes the mobile socket with an auth-specific close code;
-- mobile refreshes through the existing REST refresh endpoint, reconnects, and authenticates again;
-- refresh tokens are never sent over WebSocket.
-
-Additional event shapes:
-
-```json
-{
-  "event": "device_status",
-  "deviceId": "<uuid>",
-  "online": true,
-  "lastSeenAt": "<ISO-8601>",
-  "wifi": { "connected": true, "rssi": -57 },
-  "battery": { "supported": false, "percent": null }
-}
+{"event":"chat_message","sessionId":"<uuid>","message":{"id":"<uuid>","sender":"assistant","text":"…","createdAt":"<ISO-8601>"}}
 ```
 
 ```json
-{
-  "event": "wifi_configuration_status",
-  "deviceId": "<uuid>",
-  "configurationId": "<uuid>",
-  "status": "PENDING|DELIVERED|APPLYING|CONNECTED|FAILED|ROLLED_BACK|SUPERSEDED",
-  "errorCode": null
-}
+{"event":"device_status","deviceId":"<uuid>","online":true,"lastSeenAt":"<ISO-8601>","wifi":{"connected":true,"rssi":-57},"battery":{"supported":false,"percent":null}}
 ```
 
-```json
-{
-  "event": "proactive_delivery_status",
-  "deviceId": "<uuid>",
-  "deliveryId": "<uuid>",
-  "source": "CHAT|SCHEDULE|WHATSAPP",
-  "status": "PENDING|READY|DELIVERING|DELIVERED|FAILED|EXPIRED|MISSED",
-  "errorCode": null
-}
-```
+`voice_processing_status` has `deviceId`, `requestId`, status
+`thinking|audio_ready|completed|failed`, and nullable `errorCode`.
+`wifi_configuration_status` has `deviceId`, `configurationId`, status
+`PENDING|DELIVERED|APPLYING|CONNECTED|FAILED|ROLLED_BACK|SUPERSEDED`, and
+nullable `errorCode`.
+`proactive_delivery_status` has `deviceId`, `deliveryId`, source
+`CHAT|SCHEDULE|WHATSAPP`, status
+`PENDING|READY|DELIVERING|DELIVERED|FAILED|EXPIRED|MISSED`, and nullable
+`errorCode`.
+`schedule_status` has `scheduleId`, nullable `runId`, status
+`ACTIVE|PAUSED|CANCELLED|COMPLETED`, and status label
+`MONITORING|WEEKLY|PAUSED|COMPLETED`.
+`integration_status` has integration `whatsapp|spotify` and status
+`CONNECTED|DISCONNECTED|PENDING|ERROR|RECONNECT_REQUIRED`.
+`notification` has `id`, type `GENERIC`, bounded `title`/`body`, and
+`createdAt`. `whatsapp_notification` has `conversationId`, `displayName`,
+`conversationType` (`DM|GROUP`), and `receivedAt`; it never contains message
+body, phone number, JID, QR data, session data, or credentials.
 
-```json
-{
-  "event": "schedule_status",
-  "scheduleId": "<uuid>",
-  "runId": "<uuid>|null",
-  "status": "ACTIVE|PAUSED|CANCELLED|COMPLETED",
-  "statusLabel": "MONITORING|WEEKLY|PAUSED|COMPLETED"
-}
-```
+The two chat events, `proactive_delivery_status`, `schedule_status`, and
+`whatsapp_notification` are `RUNTIME_EMITTED`. The other outbound schemas in
+this section are `SCHEMA_DEFINED_NO_CURRENT_EMITTER`; they are not promises of
+current runtime delivery. Mobile should implement forward-compatible handlers
+but use REST state and reconnect reads as the required fallback.
 
-```json
-{
-  "event": "integration_status",
-  "integration": "whatsapp|spotify",
-  "status": "CONNECTED|DISCONNECTED|PENDING|ERROR"
-}
-```
+Event delivery is best effort. REST state, especially chat history, is the
+source of truth.
 
-```json
-{
-  "event": "notification",
-  "id": "<uuid>",
-  "type": "GENERIC",
-  "title": "BMO",
-  "body": "Safe bounded text",
-  "createdAt": "<ISO-8601>"
-}
-```
-
-Mobile WebSocket close behavior:
-
-```text
-4401 AUTHENTICATION_REQUIRED
-4403 INVALID_SESSION
-4408 AUTHENTICATION_TIMEOUT
-4410 ACCESS_TOKEN_EXPIRED
-```
-
-Authentication must arrive within 5 seconds. Mobile WS JSON messages are bounded (baseline 32 KB).
-
-Mobile WebSocket is not the device voice WebSocket.
-
----
-
-# 11. Memory
-
-Implement Backend-owned memory APIs consistent with existing P9 docs:
+## Memory
 
 ```text
 GET/PATCH /api/v1/settings/memory
-
-GET    /api/v1/memories
-GET    /api/v1/memories/:id
-PATCH  /api/v1/memories/:id
-DELETE /api/v1/memories/:id
-
-GET    /api/v1/memory-candidates
-POST   /api/v1/memory-candidates/:id/accept
-POST   /api/v1/memory-candidates/:id/reject
-
-POST   /api/v1/memories/forget-topic
-POST   /api/v1/memories/clear-all
-POST   /api/v1/memories/export
-
-GET    /api/v1/memory/summary
-POST   /api/v1/memory/summary/regenerate
-POST   /api/v1/memory/summary/feedback
+GET       /api/v1/memories
+GET       /api/v1/memories/:id
+PATCH     /api/v1/memories/:id
+DELETE    /api/v1/memories/:id
+GET       /api/v1/memory-candidates
+POST      /api/v1/memory-candidates/:id/accept
+POST      /api/v1/memory-candidates/:id/reject
+POST      /api/v1/memories/forget-topic
+POST      /api/v1/memories/clear-all
+POST      /api/v1/memories/export
+GET       /api/v1/memory/summary
+POST      /api/v1/memory/summary/regenerate
+POST      /api/v1/memory/summary/feedback
 ```
 
-ESP32 is not a memory authority and requires no change.
+Memory settings body is `{ automaticMemoryCandidates: boolean }`.
+Memory lists accept `limit` 1–100 (default 25) and an opaque cursor. Memory
+records expose `id, topic, category, content, importance, source, expiresAt,
+createdAt, updatedAt`; candidates expose `id, sourceMessageId, proposedContent,
+topic, status, expiresAt, reviewedAt, createdAt`.
 
----
+Mutating memory routes require an `idempotencyKey` (1–128 characters). PATCH
+memory also accepts optional `topic`, `category`, `normalizedContent`,
+`importance` 1–100, and nullable `expiresAt`. Accept may override category,
+importance, and expiry. Forget-topic requires `topic`; summary feedback
+requires `feedback` up to 500 characters. Delete may take the key in the body
+or `Idempotency-Key` header; conflicting values are invalid. Clear/forget
+responses contain sanitized counts. Export returns JSON containing active
+memories, pending candidates, actions, topic-forgets, and summary.
 
-# 12. Schedules
+Summary GET returns `{ summary: object | null }`. Regeneration returns `202`
+with a durable `generation` result whose current runtime status is
+`not_configured`; it does not claim an external summarizer exists.
 
-REST:
+## Schedules
 
 ```text
 GET    /api/v1/schedules
@@ -817,446 +506,165 @@ DELETE /api/v1/schedules/:id
 GET    /api/v1/schedule-runs
 ```
 
-Backend scheduler uses `Asia/Jakarta`.
-
-Create/update schedule uses the current mobile requirement vocabulary:
+Create is one of these strict shapes:
 
 ```json
-{
-  "prompt": "Remind me to stand up",
-  "frequency": "Weekly",
-  "every": 1,
-  "repeatDay": "Thursday",
-  "days": ["Thursday"],
-  "timeOfDay": "Morning",
-  "date": "2026-08-15",
-  "deliveryTargets": ["DEVICE"]
-}
+{"prompt":"Stand up","frequency":"Daily","every":1,"timeOfDay":"Morning","deliveryTargets":["MOBILE"]}
 ```
-
-Backend normalizes this into its scheduler model and server-enforces `Asia/Jakarta`.
-
-The source implementation maps the bounded presentation periods to local clock
-times as `Morning=09:00`, `Afternoon=13:00`, and `Evening=18:00`. Mutation
-requests include the current positive `version`; stale PATCH/pause/resume/delete
-requests fail with `409 CONFLICT`. `MOBILE` occurrences are durable delivery
-intents without a fabricated device ID; the device-scoped
-`proactive_delivery_status` event is emitted only for `DEVICE` delivery rows.
-
-Durable schedule status is:
-
-```text
-ACTIVE
-PAUSED
-CANCELLED
-COMPLETED
-```
-
-The following are presentation labels only; `WEEKLY` is derived from recurrence and is not stored as a lifecycle state:
-
-```text
-MONITORING
-WEEKLY
-PAUSED
-COMPLETED
-```
-
-Delivery targets are explicit:
-
-```text
-DEVICE
-MOBILE
-```
-
-Device speech uses the generic proactive-delivery contract in `02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`.
-
----
-
-# 13. WhatsApp personal-account connector
-
-WhatsApp is a BMO integration/action surface. The user pairs their personal
-WhatsApp account; there is no separate BMO bot number. Mobile talks only to
-these authenticated BMO routes and never to Hermes, Baileys, `/messages`,
-`/send`, raw JIDs, session paths, or provider credentials.
-
-## Connection
-
-```text
-GET  /api/v1/integrations/whatsapp/status
-POST /api/v1/integrations/whatsapp/disconnect
-```
-
-Response:
 
 ```json
-{
-  "provider": "whatsapp",
-  "status": "CONNECTED|DISCONNECTED|PENDING|ERROR",
-  "connectedAt": "ISO_TIMESTAMP|null",
-  "scopes": []
-}
+{"prompt":"Stand up","frequency":"Weekly","every":1,"repeatDay":"Thursday","days":["Thursday"],"timeOfDay":"Morning","deliveryTargets":["DEVICE"],"deviceId":"<uuid>"}
 ```
 
-The QR/connect routes remain operator/provider setup surfaces and are not
-needed by the mobile conversation UI.
+```json
+{"prompt":"Stand up","frequency":"Once","every":1,"date":"2026-08-20","timeOfDay":"Morning","deliveryTargets":["MOBILE"]}
+```
 
-## Conversations and recipients
+Common fields are `prompt` 1–1,000 characters, `every` 1–365,
+`timeOfDay` (`Morning|Afternoon|Evening`), and one or two unique delivery
+targets (`DEVICE|MOBILE`). `DEVICE` requires exactly one owned `deviceId`;
+`MOBILE` does not fabricate a device. Weekly requires `repeatDay` and unique
+`days` containing it; once requires a valid calendar `date`.
+
+All schedule writes return the serialized schedule, usually wrapped as
+`{ schedule }`, and emit `schedule_status`. PATCH/pause/resume/delete require
+the current positive `version`; stale or terminal mutations return `409
+CONFLICT`. DELETE is a durable `CANCELLED` transition, not a purge. Lists use
+limit 1–100 (default 50) and an ISO-timestamp/UUID cursor. Runs can filter by
+`scheduleId` and return `{ runs, nextCursor }`.
+
+Durable states are `ACTIVE|PAUSED|CANCELLED|COMPLETED`; `MONITORING` and
+`WEEKLY` are presentation labels. The timezone is fixed to `Asia/Jakarta`.
+
+## WhatsApp
+
+Mobile uses only these authenticated Backend routes:
 
 ```text
-GET  /api/v1/integrations/whatsapp/conversations?limit=50&cursor=...
-GET  /api/v1/integrations/whatsapp/conversations/:conversationId
-POST /api/v1/integrations/whatsapp/conversations/resolve
+POST  /api/v1/integrations/whatsapp/connect          → 202 connection
+GET   /api/v1/integrations/whatsapp/status           → connection
+GET   /api/v1/integrations/whatsapp/conversations   → page
+GET   /api/v1/integrations/whatsapp/conversations/:id → conversation
+POST  /api/v1/integrations/whatsapp/conversations/resolve → conversation
+GET   /api/v1/integrations/whatsapp/notification-rules → { rules }
+PATCH /api/v1/integrations/whatsapp/notification-rules → { rules }
+POST  /api/v1/integrations/whatsapp/send-preview     → 201 { send }
+POST  /api/v1/integrations/whatsapp/send-confirm     → { send }
+POST  /api/v1/integrations/whatsapp/disconnect       → 204
 ```
 
-All require the bearer token. The list response is:
+`POST /integrations/whatsapp/connect` asks the Backend to begin or inspect the
+server-side provider connection. Its source response is `{ connection, blocked
+}`; the connection projection may indicate `PENDING`, `CONNECTED`, or an error
+state, while `blocked: true` means provider/operator setup is not complete.
+Mobile should show the returned status and poll `GET
+/integrations/whatsapp/status` for changes. It must not expose a QR flow or call
+`/whatsapp/qr` / `/whatsapp/confirm-scanned`; those are operator-only setup
+surfaces and remain `OUT_OF_SCOPE` for Mobile UI.
 
-```json
-{
-  "conversations": [
-    {
-      "id": "BMO_UUID",
-      "displayName": "Rangga",
-      "type": "DM",
-      "notificationEnabled": true,
-      "lastActivityAt": "ISO_TIMESTAMP"
-    }
-  ],
-  "nextCursor": "ISO_TIMESTAMP|BMO_UUID|null"
-}
-```
+Connection is `{ provider, status, connectedAt, scopes }`. Conversation lists
+use `limit` 1–100 (default 50) and a timestamp/UUID cursor and expose only
+`id, displayName, type, notificationEnabled, lastActivityAt`.
+Resolve body is `{ phoneNumber, displayName? }`; the number is normalized as
+an international number and is never returned. Rules are 1–100 strict entries
+with scope `ALL|CONTACT|GROUP`, optional conversation UUID for non-ALL rules,
+`enabled`, and `speakOnDevice`.
 
-Groups use `"type":"GROUP"` and are notification-disabled by default. The
-Backend builds this traffic-derived index from observed messages and sends;
-it does not import the complete WhatsApp address book or history. To create or
-reuse a DM that has not yet been observed:
+Preview body is `{ conversationId, message, idempotencyKey }`, with a 1,000
+character message and a 1–128 character key. Confirm body is
+`{ requestId: UUID, confirmed: true }`; confirmation expires on the server.
+The send projection contains `id, conversationId, preview, status,
+confirmationExpiresAt, errorCode`.
 
-```json
-POST /api/v1/integrations/whatsapp/conversations/resolve
-{
-  "phoneNumber": "<E.164_PHONE>",
-  "displayName": "Rangga"
-}
-```
+`/whatsapp/qr` and `/whatsapp/confirm-scanned` are registered authenticated
+operator setup surfaces, not Mobile UI features. Mark them `OUT_OF_SCOPE` for
+Mobile. Mobile never calls bridge `/health`, `/messages`, `/send`, the resolver,
+Hermes, or any provider/session path. WhatsApp provider/runtime availability is
+an independent `BLOCKED` or connected state; route registration is not proof of
+real-world delivery.
 
-The response is one safe conversation object. Phone identity is normalized and
-mapped to the provider destination only on the server; the response never
-contains the phone number or JID. Invalid input returns `INVALID_INPUT` (400),
-and a foreign/malformed conversation returns `OWNERSHIP_DENIED` (404).
+## Spotify
 
-For DM identity reconciliation, Backend keeps a private provider-alias index
-for every explicit provider reference observed for the owner-scoped
-conversation. This allows a phone-JID resolve and a Baileys LID/chat alias to
-converge when the bridge exposes both references. Because the bridge payload
-does not serialize its relationship, the candidate may use the private,
-loopback-only Hermes identity resolver. That companion runs as `hermes`, reads
-only validated `lid-mapping-*.json` and `_reverse` files, and returns bounded
-equivalence sets to Backend; it never returns session credentials, keys, or
-history. Backend must still not guess from a display name, message text,
-timing, or contact cardinality. If the resolver is unavailable or a mapping is
-missing, the event remains conservative and can reconcile automatically on a
-later event or resolve after the provider mapping appears. Alias rows never
-appear in Mobile responses.
+The production callback is exactly:
 
-## Notification rules
+`https://api.personalbmo.web.id/api/v1/integrations/spotify/callback`
+
+It is already registered provider-side. Mobile does not call the callback;
+Mobile starts OAuth through the Backend:
 
 ```text
-GET   /api/v1/integrations/whatsapp/notification-rules
-PATCH /api/v1/integrations/whatsapp/notification-rules
+POST /api/v1/integrations/spotify/connect       → 200 { authorizationUrl }
+GET  /api/v1/integrations/spotify/status        → connection
+GET  /api/v1/integrations/spotify/search        → { results }
+GET  /api/v1/integrations/spotify/devices       → { devices }
+GET  /api/v1/integrations/spotify/active-device → { device }
+GET  /api/v1/integrations/spotify/playback      → { playback }
+PUT  /api/v1/integrations/spotify/preferred-device → { device }
+POST /api/v1/integrations/spotify/actions       → 202 { action }
+POST /api/v1/integrations/spotify/disconnect    → 204
 ```
 
-The patch replaces the authenticated user's WhatsApp rule set:
+Spotify connection lifecycle:
 
-```json
-{
-  "rules": [
-    { "scope": "ALL", "enabled": true, "speakOnDevice": false },
-    { "scope": "CONTACT", "conversationId": "BMO_UUID", "enabled": false, "speakOnDevice": false },
-    { "scope": "GROUP", "conversationId": "BMO_UUID", "enabled": true, "speakOnDevice": false }
-  ]
-}
-```
+1. Mobile calls `POST /api/v1/integrations/spotify/connect` with its bearer
+   token and receives `authorizationUrl`; the URL is opened in the device's
+   system browser/authentication surface.
+2. Spotify redirects the browser to the Backend callback. The callback is a
+   public provider browser route, consumes the single-use server-side OAuth
+   state, exchanges the code, stores encrypted provider credentials, and
+   returns the plain text response `Spotify connection completed. You may
+   return to BMO.` on success. Denial or invalid state is returned as an HTTP
+   error; no Mobile deep-link callback is registered in the current source.
+3. The user returns to the Mobile app through the browser/app switcher. Mobile
+   then polls `GET /api/v1/integrations/spotify/status`; this REST projection
+   is the authoritative completion signal. Do not depend on
+   `integration_status`: its schema exists, but there is no direct current
+   `sendToUser` emitter.
+4. `CONNECTED` means the server-side credential lifecycle completed.
+   `DISCONNECTED` means no connection is present. `RECONNECT_REQUIRED` means
+   the server invalidated or wiped unusable credentials, such as after
+   `invalid_grant`; Mobile should offer the connect flow again. Provider or
+   configuration failures remain visible through the status/error response and
+   should not be treated as successful linking.
 
-`ALL` is the DM default; `CONTACT` overrides one DM; `GROUP` is disabled
-unless explicitly enabled. No raw provider target is accepted. Transport
-ingestion continues for muted/unknown contacts and groups; only notification
-and optional generic proactive speech are suppressed. Notification filtering
-is PostgreSQL/BMO application state, not the Hermes transport allowlist.
+Search query is `q` 1–200 characters and optional comma-separated `type` values
+from `track,artist,album,playlist`. Preferred-device body is
+`{ deviceId: string | null }`.
 
-## Send/reply
+Action body is strict `{ action, idempotencyKey, payload?, confirmed? }`.
+Actions are `PLAY`, `PLAY_TRACK`, `PLAY_ARTIST`, `PLAY_ALBUM`, `PLAY_PLAYLIST`,
+`PAUSE`, `RESUME`, `NEXT`, `PREVIOUS`, `TRANSFER`, `SEEK`, `VOLUME`, `SHUFFLE`,
+`REPEAT`, and `SEARCH`. Payload keys are action-specific and bounded to four
+keys/1,000 bytes. URIs must be typed Spotify URIs; seek is 0–86,400,000 ms;
+volume is 0–100; repeat is `track|context|off`; shuffle is boolean.
+Actions are idempotent by user/idempotency key and may require
+`confirmed: true` before execution. Results contain only BMO action status,
+result/error codes, and expiry metadata.
+
+Provider access/refresh tokens and OAuth state remain server-side. Spotify
+audio plays on Spotify Connect devices, never through the BMO speaker or Audio
+Service. A missing usable device is reported as `NO_ACTIVE_DEVICE`, not fake
+success. Provider actions remain subject to provider/account availability.
+
+## Plugins and bug reports
 
 ```text
-POST /api/v1/integrations/whatsapp/send-preview
-POST /api/v1/integrations/whatsapp/send-confirm
+GET  /api/v1/plugins                  → 200 { items }
+POST /api/v1/support/bug-reports      → 201 { id, status: "received" }
 ```
 
-Preview request:
+The plugin catalog is a safe WhatsApp/Spotify application projection. Bug
+reports are authenticated multipart requests with fields `category` (default
+`GENERAL`, max 64), `description` (max 4,000), optional `context` (max 4,000),
+and `includeScreenshot` (`true|false`); up to five `screenshots` files are
+accepted, with a 5 MiB per-file Multer limit. Stored files and internal keys
+are never returned.
 
-```json
-{
-  "conversationId": "BMO_UUID",
-  "message": "Gw telat 10 menit",
-  "idempotencyKey": "wa-send-1"
-}
-```
+## Explicit non-goals
 
-The preview/confirm response contains `id`, `conversationId`, `preview`,
-`status`, `confirmationExpiresAt`, and nullable `errorCode`. The Backend checks
-ownership, resolves the server-side provider mapping, calls the official
-bridge `/send`, and persists an outbound delivery. Mobile never supplies or
-receives a JID. Natural-language commands such as “bales Rangga ...” must first
-be authenticated as a BMO chat/voice action and then use this explicit
-allowlisted send boundary.
-
-## Inbound data and realtime event
-
-The dedicated official Hermes Baileys bridge feeds the Backend's sole
-destructive `GET /messages` consumer. Each supported event is validated,
-classified as DM/GROUP, indexed, and persisted only as bounded BMO routing and
-delivery metadata; message bodies are not mirrored into the WhatsApp index.
-Incoming WhatsApp text is `UNTRUSTED_MESSAGE_DATA`: it never becomes a Hermes
-prompt, tool request, privileged action, or automatic reply. Only an
-authenticated BMO user action can authorize tools or send/reply.
-
-When the notification rule permits, mobile receives this metadata-only event
-on `/api/v1/ws`:
-
-```json
-{
-  "event": "whatsapp_notification",
-  "conversationId": "BMO_UUID",
-  "displayName": "Rangga",
-  "conversationType": "DM",
-  "receivedAt": "ISO_TIMESTAMP"
-}
-```
-
-It contains no body preview, phone number, raw JID, session identifier, QR,
-token, or credential. Official owner-forward events, where enabled, update
-bounded conversation activity only and do not create duplicate notifications
-for Backend `/send` echoes. Full history sync, media, typing/read receipts,
-and address-book import are outside MVP. For duplicate provider aliases,
-Backend keeps the conversation with an explicit notification rule, then uses
-earliest creation time and BMO UUID as deterministic tie-breakers; deliveries
-and send requests move to that winner. The bridge queue is in-memory and
-destructive, so WhatsApp delivery is not durable or replayable.
-
-## Runtime boundary
-
-The unchanged Hermes 0.20.0 bridge is private at `http://127.0.0.1:3001` and
-runs as the personal-account transport with `--mode bot`; `bot` is transport
-semantics, not product identity. `hermes-gateway.service` remains separate with
-`WHATSAPP_ENABLED=false` and does not consume this queue. `bmo-whatsapp-bridge.service`
-runs as `hermes`, has bounded crash restart, and is independent of the shared
-Hermes gateway. `WHATSAPP_GROUP_POLICY` is not the security enforcement layer;
-Backend classification and ownership rules are authoritative.
-
-Do not implement Telegram/SMS plugins.
-
----
-
-# 14. Spotify
-
-Priority integration.
-
-The Backend is the only Spotify client. Mobile authenticates to BMO and never
-calls Spotify directly. Spotify audio remains on the user's Spotify Connect
-device; it never enters BMO hardware, Audio Service, Piper, Kokoro, or the
-proactive-audio path.
-
-Canonical authenticated routes:
-
-```text
-POST /api/v1/integrations/spotify/connect
-GET  /api/v1/integrations/spotify/status
-POST /api/v1/integrations/spotify/disconnect
-GET  /api/v1/integrations/spotify/search?q=<bounded-query>&type=track,artist,album,playlist
-GET  /api/v1/integrations/spotify/devices
-GET  /api/v1/integrations/spotify/active-device
-GET  /api/v1/integrations/spotify/playback
-PUT  /api/v1/integrations/spotify/preferred-device
-POST /api/v1/integrations/spotify/actions
-GET  /api/v1/integrations/spotify/callback
-```
-
-`POST /connect` returns only `{ "authorizationUrl": "..." }`. The OAuth
-state is inside that URL and is not returned as a second Mobile field. The
-callback is intentionally unauthenticated at HTTP bearer level: ownership is
-derived only from the validated, hashed, single-use, short-lived OAuth state.
-Tokens and authorization codes never enter Mobile responses or logs.
-
-`GET /status` returns only:
-
-```json
-{
-  "provider": "spotify",
-  "status": "DISCONNECTED|PENDING|CONNECTED|ERROR|RECONNECT_REQUIRED",
-  "connectedAt": "ISO_TIMESTAMP|null",
-  "scopes": ["user-read-private", "user-read-playback-state", "user-modify-playback-state", "playlist-read-private"]
-}
-```
-
-Backend links the BMO user to Spotify's immutable `account_id` from the
-current-user profile. Spotify's `id`, when present, is retained only as
-server-side non-canonical profile metadata; neither identity field is returned
-to Mobile, and neither is a bearer credential. A repeated authorization for
-the same `account_id` converges on the existing BMO Spotify connection.
-
-Search returns bounded normalized track, artist, album, and playlist result
-arrays. Search uses the stored Spotify account market. The deterministic
-resolver may select only an exact/strong bounded normalized result; it does
-not depend on popularity fields.
-
-The action allowlist is:
-
-```text
-PLAY, PLAY_TRACK, PLAY_ARTIST, PLAY_ALBUM, PLAY_PLAYLIST,
-RESUME, PAUSE, NEXT, PREVIOUS, SEEK, VOLUME, SHUFFLE, REPEAT, TRANSFER, SEARCH
-```
-
-Action payloads contain only semantic fields: query, Spotify URI, target type,
-device ID/name, seek position, volume 0..100, shuffle state, repeat
-`off|context|track`, transfer play flag, and preferred-device flag. They never
-contain a provider URL, HTTP method, endpoint, headers, token, secret, SQL, or
-raw provider JSON. `QUEUE` is not part of the Phase 2.6 contract.
-
-Preferred-device writes use:
-
-```json
-{ "deviceId": "SPOTIFY_DEVICE_ID|null" }
-```
-
-Device selection precedence is explicit requested device, valid preferred
-device, active device, then a typed `NO_ACTIVE_DEVICE` result. A missing usable
-device never produces a fabricated playback success. Returned device fields
-are safe normalized projections; the device ID is exposed only because the
-Mobile UI needs it for selection.
-
-Playback-control failures use stable BMO-safe results, including
-`RECONNECT_REQUIRED`, `PREMIUM_REQUIRED`, `NO_ACTIVE_DEVICE`, `RATE_LIMITED`,
-and `SERVICE_UNAVAILABLE`. Raw Spotify error bodies never cross the boundary.
-
-The exact scopes are `user-read-private` for `account_id` identity/market,
-`user-read-playback-state` for devices/current playback,
-`user-modify-playback-state` for playback control, and
-`playlist-read-private` for resolving the user's private playlists. No
-streaming, email, library-write, playlist-write, or collaborative-playlist
-scope is requested.
-
-Refresh authorization is recorded server-side because Spotify refresh tokens do
-not expose issuance time. At six calendar months after authorization, or on
-`invalid_grant`, the Backend deletes unusable credential state and exposes
-`RECONNECT_REQUIRED`; it does not retry indefinitely. If Spotify returns a new
-refresh token, it replaces the encrypted value atomically. If it omits one, the
-existing encrypted refresh token is preserved.
-
-Hermes may identify a semantic Spotify intent only. Backend binds the current
-authenticated BMO user, validates the same action schema, resolves search and
-devices, and executes the provider call. Hermes receives neither Spotify
-credential nor client secret and never calls Spotify or supplies arbitrary
-provider request material.
-
----
-
-# 15. Plugin catalog
-
-Only two plugins:
-
-```text
-whatsapp
-spotify
-```
-
-```http
-GET /api/v1/plugins
-```
-
-Example:
-
-```json
-{
-  "items": [
-    {
-      "id": "whatsapp",
-      "title": "WhatsApp",
-      "installed": true,
-      "status": "CONNECTED"
-    },
-    {
-      "id": "spotify",
-      "title": "Spotify",
-      "installed": false,
-      "status": "DISCONNECTED"
-    }
-  ]
-}
-```
-
----
-
-# 16. Bug reports
-
-```http
-POST /api/v1/support/bug-reports
-Content-Type: multipart/form-data
-```
-
-Fields:
-
-```text
-description
-includeScreenshot
-screenshots[] (max 5)
-```
-
-Store reports in PostgreSQL and screenshots in bounded persistent storage.
-
-Return:
-
-```json
-{
-  "id": "<uuid>",
-  "status": "received"
-}
-```
-
----
-
-# 17. Voice preview
-
-LAST PRIORITY.
-
-If implemented:
-
-```http
-POST /api/v1/voice/preview
-```
-
-Request:
-
-```json
-{
-  "text": "Hi! BMO is ready.",
-  "deviceId": "<optional>"
-}
-```
-
-Must use existing TTS path, be rate-limited, create no chat/memory side effects, and return an ephemeral audio URL.
-
-If deadline pressure remains, leave as `DEFERRED` in implementation status.
-
-
----
-
-# 18. Explicit mobile non-goals for this release
-
-Do not add a separate mobile microphone/voice-upload feature merely because REST can technically upload audio.
-
-For this release:
-
-```text
-Mobile chat input = text
-Physical BMO voice input = existing ESP32 raw-WAV contract
-Mobile WebSocket = realtime events, not audio/token streaming
-```
-
-Any future mobile voice input requires a separate approved contract.
+The source does not register `POST /api/v1/voice/preview`; it is
+`NOT_IMPLEMENTED`. Mobile text chat is the current Mobile voice-adjacent
+surface. The physical device continues to use raw-WAV `/api/v1/voice`, MP3
+delivery, and `/ws`. There is no Mobile audio WebSocket, token streaming,
+provider-token projection, direct Hermes API, direct Spotify API, direct
+WhatsApp API, or robot QR pairing.

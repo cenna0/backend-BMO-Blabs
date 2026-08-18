@@ -4,7 +4,9 @@
 **Status:** `PENDING_PHYSICAL_ESP`
 **Existing voice contract:** `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` remains unchanged.
 
-This file describes hardware work required after the Backend Phase 2 handlers are available. It is not evidence that firmware supports any new event.
+This file describes hardware work required after the Backend Phase 2 handlers
+were implemented. The promoted Backend contains the additive handlers, but
+this file is not evidence that firmware supports any new event.
 
 ## Existing physical path — preserve first
 

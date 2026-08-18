@@ -2,12 +2,21 @@
 
 Repository ini adalah source of truth production. Branch deployment: `main`.
 
-Coding agent wajib mulai dari:
+Repository orientation starts at `docs/README.md`; the current Mobile work
+starts at the live-production integration package:
 
 1. [`docs/README.md`](docs/README.md)
 2. [`docs/NEXT-ACTION.md`](docs/NEXT-ACTION.md)
-3. [`docs/roadmap/P8-EXECUTION-SPEC.md`](docs/roadmap/P8-EXECUTION-SPEC.md) — historical predecessor evidence
-4. [`docs/backend-mvp/IMPLEMENTATION-STATUS.md`](docs/backend-mvp/IMPLEMENTATION-STATUS.md)
+3. [`docs/integration/00-START-HERE.md`](docs/integration/00-START-HERE.md)
+4. [`docs/integration/01-MOBILE-BACKEND-API-CONTRACT.md`](docs/integration/01-MOBILE-BACKEND-API-CONTRACT.md)
+5. [`docs/integration/05-IMPLEMENTATION-STATUS.md`](docs/integration/05-IMPLEMENTATION-STATUS.md)
+6. [`docs/integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](docs/integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md)
+
+The following repository control records remain in the entry chain for
+historical/runtime context, not as Mobile implementation instructions:
+
+7. [`docs/roadmap/P8-EXECUTION-SPEC.md`](docs/roadmap/P8-EXECUTION-SPEC.md)
+8. [`docs/backend-mvp/IMPLEMENTATION-STATUS.md`](docs/backend-mvp/IMPLEMENTATION-STATUS.md)
 
 The current Phase 2 contract linked by those entrypoints starts at
 [`docs/integration/00-START-HERE.md`](docs/integration/00-START-HERE.md).
@@ -27,9 +36,10 @@ Rules:
   [`docs/backend-mvp/P7-TEST-EVIDENCE.md`](docs/backend-mvp/P7-TEST-EVIDENCE.md).
 - P8 is `VERIFIED — PRODUCTION`: Piper Prudence is primary, Kokoro `af_heart`
   at speed `0.80` is fallback, and `RVC_ENABLED=false` remains locked.
-- P9.1 source and private candidate are verified, but production does not expose
-  the P9.1 router. The Phase 1 integration freeze under `docs/integration/`
-  defines the exact Phase 2 starting point and gates.
+- P9 production is live. Mobile uses `https://api.personalbmo.web.id` and
+  `wss://api.personalbmo.web.id/api/v1/ws`; the hardware contract remains
+  `wss://api.personalbmo.web.id/ws`. Start Mobile work at
+  `docs/integration/00-START-HERE.md`.
 - The public hardware endpoint is live and verified. Physical ESP32 acceptance
   remains pending P10. RVC runtime artifacts are removed from production and
   retained only as archived evidence/history.

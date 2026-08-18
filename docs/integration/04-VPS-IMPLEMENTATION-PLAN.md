@@ -1,5 +1,11 @@
 # Phase 2 Implementation Plan — Frozen Handoff
 
+> **COMPLETED / HISTORICAL — DO NOT EXECUTE AS A CURRENT RUNBOOK.** Production
+> P9 promotion, PostgreSQL bootstrap, six migrations, backups, Backend cutover,
+> and source closure completed on 2026-08-17/18. The current Mobile contract is
+> `01-MOBILE-BACKEND-API-CONTRACT.md`; production uses `127.0.0.1:3000`, not
+> candidate port `3010`.
+
 **Frozen:** 2026-08-11
 **Applies after:** Phase 1 documentation commit
 **Phase 1 rule:** This plan is documentation only. It authorizes no deployment, runtime change, or production migration.
@@ -10,10 +16,9 @@ The frozen handoff below describes the entry baseline and remains historical.
 Phase 2.5 has now completed candidate-only deployment and acceptance: the
 additive migration is applied to the isolated review PostgreSQL, the candidate
 Backend is healthy on `127.0.0.1:3010`, and the core acceptance gate passed.
-Production migration, production Backend replacement, active Caddy changes,
-provider credential provisioning, and physical ESP acceptance remain separate
-gates and were not performed. The exact evidence and promotion plan are in
-`05-IMPLEMENTATION-STATUS.md`.
+The historical paragraph above records its original checkpoint. Production P9
+promotion is now complete; active production facts are in
+`05-IMPLEMENTATION-STATUS.md` and the production runtime-definition runbook.
 
 ## Baseline Phase 2 must preserve
 

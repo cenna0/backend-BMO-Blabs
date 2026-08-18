@@ -1,5 +1,12 @@
 # Operator Runbook After Documentation Freeze
 
+> **COMPLETED / HISTORICAL — DO NOT EXECUTE AS A CURRENT PRODUCTION RUNBOOK.**
+> The candidate Spotify/WhatsApp workflow, production provisioning, six
+> migrations, backup checkpoints, Backend cutover, and source closure are
+> complete. Its `3010` port, loopback callback, `/tmp/bmo-p9-1-validation-*`
+> paths, candidate overrides, and promotion commands are historical only.
+> Current Mobile engineers must start at `00-START-HERE.md`.
+
 **Use after:** the Phase 1 branch/commit is reviewed and Phase 2 is explicitly authorized.
 
 ## 1. Start a clean implementation session

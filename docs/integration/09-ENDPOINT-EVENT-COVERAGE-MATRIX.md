@@ -1,232 +1,187 @@
-# Endpoint and Event Coverage Matrix
+# Mobile Endpoint and WebSocket Coverage Matrix
 
-**Frozen:** 2026-08-11
-**Rule:** Status uses `08-DOCS-MAINTENANCE-PROTOCOL.md`; availability is independent from implementation status.
+**Audited:** 2026-08-18
+**Source:** backend/src/p9/http/*.ts, backend/src/p9/websocket/mobile-events.ts, backend/src/p9/websocket/mobile-websocket.server.ts
+**Main:** e4f87ca5faf81e1c495c2719f3bb19b056340657
+**Production:** P9 promoted and live
 
-Slice 2A adds the durable source schema behind the target routes below.
-Subsequent Phase 2 source slices register the application routes and event
-boundaries described in this matrix. Migration
-`20260811190000_phase2_application_foundation` is applied to the isolated
-Phase 2.5 candidate only; it has not been applied to production. The additive
-Spotify lifecycle migration `20260815120000_spotify_phase26_lifecycle` is
-source-ready and remains candidate-only until separately authorized. Its
-canonical provider identity column is `spotifyAccountId`; `spotifyProfileId`
-is non-canonical metadata only.
+## Counting rule
 
-## Phase 2.5 candidate acceptance evidence
+The source registers 86 literal P9 HTTP routes. This Mobile inventory contains
+82 routes: every P9 route except the three internal /ops/db/* routes and the
+Spotify provider callback. The two authenticated WhatsApp QR setup routes are
+included so they cannot become undocumented, but are marked OUT_OF_SCOPE for
+the Mobile UI. The Spotify callback is documented separately as a provider
+browser callback, not a Mobile API.
 
-The private candidate was recreated from
-`adeebca58719db4386f62330026f6c3b46a91bbe`, an explicitly recorded protected-
-secret startup fix on requested source `437e48a70227220d1a40ad539ff09b307ef0c1ea`.
-Candidate Backend is `bmo-p9-1-backend-1` on `127.0.0.1:3010`, Node `22.23.1`,
-with candidate PostgreSQL `bmo-p9-1-postgres-1` on a private network and no
-published database port. Public Caddy and production Backend were unchanged.
+PRODUCTION_VERIFIED means the route is in the promoted production image. It
+does not claim that a provider action or physical ESP behavior has been
+exercised. IMPLEMENTED, PARTIALLY_IMPLEMENTED, NOT_IMPLEMENTED, OUT_OF_SCOPE,
+BLOCKED, and PENDING_PHYSICAL_ESP retain their meanings from
+05-IMPLEMENTATION-STATUS.md.
 
-The live candidate acceptance harness passed `42/42` assertions. It covered the
-registered REST surfaces for self-service auth, DOB recovery, profile,
-personalization, pairing, devices, Wi-Fi, chat/history/idempotency, memory,
-schedules, plugin catalog, and provider boundaries, plus ownership isolation,
-validation, and secret-safe projections. It also passed mobile `/api/v1/ws`
-authentication/timeout/path isolation and physical `/ws` authentication plus
-server-side telemetry/log ingestion with a synthetic bound device.
+## REST route inventory
 
-The Node 22 full suite passed 72 files and 401 tests, with one pre-existing
-authenticated database HTTP test skipped. Candidate chat operations and Hermes
-responses persisted, and the schedule worker recorded the expected expired
-occurrence as `MISSED`. Candidate voice regression completed whole-WAV upload,
-STT, Hermes, Piper, MP3 storage, `audio_ready`, and playback lifecycle through
-the fake-device boundary. These are private candidate results, not production
-availability or physical ESP evidence.
+Auth is explicit per route row: `PUBLIC`, `BEARER`, or `OPERATOR_BEARER`.
+`PUBLIC` routes are the five auth bootstrap routes plus the avatar media route; `OPERATOR_BEARER` is reserved for the two authenticated WhatsApp setup surfaces marked `OUT_OF_SCOPE` for Mobile UI.
 
-Slice 2B registers the account/profile/recovery/avatar and personalization
-surfaces in source and verifies them with automated route/service/storage
-tests, including serialized recovery epochs and fair deadline-bounded avatar
-multipart and image-processing admission. The Phase 2.5 private candidate
-acceptance additionally exercised the live auth/profile/personalization path;
-public production remains unchanged.
+| # | Method | Path | Auth | Request/query source | Response/status | Retry/idempotency | Mobile status/relevance |
+|---:|---|---|---|---|---|---|
+| 1 | POST | /api/v1/auth/register | PUBLIC | strict registration body; DOB required, optional legacy invitation | {user,session} / 201 | no key; duplicate 409 | PRODUCTION_VERIFIED |
+| 2 | POST | /api/v1/auth/login | PUBLIC | {email,password,clientDeviceId?} | {user,session} / 200 | no key; invalid input is auth failure | PRODUCTION_VERIFIED |
+| 3 | POST | /api/v1/auth/password/recovery/verify | PUBLIC | {email,dateOfBirth} | {recoveryToken,expiresAt} / 200 | no key; IP/email rate limits | PRODUCTION_VERIFIED |
+| 4 | POST | /api/v1/auth/password/recovery/reset | PUBLIC | {recoveryToken,newPassword} | empty / 204 | token single-use | PRODUCTION_VERIFIED |
+| 5 | POST | /api/v1/auth/refresh | PUBLIC | {refreshToken} | {session} / 200 | refresh rotation/replay-family handling | PRODUCTION_VERIFIED |
+| 6 | POST | /api/v1/auth/logout | BEARER | bearer, no body required | empty / 204 | current session revoke | PRODUCTION_VERIFIED |
+| 7 | POST | /api/v1/auth/logout-all | BEARER | bearer, no body required | empty / 204 | all-session revoke | PRODUCTION_VERIFIED |
+| 8 | GET | /api/v1/me | BEARER | bearer | {user: SafeUser} / 200 | safe read | PRODUCTION_VERIFIED |
+| 9 | GET | /api/v1/chat/sessions | BEARER | no body | {sessions} / 200 | safe read; max 100 | PRODUCTION_VERIFIED |
+| 10 | POST | /api/v1/chat/sessions | BEARER | {temporary?: boolean} | {session} / 201 | no key | PRODUCTION_VERIFIED |
+| 11 | GET | /api/v1/chat/sessions/:sessionId/messages | BEARER | limit 1..100, positive int64 cursor | {messages,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
+| 12 | POST | /api/v1/chat/sessions/:sessionId/messages | BEARER | {idempotencyKey: UUID,text,speakOnDevice?,deviceId?} | {userMessage,assistant} / 202 | user/idempotency key replay | PRODUCTION_VERIFIED |
+| 13 | DELETE | /api/v1/chat/sessions/:sessionId | BEARER | no body | empty / 204 | durable soft delete/cancel | PRODUCTION_VERIFIED |
+| 14 | POST | /api/v1/chat/messages/:messageId/feedback | BEARER | {rating: positive\|negative,reason?} | {feedback} / 200 | owner-scoped upsert | PRODUCTION_VERIFIED |
+| 15 | GET | /api/v1/devices/:deviceId/wifi | BEARER | no body | {wifi} or null / 200 | safe read | PRODUCTION_VERIFIED |
+| 16 | PUT | /api/v1/devices/:deviceId/wifi | BEARER | {ssid,password?} | {wifi} / 202 | latest-write-wins, no client key | PRODUCTION_VERIFIED; physical apply PENDING_PHYSICAL_ESP |
+| 17 | DELETE | /api/v1/devices/:deviceId/wifi | BEARER | no body | empty / 204 | metadata delete | PRODUCTION_VERIFIED |
+| 18 | GET | /api/v1/devices/:deviceId/logs | BEARER | limit 1..100, default 50 | {logs} / 200 | safe bounded read | PRODUCTION_VERIFIED; physical emission pending |
+| 19 | GET | /api/v1/devices/:deviceId/telemetry | BEARER | no body | {telemetry} / 200 | safe read | PRODUCTION_VERIFIED; physical emission pending |
+| 20 | GET | /api/v1/devices | BEARER | no body | {devices: SafeDevice[]} / 200 | safe read | PRODUCTION_VERIFIED |
+| 21 | GET | /api/v1/devices/:deviceId | BEARER | UUID path | {device: SafeDevice} / 200 | safe read | PRODUCTION_VERIFIED |
+| 22 | PATCH | /api/v1/devices/:deviceId/settings | BEARER | strict device settings patch | {settings} / 200 | owner-scoped write | PRODUCTION_VERIFIED; firmware sync pending |
+| 23 | POST | /api/v1/devices/:deviceId/unpair | BEARER | no body | empty / 204 | durable revoke; revokes bound sessions | PRODUCTION_VERIFIED |
+| 24 | POST | /api/v1/integrations/whatsapp/connect | BEARER | {} | `{connection,blocked}` / 202 | provider operation | PRODUCTION_VERIFIED; provider gate separate |
+| 25 | GET | /api/v1/integrations/whatsapp/status | BEARER | no body | connection / 200 | safe read | PRODUCTION_VERIFIED |
+| 26 | GET | /api/v1/integrations/whatsapp/conversations | BEARER | limit 1..100, default 50, timestamp/UUID cursor | {conversations,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
+| 27 | GET | /api/v1/integrations/whatsapp/conversations/:id | BEARER | UUID path | safe conversation / 200 | safe read | PRODUCTION_VERIFIED |
+| 28 | POST | /api/v1/integrations/whatsapp/conversations/resolve | BEARER | {phoneNumber,displayName?} | safe conversation / 200 | provider mapping/idempotent convergence | PRODUCTION_VERIFIED |
+| 29 | GET | /api/v1/integrations/whatsapp/qr | OPERATOR_BEARER | no body | {qr,expiresAt,status} / 200 | operator setup only | OUT_OF_SCOPE for Mobile UI |
+| 30 | POST | /api/v1/integrations/whatsapp/confirm-scanned | OPERATOR_BEARER | {} | {connection} / 200 | operator setup only | OUT_OF_SCOPE for Mobile UI |
+| 31 | POST | /api/v1/integrations/whatsapp/disconnect | BEARER | no body | empty / 204 | provider/state mutation | PRODUCTION_VERIFIED; provider gate separate |
+| 32 | GET | /api/v1/integrations/whatsapp/notification-rules | BEARER | no body | {rules} / 200 | safe read | PRODUCTION_VERIFIED |
+| 33 | PATCH | /api/v1/integrations/whatsapp/notification-rules | BEARER | {rules: 1..100} | {rules} / 200 | replacement write | PRODUCTION_VERIFIED |
+| 34 | POST | /api/v1/integrations/whatsapp/send-preview | BEARER | {conversationId,message,idempotencyKey} | {send} / 201 | user/idempotency key | PRODUCTION_VERIFIED; provider send gate separate |
+| 35 | POST | /api/v1/integrations/whatsapp/send-confirm | BEARER | {requestId: UUID,confirmed:true} | {send} / 200 | confirmation expiry/claim | PRODUCTION_VERIFIED; provider send gate separate |
+| 36 | POST | /api/v1/integrations/spotify/connect | BEARER | {} | {authorizationUrl} / 200 | server OAuth state | PRODUCTION_VERIFIED |
+| 37 | GET | /api/v1/integrations/spotify/status | BEARER | no body | connection / 200 | safe read | PRODUCTION_VERIFIED |
+| 38 | GET | /api/v1/integrations/spotify/search | BEARER | q 1..200, optional types | {results} / 200 | safe read/provider retry policy | PRODUCTION_VERIFIED; provider gate separate |
+| 39 | POST | /api/v1/integrations/spotify/disconnect | BEARER | no body | empty / 204 | credential/state wipe | PRODUCTION_VERIFIED |
+| 40 | GET | /api/v1/integrations/spotify/devices | BEARER | no body | {devices} / 200 | safe read | PRODUCTION_VERIFIED |
+| 41 | GET | /api/v1/integrations/spotify/active-device | BEARER | no body | {device} / 200 | safe read | PRODUCTION_VERIFIED |
+| 42 | GET | /api/v1/integrations/spotify/playback | BEARER | no body | {playback} / 200 | safe read; NO_ACTIVE_DEVICE is typed | PRODUCTION_VERIFIED |
+| 43 | PUT | /api/v1/integrations/spotify/preferred-device | BEARER | {deviceId: string\|null} | {device} / 200 | owner-scoped write | PRODUCTION_VERIFIED |
+| 44 | POST | /api/v1/integrations/spotify/actions | BEARER | {action,idempotencyKey,payload?,confirmed?} | {action} / 202 | user/action idempotency | PRODUCTION_VERIFIED; provider gate separate |
+| 45 | GET | /api/v1/plugins | BEARER | no body | {items} / 200 | safe read | PRODUCTION_VERIFIED |
+| 46 | POST | /api/v1/support/bug-reports | BEARER | authenticated multipart; max 5 screenshots | {id,status:"received"} / 201 | new report per request | PRODUCTION_VERIFIED |
+| 47 | GET | /api/v1/settings/memory | BEARER | no body | {automaticMemoryCandidates} / 200 | safe read | PRODUCTION_VERIFIED |
+| 48 | PATCH | /api/v1/settings/memory | BEARER | {automaticMemoryCandidates:boolean} | same object / 200 | owner-scoped write | PRODUCTION_VERIFIED |
+| 49 | GET | /api/v1/memories | BEARER | limit 1..100, default 25, opaque cursor | {memories,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
+| 50 | GET | /api/v1/memories/:id | BEARER | UUID path | memory projection / 200 | safe read | PRODUCTION_VERIFIED |
+| 51 | PATCH | /api/v1/memories/:id | BEARER | idempotency key plus bounded memory fields | memory projection / 200 | idempotent action | PRODUCTION_VERIFIED |
+| 52 | DELETE | /api/v1/memories/:id | BEARER | idempotency key body or header | empty / 204 | idempotent action | PRODUCTION_VERIFIED |
+| 53 | GET | /api/v1/memory-candidates | BEARER | limit 1..100, default 25, opaque cursor | {candidates,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
+| 54 | POST | /api/v1/memory-candidates/:id/accept | BEARER | idempotency key plus optional category/importance/expiry | memory projection / 200 | idempotent accept | PRODUCTION_VERIFIED |
+| 55 | POST | /api/v1/memory-candidates/:id/reject | BEARER | {idempotencyKey} | candidate projection / 200 | idempotent reject | PRODUCTION_VERIFIED |
+| 56 | POST | /api/v1/memories/forget-topic | BEARER | {idempotencyKey,topic} | sanitized counts / 200 | idempotent action | PRODUCTION_VERIFIED |
+| 57 | POST | /api/v1/memories/clear-all | BEARER | {idempotencyKey} | sanitized counts / 200 | idempotent action | PRODUCTION_VERIFIED |
+| 58 | POST | /api/v1/memories/export | BEARER | {idempotencyKey} | JSON export / 200 | idempotent audit | PRODUCTION_VERIFIED |
+| 59 | GET | /api/v1/memory/summary | BEARER | no body | {summary} / 200 | safe read | PRODUCTION_VERIFIED |
+| 60 | POST | /api/v1/memory/summary/regenerate | BEARER | {idempotencyKey} | {summary,generation} / 202 | idempotent action | PRODUCTION_VERIFIED; runtime status not_configured |
+| 61 | POST | /api/v1/memory/summary/feedback | BEARER | {idempotencyKey,feedback} | {summary} / 200 | idempotent action | PRODUCTION_VERIFIED |
+| 62 | POST | /api/v1/pairing/challenges | BEARER | no body | {pairingId,code,expiresAt} / 201 | new challenge invalidates prior | PRODUCTION_VERIFIED |
+| 63 | GET | /api/v1/pairing/:pairingId | BEARER | UUID path | {pairing} / 200 | read may expire stale challenge | PRODUCTION_VERIFIED |
+| 64 | POST | /api/v1/pairing/:pairingId/claim | BEARER | {code,hardwareId,deviceName,deviceCredential} | {device} / 201 | five-attempt replay/expiry guard | PRODUCTION_VERIFIED |
+| 65 | POST | /api/v1/pairing/:pairingId/revoke | BEARER | UUID path | empty / 204 | issued challenge revoke | PRODUCTION_VERIFIED |
+| 66 | GET | /api/v1/settings/personalization | BEARER | no body | seven-field object / 200 | safe read/upsert | PRODUCTION_VERIFIED |
+| 67 | PATCH | /api/v1/settings/personalization | BEARER | strict non-empty seven-field patch | seven-field object / 200 | owner-scoped write | PRODUCTION_VERIFIED |
+| 68 | PATCH | /api/v1/me/profile | BEARER | strict non-empty {displayName?,username?} | {user} / 200 | owner-scoped write; username conflict 409 | PRODUCTION_VERIFIED |
+| 69 | POST | /api/v1/me/avatar | BEARER | multipart one file; JPEG/PNG/WebP, max 5 MiB | {avatarUrl} / 200 | upload admission/rate limits | PRODUCTION_VERIFIED |
+| 70 | GET | /media/avatars/:fileName | PUBLIC | UUID .webp filename; no bearer required | WebP bytes / 200 | immutable cache read | PRODUCTION_VERIFIED |
+| 71 | GET | /api/v1/schedules | BEARER | limit 1..100, default 50, timestamp/UUID cursor | {schedules,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
+| 72 | POST | /api/v1/schedules | BEARER | Daily/Weekly/Once strict union | {schedule} / 201 | no key; new schedule | PRODUCTION_VERIFIED |
+| 73 | GET | /api/v1/schedules/:id | BEARER | UUID path | {schedule} / 200 | safe read | PRODUCTION_VERIFIED |
+| 74 | PATCH | /api/v1/schedules/:id | BEARER | current version plus mutable fields | {schedule} / 200 | optimistic version; 409 stale | PRODUCTION_VERIFIED |
+| 75 | POST | /api/v1/schedules/:id/pause | BEARER | {version} | {schedule} / 200 | optimistic version | PRODUCTION_VERIFIED |
+| 76 | POST | /api/v1/schedules/:id/resume | BEARER | {version} | {schedule} / 200 | optimistic version | PRODUCTION_VERIFIED |
+| 77 | DELETE | /api/v1/schedules/:id | BEARER | {version} | empty / 204 | durable cancel, optimistic version | PRODUCTION_VERIFIED |
+| 78 | GET | /api/v1/schedule-runs | BEARER | limit, cursor, optional scheduleId | {runs,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
+| 79 | GET | /api/v1/settings/user | BEARER | no body | user settings / 200 | safe read | PRODUCTION_VERIFIED |
+| 80 | PATCH | /api/v1/settings/user | BEARER | strict optional settings patch | user settings / 200 | owner-scoped write | PRODUCTION_VERIFIED |
+| 81 | GET | /api/v1/settings/devices/:deviceId | BEARER | UUID path | device settings / 200 | safe read | PRODUCTION_VERIFIED |
+| 82 | PATCH | /api/v1/settings/devices/:deviceId | BEARER | strict device settings patch | device settings / 200 | owner-scoped write | PRODUCTION_VERIFIED |
 
-Slice 5A registers the six frozen chat REST routes in the production-shaped
-source runtime and supplies the existing typed mobile chat event producers.
-The Phase 2.5 private candidate exercised chat submission, idempotency,
-history, Hermes persistence, and the separate mobile WebSocket; Caddy/public
-routing was not changed, and physical proactive speech remains pending the
-generic delivery slice and ESP evidence.
+The two registered device-settings PATCH routes are aliases to the same
+`SettingsService.updateDeviceSettings` behavior and remain separately
+documented; source and tests do not designate a canonical/deprecated one.
 
-The memory slice registers all 15 frozen memory/settings/summary routes and
-injects bounded active owner memory into chat. The Phase 2.5 private candidate
-exercised the owner-scoped memory/settings read path; public production remains
-unchanged.
+### Routes intentionally outside the Mobile count
 
-The device additions slice registers owner-scoped Wi-Fi metadata/configuration,
-device log, and telemetry routes in the production-shaped source runtime. Wi-Fi
-passwords use protected AES-256-GCM configuration and never appear in read
-responses or logs. Existing voice events remain unchanged; additive device
-events and physical behavior remain `PENDING_PHYSICAL_ESP`.
+~~~
+GET /api/v1/integrations/spotify/callback   provider browser callback, not Mobile API
+GET /api/v1/ops/db/livez                    internal operator route
+GET /api/v1/ops/db/readyz                   internal operator route
+GET /api/v1/ops/db/migrations               internal operator route
+~~~
 
-Scheduler/proactive, device additions, and provider/support slices have
-candidate evidence where noted above and remain source/test verified for
-surfaces not exercised by the live harness. No production migration, recreation,
-or activation occurred. Spotify live actions remain
-`BLOCKED_EXTERNAL_SECRET`; WhatsApp live runtime actions remain
-`BLOCKED_OPERATOR`; physical additive events remain
-`PENDING_PHYSICAL_ESP`.
+The production Spotify callback is exactly
+https://api.personalbmo.web.id/api/v1/integrations/spotify/callback. Mobile
+starts OAuth with /spotify/connect and does not call the callback itself.
 
-## Runtime and existing voice surfaces
+The source does not register GET /api/v1/devices/:deviceId/status or POST
+/api/v1/voice/preview; both are NOT_IMPLEMENTED.
 
-| Method/surface | Path/event | Status | Availability / evidence |
-|---|---|---|---|
-| GET | `/health` | `EXISTING_VERIFIED` | Public production 200; integrated source returns sanitized `database: error`/503 when enabled P9 DB health or migrations are not ready |
-| GET | `/livez` | `EXISTING_VERIFIED` | Backend loopback 200; Caddy deliberately returns public 404 |
-| GET | `/readyz` | `EXISTING_VERIFIED` | Backend loopback; P9-enabled source includes DB health/migration readiness; Caddy deliberately returns public 404 |
-| POST | `/api/v1/voice` | `EXISTING_VERIFIED` | Production device-authenticated whole raw-WAV upload |
-| GET | `/audio/:fileName` | `EXISTING_VERIFIED` | Canonical client form `/audio/:audioId.mp3`; production MP3 delivery |
-| WSS | `/ws` | `EXISTING_VERIFIED` | Production physical-device contract; not mobile realtime |
-| GET | `/api/v1/ops/db/livez` | `EXISTING_VERIFIED` | Private candidate only (`includeOps=true`) |
-| GET | `/api/v1/ops/db/readyz` | `EXISTING_VERIFIED` | Private candidate only |
-| GET | `/api/v1/ops/db/migrations` | `EXISTING_VERIFIED` | Private candidate only; sanitized migration state |
-| TCP exposure | `*:5555` | `EXISTING_VERIFIED` | Phase 2 remediation: manual Prisma Studio stopped; no listener, Docker publication, or Caddy route. Firewall rules unreadable without passworded sudo. |
+## Mobile WebSocket event inventory
 
-## Auth, profile, and settings
+The source defines 12 Mobile event names: one client authentication event, one
+server authentication acknowledgement, and ten additional server events.
 
-Existing P9.1 rows below are source- and private-candidate-verified. The Phase
-2.5 candidate packages them with the full Backend voice runtime; public
-production remains unchanged and still returns 404 for routes not enabled there.
+| Direction | Event | Runtime evidence | Authentication | Payload | Trigger/source | Mobile behavior |
+|---|---|---|---|---|---|---|
+| Mobile → Backend | authenticate | RUNTIME_PROTOCOL | First message within 5 seconds | `{event,accessToken}` | Client opens exact `/api/v1/ws` path | Send once; never use query token or refresh token |
+| Backend → Mobile | authenticated | RUNTIME_PROTOCOL | After active JWT/session verification | `{event,status:"ok",userId}` | Successful authentication | Mark socket ready |
+| Backend → Mobile | chat_thinking | RUNTIME_EMITTED | Authenticated socket | `{sessionId,messageId}` | Durable chat accepted/processing | Show transient thinking; recover from history |
+| Backend → Mobile | chat_message | RUNTIME_EMITTED | Authenticated socket | `{sessionId,message:{id,sender:"assistant",text,createdAt}}` | Assistant message persisted | Insert/update chat; history remains authority |
+| Backend → Mobile | device_status | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | device UUID, online, lastSeenAt, Wi-Fi RSSI, nullable battery | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; use REST device state as fallback |
+| Backend → Mobile | voice_processing_status | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | device/request UUID, `thinking\|audio_ready\|completed\|failed`, nullable errorCode | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; do not require current delivery |
+| Backend → Mobile | wifi_configuration_status | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | device/config UUID, Wi-Fi lifecycle status, nullable errorCode | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; use REST Wi-Fi state as fallback |
+| Backend → Mobile | proactive_delivery_status | RUNTIME_EMITTED | Authenticated socket | device/delivery UUID, source, delivery status, nullable errorCode | Generic CHAT/SCHEDULE/WHATSAPP delivery | Show device delivery status; no fabricated device for MOBILE target |
+| Backend → Mobile | schedule_status | RUNTIME_EMITTED | Authenticated socket | schedule UUID, nullable run UUID, durable status, label | Schedule create/update/lifecycle | Refresh schedule state |
+| Backend → Mobile | integration_status | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | integration `whatsapp\|spotify`, status `CONNECTED\|DISCONNECTED\|PENDING\|ERROR\|RECONNECT_REQUIRED` | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; poll integration REST status |
+| Backend → Mobile | notification | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | UUID, `GENERIC`, bounded title/body, createdAt | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; do not require current delivery |
+| Backend → Mobile | whatsapp_notification | RUNTIME_EMITTED | Authenticated socket | conversation UUID, displayName, `DM\|GROUP`, receivedAt | Allowed inbound metadata notification | Refresh conversation; no message body/JID/phone/token |
 
-| Method | Path | Status | Availability / gap |
-|---|---|---|---|
-| POST | `/api/v1/auth/register` | `EXISTING_VERIFIED` | Slice 2B source/tests: self-service email/password/DOB; optional invitation compatibility only. Running private candidate remains invitation-era and public production unchanged |
-| POST | `/api/v1/auth/login` | `EXISTING_VERIFIED` | Private candidate + Slice 2B source tests; every valid normalized email uses discovery, one transaction, real-or-stable-dummy lock, authoritative lookup, and one Argon2 verify; registration-between-lookups re-locks/refetches the real user before issue |
-| POST | `/api/v1/auth/refresh` | `EXISTING_VERIFIED` | Private candidate + source race tests; discover owner, lock, refetch, validate, then rotate with replay-family revocation |
-| POST | `/api/v1/auth/logout` | `EXISTING_VERIFIED` | Private candidate |
-| POST | `/api/v1/auth/logout-all` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/me` | `EXISTING_VERIFIED` | Private candidate legacy shape; Slice 2B source/tests return canonical username/avatar URL without DOB |
-| POST | `/api/v1/auth/password/recovery/verify` | `EXISTING_VERIFIED` | Slice 2B source/tests; generic enumeration-safe failure, request-ID-bearing independent IP/email limits, Jakarta calendar boundary, per-user serialized replacement epochs using a post-lock DB clock, 600-second opaque token, and SHA-256 verifier only; not deployed |
-| POST | `/api/v1/auth/password/recovery/reset` | `EXISTING_VERIFIED` | Slice 2B source/tests; per-user lock and post-lock DB clock precede refetch/atomic single use, sibling-epoch invalidation, Argon2id replacement, and transactional all-session/refresh revocation; not deployed |
-| PATCH | `/api/v1/me/profile` | `EXISTING_VERIFIED` | Slice 2B source/tests; bearer-owned strict display-name/normalized-username patch and sanitized conflict |
-| POST | `/api/v1/me/avatar` | `EXISTING_VERIFIED` | Slice 2B source/tests; independent user/IP limits, global 2-active/4-waiting admission before 5 MiB Multer buffering, one-owner/IP active/waiting fairness, bounded 30-second pre-parse receive deadline with sanitized 408, post-parse leases retained through processing despite disconnect, separate 2-active/4-waiting Sharp admission, 8 MP/4096 px/4:1/single-page decode bounds, WebP transcode, hardened runtime-owned storage, temp-plus-atomic-rename UUID publication, nonfatal old cleanup, and aged bounded paginated DB-rechecked orphan reconciliation |
-| GET | `/media/avatars/:opaqueId.webp` | `EXISTING_VERIFIED` | Slice 2B source/tests; exact UUID WebP path, `image/webp`, `nosniff`, immutable cache, request context, and local sanitized errors; no directory listing |
-| GET | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
-| PATCH | `/api/v1/settings/user` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B exact-body source/tests; owner-scoped safe upsert returns the bare canonical seven-field object; Slice 5A consumes it in bounded server-built Hermes chat context |
-| PATCH | `/api/v1/settings/personalization` | `EXISTING_VERIFIED` | Slice 2B exact-body source/tests; strict nonempty bounded canonical owner patch returns the bare seven-field object; Slice 5A consumes it in bounded server-built Hermes chat context |
+The five `RUNTIME_EMITTED` application events have direct current emitters:
+`chat_thinking`, `chat_message`, `proactive_delivery_status`,
+`schedule_status`, and `whatsapp_notification`. The five
+`SCHEMA_DEFINED_NO_CURRENT_EMITTER` events are forward-compatible schemas
+only; Mobile must not require them to arrive and should use authoritative
+REST state or reconnect reads where applicable.
 
-## Pairing and devices
+All outbound schemas are strict. The Mobile socket has a 32 KiB maximum
+payload, 60-second server ping, and termination after two missed pongs. Token
+expiry closes 4410 ACCESS_TOKEN_EXPIRED; invalid session closes 4403; auth
+timeout closes 4408; malformed pre-auth data closes 4401.
 
-All four current pairing calls require a mobile bearer token. The ESP does not claim through `/ws`; the claim credential is supplied out-of-band.
+/api/v1/ws is an event transport, not a chat-history authority, command
+channel, audio stream, or LLM token stream. REST history and resource reads are
+the recovery source after reconnect.
 
-| Method | Path | Status | Availability / gap |
-|---|---|---|---|
-| POST | `/api/v1/pairing/challenges` | `EXISTING_VERIFIED` | Private candidate; six digits, 600-second TTL, five attempts |
-| GET | `/api/v1/pairing/:pairingId` | `EXISTING_VERIFIED` | Private candidate |
-| POST | `/api/v1/pairing/:pairingId/claim` | `EXISTING_VERIFIED` | Private candidate; body includes code, hardwareId, deviceName, deviceCredential |
-| POST | `/api/v1/pairing/:pairingId/revoke` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/devices` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/devices/:deviceId` | `EXISTING_VERIFIED` | Private candidate |
-| PATCH | `/api/v1/devices/:deviceId/settings` | `EXISTING_VERIFIED` | Private candidate; DB-only settings route |
-| POST | `/api/v1/devices/:deviceId/unpair` | `EXISTING_VERIFIED` | Private candidate |
-| GET | `/api/v1/settings/devices/:deviceId` | `EXISTING_VERIFIED` | Private candidate; canonical settings read |
-| PATCH | `/api/v1/settings/devices/:deviceId` | `EXISTING_VERIFIED` | Private candidate; canonical settings write |
-| GET | `/api/v1/devices/:deviceId/status` | `READY_TO_IMPLEMENT` | Not registered |
-| GET | `/api/v1/devices/:deviceId/wifi` | `EXISTING_VERIFIED` | Owner-scoped metadata only; plaintext/ciphertext never returned |
-| PUT | `/api/v1/devices/:deviceId/wifi` | `EXISTING_VERIFIED` | Owner-scoped latest-write-wins AES-256-GCM desired state; physical apply pending |
-| DELETE | `/api/v1/devices/:deviceId/wifi` | `EXISTING_VERIFIED` | Deletes Backend metadata only; does not factory-reset device |
-| GET | `/api/v1/devices/:deviceId/logs` | `EXISTING_VERIFIED` | Owner-scoped bounded sanitized seven-day log read |
-| GET | `/api/v1/devices/:deviceId/telemetry` | `EXISTING_VERIFIED` | Owner-scoped current RSSI/nullable battery read |
+## Separate hardware WebSocket
 
-## Chat and mobile realtime
+The hardware contract remains wss://api.personalbmo.web.id/ws with
+device_id/device_token, existing raw-WAV voice, and MP3 playback events. It is
+not interchangeable with Mobile /api/v1/ws. Additive Wi-Fi, telemetry, log,
+settings, and proactive events remain PENDING_PHYSICAL_ESP until firmware and
+real-device evidence exist.
 
-| Method/surface | Path/event | Status | Availability / gap |
-|---|---|---|---|
-| GET | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Private candidate plus source tests; bearer-owner scope and bounded deterministic ordering; public production unchanged |
-| POST | `/api/v1/chat/sessions` | `EXISTING_VERIFIED` | Private candidate plus source tests; strict `{temporary}` and server-derived owner |
-| GET | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Private candidate plus source tests; owned active session, positive signed-64-bit cursor, bounded stable ascending pagination |
-| POST | `/api/v1/chat/sessions/:sessionId/messages` | `EXISTING_VERIFIED` | Private candidate plus source tests; durable 202 user message/operation, transactional per-user UUID idempotency and conflict rejection, bounded scheduling, DB-clock lease renewal before Hermes, and delete abort/persistence guard; `speakOnDevice:false` accepted live, while physical proactive delivery remains pending |
-| DELETE | `/api/v1/chat/sessions/:sessionId` | `EXISTING_VERIFIED` | Source tests; owner-scoped soft deletion and cancellation of processing operations; no invented purge period |
-| POST | `/api/v1/chat/messages/:messageId/feedback` | `EXISTING_VERIFIED` | Source tests; owner-scoped assistant-only bounded feedback upsert |
-| WSS | `/api/v1/ws` | `EXISTING_VERIFIED` | Private candidate plus source tests; exact separate mobile upgrade path with authentication timeout and path isolation; public production unchanged |
-| Mobile -> Backend | `authenticate` | `EXISTING_VERIFIED` | Source/test tier; strict `{event,accessToken}` within five seconds, no URL-query token or client identity |
-| Backend -> Mobile | `authenticated` | `EXISTING_VERIFIED` | Source/test tier; verified token plus active server session supplies `userId`; expiry closes 4410 |
-| Backend -> Mobile | `chat_thinking` | `EXISTING_VERIFIED` | Typed bounded schema plus Slice 5A best-effort per-user producer after durable acceptance; history remains recovery authority |
-| Backend -> Mobile | `chat_message` | `EXISTING_VERIFIED` | Typed bounded schema plus Slice 5A per-user producer after sanitized assistant persistence; no token stream |
-| Backend -> Mobile | `device_status` | `EXISTING_VERIFIED` | Typed nullable battery/RSSI schema + per-user fanout source/test; status producer remains `READY_TO_IMPLEMENT` |
-| Backend -> Mobile | `voice_processing_status` | `EXISTING_VERIFIED` | Typed sanitized schema + per-user fanout source/test; no audio URL/stream; producer remains `READY_TO_IMPLEMENT` |
-| Backend -> Mobile | `wifi_configuration_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user fanout source/test; device additive lifecycle remains physical pending |
-| Backend -> Mobile | `proactive_delivery_status` | `EXISTING_VERIFIED` | Typed generic CHAT/SCHEDULE/WHATSAPP schema + per-user fanout and generic device-delivery lifecycle producer source/test; physical sender/playback remains `PENDING_PHYSICAL_ESP`; device-less MOBILE intents do not fabricate this device-scoped event |
-| Backend -> Mobile | `schedule_status` | `EXISTING_VERIFIED` | Typed bounded schema + per-user schedule lifecycle/one-shot completion producer source/test; candidate worker expiry path accepted, public production unchanged |
-| Backend -> Mobile | `integration_status` | `EXISTING_VERIFIED` | Typed WhatsApp/Spotify schema + per-user fanout source/test; WhatsApp bridge adapter/poller is source-verified while live session acceptance remains `BLOCKED_OPERATOR`; Spotify live credentials remain blocked |
-| Backend -> Mobile | `whatsapp_notification` | `SOURCE_VERIFIED` | Metadata-only per-user event with BMO conversation UUID/display name/DM-GROUP classification; no body, phone, JID, session, or credential; live provider acceptance is candidate-gated |
-| Backend -> Mobile | `notification` | `EXISTING_VERIFIED` | Typed bounded GENERIC schema for non-WhatsApp notifications; WhatsApp uses the dedicated metadata-only event above |
+## Coverage result
 
-## Memory and schedules
+~~~
+MOBILE_ROUTE_SOURCE_COUNT=82
+MOBILE_WS_EVENT_SOURCE_COUNT=12
+MOBILE_ROUTE_DOC_COVERAGE=100%
+MOBILE_WS_EVENT_DOC_COVERAGE=100%
+~~~
 
-| Methods | Path family | Status | Availability / gap |
-|---|---|---|---|
-| GET/PATCH | `/api/v1/settings/memory` | `EXISTING_VERIFIED` | Private candidate read plus source tests; exact `{automaticMemoryCandidates}` body and bearer-derived owner; public production unchanged |
-| GET | `/api/v1/memories`, `/api/v1/memories/:id` | `EXISTING_VERIFIED` | Private candidate read plus source tests; deterministic opaque cursor, bounded pages, active/unexpired owner rows only |
-| PATCH/DELETE | `/api/v1/memories/:id` | `EXISTING_VERIFIED` | Source/test tier; strict bounded patch, owner-safe soft delete, idempotent audited actions |
-| GET | `/api/v1/memory-candidates` | `EXISTING_VERIFIED` | Source/test tier; bounded deterministic pending/unexpired owner candidates only |
-| POST | `/api/v1/memory-candidates/:id/accept`, `.../reject` | `EXISTING_VERIFIED` | Source/test tier; transaction-locked owner scope and payload-aware idempotent replay/conflict behavior |
-| POST | `/api/v1/memories/forget-topic`, `.../clear-all`, `.../export` | `EXISTING_VERIFIED` | Source/test tier; suppression includes pending candidates/summary as applicable; JSON export excludes deleted/expired memory and non-pending candidates |
-| GET | `/api/v1/memory/summary` | `EXISTING_VERIFIED` | Source/test tier; active/unexpired owner summary or explicit null |
-| POST | `/api/v1/memory/summary/regenerate`, `.../feedback` | `EXISTING_VERIFIED` | Source/test tier; durable `generating` boundary reports memory-record source and `not_configured` runtime; no invented Hermes summary provider |
-| GET/POST | `/api/v1/schedules` | `EXISTING_VERIFIED` | Private candidate plus source tests; owner-derived strict create and deterministic bounded listing; public production unchanged |
-| GET/PATCH | `/api/v1/schedules/:id` | `EXISTING_VERIFIED` | Private candidate plus source tests; owner-safe lookup and required optimistic `version` conflict boundary |
-| POST | `/api/v1/schedules/:id/pause`, `.../resume` | `EXISTING_VERIFIED` | Source/test; lifecycle transitions require the current positive version |
-| DELETE | `/api/v1/schedules/:id` | `EXISTING_VERIFIED` | Source/test; durable CANCELLED transition, no silent purge |
-| GET | `/api/v1/schedule-runs` | `EXISTING_VERIFIED` | Source/test; owner-scoped schedule filter and deterministic dueAt/id cursor |
-
-## Integrations, plugins, and support
-
-| Methods | Path | Status | Availability / gate |
-|---|---|---|---|
-| GET/POST | `/api/v1/integrations/whatsapp/connect`, `.../status` | `CANDIDATE_VERIFIED` | Candidate-only authenticated smoke passed connection/status against the paired loopback bridge; mobile receives application status only, not bridge details |
-| GET/POST | `/api/v1/integrations/whatsapp/qr`, `.../confirm-scanned` | `CANDIDATE_VERIFIED` | Operator-only setup surface; QR pairing completed outside mobile UI and the dedicated bridge is active |
-| POST | `/api/v1/integrations/whatsapp/disconnect` | `SOURCE_VERIFIED` | Owner-scoped metadata/provider boundary; no live disconnect acceptance claimed |
-| GET | `/api/v1/integrations/whatsapp/conversations`, `.../:id` | `CANDIDATE_VERIFIED` | Candidate-only authenticated smoke passed owner-scoped list/detail; responses contain BMO UUID and safe display/type/activity/notification fields only |
-| POST | `/api/v1/integrations/whatsapp/conversations/resolve` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed validated international phone resolution/creation; when the private resolver is available, forward/reverse provider mappings are added before candidate lookup, otherwise the phone alias remains conservative; no provider identity projection is performed |
-| GET/PATCH | `/api/v1/integrations/whatsapp/notification-rules` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed authenticated `ALL` DM default plus UUID-scoped `CONTACT`; `GROUP` remains default-disabled and ingestion-independent |
-| POST | `/api/v1/integrations/whatsapp/send-preview`, `.../send-confirm` | `CANDIDATE_VERIFIED` | Candidate-only smoke passed conversation-scoped preview and bounded foreign-confirm rejection; outbound resolution uses the server-side canonical mapping and any explicit provider aliases |
-| POST | `/api/v1/integrations/spotify/connect` | `SOURCE_READY` | Server-side Authorization Code URL with hashed single-use state; Mobile receives URL only; live credentials `BLOCKED_EXTERNAL_SECRET` |
-| GET | `/api/v1/integrations/spotify/callback` | `SOURCE_READY` | Exact configurable loopback redirect, state ownership/expiry/reuse validation, server-side exchange and encrypted persistence; no bearer token or Caddy exposure |
-| GET | `/api/v1/integrations/spotify/status` | `SOURCE_READY` | Normalized owner-scoped state including `RECONNECT_REQUIRED`; canonical `account_id` linking remains server-side; no token/provider payload |
-| POST | `/api/v1/integrations/spotify/disconnect` | `SOURCE_READY` | Owner-scoped credential and provider-identity metadata wipe with disconnected state |
-| GET | `/api/v1/integrations/spotify/search`, `/.../active-device` | `SOURCE_READY` | Bounded market-aware normalized search and server-derived active-device projection; candidate provider credentials blocked |
-| GET | `/api/v1/integrations/spotify/devices`, `.../playback` | `SOURCE_READY` | Safe Connect device/current playback projection; no-device is typed and never fabricated as success |
-| PUT | `/api/v1/integrations/spotify/preferred-device` | `SOURCE_READY` | Owner-scoped safe-device selection/clear; only required device projection is returned |
-| POST | `/api/v1/integrations/spotify/actions` | `SOURCE_READY` | Strict semantic allowlist for search/resolution, track/artist/album/playlist play, pause/resume/skip, transfer, seek, volume, shuffle, and repeat; no queue/arbitrary provider proxy; live provider blocked |
-| GET | `/api/v1/plugins` | `EXISTING_VERIFIED` | Source/test; exactly WhatsApp + Spotify safe status catalog |
-| POST | `/api/v1/support/bug-reports` | `EXISTING_VERIFIED` | Source/test; bounded authenticated multipart, max five images, opaque persistent keys |
-| POST | `/api/v1/voice/preview` | `DEFERRED` | Not registered; last-priority optional surface |
-
-## Existing device `/ws` events
-
-| Direction | Event | Status | Evidence |
-|---|---|---|---|
-| ESP -> Backend | `authenticate` | `EXISTING_VERIFIED` | Config-based `DEVICE_ID`/`DEVICE_TOKEN`; 8 KiB max payload; source tests verify additive active hardware-ID/SHA-256 binding plus ACTIVE revalidation/clear before owner use without regressing legacy voice |
-| Backend -> ESP | `authenticated` | `EXISTING_VERIFIED` | Current production source/runtime |
-| Backend -> ESP | `authentication_failed` | `EXISTING_VERIFIED` | Current source |
-| Backend -> ESP | `connection_replaced` | `EXISTING_VERIFIED` | One active connection per device |
-| Backend -> ESP | `display_status` | `EXISTING_VERIFIED` | Current voice lifecycle |
-| Backend -> ESP | `audio_ready` | `EXISTING_VERIFIED` | MP3 URL lifecycle |
-| Backend -> ESP | `request_failed` | `EXISTING_VERIFIED` | Current error lifecycle |
-| ESP -> Backend | `audio_playback_done` | `EXISTING_VERIFIED` | Current source |
-| ESP -> Backend | `audio_playback_failed` | `EXISTING_VERIFIED` | Current source |
-
-## Additive device `/ws` events
-
-Every row below is unimplemented on the physical ESP at freeze time.
-
-| Direction | Event | Status | Backend target / physical gate |
-|---|---|---|---|
-| Backend -> ESP | `wifi_configuration` | `PENDING_PHYSICAL_ESP` | Encrypted DB desired state; firmware apply required |
-| ESP -> Backend | `wifi_configuration_received` | `PENDING_PHYSICAL_ESP` | Receipt only, not apply success |
-| ESP -> Backend | `wifi_configuration_result` | `PENDING_PHYSICAL_ESP` | Physical reconnect/result required |
-| ESP -> Backend | `device_log` | `PENDING_PHYSICAL_ESP` | Bounded/sanitized ingestion target |
-| ESP -> Backend | `device_telemetry` | `PENDING_PHYSICAL_ESP` | RSSI/current state; battery nullable |
-| Backend -> ESP | `device_settings` | `PENDING_PHYSICAL_ESP` | Initial physical field is playback volume |
-| ESP -> Backend | `device_settings_applied` | `PENDING_PHYSICAL_ESP` | Physical application acknowledgement |
-| Backend -> ESP | `proactive_audio_ready` | `PENDING_PHYSICAL_ESP` | Generic source-neutral playback request |
-| ESP -> Backend | `proactive_playback_done` | `PENDING_PHYSICAL_ESP` | Physical completion proof |
-| ESP -> Backend | `proactive_playback_failed` | `PENDING_PHYSICAL_ESP` | Physical failure proof |
-
-No token-by-token LLM streaming or WebSocket audio streaming is in the frozen release. A new registered route/event must be added here in the same change or it is scope drift.
+Any new registered route or event must update this matrix, the canonical Mobile
+contract, and implementation status in the same source change.

@@ -2,6 +2,10 @@
 
 **Frozen:** 2026-08-11
 
+**Current update:** Decisions INT-061 through INT-065 below record the
+post-promotion production and Mobile documentation state. Older entries retain
+their historical meaning unless explicitly superseded.
+
 | ID | Decision | Reason / consequence |
 |---|---|---|
 | INT-001 | One production Backend API service owns mobile and device application APIs. | Avoid a second source of business truth. |
@@ -35,6 +39,11 @@
 | INT-058 | Spotify requests exactly `user-read-private`, `user-read-playback-state`, `user-modify-playback-state`, and `playlist-read-private`; the Backend stores authorization time because refresh tokens do not expose issuance time and requires reauthorization after six calendar months or `invalid_grant`. | Minimize consent and make the six-month provider lifecycle explicit and testable. |
 | INT-059 | Candidate Spotify OAuth uses an operator loopback redirect forwarded by SSH to Backend `127.0.0.1:3010`; candidate Caddy remains unchanged and production redirect registration is deferred to Production Promotion. | Avoid public exposure of the candidate callback while retaining an exact Spotify redirect URI. |
 | INT-060 | Spotify account linking uses the current-user `account_id` as the canonical immutable provider identity. The profile `id` may be retained only as non-canonical server-side metadata; it is never an ownership key, bearer value, Mobile field, or Hermes input. A repeated `account_id` converges to one BMO Spotify connection and cross-user reuse is rejected. | Follow Spotify's account-linking contract and prevent mutable/profile identifiers from creating ambiguous ownership. |
+| INT-061 (supersedes INT-042) | P9 production is live: the promoted Backend serves Mobile REST and `/api/v1/ws` on `https://api.personalbmo.web.id`, with private PostgreSQL and the six required migrations applied. | Source, runtime, health, migration, backup, and rollback evidence cleared the production gate. |
+| INT-062 (supersedes INT-059) | The production Spotify callback is `https://api.personalbmo.web.id/api/v1/integrations/spotify/callback`; the candidate loopback callback and port `3010` are historical validation-only values. | Provider-side redirect registration was verified before production cutover; Caddy remains unchanged. |
+| INT-063 | Mobile has exactly one primary contract: `01-MOBILE-BACKEND-API-CONTRACT.md`, with `05-IMPLEMENTATION-STATUS.md` and `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md` as its required companions. | Prevent stale handoffs and candidate-era docs from competing with the current Mobile integration package. |
+| INT-064 | Mobile calls only the Backend. Hermes, PostgreSQL, Audio, WhatsApp bridge/resolver, Spotify Web API, and hardware `/ws` remain internal or separate boundaries. | Keep credentials, provider protocols, and physical-device ownership server-side. |
+| INT-065 (supersedes INT-041) | Current Mobile integration status vocabulary is exactly `PRODUCTION_VERIFIED`, `IMPLEMENTED`, `PARTIALLY_IMPLEMENTED`, `NOT_IMPLEMENTED`, `OUT_OF_SCOPE`, `BLOCKED`, and `PENDING_PHYSICAL_ESP`. `EXISTING_VERIFIED`, `READY_TO_IMPLEMENT`, and `DEFERRED` remain historical freeze labels only and must not be used in current Mobile status tables. | Align the current status file and maintenance protocol while preserving INT-041 as historical evidence. |
 | INT-047 | Prisma Studio on `*:5555` is a security blocker and is not part of declared production architecture. | Close before Phase 2/deploy. |
 | INT-048 | `docs/product/BMO-BY-BLABS-PRD-v1.4.0.md` is the current integration PRD; v1.2.4 remains the locked historical product baseline. | Keeps verifier-protected history intact. |
 

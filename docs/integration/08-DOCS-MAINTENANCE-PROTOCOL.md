@@ -2,6 +2,11 @@
 
 **Effective:** 2026-08-11
 
+**Current production note:** P9 production is complete and the Mobile package
+is current at main `e4f87ca5faf81e1c495c2719f3bb19b056340657`. Promotion and
+migration instructions in historical documents must not be treated as pending
+work.
+
 ## 1. Authority order
 
 1. Registered code, Prisma migration history, and inspected runtime are evidence of the current state.
@@ -14,24 +19,42 @@ When evidence conflicts with current prose, correct current prose and record the
 
 ## 2. Required status vocabulary
 
-Use only:
+Current integration documents use:
 
 ```text
-EXISTING_VERIFIED
-READY_TO_IMPLEMENT
-PENDING_PHYSICAL_ESP
+PRODUCTION_VERIFIED
+IMPLEMENTED
+PARTIALLY_IMPLEMENTED
+NOT_IMPLEMENTED
+OUT_OF_SCOPE
 BLOCKED
-DEFERRED
+PENDING_PHYSICAL_ESP
 ```
 
-`EXISTING_VERIFIED` must name its tier: source, private candidate, loopback production, public production, or physical. Do not infer public availability from source existence. Do not use `implemented`, `done`, or `live` as a standalone status.
+`DEFERRED` belongs only to the historical freeze vocabulary retained in old
+decision records. It is not a current status for the Mobile integration
+package; use `OUT_OF_SCOPE`, `BLOCKED`, or an explicitly named implementation
+gap instead.
+
+`PRODUCTION_VERIFIED` must name the production/runtime evidence boundary when
+it matters; `IMPLEMENTED` must name source/test evidence when production is not
+claimed. Do not infer public availability from source existence. Do not use
+`implemented`, `done`, or `live` as a standalone status.
 
 ## 3. Same-change synchronization
 
-Any implementation commit that changes an endpoint, event, model, owner, exposure, or acceptance state must update at least:
+Any source change that changes a Mobile route or Mobile WebSocket event must
+update all three of these in the same source change:
 
+- `01-MOBILE-BACKEND-API-CONTRACT.md`;
 - `05-IMPLEMENTATION-STATUS.md`;
 - `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`;
+
+The route/event source registration and relevant tests remain the validation
+authority. Other implementation commits that change a model, owner, exposure,
+or acceptance state must also update the relevant P9 architecture/schema/test
+document, `06-DECISION-REGISTER.md` when a frozen decision changes, and
+`docs/NEXT-ACTION.md` when the next executable boundary changes.
 - the relevant P9 architecture/schema/security/test document;
 - `06-DECISION-REGISTER.md` when a frozen decision changes;
 - `docs/NEXT-ACTION.md` when the next executable boundary changes.
@@ -76,7 +99,10 @@ Before a docs or implementation milestone is complete:
 
 ## 8. Promotion evidence
 
-- `READY_TO_IMPLEMENT` -> `EXISTING_VERIFIED`: code plus relevant test/runtime evidence and an explicit tier.
-- `PENDING_PHYSICAL_ESP` -> `EXISTING_VERIFIED`: firmware commit/build and real-device acceptance, not a fake client.
-- `BLOCKED` -> another state: name the evidence that removed the blocker.
-- `DEFERRED` -> active: record an approved scope/priority decision first.
+Current status changes must use the vocabulary in §2 and name the evidence
+that justifies the change. Historical records may contain the superseded
+labels `EXISTING_VERIFIED`, `READY_TO_IMPLEMENT`, or `DEFERRED`; do not copy
+those labels into current Mobile status tables. `PENDING_PHYSICAL_ESP` may
+change only after firmware commit/build evidence and real-device acceptance,
+not a fake client. `BLOCKED` may change only when the external/provider or
+operator gate is explicitly cleared.

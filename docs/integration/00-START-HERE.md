@@ -1,181 +1,111 @@
-# BMO Integration Pack — Canonical Contract Freeze
+# BMO Mobile Integration — Current Production Entry Point
 
-**Version:** 2.0.0
-**Frozen:** 2026-08-11
-**Phase:** Phase 1 — VPS Audit + Documentation Freeze
-**Implementation authority:** none; Phase 2 starts only from the checkpoint in `docs/NEXT-ACTION.md`.
+**Audited:** 2026-08-18
+**Source of truth:** Git `main` at `e4f87ca5faf81e1c495c2719f3bb19b056340657`
+**Production state:** P9 Backend and PostgreSQL are live and healthy.
 
-**Current source checkpoint:** Phase 2 account/profile/recovery/avatar,
-personalization, mobile realtime `/api/v1/ws`, chat/Hermes, memory,
-scheduler/proactive delivery, device data-plane additions, provider integration
-boundaries, plugin catalog, and bug reports are source/test verified. Physical
-ESP behavior remains `PENDING_PHYSICAL_ESP`; Phase 2.6 source Spotify capability
-is `SOURCE_VERIFIED` while live Spotify acceptance is `BLOCKED_EXTERNAL_SECRET`.
-WhatsApp adapter/source acceptance is `SOURCE_VERIFIED` against the Hermes 0.20.0
-loopback bridge; live acceptance is `BLOCKED_OPERATOR` pending candidate bridge
-configuration and QR pairing. This does not alter the frozen Phase 1 runtime facts
-below: the running private candidate is still invitation-era/unmigrated and
-public production is unchanged.
+This is the current onboarding page for the Mobile team. Do not use old
+candidate handoffs as a production guide.
 
-## 1. Terminology and authority
+## Read in this order
 
-For this project, **backend** means the complete BMO VPS platform:
+1. `01-MOBILE-BACKEND-API-CONTRACT.md` — the canonical Mobile API contract.
+2. `05-IMPLEMENTATION-STATUS.md` — implementation and production-verification status.
+3. `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md` — source-derived route and event inventory.
+
+`02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md` and
+`03-HARDWARE-IMPLEMENTATION-HANDOFF.md` are for the separate physical-device
+contract. They do not replace the Mobile API contract.
+
+## Production endpoints
 
 ```text
-Caddy + public TLS/routing
-Docker Engine + Compose/runtime
-Backend API service (Express/Node)
-PostgreSQL + Prisma
-Hermes Agent
-Audio Service
-Beszel/observability
-secrets/config
-internal networking + deployment state
+API base:       https://api.personalbmo.web.id
+Mobile WS:      wss://api.personalbmo.web.id/api/v1/ws
+Hardware WS:    wss://api.personalbmo.web.id/ws
 ```
 
-Use **Backend API service** only for the Express/Node component.
+The two WebSockets are different protocols and authentication contracts.
+Mobile uses only `/api/v1/ws`; the ESP32 uses only `/ws`.
 
-Authority order for the integration release:
+The physical Mobile app must not use VPS localhost addresses. Port `3010` is a
+historical private candidate port and is not the production Mobile API.
 
-1. existing physical voice wire contract: `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`;
-2. approved integration REST/mobile/device targets: `01-MOBILE-BACKEND-API-CONTRACT.md` and `02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`;
-3. locked decisions: `06-DECISION-REGISTER.md`;
-4. actual baseline and availability: `05-IMPLEMENTATION-STATUS.md`;
-5. per-surface readiness/evidence: `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`;
-6. concern-specific P9 and backend-MVP documents linked from `docs/README.md`.
+Mobile communicates only with the BMO Backend. It must not connect directly to
+Hermes, PostgreSQL, Audio Service, the WhatsApp bridge, the WhatsApp identity
+resolver, Spotify Web API, or the ESP32.
 
-If documentation and code/runtime disagree, code/runtime determines the current implementation claim and the target contract remains explicitly `READY_TO_IMPLEMENT`, `PENDING_PHYSICAL_ESP`, `BLOCKED`, or `DEFERRED`.
+## Authority and status vocabulary
 
-## 2. Frozen baseline
+When prose conflicts with source, tests, migrations, or the running production
+definition, those sources win. The current status vocabulary is:
 
-Audit base:
+- `PRODUCTION_VERIFIED` — the route/runtime is present in the promoted production image; this does not prove provider or physical-device success.
+- `IMPLEMENTED` — source and relevant tests implement the behavior, but production verification is not claimed.
+- `PARTIALLY_IMPLEMENTED` — only a defined subset is implemented.
+- `NOT_IMPLEMENTED` — no registered production implementation exists.
+- `OUT_OF_SCOPE` — intentionally not a Mobile feature in this release.
+- `BLOCKED` — an external/provider/operator gate prevents the behavior.
+- `PENDING_PHYSICAL_ESP` — Backend support exists or is defined, but firmware and real-device evidence are still required.
+
+## Current production architecture
 
 ```text
-source branch before freeze: main
-source SHA: d638b20c381c676136c94524a38a1def5d70e565
-documentation branch: docs/integration-contract-freeze
-production voice image source: 4d7b472adc4c2243d8f7364032a491ad70efb6d3
+React Native Mobile
+        │ HTTPS / WSS
+        ▼
+BMO Backend :3000
+   ├── PostgreSQL :private
+   ├── Hermes :8642
+   ├── Audio Service :8001
+   ├── WhatsApp bridge :3001
+   ├── WhatsApp identity resolver :3002
+   └── Spotify provider boundary
 ```
 
-Verified current boundaries:
+Only the Backend is a Mobile integration boundary. Spotify/provider access and
+refresh tokens, OAuth state, resolver/provider/session internals, and internal
+service keys remain server-side. The Mobile app necessarily holds the BMO
+application access and refresh tokens, submits the Wi-Fi password to the
+Backend, and may submit `deviceCredential` for pairing if its external
+provenance is resolved. Wi-Fi passwords are never returned in Backend
+responses, and pairing `deviceCredential` is never returned and is hashed
+before persistence.
 
-- production public voice remains `WSS /ws`, raw whole-WAV `POST /api/v1/voice`, and MP3 `GET /audio/:audioId.mp3`;
-- production Backend API service does not enable P9 and public auth/device/settings/mobile-WS routes return `404`;
-- current repository contains the implemented P9.1 invitation-auth, session, six-digit pairing, device, and settings source;
-- a private P9.1 candidate and PostgreSQL 16.14 run on an internal Docker network with two applied migrations and no host-published port;
-- the P9.1 candidate is not the production Backend API service;
-- mobile `WSS /api/v1/ws` and the Phase 2 application surfaces are `EXISTING_VERIFIED` at source/test tier only; the running candidate remains unmigrated and public production is unchanged;
-- the existing device identity remains runtime `DEVICE_ID`/`DEVICE_TOKEN`; Slice 1 resolves an optional active P9.1 application row after legacy authentication and revalidates it before any owner-specific use;
-- Hermes 0.20.0 is healthy on loopback; Audio Service is healthy/degraded only because RVC is intentionally disabled; Caddy exposes the public API through port 443;
-- physical ESP32 acceptance and every new additive firmware capability remain unverified.
-- at the Phase 1 freeze, a manual Prisma Studio process listened on `*:5555`; Phase 2 stopped it and verified no listener, Docker publication, or Caddy route remains. Privileged firewall-policy visibility is still an operator evidence gap.
+## Integration order
 
-Exact route, schema, runtime, test, and blocker evidence is in `05-IMPLEMENTATION-STATUS.md`.
+Use this order because later features depend on earlier identity and transport
+state:
 
-### Phase 2.5 current override — 2026-08-13
+1. API client, `X-Request-Id`, and the common error envelope.
+2. Registration, login, access/refresh session persistence, logout, and recovery.
+3. `/me`, profile, avatar, user settings, and personalization.
+4. Resolve `PAIRING_MOBILE_INPUT_SOURCE_NEEDS_REVIEW` before implementing the
+   end-to-end six-digit BMO pairing UX. Pairing is currently
+   `PARTIALLY_IMPLEMENTED` at the external input boundary because the Backend
+   does not define how Mobile obtains `hardwareId`, `deviceName`, or
+   `deviceCredential`; device list/detail/unpair and device settings remain
+   separable work where their implemented APIs permit.
+5. Mobile WebSocket authentication, heartbeat, reconnect, and event dispatch.
+6. Chat sessions, history, idempotent message submission, and WebSocket updates.
+7. Memory records, candidates, summaries, forget/delete/export operations.
+8. Schedules, optimistic versioning, pause/resume/cancel, and run history.
+9. WhatsApp application routes; provider setup remains operator-controlled.
+10. Spotify server-side OAuth/status/devices/playback/actions.
+11. Bug reports and diagnostics.
 
-The freeze facts above describe the Phase 1/Phase 2 entry baseline. The isolated
-Phase 2.5 candidate has since been recreated from the recorded candidate SHA,
-the additive migration has been applied only to its private PostgreSQL, and
-the core candidate acceptance gate has passed. Candidate Backend remains
-separate from production on `127.0.0.1:3010`; production migration, Backend
-replacement, and Caddy activation were not performed. See the current evidence
-and blockers in `05-IMPLEMENTATION-STATUS.md` and route/event results in
-`09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`.
+## Production safety boundaries
 
-## 3. Approved Phase 2 scope
+- Do not repeat production promotion, migrations, or candidate acceptance as part of Mobile integration.
+- Do not use candidate Compose, candidate secrets, candidate callback URLs, or `/tmp/bmo-p9-1-validation-*` paths.
+- Do not apply the candidate Caddy patch or use port `3010`.
+- Do not call `/messages`, `/send`, Hermes, Spotify, PostgreSQL, or the resolver directly.
+- Do not treat source/test implementation as proof of physical ESP behavior.
 
-The following target scope is frozen and must not be re-inferred from older UI or architecture drafts:
+## Companion documents
 
-```text
-self-service registration
-DOB password recovery
-profile + unique username + avatar
-personalization
-existing 6-digit pairing
-device APIs/settings
-Wi-Fi configuration via VPS DB → ESP
-mobile chat/history
-separate mobile realtime WebSocket
-memory
-schedules
-WhatsApp
-Spotify
-plugin catalog limited to WhatsApp + Spotify
-bug reports
-device logs
-telemetry/RSSI
-generic proactive audio
-device settings sync
-```
-
-Voice preview remains `DEFERRED` unless separately prioritized after the required scope.
-
-## 4. Compatibility locks
-
-The physical voice transport is unchanged:
-
-```text
-device WSS /ws
-authentication message uses device_id + device_token
-raw whole WAV via HTTP
-MP3 via HTTP
-device JSON remains snake_case
-```
-
-The mobile realtime contract is separate:
-
-```text
-mobile WSS /api/v1/ws
-access token sent after socket open
-mobile JSON uses camelCase
-REST submits commands; WS delivers realtime status/results
-no token streaming, microphone streaming, or audio streaming
-```
-
-Never expose a device credential to mobile or allow a mobile access token to authenticate `/ws`.
-
-## 5. Locked ownership
-
-```text
-Mobile              presentation, local drafts/session storage, user intent
-Caddy               public TLS and reverse proxy only
-Backend API service authz, APIs, idempotency, orchestration, policy, adapters
-PostgreSQL          durable application state and audit
-Hermes              reasoning/personality and Hermes-owned WhatsApp session
-Audio Service       STT/TTS/FFmpeg only
-ESP32               recording, playback, local display/Wi-Fi/telemetry capabilities
-External providers  provider-side account/playback/messaging state
-```
-
-Mobile never calls PostgreSQL, Hermes, Audio Service, Spotify, WhatsApp, or ESP32 directly. Hermes and Audio Service remain private. Backend is the only application authority crossing those boundaries.
-
-## 6. Device identity lock
-
-Current production voice authentication and P9.1 application identity are separate implementations. Phase 2 must preserve the current physical credential and add a resolver after successful `/ws` authentication:
-
-```text
-authenticated device_id
-→ active Device.hardwareId equality
-→ SHA-256(authenticated device_token) equals Device.tokenHash
-→ resolve owning User/Device
-```
-
-If no active matching row exists, existing voice remains available but owner-specific Wi-Fi, settings, telemetry ownership, logs, and proactive content are denied with a safe diagnostic. No implicit credential rotation is allowed.
-
-## 7. Hardware status rule
-
-Every new ESP behavior is `PENDING_PHYSICAL_ESP` until real firmware/device evidence exists. This includes Wi-Fi apply/rollback, RSSI/log emission, proactive playback/deduplication, and playback-volume settings application. Backend code or simulated tests cannot upgrade that classification.
-
-## 8. Phase 1 stop condition
-
-This freeze authorizes documentation changes only. It does not authorize:
-
-- feature implementation;
-- production migration;
-- application/container/Caddy restart or deployment;
-- firewall changes;
-- device credential rotation;
-- physical firmware claims.
-
-Phase 2 starts exactly at `docs/NEXT-ACTION.md` and must treat the matrix/status files as the pre-implementation baseline.
+- `06-DECISION-REGISTER.md` records non-negotiable ownership and lifecycle decisions.
+- `08-DOCS-MAINTENANCE-PROTOCOL.md` requires route/event documentation to change with implementation.
+- `02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md` is the Backend ↔ ESP32 contract.
+- `03-HARDWARE-IMPLEMENTATION-HANDOFF.md` records the remaining physical work.
+- `04-VPS-IMPLEMENTATION-PLAN.md`, `07-ONE-SHOT-AGENT-PROMPT.md`, and `10-OPERATOR-PROMPT-RUNBOOK.md` are completed historical operational records, not current promotion instructions.

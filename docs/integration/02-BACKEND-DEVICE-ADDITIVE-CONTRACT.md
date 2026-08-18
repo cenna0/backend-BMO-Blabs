@@ -4,7 +4,14 @@
 **Date:** 2026-08-11
 **Rule:** Additive only. This file describes the Backend API service ↔ ESP32 protocol. Existing `BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5` voice behavior remains valid.
 
-**Implementation state:** all capabilities in sections 2–6 are `PENDING_PHYSICAL_ESP`; no physical implementation is claimed. Backend handlers are also absent at the freeze SHA and are Phase 2 work.
+**Implementation state:** Backend handlers for the additive capabilities are
+implemented in the promoted P9 runtime. Firmware behavior and real-device
+acceptance remain `PENDING_PHYSICAL_ESP`; this document must not be read as
+evidence that an ESP32 supports the new events.
+
+**Current production:** Backend source/runtime is `PRODUCTION_VERIFIED` at
+main `e4f87ca5faf81e1c495c2719f3bb19b056340657`. The physical contract remains
+separate from Mobile `/api/v1/ws` and existing hardware `/ws` voice behavior.
 
 ---
 

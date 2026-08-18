@@ -1,21 +1,26 @@
 # BMO P9 — Current Architecture and Scope Authority
 
-**Frozen:** 2026-08-11
-**Current authority:** [`../integration/00-START-HERE.md`](../integration/00-START-HERE.md) and the Phase 1 freeze documents.
+**Frozen:** 2026-08-11; production status synchronized 2026-08-18
+**Current authority:** [`../integration/00-START-HERE.md`](../integration/00-START-HERE.md), [`../integration/01-MOBILE-BACKEND-API-CONTRACT.md`](../integration/01-MOBILE-BACKEND-API-CONTRACT.md), [`../integration/05-IMPLEMENTATION-STATUS.md`](../integration/05-IMPLEMENTATION-STATUS.md), and [`../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md).
 
-P9.1 source is present at the audited `main` SHA and is verified in a private candidate stack. Its auth, six-digit pairing, device, settings, Prisma, and PostgreSQL foundation is not enabled on the public production Backend API. The historical statement “no P9.1 candidate is deployed to production” remains true when “production” means the public production service; the candidate is an isolated private runtime. P9.2–P9.6 remain proposed in the historical stage model and are not implemented.
+P9.1 is implemented on `main` at `e4f87ca5faf81e1c495c2719f3bb19b056340657` and is live in the public production Backend. The production Mobile API is `https://api.personalbmo.web.id`, the Mobile WebSocket is `wss://api.personalbmo.web.id/api/v1/ws`, and the hardware WebSocket remains the separate `wss://api.personalbmo.web.id/ws` contract. Candidate-only assets, port `3010`, loopback callback URLs, and validation paths are historical and must not be used as production instructions. P9.2–P9.6 remain proposed in the historical stage model unless the current integration status says otherwise.
+
+> **Historical isolated-candidate safety assertion — superseded for current production:** the pre-promotion record stated that no P9.1 candidate is deployed to production and that P9.2–P9.6 remain proposed and not implemented. That record is retained as historical evidence; the current production status is the statement above and the canonical integration package.
 
 ## Current classification
 
-- Existing production: device `/ws`, raw whole WAV over HTTP, MP3 over HTTP, Hermes and Audio Service integration.
-- Existing private candidate: P9.1 auth/session, pairing, devices/settings, 11-model Prisma schema, two applied migrations.
-- Source/test `EXISTING_VERIFIED`: Slice 2B self-service account recovery,
-  profile/avatar, personalization persistence, and the separate authenticated
-  mobile realtime `/api/v1/ws` transport; the private candidate and public
-  production are unchanged.
-- `READY_TO_IMPLEMENT`: approved chat/memory/scheduler/integration backend scope and later personalization-to-Hermes context assembly.
-- `PENDING_PHYSICAL_ESP`: all additive firmware events and physical acceptance.
-- `BLOCKED`: the exact operational/provider gates in the integration status file.
+- Production: P9 Backend REST and authenticated Mobile `/api/v1/ws`, PostgreSQL,
+  the legacy hardware `/ws` contract, Hermes, and Audio Service integration.
+- `PRODUCTION_VERIFIED`: P9 production runtime, six applied Prisma migrations,
+  public routing, and the production Spotify callback are operationally verified.
+- `IMPLEMENTED`: the source-backed Mobile auth, profile, personalization,
+  pairing, devices/settings, chat, memory, schedules, WhatsApp projections,
+  Spotify lifecycle, bug-report, and Mobile WebSocket contracts documented in
+  the integration package.
+- `PENDING_PHYSICAL_ESP`: additive firmware behavior and physical hardware
+  acceptance remain outside this Backend documentation synchronization.
+- `NOT_IMPLEMENTED` / `OUT_OF_SCOPE`: capabilities explicitly marked that way
+  in the canonical Mobile contract; do not infer APIs from historical plans.
 
 The current PRD is [`../product/BMO-BY-BLABS-PRD-v1.4.0.md`](../product/BMO-BY-BLABS-PRD-v1.4.0.md). The locked v1.2.4 PRD, P9.1 evidence, and review files are historical evidence and must not be rewritten.
 

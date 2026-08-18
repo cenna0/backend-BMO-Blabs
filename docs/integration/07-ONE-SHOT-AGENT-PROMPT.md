@@ -1,5 +1,11 @@
 # Phase 2 Agent Prompt — Frozen Input
 
+> **COMPLETED / HISTORICAL — DO NOT RUN FOR CURRENT PRODUCTION.** The P9
+> implementation and production promotion described by this prompt completed at
+> main `e4f87ca5faf81e1c495c2719f3bb19b056340657`. Use the current Mobile contract
+> documents for integration work. Do not repeat candidate acceptance, six
+> migrations, promotion, or the `3010` callback workflow.
+
 Use this prompt only after the Phase 1 docs commit is present and implementation is explicitly authorized.
 
 ```text
