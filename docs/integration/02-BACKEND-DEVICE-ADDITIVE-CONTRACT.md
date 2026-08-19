@@ -1,7 +1,7 @@
 # BMO Backend API Service ↔ ESP32 Additive Device Contract
 
 **Version:** 2.0.0
-**Date:** 2026-08-11
+**Date:** 2026-08-19
 **Rule:** Additive only. This file describes the Backend API service ↔ ESP32 protocol. Existing `BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5` voice behavior remains valid.
 
 **Implementation state:** Backend handlers for the additive capabilities are
@@ -9,12 +9,12 @@ implemented in the promoted P9 runtime. Firmware behavior and real-device
 acceptance remain `PENDING_PHYSICAL_ESP`; this document must not be read as
 evidence that an ESP32 supports the new events.
 
-**Current lifecycle:** Code-only enrollment exists in reviewed source but is
-NOT YET DEPLOYED. Migration
-`20260818110000_pairing_code_only_enrollment` is NOT YET APPLIED IN PRODUCTION.
-Physical firmware acceptance remains `PENDING_PHYSICAL_ESP`. The physical
-contract remains separate from Mobile `/api/v1/ws` and existing hardware
-`/ws` voice behavior.
+**Current lifecycle:** Code-only enrollment is deployed in the production
+Backend from `main` commit `d1473d04f4b76ccb52cc8eeaff52a268504310f0`.
+Migration `20260818110000_pairing_code_only_enrollment` is applied in
+production. Backend health and soak verification passed. Physical firmware
+acceptance remains `PENDING_PHYSICAL_ESP`; the physical contract remains
+separate from Mobile `/api/v1/ws` and existing hardware `/ws` voice behavior.
 
 ---
 
@@ -51,7 +51,9 @@ A newer valid connection replaces the old one.
 
 ## 1.1 Application-device binding
 
-Existing `/ws` authentication remains backward-compatible.
+Existing `/ws` authentication remains backward-compatible. The deployed
+Backend can issue code-only enrollment after a valid legacy hardware
+authentication; no firmware acceptance has been recorded.
 
 Phase 2 must resolve the authenticated hardware/device identity to the application `Device` row before allowing DB-owned additive features. The frozen resolver rule is:
 

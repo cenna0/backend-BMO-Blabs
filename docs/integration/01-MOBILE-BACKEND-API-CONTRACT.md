@@ -1,21 +1,27 @@
 # BMO Mobile ↔ Backend API Contract
 
 **Version:** 3.0.0
-**Audited:** 2026-08-18
-**Source status:** Code-only enrollment exists in reviewed source.
-**Production status:** NOT YET DEPLOYED.
-**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Audited:** 2026-08-19
+**Source status:** Code-only enrollment is on `main` at
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
+**Production status:** `PRODUCTION_VERIFIED` — image
+`bmo-p9.1:pairing-code-only-d1473d0`.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied in
+production; state is `7 completed, 0 unfinished, 0 rolled_back`.
+**Production verification:** Direct/public health, Mobile REST/WS smoke, and
+the six-sample production soak passed. Mobile REST has 79 routes and Mobile WS
+has 12 events.
 **Physical status:** `PENDING_PHYSICAL_ESP`.
 **Production base URL:** `https://api.personalbmo.web.id`
 **REST base path:** `/api/v1`
 **Canonical companion:** `09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`
 
-This is the one primary Mobile contract. It describes the approved Backend
-contract; production verification is labeled per route. The matrix is the
-source-derived inventory for every registered Mobile API route and Mobile
-WebSocket event. The code-only enrollment route is implemented in reviewed
-source but is not deployed; this contract does not claim production
-verification for the new pairing flow.
+This is the one primary Mobile contract. It describes the approved and
+production-deployed Backend contract; production verification is labeled per
+route. The matrix is the source-derived inventory for every registered Mobile
+API route and Mobile WebSocket event. Code-only enrollment is production
+verified at the Backend boundary; physical firmware completion remains
+`PENDING_PHYSICAL_ESP`.
 
 ## Boundaries
 

@@ -4,6 +4,12 @@
 **Status:** `PENDING_PHYSICAL_ESP`
 **Existing voice contract:** `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` remains unchanged.
 
+The code-only Backend enrollment path is deployed and production-verified in
+`bmo-p9.1:pairing-code-only-d1473d0` from `main` commit
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0`; migration #7 is applied. This
+handoff remains the firmware and real-device work boundary, so its status stays
+`PENDING_PHYSICAL_ESP`.
+
 This file describes hardware work required after the Backend Phase 2 handlers
 were implemented. The promoted Backend contains the additive handlers, but
 this file is not evidence that firmware supports any new event.
@@ -20,7 +26,11 @@ audio_ready with an HTTPS MP3 URL
 audio_playback_done / audio_playback_failed
 ```
 
-Current production supports one configured device credential. P9.1 pairing rows do not authenticate `/ws` today. Hardware must not rotate the working credential as an implicit integration fix.
+Current production preserves the configured legacy device credential and `/ws`
+voice path. `/ws` still authenticates with the hardware credential; after a
+valid unbound authentication, the deployed Backend may issue a durable
+code-only enrollment. Hardware must not rotate the working credential as an
+implicit integration fix.
 
 ## Required additive capabilities
 

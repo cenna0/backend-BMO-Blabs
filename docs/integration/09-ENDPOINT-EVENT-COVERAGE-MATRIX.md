@@ -1,10 +1,11 @@
 # Mobile Endpoint and WebSocket Coverage Matrix
 
-**Audited:** 2026-08-18
+**Audited:** 2026-08-19
 **Source:** backend/src/p9/http/*.ts, backend/src/p9/websocket/mobile-events.ts, backend/src/p9/websocket/mobile-websocket.server.ts
-**Source status:** Code-only enrollment exists in reviewed source.
-**Production status:** Code-only enrollment is NOT YET DEPLOYED.
-**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Source status:** Code-only enrollment is on `main` at `d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
+**Production status:** Code-only enrollment is `PRODUCTION_VERIFIED` in `bmo-p9.1:pairing-code-only-d1473d0`.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied in production; state is `7 completed, 0 unfinished, 0 rolled_back`.
+**Production verification:** Health and six-sample soak passed; Docker healthcheck resolves `BACKEND_PORT=3000`; old raw-credential Mobile pairing routes are absent.
 **Physical status:** `PENDING_PHYSICAL_ESP`.
 
 ## Counting rule
@@ -90,7 +91,7 @@ Auth is explicit per route row: `PUBLIC`, `BEARER`, or `OPERATOR_BEARER`.
 | 59 | GET | /api/v1/memory/summary | BEARER | no body | {summary} / 200 | safe read | PRODUCTION_VERIFIED |
 | 60 | POST | /api/v1/memory/summary/regenerate | BEARER | {idempotencyKey} | {summary,generation} / 202 | idempotent action | PRODUCTION_VERIFIED; runtime status not_configured |
 | 61 | POST | /api/v1/memory/summary/feedback | BEARER | {idempotencyKey,feedback} | {summary} / 200 | idempotent action | PRODUCTION_VERIFIED |
-| 62 | POST | /api/v1/pairing/claim | BEARER | strict {code: six digits} | {device} / 201; generic unusable-code 409; rate limit 429 | single-use transaction; user/session/IP limits | IMPLEMENTED; physical completion PENDING_PHYSICAL_ESP |
+| 62 | POST | /api/v1/pairing/claim | BEARER | strict {code: six digits} | {device} / 201; generic unusable-code 409; rate limit 429 | single-use transaction; user/session/IP limits | PRODUCTION_VERIFIED; physical completion PENDING_PHYSICAL_ESP |
 | 63 | GET | /api/v1/settings/personalization | BEARER | no body | seven-field object / 200 | safe read/upsert | PRODUCTION_VERIFIED |
 | 64 | PATCH | /api/v1/settings/personalization | BEARER | strict non-empty seven-field patch | seven-field object / 200 | owner-scoped write | PRODUCTION_VERIFIED |
 | 65 | PATCH | /api/v1/me/profile | BEARER | strict non-empty {displayName?,username?} | {user} / 200 | owner-scoped write; username conflict 409 | PRODUCTION_VERIFIED |

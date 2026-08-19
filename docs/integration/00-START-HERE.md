@@ -1,18 +1,22 @@
 # BMO Mobile Integration — Current Production Entry Point
 
-**Audited:** 2026-08-18
-**Source status:** Code-only enrollment exists in reviewed source.
+**Audited:** 2026-08-19
+**Source status:** Code-only enrollment is on `main` at
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
 **Production state:** P9 Backend and PostgreSQL are live and healthy.
-**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Production image:** `bmo-p9.1:pairing-code-only-d1473d0`.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied;
+production migration state is `7 completed, 0 unfinished, 0 rolled_back`.
+**Production verification:** Health and six-sample soak passed; Mobile REST is
+79 routes and Mobile WS is 12 events.
 **Physical status:** `PENDING_PHYSICAL_ESP`.
 
 This is the current onboarding page for the Mobile team. Do not use old
 candidate handoffs as a production guide.
 
-The code-only enrollment implementation is present in reviewed source but is
-not deployed. Production remains at the six-migration baseline until explicit
-deployment approval; physical firmware acceptance remains
-`PENDING_PHYSICAL_ESP`.
+The code-only enrollment implementation is deployed in the production Backend.
+Its physical firmware acceptance remains `PENDING_PHYSICAL_ESP`; source and
+Backend rollout evidence do not substitute for a real ESP32 acceptance.
 
 ## Read in this order
 

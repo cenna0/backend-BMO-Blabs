@@ -1,10 +1,14 @@
 # Mobile / P9 Implementation Status
 
-**Audited:** 2026-08-18
-**Source status:** Code-only enrollment exists in reviewed source.
+**Audited:** 2026-08-19
+**Source status:** Code-only enrollment is on `main` at
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
 **Production state:** `PRODUCTION_VERIFIED` — P9 Backend and PostgreSQL are live.
-**Production status for code-only enrollment:** NOT YET DEPLOYED.
-**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Production image:** `bmo-p9.1:pairing-code-only-d1473d0`.
+**Production status for code-only enrollment:** `PRODUCTION_VERIFIED`.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied in production; state is `7 completed, 0 unfinished, 0 rolled_back`.
+**Production verification:** Direct/public health, Mobile REST/WS smoke, pairing
+route absence checks, voice/integration continuity, and six soak samples passed.
 **Physical status:** `PENDING_PHYSICAL_ESP`.
 
 This document separates implementation from production verification. A route
@@ -29,7 +33,7 @@ behavior, or complete acceptance suite remains blocked.
 |---|---|---|
 | P9 Backend runtime | `PRODUCTION_VERIFIED` | `bmo-production-p9-backend-1`, frozen image digest, loopback `127.0.0.1:3000`, healthy. |
 | PostgreSQL | `PRODUCTION_VERIFIED` | Private `bmo-production-p9-postgres-1`, persistent `/opt/bmo/data/postgres`, healthy, no public port. |
-| Prisma schema | `PRODUCTION_VERIFIED` | Exactly six finished migrations are applied in production. |
+| Prisma schema | `PRODUCTION_VERIFIED` | Exactly seven finished migrations are applied in production; migration #7 adds HardwareEnrollment and active pairing/device uniqueness boundaries. |
 | Production callback | `PRODUCTION_VERIFIED` | `https://api.personalbmo.web.id/api/v1/integrations/spotify/callback` is provider-registered and configured. |
 | Caddy routing | `PRODUCTION_VERIFIED` | Existing public route terminates TLS and proxies to `127.0.0.1:3000`; no candidate `3010` patch is used. |
 
@@ -42,12 +46,12 @@ Production migrations, in order:
 20260814120000_whatsapp_conversations
 20260814210000_whatsapp_identity_aliases
 20260815120000_spotify_phase26_lifecycle
+20260818110000_pairing_code_only_enrollment
 ```
 
-The reviewed code-only enrollment implementation adds migration
-`20260818110000_pairing_code_only_enrollment`. It has not been deployed or
-applied to production; production remains at the six migrations listed above
-until deployment approval.
+The seven migrations above are the completed production migration history.
+Migration #7 is additive and is covered by the preserved rollback image and
+fresh encrypted backup checkpoint.
 
 ## Mobile API implementation
 
@@ -58,7 +62,7 @@ until deployment approval.
 | Profile and avatar | `PRODUCTION_VERIFIED` | Strict profile patch, opaque UUID WebP avatar path, bounded multipart admission, persistent production storage. |
 | User settings | `PRODUCTION_VERIFIED` | Language, response length, automatic memory candidates, server-fixed `Asia/Jakarta` timezone. |
 | Personalization | `PRODUCTION_VERIFIED` | Seven bounded user-level fields; persistence is implemented. |
-| Six-digit pairing | `IMPLEMENTED` | Backend creates durable HardwareEnrollment rows from authenticated unbound hardware, sends pairing codes over hardware `/ws`, accepts code-only Mobile claims, copies the trusted token digest into Device, enforces TTL/replacement/concurrency/rate limits, and sends pairing completion. Physical firmware support and real-device acceptance remain `PENDING_PHYSICAL_ESP`. No robot QR pairing. |
+| Six-digit pairing | `PRODUCTION_VERIFIED` | Backend creates durable HardwareEnrollment rows from authenticated unbound hardware, sends pairing codes over hardware `/ws`, accepts code-only Mobile claims, copies the trusted token digest into Device, enforces TTL/replacement/concurrency/rate limits, and sends pairing completion. Physical firmware support and real-device acceptance remain `PENDING_PHYSICAL_ESP`. No robot QR pairing. |
 | Devices and settings | `PRODUCTION_VERIFIED` | List/detail/unpair, both registered device-settings PATCH aliases, user/device settings, ownership enforcement. |
 | Device status route | `NOT_IMPLEMENTED` | `/api/v1/devices/:deviceId/status` is not registered. Status is represented by Mobile WS events when produced. |
 | Wi-Fi API | `PRODUCTION_VERIFIED` | Encrypted server-side desired state and bounded metadata projection; physical apply remains pending. |
@@ -94,7 +98,9 @@ until deployment approval.
 - `/livez` and `/readyz` are internal health routes; the public `/health` route is the public smoke endpoint.
 - `rvc=unavailable` is the accepted readiness degradation; it does not block Mobile API use.
 - No candidate project, candidate port `3010`, candidate callback, or `/tmp/bmo-p9-1-validation-*` path is part of production.
-- The code-only enrollment source is reviewed but not deployed. Do not rerun the six production migrations or apply migration #7 as Mobile integration work.
+- Code-only enrollment is deployed and migration #7 is applied. Do not rerun
+  production migrations as Mobile integration work; physical firmware
+  acceptance remains `PENDING_PHYSICAL_ESP`.
 - `integration_status`, `device_status`, `voice_processing_status`, `wifi_configuration_status`, and `notification` are schema-defined outbound events with no direct current `sendToUser` emitter; Mobile must use REST state/fallbacks and must not require those events.
 - `chat_thinking`, `chat_message`, `proactive_delivery_status`, `schedule_status`, and `whatsapp_notification` have direct current runtime emitters.
 - Spotify OAuth has no application deep-link callback in the current source: Mobile opens `authorizationUrl`, the browser receives the Backend callback, and Mobile polls `/integrations/spotify/status` after returning to the app.

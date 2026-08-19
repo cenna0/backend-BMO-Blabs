@@ -1,18 +1,19 @@
 # BMO — Current Next Action
 
-**Last updated:** 2026-08-18
+**Last updated:** 2026-08-19
 **Current executable boundary:** Mobile application integration against the live production P9 Backend.
-**Source status:** Code-only enrollment exists in reviewed source.
-**Production status:** NOT YET DEPLOYED.
-**Migration #7:** `20260818110000_pairing_code_only_enrollment` NOT YET APPLIED IN PRODUCTION.
+**Source status:** Code-only enrollment is on `main` at `d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
+**Production status:** `PRODUCTION_VERIFIED` — Backend deployed as `bmo-p9.1:pairing-code-only-d1473d0`.
+**Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied in production; migration state is `7 completed, 0 unfinished, 0 rolled_back`.
+**Production verification:** Direct/public health and the six-sample production soak passed. Mobile REST coverage is 79 routes and Mobile WebSocket coverage is 12 events.
+**Rollback anchor:** `bmo-p9.1:spotify-phase26-9819ef7` remains preserved.
 **Physical status:** `PENDING_PHYSICAL_ESP`.
 
-P9 production promotion, PostgreSQL bootstrap, the six migrations, backups,
-Backend cutover, source closure, and main fast-forward are complete. Do not
-repeat promotion, the six production migrations, candidate acceptance, or
-runtime cleanup as part of Mobile integration. The reviewed code-only
-enrollment source and migration remain outside production until explicit
-deployment approval.
+P9 production promotion, PostgreSQL bootstrap, the seven migrations, encrypted
+backups, Backend cutover, source closure, and main fast-forward are complete.
+Do not repeat promotion, production migrations, candidate acceptance, or
+runtime cleanup as part of Mobile integration. The remaining pairing boundary
+is physical firmware implementation and real-device acceptance.
 
 ## Mobile starting point
 
@@ -56,9 +57,9 @@ WhatsApp bridge/resolver, Spotify Web API, or the hardware `/ws` protocol.
 
 ## Explicit remaining boundaries
 
-- Backend code-only pairing is implemented; physical firmware display,
-  reissue, completion handling, and real-device acceptance remain
-  `PENDING_PHYSICAL_ESP`.
+- Backend code-only pairing is deployed and production-verified; physical
+  firmware display, reissue, completion handling, and real-device acceptance
+  remain `PENDING_PHYSICAL_ESP`.
 - Physical ESP Wi-Fi/log/telemetry/settings/proactive behavior remains
   `PENDING_PHYSICAL_ESP`.
 - WhatsApp provider send/inbound acceptance and Spotify provider action/OAuth

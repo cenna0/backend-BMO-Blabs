@@ -1,26 +1,28 @@
 # Production P9 Runtime Definition
 
-**Status:** `PRODUCTION_P9_RUNTIME_DEFINITION_READY` after the static checks
-listed below pass. This document is preparation-only. No command in the
-future-command sections was executed while creating this definition.
+**Status:** `PRODUCTION_P9_RUNTIME_DEFINITION_EXECUTED`
+
+The rollout described by this historical preparation runbook completed on
+2026-08-19. The future-command sections below are retained as an audit trail;
+they are not current deployment instructions or evidence that production is
+still pending.
 
 ## Frozen artifact and boundary
 
 ```text
-commit: 9819ef7c05bd9c71ea153feffc41ca8f96695287
-image:  bmo-p9.1-candidate:spotify-phase26-9819ef7
-digest: sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241
+commit: d1473d04f4b76ccb52cc8eeaff52a268504310f0
+image:  bmo-p9.1:pairing-code-only-d1473d0
+digest: sha256:203817f83a023f730ed5dfd71be8bc96d127001a727c5ebc3d8999e945769973
 ```
 
-The production Compose reference is a future production tag,
-`bmo-p9.1:spotify-phase26-9819ef7`; it is not present until the operator
-performs the explicitly listed metadata-only retag. The production Compose
-has no build section and never rebuilds the frozen image.
+The current production Compose reference uses the immutable deployed image
+above. The rollback image `bmo-p9.1:spotify-phase26-9819ef7` remains preserved
+at digest `sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241`.
+Production migration state is `7 completed, 0 unfinished, 0 rolled_back`.
 
-This preparation did not start, stop, restart, recreate, or migrate any
-service/database. It did not execute a backup, alter a provider credential,
-generate or rotate a secret, change firewall state, reload Caddy, or prune
-Docker resources.
+The executed production mutation was limited to migration #7 and Backend-only
+cutover. PostgreSQL, Audio, Hermes, WhatsApp, Spotify configuration, Caddy,
+firewall, and secrets were preserved; no Docker cleanup or prune was performed.
 
 ## Compose structure
 
