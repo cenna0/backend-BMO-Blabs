@@ -1,117 +1,101 @@
-# BMO Hardware / ESP32 Handoff — Frozen Requirements
+# BMO Hardware / ESP32 Implementation Handoff
 
-**Frozen:** 2026-08-11
-**Status:** `PENDING_PHYSICAL_ESP`
-**Existing voice contract:** `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` remains unchanged.
+> **CURRENT / CANONICAL**
+> Backend code-only pairing is production-deployed. This document describes
+> firmware and real-device work, whose status remains
+> `PENDING_PHYSICAL_ESP`.
 
-The code-only Backend enrollment path is deployed and production-verified in
-`bmo-p9.1:pairing-code-only-d1473d0` from `main` commit
-`d1473d04f4b76ccb52cc8eeaff52a268504310f0`; migration #7 is applied. This
-handoff remains the firmware and real-device work boundary, so its status stays
-`PENDING_PHYSICAL_ESP`.
+**Audited:** 2026-08-20
+**Production image:** `bmo-p9.1:pairing-code-only-d1473d0`
+**Deployed-image source revision:**
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable provenance, not current
+Git HEAD)
+**Production migrations:** `7 completed, 0 unfinished, 0 rolled_back`
+**Hardware WSS:** `wss://api.personalbmo.web.id/ws`
 
-This file describes hardware work required after the Backend Phase 2 handlers
-were implemented. The promoted Backend contains the additive handlers, but
-this file is not evidence that firmware supports any new event.
+Start at [`ESP-AGENT-HANDOFF.md`](ESP-AGENT-HANDOFF.md). The existing physical
+voice authority remains
+[`../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md).
 
-## Existing physical path — preserve first
+## Milestone 1 — connection stability first
 
-The physical device must continue to use:
+Reach `HW_VPS_CONNECTION_STABLE` before pairing implementation:
 
-```text
-WSS /ws
-authenticate { device_id, device_token }
-raw whole WAV POST /api/v1/voice
-audio_ready with an HTTPS MP3 URL
-audio_playback_done / audio_playback_failed
-```
+1. Wi-Fi association;
+2. DNS resolution of `api.personalbmo.web.id`;
+3. trustworthy device time via SNTP/NTP;
+4. TLS certificate-chain, hostname, and SNI validation;
+5. WSS upgrade to the exact `/ws` URL;
+6. `authenticate` as the first JSON message within five seconds using existing
+   `device_id` / `device_token`;
+7. receive `authenticated`;
+8. maintain native ping/pong;
+9. bounded reconnect plus re-authentication;
+10. preserve existing wakeword, whole-WAV upload, MP3 playback, and completion.
 
-Current production preserves the configured legacy device credential and `/ws`
-voice path. `/ws` still authenticates with the hardware credential; after a
-valid unbound authentication, the deployed Backend may issue a durable
-code-only enrollment. Hardware must not rotate the working credential as an
-implicit integration fix.
+Do not rotate a working hardware credential as an integration fix. Do not send
+`DEVICE_TOKEN` to Mobile or logs.
 
-## Required additive capabilities
+## Exact current source event contract
 
-| Capability | Firmware requirement | Phase 1 status |
-|---|---|---|
-| Wi-Fi configuration | receive, persist pending, ACK, apply, rollback, reconnect, result | `PENDING_PHYSICAL_ESP` |
-| Safe device logs | bounded `device_log`; no credentials/password/content secrets | `PENDING_PHYSICAL_ESP` |
-| RSSI telemetry | `device_telemetry` every ~60 s and on significant change | `PENDING_PHYSICAL_ESP` |
-| Battery telemetry | omit/null until reliable hardware measurement is proven | `PENDING_PHYSICAL_ESP` |
-| Generic proactive audio | dedupe `delivery_id`, download MP3, play, report done/failed | `PENDING_PHYSICAL_ESP` |
-| Settings sync | apply versioned playback volume only after HW confirmation | `PENDING_PHYSICAL_ESP` |
-| Code-only pairing | receive/display `pairing_code`, request reissue, clear on `pairing_completed` | `PENDING_PHYSICAL_ESP` |
-| Wake word | target `Hi BMO`; firmware-owned, separate from VPS protocol | `PENDING_PHYSICAL_ESP` |
-
-Exact payloads are in `02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`.
-
-## Code-only pairing behavior
-
-After successful existing `authenticate`, an unbound BMO receives
-`pairing_code` over the same WSS `/ws` connection. The firmware displays the
-six digits and clears them when `expires_at` is reached. No local persistent
-pairing state is required; a reconnect receives a replacement code when
-needed.
-
-The unbound authenticated socket receives the first `pairing_code`
-automatically. The firmware may send `pairing_mode_request` only when it
-explicitly needs a replacement after expiry or reconnect; Backend accepts it
-only from the authenticated hardware socket and returns a replacement code.
-Firmware must debounce requests with backoff because Backend enforces a
-five-second hardware reissue cooldown and a six-per-15-minute limit.
-
-After Mobile successfully claims the code, Backend sends `pairing_completed`
-on the currently authenticated but still-unbound socket. Firmware MUST clear
-pairing UI, close the old WSS `/ws` session, and reconnect/authenticate with
-the unchanged `DEVICE_ID` and `DEVICE_TOKEN`. Backend then resolves the newly
-created ACTIVE Device during normal authentication, after which application-
-bound settings, Wi-Fi, and proactive behavior may resume. The old socket must
-not be treated as application-bound and owner-specific additive events remain
-blocked until the reconnect completes. The firmware never sends
-`DEVICE_TOKEN` to Mobile and must not log the token or pairing code. Physical
-firmware acceptance remains `PENDING_PHYSICAL_ESP`.
-
-If the old socket disconnected before it received `pairing_completed`, the
-claim is still authoritative. After the reconnect has authenticated and the
-Backend has resolved the ACTIVE Device, firmware sends exactly one
-`pairing_mode_request` only if its pairing UI is still incomplete. The bound
-reconnect receives `pairing_completed`; this is conditional recovery, not an
-automatic request after every authentication, and firmware must not retry it
-in a loop.
-
-## Wi-Fi flow and ownership
+ESP → Backend:
 
 ```text
-Mobile → Backend API service → encrypted PostgreSQL record
-       → bound authenticated ESP socket → wifi_configuration
-ESP stores pending + previous known-good config
-       → wifi_configuration_received
-       → switch network
-       → reconnect/authenticate
-       → wifi_configuration_result CONNECTED|ROLLED_BACK|FAILED
+authenticate
+audio_playback_done
+audio_playback_failed
+wifi_configuration_received
+wifi_configuration_result
+device_log
+device_telemetry
+device_settings_applied
+pairing_mode_request
 ```
 
-The ESP must never echo the password in serial logs, network logs, ACKs, results, or telemetry. Open networks omit the password. Backend owns versioning/latest-write-wins; ESP owns applying and rollback.
+Backend → ESP:
 
-## First-boot blocker
+```text
+authenticated
+authentication_failed
+connection_replaced
+display_status
+audio_ready
+request_failed
+wifi_configuration
+device_settings
+pairing_code
+pairing_completed
+```
 
-A VPS cannot deliver Wi-Fi credentials to a device with no network path. Hardware/product must choose and verify the initial bootstrap mechanism (for example factory provisioning, BLE, or SoftAP) before claiming first-boot provisioning. This remains `PENDING_PHYSICAL_ESP`; the Backend must not invent a transport.
+`backend/src/websocket/events.ts` wins if prose drifts. Source-defined
+Wi-Fi/log/telemetry/settings support is not physical acceptance. No proactive
+hardware event family is defined in the current source schema.
 
-## Generic proactive speech
+## Milestone 2 — physical code-only pairing
 
-One event family serves `CHAT`, `SCHEDULE`, and `WHATSAPP`. Firmware must not create source-specific queues. Existing user-initiated playback is never interrupted; duplicate `delivery_id` must never replay.
+After stable connection/auth/voice continuity:
 
-## Physical acceptance required
+1. An authenticated unbound BMO receives `pairing_code` automatically.
+2. Display the six digits and clear them at `expires_at`.
+3. Use a debounced `pairing_mode_request` only when replacement is actually
+   needed; Backend enforces a five-second cooldown and six per 15 minutes.
+4. When Mobile claims the code, receive `pairing_completed`.
+5. Clear pairing UI, close the old unbound socket, and reconnect/authenticate
+   using the unchanged `DEVICE_ID` / `DEVICE_TOKEN`.
+6. If completion was missed, a newly bound reconnect may send exactly one
+   conditional `pairing_mode_request`; Backend responds `pairing_completed`.
 
-No status may move beyond `PENDING_PHYSICAL_ESP` without real-device evidence for:
+The old socket is not promoted in place. The durable ACTIVE Device binding is
+resolved only on normal reconnect/authentication. Pairing UI/logs must never
+expose the hardware token or persist pairing code unnecessarily.
 
-- existing WSS/auth/heartbeat/reconnect and whole-WAV voice regression;
-- good and bad Wi-Fi apply with rollback;
-- reconnect and result after network change;
-- RSSI/log emission without secrets;
-- proactive audio without a preceding voice upload;
-- duplicate proactive delivery suppression;
-- playback-volume application if supported;
-- behavior after power loss during pending Wi-Fi/proactive work.
+## Later source-defined additive acceptance
+
+Only after the two milestones above remain stable, test Wi-Fi apply/rollback,
+bounded device logs, telemetry, and versioned playback-volume settings. Every
+physical capability remains `PENDING_PHYSICAL_ESP` until real firmware build
+and bench evidence exists. Fake-client Backend tests do not satisfy this gate.
+
+The Backend repo is not the ESP firmware repository. If firmware source is not
+mounted, return a repository-access blocker instead of modifying fake-ESP
+tests as a substitute.

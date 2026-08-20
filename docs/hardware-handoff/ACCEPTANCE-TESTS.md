@@ -1,5 +1,11 @@
 # BMO MVP — Physical ESP32 Acceptance Tests
 
+> **VOICE-SPECIFIC PHYSICAL MATRIX**
+> Start at
+> [`../integration/ESP-AGENT-HANDOFF.md`](../integration/ESP-AGENT-HANDOFF.md).
+> Prove `HW_VPS_CONNECTION_STABLE` before adding the separate code-only pairing
+> acceptance cases.
+
 **Purpose:** Final verification that firmware behavior matches the canonical backend contract.
 
 **Current state:** the P7 public endpoint and fake-client matrix are verified,
@@ -228,8 +234,13 @@ only when:
 ## Additive Phase 2 acceptance boundary
 
 The declaration above applies to the existing v1.0.5 voice matrix. It does not
-verify Wi-Fi configuration, device logs/telemetry, settings sync, or generic
-proactive playback. Those capabilities remain `PENDING_PHYSICAL_ESP` and need
-the separate real-device cases in
+verify Wi-Fi configuration, device logs/telemetry, settings sync, or pairing.
+Those source-defined capabilities remain `PENDING_PHYSICAL_ESP` and need the
+separate real-device cases in
 [`../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md`](../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md)
 after Backend handlers exist.
+
+Current source defines no proactive hardware event family. Physical pairing
+acceptance must cover code
+display/expiry/reissue/completion plus reconnect/re-authentication with the
+unchanged hardware credential.

@@ -1,66 +1,110 @@
 # BMO Documentation — Current Entry Point
 
-**Last audited:** 2026-08-18
-**Current milestone:** P9 production is promoted and the Mobile integration package is current.
+> **CURRENT / CANONICAL**
+> This page routes Mobile and ESP/Hardware agents to the current production
+> contract. If it conflicts with dated plans/evidence, current source and the
+> canonical integration package win.
 
-## Current Mobile reading order
+**Last audited:** 2026-08-20
+**Backend/VPS status:** code-only pairing is deployed and production-verified.
+**Physical pairing status:** `PENDING_PHYSICAL_ESP`.
+
+## Mobile agent start
+
+Start at [`integration/MOBILE-AGENT-HANDOFF.md`](integration/MOBILE-AGENT-HANDOFF.md),
+then follow its short reading order:
 
 1. [`integration/00-START-HERE.md`](integration/00-START-HERE.md)
 2. [`integration/01-MOBILE-BACKEND-API-CONTRACT.md`](integration/01-MOBILE-BACKEND-API-CONTRACT.md)
 3. [`integration/05-IMPLEMENTATION-STATUS.md`](integration/05-IMPLEMENTATION-STATUS.md)
 4. [`integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md)
 
-[`NEXT-ACTION.md`](NEXT-ACTION.md) records the current Mobile executable
-boundary. It is not a substitute for the four-document contract package.
-
-Current production endpoints are:
+Current Mobile boundary:
 
 - API: `https://api.personalbmo.web.id`
-- Mobile WebSocket: `wss://api.personalbmo.web.id/api/v1/ws`
-- Hardware WebSocket: `wss://api.personalbmo.web.id/ws`
+- WebSocket: `wss://api.personalbmo.web.id/api/v1/ws`
+- registered Mobile REST routes: `79`
+- Mobile WebSocket event names: `12`
+- ordinary pairing: authenticated `POST /api/v1/pairing/claim` with
+  `{ "code": "123456" }` only
+- Mobile communicates only with Backend; it never receives the hardware
+  `DEVICE_TOKEN` or calls hardware `/ws`.
 
-## Historical and supporting records
+## ESP/Hardware agent start
 
-The current integration PRD is [`product/BMO-BY-BLABS-PRD-v1.4.0.md`](product/BMO-BY-BLABS-PRD-v1.4.0.md). The domain architecture is [`p9/README.md`](p9/README.md). Existing runtime authority is [`backend-mvp/CURRENT-RUNTIME-CONFIG.md`](backend-mvp/CURRENT-RUNTIME-CONFIG.md), and existing physical voice authority is [`hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md).
+Start at [`integration/ESP-AGENT-HANDOFF.md`](integration/ESP-AGENT-HANDOFF.md).
+It routes to the exact current `/ws` event contract, the immutable existing
+voice contract, and the physical acceptance boundary.
 
-[`integration/04-VPS-IMPLEMENTATION-PLAN.md`](integration/04-VPS-IMPLEMENTATION-PLAN.md), [`integration/07-ONE-SHOT-AGENT-PROMPT.md`](integration/07-ONE-SHOT-AGENT-PROMPT.md), and [`integration/10-OPERATOR-PROMPT-RUNBOOK.md`](integration/10-OPERATOR-PROMPT-RUNBOOK.md) are `COMPLETED / HISTORICAL` operator evidence. They are not mandatory Mobile onboarding.
+Current Hardware boundary:
 
-Historical phase records such as [`roadmap/P8-EXECUTION-SPEC.md`](roadmap/P8-EXECUTION-SPEC.md), [`roadmap/P6-EXECUTION-SPEC.md`](roadmap/P6-EXECUTION-SPEC.md), P9.1 evidence/review, and [`product/BMO-BY-BLABS-PRD-v1.2.4.md`](product/BMO-BY-BLABS-PRD-v1.2.4.md) remain immutable evidence for their time. They are not the current integration requirement.
+- WebSocket: `wss://api.personalbmo.web.id/ws`
+- immediate milestone: `HW_VPS_CONNECTION_STABLE`
+- stabilize Wi-Fi, DNS, time, TLS, WSS, authentication, ping/pong, reconnect,
+  and existing voice continuity before implementing physical pairing
+- Backend pairing support is deployed; firmware/real-device acceptance remains
+  `PENDING_PHYSICAL_ESP`
+- this Backend repository is not the ESP firmware repository.
 
-## Source-of-truth order
+## Production facts
 
-1. Actual registered source, Prisma migration history, and inspected runtime establish current facts.
-2. Hardware contract v1.0.5 owns existing device voice protocol.
-3. Integration `00`, `01`, `02`, `05`, `06`, `08`, and `09` plus PRD v1.4.0 own the approved target.
-4. Current P9 docs own domain architecture, source-of-truth, and conceptual schema.
-5. Runtime config owns deployed STT/TTS values.
-6. Historical evidence describes only its recorded checkpoint.
+- Backend origin: `127.0.0.1:3000`
+- immutable deployed image: `bmo-p9.1:pairing-code-only-d1473d0`
+- deployed-image source revision: `d1473d04f4b76ccb52cc8eeaff52a268504310f0`
+- production has exactly seven completed P9 migrations, including
+  `20260818110000_pairing_code_only_enrollment`
+- production migration state: `7 completed, 0 unfinished, 0 rolled_back`
+- candidate port `3010` is historical/non-production
+- health and the six-sample production soak passed; the rollback image remains
+  preserved.
+- real RVC inference is not verified; `rvc=unavailable` is an accepted
+  readiness limitation, not a Mobile/ESP outage
+- physical ESP32 integration is not verified; current firmware pairing status
+  remains `PENDING_PHYSICAL_ESP`.
 
-## Audited current boundary
+Discover the current repository revision with `git rev-parse HEAD`. Do not
+confuse mutable Git HEAD with the immutable source revision of the deployed
+image.
 
-- P7 is `VERIFIED — PRODUCTION`; P8 Piper Prudence primary/Kokoro fallback remains production behavior, and real RVC inference is not verified.
-- Production exposes the existing device voice path and the promoted P9 Mobile REST/WebSocket contract at `https://api.personalbmo.web.id`.
-- Production PostgreSQL contains exactly the six applied P9 migrations; candidate resources and port `3010` are not production.
-- Hermes is a host systemd runtime on `127.0.0.1:8642`; production Hermes integration is verified. Audio Service is private on `127.0.0.1:8001`; Backend is private on `127.0.0.1:3000`. Caddy is the public edge.
-- physical ESP32 integration is not verified. All additive Wi-Fi/log/telemetry/settings/proactive events remain `PENDING_PHYSICAL_ESP`.
-- The manual Prisma Studio `*:5555` listener was stopped in Phase 2; no listener, Docker publication, or Caddy route remains. Privileged firewall-policy inspection is still an operator evidence gap.
+## Current authority and historical records
+
+Current integration authority is the Mobile/ESP entrypoints plus integration
+documents `00`, `01`, `02`, `03`, `05`, `06`, `08`, and `09`.
+
+The physical voice authority remains
+[`hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md).
+Current STT/TTS values are in
+[`backend-mvp/CURRENT-RUNTIME-CONFIG.md`](backend-mvp/CURRENT-RUNTIME-CONFIG.md).
+
+Dated plans, specs, PRDs, acceptance evidence, audit reports, candidate
+runbooks, and old phase prompts record their checkpoint only. They are not
+current Mobile or ESP implementation instructions. In particular, do not read
+every integration file `00` through `10` as an onboarding sequence: `04`, `07`,
+and `10` are completed historical operator records.
+
+Legacy verifier compatibility links (historical only):
+
+- [`NEXT-ACTION.md`](NEXT-ACTION.md)
+- [`roadmap/P8-EXECUTION-SPEC.md`](roadmap/P8-EXECUTION-SPEC.md)
+- [`roadmap/P6-EXECUTION-SPEC.md`](roadmap/P6-EXECUTION-SPEC.md)
+- [`product/BMO-BY-BLABS-PRD-v1.2.4.md`](product/BMO-BY-BLABS-PRD-v1.2.4.md)
+
+The protected lineage statement “P7 is `VERIFIED — PRODUCTION`” remains true
+for its voice rollout checkpoint, but current production authority is the P9
+integration status above.
 
 ### Hermes host bootstrap clarification
 
 The historical production VPS preflight reported Hermes absent. P6 re-confirmed
-the `ABSENT` branch and created the maintained loopback host service; P7 then
-verified production integration. This clarification does not modify the locked PRD snapshot or hardware contract. The current audited service is Hermes 0.20.0
-on `127.0.0.1:8642`.
+the `ABSENT` branch and created the maintained loopback host service; P7 later
+verified production integration. This does not modify the locked PRD snapshot or hardware contract. Current Hermes remains a private Backend dependency.
 
-## Teams
+## Secrets and verification
 
-Hardware should continue with `hardware-handoff/` for the existing voice contract and use `integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md` only for additive, explicitly pending work. Backend/infrastructure work follows the integration plan and must keep route/schema/status documentation synchronized.
+Never store credentials, database URLs, Wi-Fi passwords, provider
+tokens/session bytes, recovery/pairing values, or hardware tokens in Git/docs.
 
-## Secrets
-
-Never store credentials, database URLs, Wi-Fi passwords, provider tokens/session bytes, or recovery/pairing tokens in Git/docs. Use variable names and sanitized evidence only.
-
-Repository verifier:
+Repository docs verifier:
 
 ```text
 python3 scripts/verify-backend-mvp-docs.py

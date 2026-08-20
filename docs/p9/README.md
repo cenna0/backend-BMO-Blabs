@@ -1,38 +1,73 @@
 # BMO P9 — Current Architecture and Scope Authority
 
-**Frozen:** 2026-08-11; production status synchronized 2026-08-18
-**Current authority:** [`../integration/00-START-HERE.md`](../integration/00-START-HERE.md), [`../integration/01-MOBILE-BACKEND-API-CONTRACT.md`](../integration/01-MOBILE-BACKEND-API-CONTRACT.md), [`../integration/05-IMPLEMENTATION-STATUS.md`](../integration/05-IMPLEMENTATION-STATUS.md), and [`../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md).
+> **CURRENT / CANONICAL NAVIGATION**
+> Current runtime/API/status authority is source plus the canonical integration
+> package. Numbered P9 files retain domain design and checkpoint context; follow
+> their status banners and never let a frozen candidate statement override the
+> current integration docs.
 
-P9.1 is implemented on `main` at `e4f87ca5faf81e1c495c2719f3bb19b056340657` and is live in the public production Backend. The production Mobile API is `https://api.personalbmo.web.id`, the Mobile WebSocket is `wss://api.personalbmo.web.id/api/v1/ws`, and the hardware WebSocket remains the separate `wss://api.personalbmo.web.id/ws` contract. Candidate-only assets, port `3010`, loopback callback URLs, and validation paths are historical and must not be used as production instructions. P9.2–P9.6 remain proposed in the historical stage model unless the current integration status says otherwise.
+**Audited:** 2026-08-20
 
-> **Historical isolated-candidate safety assertion — superseded for current production:** the pre-promotion record stated that no P9.1 candidate is deployed to production and that P9.2–P9.6 remain proposed and not implemented. That record is retained as historical evidence; the current production status is the statement above and the canonical integration package.
+P9 Backend and PostgreSQL are live in production. Code-only pairing is deployed
+in `bmo-p9.1:pairing-code-only-d1473d0`; production has seven completed
+migrations, including `20260818110000_pairing_code_only_enrollment`. Mobile has
+79 registered REST routes and 12 Mobile WebSocket event names. Production uses
+Backend port `3000`; candidate port `3010` is historical/non-production.
 
-## Current classification
+The immutable deployed image was built from source revision
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0`. That is not a claim about current
+Git HEAD. Use `git rev-parse HEAD` to discover the repository revision.
 
-- Production: P9 Backend REST and authenticated Mobile `/api/v1/ws`, PostgreSQL,
-  the legacy hardware `/ws` contract, Hermes, and Audio Service integration.
-- `PRODUCTION_VERIFIED`: P9 production runtime, six applied Prisma migrations,
-  public routing, and the production Spotify callback are operationally verified.
-- `IMPLEMENTED`: the source-backed Mobile auth, profile, personalization,
-  pairing, devices/settings, chat, memory, schedules, WhatsApp projections,
-  Spotify lifecycle, bug-report, and Mobile WebSocket contracts documented in
-  the integration package.
-- `PENDING_PHYSICAL_ESP`: additive firmware behavior and physical hardware
-  acceptance remain outside this Backend documentation synchronization.
-- `NOT_IMPLEMENTED` / `OUT_OF_SCOPE`: capabilities explicitly marked that way
-  in the canonical Mobile contract; do not infer APIs from historical plans.
+Physical ESP pairing, display, completion handling, and real-device acceptance
+remain `PENDING_PHYSICAL_ESP`. Backend deployment is not pending.
 
-The current PRD is [`../product/BMO-BY-BLABS-PRD-v1.4.0.md`](../product/BMO-BY-BLABS-PRD-v1.4.0.md). The locked v1.2.4 PRD, P9.1 evidence, and review files are historical evidence and must not be rewritten.
+## Current integration authority
 
-## Reading order
+For Mobile, start at
+[`../integration/MOBILE-AGENT-HANDOFF.md`](../integration/MOBILE-AGENT-HANDOFF.md).
+For ESP/Hardware, start at
+[`../integration/ESP-AGENT-HANDOFF.md`](../integration/ESP-AGENT-HANDOFF.md).
 
-1. [`../integration/00-START-HERE.md`](../integration/00-START-HERE.md) through [`../integration/10-OPERATOR-PROMPT-RUNBOOK.md`](../integration/10-OPERATOR-PROMPT-RUNBOOK.md)
-2. [`01-product-scope.md`](01-product-scope.md)
-3. [`03-system-architecture.md`](03-system-architecture.md)
-4. [`04-component-ownership.md`](04-component-ownership.md)
-5. [`05-source-of-truth-matrix.md`](05-source-of-truth-matrix.md)
-6. [`06-preliminary-prisma-schema.md`](06-preliminary-prisma-schema.md)
-7. domain documents `08`–`19`
-8. [`23-test-acceptance-matrix.md`](23-test-acceptance-matrix.md), [`24-decision-register.md`](24-decision-register.md), and [`25-unresolved-decisions.md`](25-unresolved-decisions.md)
+Primary current contracts:
 
-The public physical voice authority remains [`../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md). Additive device proposals do not edit or reinterpret it.
+1. [`../integration/00-START-HERE.md`](../integration/00-START-HERE.md)
+2. [`../integration/01-MOBILE-BACKEND-API-CONTRACT.md`](../integration/01-MOBILE-BACKEND-API-CONTRACT.md)
+3. [`../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`](../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md)
+4. [`../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md`](../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md)
+5. [`../integration/05-IMPLEMENTATION-STATUS.md`](../integration/05-IMPLEMENTATION-STATUS.md)
+6. [`../integration/06-DECISION-REGISTER.md`](../integration/06-DECISION-REGISTER.md)
+7. [`../integration/08-DOCS-MAINTENANCE-PROTOCOL.md`](../integration/08-DOCS-MAINTENANCE-PROTOCOL.md)
+8. [`../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md)
+
+Do not read integration `04`, `07`, or `10` as current execution instructions;
+they are completed historical operator records.
+
+## Domain references
+
+- [`04-component-ownership.md`](04-component-ownership.md) and
+  [`05-source-of-truth-matrix.md`](05-source-of-truth-matrix.md) retain useful
+  ownership boundaries.
+- [`08-auth-device-pairing.md`](08-auth-device-pairing.md) describes the
+  current code-only enrollment model.
+- [`14-additive-hardware-events.md`](14-additive-hardware-events.md) records the
+  exact current source event inventory and physical acceptance boundary.
+- Other numbered P9 documents are frozen design/checkpoint records unless their
+  banner explicitly says current. Their candidate ports, old migration counts,
+  old route shapes, `READY_TO_IMPLEMENT` labels, and deployment assertions are
+  historical only.
+
+The existing physical voice authority remains
+[`../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md).
+
+## Legacy verifier control text
+
+> **HISTORICAL PREDECESSOR — NOT CURRENT STATUS**
+> The following strings are retained only for the legacy P9.1 verifier. They
+> describe the isolated-candidate checkpoint before production promotion.
+
+```text
+no P9.1 candidate is deployed to production
+P9.2–P9.6 remain proposed and not implemented
+```
+
+They are superseded by the production status at the top of this page.

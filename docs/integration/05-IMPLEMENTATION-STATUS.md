@@ -1,8 +1,13 @@
 # Mobile / P9 Implementation Status
 
-**Audited:** 2026-08-19
-**Source status:** Code-only enrollment is on `main` at
-`d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
+> **CURRENT / CANONICAL**
+> This is the current implementation/runtime status; historical phase labels do
+> not override it.
+
+**Audited:** 2026-08-20
+**Deployed-image source revision:**
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable provenance, not current
+Git HEAD).
 **Production state:** `PRODUCTION_VERIFIED` — P9 Backend and PostgreSQL are live.
 **Production image:** `bmo-p9.1:pairing-code-only-d1473d0`.
 **Production status for code-only enrollment:** `PRODUCTION_VERIFIED`.
@@ -88,7 +93,7 @@ fresh encrypted backup checkpoint.
 | WhatsApp live send/inbound acceptance | `BLOCKED` | Requires a separately authorized, non-destructive provider test. No Mobile contract change is needed. |
 | Spotify provider session/actions | `BLOCKED` | Provider account/OAuth/action acceptance is not part of this documentation sync. The production redirect is registered and the server-side boundary is implemented. |
 | Existing device `/ws` voice | `PRODUCTION_VERIFIED` | Promoted Backend preserves the legacy voice route and dependency path. |
-| Additive ESP Wi-Fi/log/telemetry/settings/proactive behavior | `PENDING_PHYSICAL_ESP` | Requires firmware build and real-device evidence; source/tests alone cannot promote this status. |
+| Additive ESP Wi-Fi/log/telemetry/settings behavior | `PENDING_PHYSICAL_ESP` | Requires firmware build and real-device evidence; source/tests alone cannot promote this status. Current source defines no proactive hardware event family. |
 
 ## Production verification boundaries
 

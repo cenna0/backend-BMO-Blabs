@@ -2,14 +2,18 @@
 
 **Effective:** 2026-08-11
 
-**Current lifecycle note:** Code-only enrollment is deployed from `main` commit
-`d1473d04f4b76ccb52cc8eeaff52a268504310f0` as
+**Current lifecycle note:** Code-only enrollment is deployed from immutable
+image source revision `d1473d04f4b76ccb52cc8eeaff52a268504310f0` as
 `bmo-p9.1:pairing-code-only-d1473d0`. Migration
 `20260818110000_pairing_code_only_enrollment` is applied in production; state
 is `7 completed, 0 unfinished, 0 rolled_back`. Health, Mobile REST/WS smoke,
 and the six-sample soak passed. Physical firmware acceptance remains
 `PENDING_PHYSICAL_ESP`. Promotion instructions in historical documents must
 not be treated as current work.
+
+The deployed-image revision is not mutable repository HEAD. Active docs should
+normally tell readers to run `git rev-parse HEAD` rather than hardcoding a
+one-time source-head value.
 
 ## 1. Authority order
 

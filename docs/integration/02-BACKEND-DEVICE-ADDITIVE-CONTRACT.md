@@ -1,16 +1,18 @@
 # BMO Backend API Service ↔ ESP32 Additive Device Contract
 
 **Version:** 2.0.0
-**Date:** 2026-08-19
+**Date:** 2026-08-20
 **Rule:** Additive only. This file describes the Backend API service ↔ ESP32 protocol. Existing `BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5` voice behavior remains valid.
 
-**Implementation state:** Backend handlers for the additive capabilities are
-implemented in the promoted P9 runtime. Firmware behavior and real-device
-acceptance remain `PENDING_PHYSICAL_ESP`; this document must not be read as
-evidence that an ESP32 supports the new events.
+**Implementation state:** The exact source-defined Wi-Fi, log, telemetry,
+settings, and pairing handlers are implemented in the promoted P9 runtime.
+Firmware behavior and real-device acceptance remain `PENDING_PHYSICAL_ESP`;
+this document must not be read as evidence that an ESP32 supports them.
 
 **Current lifecycle:** Code-only enrollment is deployed in the production
-Backend from `main` commit `d1473d04f4b76ccb52cc8eeaff52a268504310f0`.
+Backend from immutable image source revision
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0`. That provenance is not current
+Git HEAD.
 Migration `20260818110000_pairing_code_only_enrollment` is applied in
 production. Backend health and soak verification passed. Physical firmware
 acceptance remains `PENDING_PHYSICAL_ESP`; the physical contract remains
@@ -38,9 +40,40 @@ audio_playback_failed
 
 Do not change raw WAV upload or MP3 download semantics.
 
-The events below extend `/ws`.
+The current source-defined event inventory is exact.
 
-Audited existing `/ws` implementation accepts only `authenticate`, `audio_playback_done`, and `audio_playback_failed` inbound, and emits only the existing voice events listed above. It authenticates one configured `DEVICE_ID`/`DEVICE_TOKEN`; it does not query Prisma.
+ESP32 → Backend:
+
+```text
+authenticate
+audio_playback_done
+audio_playback_failed
+wifi_configuration_received
+wifi_configuration_result
+device_log
+device_telemetry
+device_settings_applied
+pairing_mode_request
+```
+
+Backend → ESP32:
+
+```text
+authenticated
+authentication_failed
+connection_replaced
+display_status
+audio_ready
+request_failed
+wifi_configuration
+device_settings
+pairing_code
+pairing_completed
+```
+
+`backend/src/websocket/events.ts` is the event-name authority. Do not add an
+event from a plan or design unless source is changed and the canonical docs are
+updated in the same source change.
 
 Current defaults are a 5-second auth timeout, 60-second native ping interval,
 two missed pongs, and 8,192-byte JSON payload limit. Close behavior uses code
@@ -55,7 +88,8 @@ Existing `/ws` authentication remains backward-compatible. The deployed
 Backend can issue code-only enrollment after a valid legacy hardware
 authentication; no firmware acceptance has been recorded.
 
-Phase 2 must resolve the authenticated hardware/device identity to the application `Device` row before allowing DB-owned additive features. The frozen resolver rule is:
+The Backend resolves authenticated hardware/device identity to the application
+`Device` row before allowing DB-owned additive features. The resolver rule is:
 
 ```text
 Device.hardwareId == authenticated device_id
@@ -68,7 +102,7 @@ The resolved `Device.userId` owns every subsequent DB operation. Matching only a
 If no active owned application device can be bound:
 
 - existing voice behavior remains available if it was already valid under the current voice contract;
-- Backend must not deliver owner-specific Wi-Fi credentials/settings/proactive content;
+- Backend must not deliver owner-specific Wi-Fi credentials or settings;
 - Backend records a safe `DEVICE_NOT_BOUND` diagnostic;
 - do not rotate the currently deployed physical-device credential as an implicit fix.
 
@@ -131,8 +165,8 @@ claim while hardware was unbound. It is not promoted in place and must not be
 treated as application-bound. Firmware MUST clear pairing UI, close that WSS
 `/ws` session, and reconnect using the unchanged `DEVICE_ID` and
 `DEVICE_TOKEN`. On the new authenticated session, Backend resolves the new
-ACTIVE Device and normal application-bound settings, Wi-Fi, and proactive
-behavior resumes. Owner-specific additive events remain blocked on the old
+ACTIVE Device and normal application-bound settings and Wi-Fi behavior resume.
+Owner-specific additive events remain blocked on the old
 socket and are available only after this normal reconnect/authentication
 binding step. Firmware support and physical acceptance remain
 `PENDING_PHYSICAL_ESP`.
@@ -301,7 +335,6 @@ WS_DISCONNECTED
 VOICE_UPLOAD_FAILED
 AUDIO_DOWNLOAD_FAILED
 AUDIO_PLAYBACK_FAILED
-PROACTIVE_AUDIO_FAILED
 ```
 
 ---
@@ -330,106 +363,28 @@ Rules:
 
 ---
 
-# 5. New capability D — generic proactive audio
+# 5. Generic proactive delivery boundary
 
-Purpose:
+Backend persists and arbitrates `CHAT`, `SCHEDULE`, and `WHATSAPP` delivery
+intents with database idempotency, expiry, and user/device ownership. The
+current hardware source schema does **not** define a proactive-audio event
+family or install a physical sender.
 
-```text
-mobile chat
-schedule
-WhatsApp
-future backend-initiated speech
-```
+Therefore `proactive_audio_ready`, `proactive_playback_done`, and
+`proactive_playback_failed` are not current `/ws` events and must not be
+implemented from historical plans. A future source change must define payloads,
+tests, compatibility, documentation, and physical acceptance together.
 
-Backend must be able to make BMO speak without a preceding ESP32 voice request.
-
-## 5.1 Backend-side queue rule
-
-Backend owns queueing.
-
-Source/test status: Backend now persists and arbitrates all `CHAT`, `SCHEDULE`,
-and `WHATSAPP` intents through the same delivery/attempt service with database
-idempotency, expiry, per-device exclusion, and a user-voice-busy boundary. No
-physical sender is installed and this does not implement any Section 5.2/5.4
-device event. Physical status remains `PENDING_PHYSICAL_ESP`.
-
-Arbitration is locked for this release:
-
-1. an already-running physical playback is never interrupted;
-2. a user-initiated voice request has priority over proactive items that have not started;
-3. proactive items wait while the device is processing/playing a user voice request;
-4. only one proactive delivery may be actively offered/played per device at a time;
-5. ESP32 does not need a large durable queue.
-
-Backend should queue the **delivery intent/text/source** first and synthesize or publish the MP3 when the device is eligible, so a file does not expire while waiting behind a busy/offline device.
-
-Baseline proactive delivery deadline from its due/creation time is 5 minutes unless the source-specific policy says otherwise. Expired stale items become `EXPIRED`/`MISSED` and must not suddenly speak hours later.
-
-## 5.2 Backend → ESP32: `proactive_audio_ready`
-
-```json
-{
-  "event": "proactive_audio_ready",
-  "delivery_id": "<uuid>",
-  "source": "CHAT|SCHEDULE|WHATSAPP",
-  "audio_url": "https://api.personalbmo.web.id/audio/<uuid>.mp3",
-  "format": "mp3",
-  "expires_in_seconds": 300
-}
-```
-
-`delivery_id` is not a voice `request_id`.
-
-## 5.3 ESP32 behavior
-
-```text
-receive proactive_audio_ready
-→ deduplicate delivery_id
-→ download MP3
-→ set display speaking when playback begins
-→ play
-→ send done/failed
-→ return idle
-```
-
-Do not replay the same `delivery_id` after reconnect.
-
-## 5.4 ESP32 → Backend completion
-
-```json
-{
-  "event": "proactive_playback_done",
-  "delivery_id": "<uuid>"
-}
-```
-
-Failure:
-
-```json
-{
-  "event": "proactive_playback_failed",
-  "delivery_id": "<uuid>",
-  "reason": "DOWNLOAD_FAILED|DECODE_FAILED|PLAYBACK_FAILED|DEVICE_BUSY"
-}
-```
-
-Completion/failure must be idempotent.
-
-## 5.5 Reconnect
-
-If delivery is pending and MP3 still valid, Backend may resend `proactive_audio_ready`.
-
-If a delivery intent is still valid but audio was never generated because the device was busy/offline, Backend may generate it when the device becomes eligible. Do not regenerate after a terminal playback failure merely as an implicit retry.
-
-ESP32 deduplicates by `delivery_id`.
-
-If playback completed but completion delivery was uncertain, ESP32 may resend `proactive_playback_done`.
+Current Mobile `proactive_delivery_status` describes Backend-durable delivery
+state; it is not evidence of a hardware event or physical playback.
 
 ---
 
 # 6. Device settings sync
 
-Existing P9.1 candidate persistence has device settings such as playback volume, but no value is currently synchronized to firmware.
+Production persistence and Backend source define versioned playback-volume
+delivery and acknowledgement. Physical firmware application remains
+`PENDING_PHYSICAL_ESP`.
 
 Additive Backend → ESP32:
 
@@ -496,8 +451,7 @@ Backend tests:
 - Wi-Fi config never appears in logs;
 - pending config delivered on reconnect;
 - terminal config not endlessly redelivered;
-- proactive delivery deduplicated;
-- proactive completion idempotent;
+- no non-source proactive hardware event is emitted;
 - telemetry updates latest status;
 - log ingestion bounded/rate-limited;
 - device settings versioning works.
@@ -508,8 +462,6 @@ Physical ESP32 tests:
 - rollback bad Wi-Fi;
 - reconnect/auth after network change;
 - report RSSI;
-- proactive audio plays without voice request;
-- duplicate proactive event does not replay;
 - existing voice conversation still works.
 
 Until those real-device tests exist, every item in this physical list remains `PENDING_PHYSICAL_ESP` even if Backend unit/fake-device tests later pass.

@@ -1,8 +1,12 @@
 # BMO — Current Next Action
 
-**Last updated:** 2026-08-19
+> **CURRENT / CANONICAL**
+> Current source and the canonical integration package override dated
+> plans/evidence.
+
+**Last updated:** 2026-08-20
 **Current executable boundary:** Mobile application integration against the live production P9 Backend.
-**Source status:** Code-only enrollment is on `main` at `d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
+**Deployed-image source revision:** `d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable image provenance, not current Git HEAD).
 **Production status:** `PRODUCTION_VERIFIED` — Backend deployed as `bmo-p9.1:pairing-code-only-d1473d0`.
 **Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied in production; migration state is `7 completed, 0 unfinished, 0 rolled_back`.
 **Production verification:** Direct/public health and the six-sample production soak passed. Mobile REST coverage is 79 routes and Mobile WebSocket coverage is 12 events.
@@ -17,6 +21,10 @@ is physical firmware implementation and real-device acceptance.
 
 ## Mobile starting point
 
+Start with
+[`integration/MOBILE-AGENT-HANDOFF.md`](integration/MOBILE-AGENT-HANDOFF.md),
+then read the linked canonical package:
+
 Read these documents in order:
 
 1. [`integration/00-START-HERE.md`](integration/00-START-HERE.md)
@@ -29,6 +37,11 @@ Production API: `https://api.personalbmo.web.id`
 Mobile WebSocket: `wss://api.personalbmo.web.id/api/v1/ws`
 
 Hardware WebSocket: `wss://api.personalbmo.web.id/ws` — separate from Mobile.
+
+ESP/Hardware work starts at
+[`integration/ESP-AGENT-HANDOFF.md`](integration/ESP-AGENT-HANDOFF.md). Its
+immediate milestone is `HW_VPS_CONNECTION_STABLE`; pairing comes only after
+stable WSS/auth/reconnect/voice continuity.
 
 Current runtime context: production Hermes integration is verified on the
 private origins only boundary `127.0.0.1:8642`; Audio and Backend remain
@@ -60,8 +73,10 @@ WhatsApp bridge/resolver, Spotify Web API, or the hardware `/ws` protocol.
 - Backend code-only pairing is deployed and production-verified; physical
   firmware display, reissue, completion handling, and real-device acceptance
   remain `PENDING_PHYSICAL_ESP`.
-- Physical ESP Wi-Fi/log/telemetry/settings/proactive behavior remains
-  `PENDING_PHYSICAL_ESP`.
+- Physical ESP Wi-Fi/log/telemetry/settings behavior remains
+  `PENDING_PHYSICAL_ESP`. Generic proactive delivery is Backend-durable, but
+  no proactive hardware event family is defined in the current `/ws` source
+  schema.
 - WhatsApp provider send/inbound acceptance and Spotify provider action/OAuth
   acceptance remain separately controlled; route registration is not provider
   acceptance.

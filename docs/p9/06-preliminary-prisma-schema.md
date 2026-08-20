@@ -1,5 +1,9 @@
 # Prisma Schema — Phase 2 Application Foundation
 
+> **HISTORICAL SCHEMA CHECKPOINT — NOT CURRENT MIGRATION STATUS**
+> Preserve this pre-rollout evidence. Production now has seven completed
+> migrations; inspect Prisma source/manifest and current integration status.
+
 **Source state:** `EXISTING_VERIFIED` for schema and migration source, plus an
 authorized disposable PostgreSQL migration gate.
 **Runtime state:** migration `20260811190000_phase2_application_foundation` has

@@ -1,5 +1,9 @@
 # Memory Lifecycle and Privacy
 
+> **HISTORICAL IMPLEMENTATION CHECKPOINT — NOT CURRENT DEPLOYMENT STATUS**
+> Preserve the privacy design; current route/runtime status is in the canonical
+> integration package.
+
 **Status:** `EXISTING_VERIFIED` at source/test tier; not candidate/public deployed.
 
 Chat history, memory, schedules, and provider conversations are separate domains. Chat does not become memory automatically.

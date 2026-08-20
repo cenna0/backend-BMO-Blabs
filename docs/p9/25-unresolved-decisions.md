@@ -1,5 +1,9 @@
 # Unresolved Decisions and External Gates
 
+> **HISTORICAL OPEN-GATE SNAPSHOT — NOT CURRENT STATUS**
+> Some gates below were cleared by production rollout. Use integration `05` and
+> `06` for current decisions; preserve this list as checkpoint evidence.
+
 These do not change approved scope; they block only the named acceptance or require a bounded implementation choice.
 
 | Gate/decision | State | Owner / required evidence |

@@ -1,64 +1,76 @@
-# Authentication, Device Identity, and Pairing
+# Authentication, Device Identity, and Code-Only Pairing
 
-## Existing private candidate
+> **CURRENT / CANONICAL DOMAIN GUIDE**
+> The historical four-field Mobile pairing flow is superseded. Current source
+> and the canonical integration package are authoritative.
 
-- Registration requires `invitationToken`, email, password of at least 12 characters, and optional display name.
-- Passwords use Argon2id (`m=19456`, `t=3`, `p=1`); access JWT is HS256 with 15-minute lifetime, issuer `bmo-p9`, audience `bmo-mobile`.
-- Opaque 30-day refresh tokens are stored by hash, rotate on use, and revoke their family on replay. Logout and logout-all exist.
-- Six-digit pairing has 600-second TTL, five-attempt maximum, keyed HMAC digest, single use, and active-challenge invalidation.
-- Every pairing route requires mobile bearer auth. Claim body is `code`, `hardwareId`, `deviceName`, and an out-of-band `deviceCredential`; the ESP does not claim on `/ws`.
+Backend code-only pairing is deployed and production-verified. Physical
+firmware implementation and real-device acceptance remain
+`PENDING_PHYSICAL_ESP`.
 
-## Approved target
+## Mobile claim
 
-- Make registration self-service and add DOB recovery with uniform responses, strong rate limiting, single-use recovery token, audit, and session-family revocation after reset.
-- Add username/profile/avatar without exposing DOB or credential fields.
-- Complete client-device session binding before claiming per-device mobile revocation.
-- Preserve current pairing code semantics and route shapes.
+```http
+POST /api/v1/pairing/claim
+Authorization: Bearer <access-token>
+Content-Type: application/json
 
-## Phase 2 Slice 2B source evidence
-
-- Registration is self-service with normalized email, password minimum 12,
-  optional bounded display name, and required exact non-future calendar DOB.
-  Optional valid invitations remain consumable for legacy clients and operator
-  tooling remains intact. Argon2id/session behavior is unchanged.
-- Canonical `SafeUser` now contains nullable normalized username and a public
-  opaque avatar URL, never DOB. Profile updates use only the authenticated user
-  ID and sanitize uniqueness conflicts.
-- Recovery verification gives unknown email and wrong DOB the same public
-  error, uses independent one-hop-proxy-aware IP and normalized-email limits,
-  stores only a SHA-256 verifier, and expires at 600 seconds. Reset claims the
-  verifier once after taking the per-user transaction lock and refetching it,
-  replaces the Argon2id hash, and revokes every session and refresh token.
-  Login and refresh take that same lock and refetch authoritative state before
-  credential verification/session issuance or refresh validation/rotation, so
-  a completed reset wins deterministic interleavings.
-- These are source/automated-test facts only. The running private candidate
-  remains invitation-era/unmigrated and public production is unchanged.
-
-## Physical identity bridge
-
-The current `/ws` and voice HTTP auth remains config-based. After it succeeds, owner-only device capabilities resolve only when:
-
-```text
-Device.status == ACTIVE
-Device.hardwareId == authenticated device_id
-Device.tokenHash == SHA-256(authenticated device_token)
+{"code":"123456"}
 ```
 
-If no row matches, keep valid legacy voice working but deny owner-specific Wi-Fi/settings/telemetry/proactive operations. Do not silently rotate credentials during binding. Physical pairing proof is `PENDING_PHYSICAL_ESP`.
+The strict ordinary Mobile claim contains only the six-digit `code`. It does
+not accept `pairingId`, `hardwareId`, `deviceName`, `deviceCredential`,
+`DEVICE_TOKEN`, or `tokenHash`. A non-secret `hardwareId` may appear later in a
+normal `SafeDevice` response, but it is never a Mobile pairing input. Device
+name defaults to `BMO`; friendly rename happens through existing settings APIs.
 
-## Phase 2 Slice 1 evidence
+## Trusted hardware enrollment
 
-- Optional `clientDeviceId` token issuance now queries `Device` with the
-  authenticated user ID and `ACTIVE` state before persisting the session
-  binding. Issuance runs in a transaction under the same per-user advisory lock
-  as unpair; registration reuses its open transaction and sessions issued before
-  pairing remain nullable.
-- Device `/ws` resolves `hardwareId` plus a timing-safe comparison of the stored
-  SHA-256 verifier after the unchanged runtime credential succeeds. Before any
-  owner-specific use, the only server authorization accessor revalidates exact
-  device/user/hardware identity plus `ACTIVE` state and clears invalid cache.
-- Unit/integration tests cover owner rejection, token mismatch, successful
-  binding, post-bind revocation, delayed-resolver stale binding, and unbound
-  legacy voice continuity. This is source evidence, not public production or
-  physical pairing evidence.
+1. Hardware opens `/ws` and authenticates with its existing `device_id` and
+   `device_token`.
+2. Authenticated hardware identity establishes the trusted `hardwareId` and
+   SHA-256 token digest.
+3. Before any Mobile claim, Backend creates a durable `HardwareEnrollment`.
+4. Backend sends a six-digit `pairing_code` to the authenticated unbound
+   hardware socket.
+5. Mobile submits the visible code only; Backend creates the ACTIVE Device from
+   trusted enrollment data.
+
+Raw `DEVICE_TOKEN` is not persisted by enrollment and never enters the Mobile
+contract. Raw pairing code is not persisted. Backend stores its HMAC-SHA256
+digest using the protected pairing pepper. The code TTL is 600 seconds,
+single-use, and generic invalid/expired/replaced/replayed outcomes return `409`.
+
+Replacement invalidates the previous issued enrollment/code, and immediate
+same-code reissue is rejected. An existing `PENDING` or `ACTIVE` Device for the
+hardware blocks new issuance. Partial unique indexes plus a hardware-scoped
+database lock make issue/claim concurrency-safe. An expired matching claim
+persists `EXPIRED` before returning the generic `409` response.
+
+Mobile claim limits are scoped independently to authenticated user, session,
+and request IP. Code-only MVP intentionally has no per-enrollment wrong-code
+counter: an arbitrary wrong code cannot safely be attributed to one hardware
+enrollment. See decision `INT-067` in
+[`../integration/06-DECISION-REGISTER.md`](../integration/06-DECISION-REGISTER.md).
+
+## Hardware protocol and reconnect
+
+Current pairing events are:
+
+- Backend → hardware: `pairing_code`
+- hardware → Backend: `pairing_mode_request`
+- Backend → hardware: `pairing_completed`
+
+The initial code is issued automatically after successful unbound hardware
+authentication. Firmware uses `pairing_mode_request` only for a needed
+replacement after expiry/reconnect, with debounce/backoff; Backend enforces a
+five-second reissue cooldown and six reissues per 15 minutes.
+
+After claim, the old socket remains unbound. Firmware clears pairing UI,
+closes it, and reconnects/re-authenticates with the unchanged hardware
+credential. Backend then resolves the ACTIVE Device. If completion was missed
+because the old socket disconnected, a bound reconnect may send exactly one
+conditional `pairing_mode_request`; Backend responds `pairing_completed`.
+
+Do not begin this physical pairing work until `HW_VPS_CONNECTION_STABLE` is
+proven. Existing wakeword/whole-WAV/MP3 voice behavior must remain intact.

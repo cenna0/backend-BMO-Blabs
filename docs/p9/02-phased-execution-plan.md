@@ -1,5 +1,9 @@
 # P9 / Integration Execution Plan
 
+> **HISTORICAL PLAN — DO NOT EXECUTE**
+> P9 promotion and seven migrations are complete. Current Mobile/ESP work starts
+> at the audience handoffs linked from `docs/README.md`.
+
 **Current plan:** [`../integration/04-VPS-IMPLEMENTATION-PLAN.md`](../integration/04-VPS-IMPLEMENTATION-PLAN.md)
 
 The historical P9.1–P9.6 grouping remains useful for lineage, but Phase 2 executes tracer slices against one Backend API and additive schema:

@@ -1,10 +1,17 @@
 # BMO MVP — Hardware Integration Handoff
 
+> **VOICE-SPECIFIC SUPPORTING GUIDE**
+> Start current firmware work at
+> [`../integration/ESP-AGENT-HANDOFF.md`](../integration/ESP-AGENT-HANDOFF.md).
+> This file preserves the existing voice flow; it is not the complete current
+> `/ws` event inventory. Reach `HW_VPS_CONNECTION_STABLE` before pairing.
+
 **Audience:** ESP32-S3 firmware/hardware team  
 **Protocol authority:** [`../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md)  
 **Deployment values:** [`DEPLOYMENT-CONFIG.md`](DEPLOYMENT-CONFIG.md)
 
-This file answers one question: **what does the ESP32 need to implement to talk to the existing BMO voice backend?**
+This file answers one question: **what does the ESP32 need to preserve for the
+existing BMO voice path?**
 
 > Do not invent endpoint, event, state, acknowledgment, field, or retry behavior. If this summary ever conflicts with the canonical hardware contract, stop and use the canonical contract.
 
@@ -225,7 +232,9 @@ Rules:
 
 ## 5. WebSocket Event — Backend → ESP32
 
-Only these public events are valid:
+Within the existing v1.0.5 **voice subset**, only these Backend events are
+used. This is not the complete current `/ws` inventory; see
+[`../integration/ESP-AGENT-HANDOFF.md`](../integration/ESP-AGENT-HANDOFF.md).
 
 ### `authenticated`
 
@@ -302,7 +311,9 @@ Do **not** implement an `audio_ready_received` acknowledgment. It does not exist
 
 ## 6. Event yang ESP32 harus kirim
 
-Only these events are sent by ESP32:
+Within the existing v1.0.5 **voice subset**, ESP32 sends only these events.
+The current additive/pairing inventory is in
+[`../integration/ESP-AGENT-HANDOFF.md`](../integration/ESP-AGENT-HANDOFF.md).
 
 ### `authenticate`
 
@@ -821,8 +832,11 @@ Firmware is ready for backend integration when:
 
 ## Additive Phase 2 handoff
 
-The checklist above remains the existing voice-v1.0.5 gate. Approved additive
-Wi-Fi, logs, telemetry/RSSI, playback-volume sync, and generic proactive-audio
-requirements are separate and remain `PENDING_PHYSICAL_ESP`; read
+The checklist above remains the existing voice-v1.0.5 gate. Source-defined
+Wi-Fi, logs, telemetry/RSSI, playback-volume sync, and pairing requirements are
+separate and remain `PENDING_PHYSICAL_ESP`; read
 [`../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md`](../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md).
 Do not merge their acceptance status into the existing public fake-client result.
+
+Current source defines no proactive hardware event family; do not implement
+proactive event names from historical plans.

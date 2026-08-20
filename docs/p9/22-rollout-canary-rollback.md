@@ -1,5 +1,9 @@
 # Rollout, Canary, and Rollback
 
+> **HISTORICAL ROLLOUT PLAN — DO NOT EXECUTE**
+> P9 production rollout and code-only pairing cutover are complete. Current
+> Mobile/ESP work must not repeat these steps.
+
 **Status:** `READY_TO_IMPLEMENT`; production execution requires a separate authorization gate.
 
 ## Rollout sequence

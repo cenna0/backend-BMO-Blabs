@@ -1,6 +1,6 @@
 # BMO Voice MVP — Current Runtime Configuration
 
-**Updated:** 2026-08-03
+**Updated:** 2026-08-20
 **Status:** VERIFIED P8 PRODUCTION — PIPER PRIMARY; KOKORO FALLBACK
 **Scope:** STT/TTS runtime values only; the public hardware contract is unchanged.
 
@@ -151,9 +151,8 @@ The RVC experiment remains archived at
 `feat/p8-rvc-foundation` / `8420d4192a16025f439c040cd7a32a50b41fe52b` with
 classification `P8_CANARY_NEEDS_LARGER_HOST`. It was not merged or deployed.
 
-Database persistence is not enabled in the public production Backend API.
-P9.1 Prisma/PostgreSQL is present in source and verified in a private candidate
-stack with two applied foundation migrations. Its stored user/device settings
-do not currently alter production voice or synchronize to an ESP. Target
-integration schema/routes remain documented work, not a production runtime
-claim.
+P9 Backend persistence is enabled in public production with private PostgreSQL
+and seven completed migrations. Code-only pairing is deployed. Physical
+settings application and ESP pairing acceptance remain
+`PENDING_PHYSICAL_ESP`; these STT/TTS values do not claim that firmware has
+applied database-backed settings.

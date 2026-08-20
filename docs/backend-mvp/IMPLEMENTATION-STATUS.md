@@ -1,5 +1,10 @@
 # BMO Backend MVP — Voice Lineage and Integration Overlay
 
+> **HISTORICAL CONTROL RECORD — NOT CURRENT STATUS**
+> Legacy verifier text below is intentionally preserved. P9 Backend and seven
+> migrations are production-deployed; current status is
+> `docs/integration/05-IMPLEMENTATION-STATUS.md`.
+
 **Last updated:** 2026-08-11
 **Backend reference lineage:** 1.0.1; current active documentation is date-audited and governed by this status file
 

@@ -1,6 +1,12 @@
 # BMO VPS — Maintenance and Recovery Runbook
 
-**Status:** CURRENT VERIFIED PRODUCTION RUNBOOK
+> **SUPERSEDED FOR CURRENT P9 OPERATIONS — DO NOT EXECUTE STALE CANDIDATE STEPS**
+> This file contains valuable P6–P8 maintenance history plus candidate-era P9
+> state. Use `docs/integration/05-IMPLEMENTATION-STATUS.md` and the executed
+> production record before any separately authorized operation. Mobile/ESP
+> agents must not use this file as an integration contract.
+
+**Status:** HISTORICAL P6–P8 RUNBOOK WITH SUPERSEDED P9 CANDIDATE SECTIONS
 **Owner:** `bmo-admin` / Codex when explicitly authorized  
 **Applies from:** P6 foundation onward; service-specific steps activate when the related phase is deployed.
 

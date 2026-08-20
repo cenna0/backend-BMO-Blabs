@@ -1,5 +1,9 @@
 # Component Ownership — Frozen
 
+> **CURRENT / SUPPORTING**
+> These ownership boundaries remain current. Source and the canonical
+> integration package win on route, event, and runtime status.
+
 | Component | Owns | Must not own |
 |---|---|---|
 | Mobile | presentation, local secure session handle, explicit user intent/confirmation | provider secrets, DB, Hermes/Audio calls, firmware state |

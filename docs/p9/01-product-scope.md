@@ -1,5 +1,9 @@
 # P9 Product Scope — Integration Freeze
 
+> **HISTORICAL FREEZE SNAPSHOT — NOT CURRENT STATUS OR API INSTRUCTIONS**
+> Preserve the dated design below. Current authority is `docs/p9/README.md` and
+> the canonical integration package.
+
 **Status:** Phase 1 frozen; target features are not implementation claims.
 
 ## Existing verified baseline

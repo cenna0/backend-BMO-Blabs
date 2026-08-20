@@ -1,4 +1,8 @@
-# P9 Decision Register — Current
+# P9 Decision Register — Historical Summary
+
+> **SUPERSEDED SUMMARY — DO NOT IMPLEMENT STALE PAIRING/STATUS ROWS**
+> Current decisions are in `docs/integration/06-DECISION-REGISTER.md`; code-only
+> pairing supersedes the five-attempt/four-field-era model below.
 
 **Canonical integration decisions:** [`../integration/06-DECISION-REGISTER.md`](../integration/06-DECISION-REGISTER.md)
 

@@ -1,5 +1,9 @@
 # Entity Relationships — Phase 2 Source Foundation
 
+> **HISTORICAL SCHEMA SNAPSHOT — NOT CURRENT RUNTIME STATUS**
+> This graph predates the final pairing enrollment migration. Current Prisma
+> source and migration history win.
+
 **Evidence tier:** Prisma schema plus disposable PostgreSQL migration evidence.
 The running `bmo` candidate and production databases still contain the P9.1
 foundation; Slice 2A did not apply or deploy this graph to either runtime.

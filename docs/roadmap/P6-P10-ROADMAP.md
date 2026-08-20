@@ -1,5 +1,9 @@
 # BMO — P6–P10 Infrastructure and Hardware Readiness Roadmap
 
+> **HISTORICAL ROADMAP — NOT CURRENT EXECUTION INSTRUCTIONS**
+> P9 Backend rollout and seven migrations are complete. Current Mobile/ESP work
+> starts at the audience handoffs in `docs/integration/`.
+
 **Status:** LOCKED ROADMAP / PHASE-BY-PHASE EXECUTION  
 **Current next phase:** P9.1 — `ARCHITECTURE LOCKED; NOT_STARTED / AWAITING EXPLICIT USER AUTHORIZATION`
 **Reason for split:** the original P6 scope became too broad after adding full VPS foundation, public TLS, monitoring, real RVC, database readiness, backup/recovery, and hardware handoff.

@@ -1,5 +1,9 @@
 # Security and Encryption — Frozen Requirements
 
+> **HISTORICAL SECURITY CHECKPOINT — NOT CURRENT DEPLOYMENT STATUS**
+> Preserve the controls/evidence below, but use integration `05`, `06`, and
+> `09` for current production, auth-label, ops-route, and rate-limit topology.
+
 ## Existing controls
 
 - Argon2id password hashes; short HS256 access JWT; opaque hashed/rotating refresh tokens with replay-family revocation.

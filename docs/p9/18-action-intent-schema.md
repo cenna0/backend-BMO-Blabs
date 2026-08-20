@@ -1,5 +1,9 @@
 # Hermes ↔ Backend Action-Intent Schema
 
+> **HISTORICAL DESIGN SNAPSHOT — NOT A CURRENT MOBILE/ESP CONTRACT**
+> Use current registered source and integration docs for implemented provider
+> and hardware behavior.
+
 **Status:** `SOURCE_READY` for the Backend semantic validation/provider action
 boundary; the current text-only Hermes transport has no direct provider tool
 call and remains intentionally unable to access Spotify credentials.

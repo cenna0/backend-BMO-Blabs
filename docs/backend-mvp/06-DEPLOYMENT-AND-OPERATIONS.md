@@ -1,5 +1,9 @@
 # BMO Backend MVP — Deployment and Operations
 
+> **HISTORICAL P7/P8 DEPLOYMENT BASELINE — NOT CURRENT P9 INSTRUCTIONS**
+> Preserve this voice-runtime evidence, but use `docs/README.md` and
+> `docs/integration/05-IMPLEMENTATION-STATUS.md` for current production state.
+
 **Versi:** 1.2.0
 **Status:** VERIFIED — PRODUCTION
 **Last audited:** 2026-08-03

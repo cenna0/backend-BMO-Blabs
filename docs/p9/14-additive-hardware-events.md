@@ -1,22 +1,49 @@
 # Additive Hardware Events
 
-**Status:** `PENDING_PHYSICAL_ESP`
+> **CURRENT / SOURCE-DERIVED**
+> `backend/src/websocket/events.ts` is authoritative. Backend implementation
+> does not prove physical firmware acceptance.
 
-The exact payloads and state rules are canonical in [`../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`](../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md). The target events are:
+**Physical status:** `PENDING_PHYSICAL_ESP`
+
+Exact ESP → Backend events:
 
 ```text
-Backend -> ESP  wifi_configuration
-ESP -> Backend  wifi_configuration_received
-ESP -> Backend  wifi_configuration_result
-ESP -> Backend  device_log
-ESP -> Backend  device_telemetry
-Backend -> ESP  device_settings
-ESP -> Backend  device_settings_applied
-Backend -> ESP  proactive_audio_ready
-ESP -> Backend  proactive_playback_done
-ESP -> Backend  proactive_playback_failed
+authenticate
+audio_playback_done
+audio_playback_failed
+wifi_configuration_received
+wifi_configuration_result
+device_log
+device_telemetry
+device_settings_applied
+pairing_mode_request
 ```
 
-They extend device `/ws`; they do not replace `authenticate`, `display_status`, `audio_ready`, `audio_playback_done`, or `audio_playback_failed`. Firmware must preserve the whole-WAV/MP3 voice path.
+Exact Backend → ESP events:
 
-Backend test doubles may verify parsing/queue state, but promotion requires firmware source/build plus a real ESP test for reconnect, idempotency, rollback, offline delivery, and physical playback. First-boot Wi-Fi and reliable battery measurement remain hardware-owned gates.
+```text
+authenticated
+authentication_failed
+connection_replaced
+display_status
+audio_ready
+request_failed
+wifi_configuration
+device_settings
+pairing_code
+pairing_completed
+```
+
+These extend/preserve device `/ws`; Mobile uses a different `/api/v1/ws`
+contract. Payloads and binding rules are in
+[`../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`](../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md).
+
+Current source does not define `proactive_audio_ready`,
+`proactive_playback_done`, or `proactive_playback_failed`. Backend durable
+proactive-delivery state must not be mistaken for a hardware event family.
+
+Firmware work starts with `HW_VPS_CONNECTION_STABLE`, then physical pairing,
+then other additive acceptance. Existing wakeword/whole-WAV/MP3 voice behavior
+must remain regression-green. Promotion requires actual firmware source/build
+and real ESP evidence; fake clients are insufficient.

@@ -1,5 +1,9 @@
 # Documentation Audit Record
 
+> **HISTORICAL AUDIT INDEX — NOT CURRENT INSTRUCTIONS**
+> Audit verdicts below apply to their dated checkpoint. Use `docs/README.md`
+> and the canonical integration package for current truth.
+
 Current final audit:
 
 - [`2026-07-26-FINAL-LOOP-VERIFICATION.md`](2026-07-26-FINAL-LOOP-VERIFICATION.md) — latest full authority/runtime/infrastructure/hardware-handoff verification.

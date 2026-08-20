@@ -1,5 +1,9 @@
 # Backup, Restore, and Migration Plan
 
+> **HISTORICAL CANDIDATE PLAN — DO NOT EXECUTE AS CURRENT OPERATIONS**
+> Production backup/migration/cutover completed with seven migrations. This
+> plan remains checkpoint evidence only.
+
 **Status:** P9.1 candidate procedure `EXISTING_VERIFIED`; target integration
 migration `READY_TO_IMPLEMENT`; off-VPS destination `BLOCKED` for final sign-off.
 

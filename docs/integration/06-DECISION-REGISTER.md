@@ -2,7 +2,7 @@
 
 **Frozen:** 2026-08-11
 
-**Current update:** Decisions INT-061 through INT-068 below record the
+**Current update:** Decisions INT-061 through INT-071 below record the
 post-promotion production and Mobile documentation state. Older entries retain
 their historical meaning unless explicitly superseded.
 
@@ -16,7 +16,7 @@ their historical meaning unless explicitly superseded.
 | INT-006 | DOB recovery is a dedicated audited workflow, not a plaintext DOB lookup. | Reduce enumeration/replay risk. |
 | INT-007 | Wi-Fi credentials are written to VPS DB encrypted at rest, queued to ESP, and never returned in plaintext. | Backend owns desired state; ESP owns application. |
 | INT-008 | First-boot Wi-Fi bootstrap is not solved by the VPS. | A disconnected ESP cannot receive a remote DB command. |
-| INT-009 | Proactive delivery uses one generic backend queue/event family. | Chat, schedule, and WhatsApp share delivery mechanics. |
+| INT-009 | Proactive delivery uses one generic Backend queue/status family. Current source defines no proactive hardware event family. | Chat, schedule, and WhatsApp share durable delivery mechanics without inventing unsupported `/ws` events. |
 | INT-010 | Battery telemetry is nullable and capability-gated. | Hardware measurement support is not proven. |
 | INT-011 | Spotify tokens stay server-side and use Authorization Code callback/state. | Backend is a confidential server client. |
 | INT-012 | WhatsApp conversations remain in the provider/Hermes boundary; BMO stores linkage, rules, deliveries, and audit metadata. | Avoid duplicating provider session ownership. |
@@ -47,7 +47,10 @@ their historical meaning unless explicitly superseded.
 | INT-066 (supersedes INT-044) | Ordinary Mobile pairing is code-only: authenticated unbound hardware receives a short-lived six-digit code over `/ws`; Mobile calls `POST /api/v1/pairing/claim` with `{code}` only. Backend stores a durable HardwareEnrollment with trusted `hardwareId` and SHA-256 token digest, creates Device only after claim, and never accepts Mobile `DEVICE_TOKEN`/`deviceCredential`. | Keep the physical credential inside hardware ↔ Backend, remove credential provenance ambiguity, preserve first-valid-claim MVP semantics, and leave physical firmware acceptance as `PENDING_PHYSICAL_ESP`. |
 | INT-067 | Code-only pairing intentionally has no per-enrollment failed-code counter in the MVP. An arbitrary wrong `{code}` that matches no active enrollment cannot be attributed to one hardware enrollment; a code matching an active enrollment is the possession factor and is a successful claim. | Preserve the locked code-only UX and keep authenticated-user, user/session/IP rate limits, 600-second TTL, active-code uniqueness, one-time consumption, immediate replacement invalidation, generic invalid/expired errors, and first-valid-claim semantics. Do not add `pairingId`, per-enrollment attempt fields, or a Prisma/migration change for this decision. |
 | INT-068 | Production rollout closure is complete for Backend code-only pairing: image `bmo-p9.1:pairing-code-only-d1473d0` is deployed, migration #7 is applied, Mobile REST/WS coverage is 79/12, health and soak passed, and rollback image `bmo-p9.1:spotify-phase26-9819ef7` remains preserved. | Physical firmware acceptance and real-device pairing evidence remain `PENDING_PHYSICAL_ESP`; no provider action or physical status is implied. |
+| INT-069 | `/api/v1/ops/db/*` routes are internal/operator-only and outside the Mobile route count; Mobile and ESP must never call them. Current source does not apply ordinary app bearer authentication. | Future edge-deny/operator-auth hardening is defense in depth and must not be documented as implemented until source/runtime proves it. |
+| INT-070 | `OPERATOR_BEARER` on WhatsApp QR/confirm rows is a product/UI policy label. Current source uses ordinary authenticated-user middleware and has no distinct operator RBAC role. | Ordinary Mobile UI still must not expose or call the QR/confirm setup routes; docs must not invent source-enforced RBAC. |
+| INT-071 | Login and pairing rate-limit state is process-local and acceptable for the current single-Backend production topology. | A future multi-replica Backend requires shared/distributed rate-limit state; this scaling note is not a current outage. |
 | INT-047 | Prisma Studio on `*:5555` is a security blocker and is not part of declared production architecture. | Close before Phase 2/deploy. |
-| INT-048 | `docs/product/BMO-BY-BLABS-PRD-v1.4.0.md` is the current integration PRD; v1.2.4 remains the locked historical product baseline. | Keeps verifier-protected history intact. |
+| INT-048 (superseded by current source/integration authority) | `docs/product/BMO-BY-BLABS-PRD-v1.4.0.md` is a frozen product snapshot; v1.2.4 remains the locked historical baseline. | Current runtime/API/status authority is source plus integration `00`, `01`, `02`, `03`, `05`, `06`, `08`, and `09`; preserve PRD history without treating freeze-time status as current. |
 
 Decisions may be superseded only by a new dated entry that states the old ID, migration/compatibility impact, and evidence required. Do not silently rewrite these rows.

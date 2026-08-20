@@ -1,55 +1,66 @@
 # BMO Repository Bootstrap
 
-Repository ini adalah source of truth production. Branch deployment: `main`.
+The canonical branch is `main`. Repository orientation starts at
+[`docs/README.md`](docs/README.md).
 
-Repository orientation starts at `docs/README.md`; the current Mobile work
-starts at the live-production integration package:
+## Audience entrypoints
 
-1. [`docs/README.md`](docs/README.md)
-2. [`docs/NEXT-ACTION.md`](docs/NEXT-ACTION.md)
-3. [`docs/integration/00-START-HERE.md`](docs/integration/00-START-HERE.md)
-4. [`docs/integration/01-MOBILE-BACKEND-API-CONTRACT.md`](docs/integration/01-MOBILE-BACKEND-API-CONTRACT.md)
-5. [`docs/integration/05-IMPLEMENTATION-STATUS.md`](docs/integration/05-IMPLEMENTATION-STATUS.md)
-6. [`docs/integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](docs/integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md)
+- Mobile coding agents:
+  [`docs/integration/MOBILE-AGENT-HANDOFF.md`](docs/integration/MOBILE-AGENT-HANDOFF.md)
+- ESP/Hardware coding agents:
+  [`docs/integration/ESP-AGENT-HANDOFF.md`](docs/integration/ESP-AGENT-HANDOFF.md)
+- Current executable boundary:
+  [`docs/NEXT-ACTION.md`](docs/NEXT-ACTION.md)
 
-The following repository control records remain in the entry chain for
-historical/runtime context, not as Mobile implementation instructions:
+Mobile authority is the handoff plus integration `00`, `01`, `05`, and `09`.
+ESP authority is the ESP handoff, integration `02` and `03`, source event
+schemas, and the immutable existing hardware voice contract. Do not read
+integration `04`, `07`, or `10`, old phase plans, candidate runbooks, or frozen
+PRDs as current execution instructions.
 
-7. [`docs/roadmap/P8-EXECUTION-SPEC.md`](docs/roadmap/P8-EXECUTION-SPEC.md)
-8. [`docs/backend-mvp/IMPLEMENTATION-STATUS.md`](docs/backend-mvp/IMPLEMENTATION-STATUS.md)
+## Current production boundary
 
-The current Phase 2 contract linked by those entrypoints starts at
-[`docs/integration/00-START-HERE.md`](docs/integration/00-START-HERE.md).
+- Backend/VPS code-only pairing is deployed and production-verified.
+- Mobile API: `https://api.personalbmo.web.id`
+- Mobile WSS: `wss://api.personalbmo.web.id/api/v1/ws`
+- Hardware WSS: `wss://api.personalbmo.web.id/ws`
+- production Backend origin: `127.0.0.1:3000`
+- production migrations: `7 completed, 0 unfinished, 0 rolled_back`
+- Mobile coverage: `79` REST routes and `12` WebSocket event names
+- physical ESP pairing remains `PENDING_PHYSICAL_ESP`
+- candidate port `3010` is historical/non-production.
 
-Current canonical references:
+The deployed image is `bmo-p9.1:pairing-code-only-d1473d0`, built from
+immutable source revision `d1473d04f4b76ccb52cc8eeaff52a268504310f0`.
+That provenance is not the mutable repository HEAD; inspect the checkout with
+`git rev-parse HEAD`.
 
-- Integration PRD: [`docs/product/BMO-BY-BLABS-PRD-v1.4.0.md`](docs/product/BMO-BY-BLABS-PRD-v1.4.0.md)
-- Locked historical PRD: [`docs/product/BMO-BY-BLABS-PRD-v1.2.4.md`](docs/product/BMO-BY-BLABS-PRD-v1.2.4.md)
-- Hardware contract: [`docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md)
-- Verified runtime baseline: [`docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`](docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md)
-- Implementation status: [`docs/backend-mvp/IMPLEMENTATION-STATUS.md`](docs/backend-mvp/IMPLEMENTATION-STATUS.md)
+## Current supporting references
 
-Rules:
+- physical voice contract:
+  [`docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md)
+- STT/TTS runtime values:
+  [`docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`](docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md)
+- current implementation status:
+  [`docs/integration/05-IMPLEMENTATION-STATUS.md`](docs/integration/05-IMPLEMENTATION-STATUS.md)
+- route/event coverage:
+  [`docs/integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](docs/integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md)
 
-- Active docs override historical/archive evidence.
-- P6 is `VERIFIED`; P7 is `VERIFIED — PRODUCTION`. See
-  [`docs/backend-mvp/P7-TEST-EVIDENCE.md`](docs/backend-mvp/P7-TEST-EVIDENCE.md).
-- P8 is `VERIFIED — PRODUCTION`: Piper Prudence is primary, Kokoro `af_heart`
-  at speed `0.80` is fallback, and `RVC_ENABLED=false` remains locked.
-- P9 production is live. Mobile uses `https://api.personalbmo.web.id` and
-  `wss://api.personalbmo.web.id/api/v1/ws`; the hardware contract remains
-  `wss://api.personalbmo.web.id/ws`. Start Mobile work at
-  `docs/integration/00-START-HERE.md`.
-- The public hardware endpoint is live and verified. Physical ESP32 acceptance
-  remains pending P10. RVC runtime artifacts are removed from production and
-  retained only as archived evidence/history.
-- [`docs/roadmap/P6-EXECUTION-SPEC.md`](docs/roadmap/P6-EXECUTION-SPEC.md)
-  remains the historical locked P6 record, not the current execution contract.
-- Do not deploy, migrate production, or change the locked hardware voice contract
-  without explicit authorization. Additive ESP work remains physical-evidence gated.
-- Never commit real secrets. Copy the root `.env.*.example` templates to runtime config outside Git.
+Historical evidence is retained for traceability and must remain labeled as
+historical. Never commit real secrets or copy protected runtime values into
+Git/docs.
 
-Repository verification:
+Legacy verifier compatibility links, in protected historical order (not an
+agent onboarding chain):
+
+1. [`docs/roadmap/P8-EXECUTION-SPEC.md`](docs/roadmap/P8-EXECUTION-SPEC.md)
+2. [`docs/backend-mvp/IMPLEMENTATION-STATUS.md`](docs/backend-mvp/IMPLEMENTATION-STATUS.md)
+3. [`docs/product/BMO-BY-BLABS-PRD-v1.2.4.md`](docs/product/BMO-BY-BLABS-PRD-v1.2.4.md)
+
+These links retain verifier-protected P8/P9.1 lineage only; their old phase
+status does not override the audience entrypoints above.
+
+Repository docs verifier:
 
 ```text
 python3 scripts/verify-backend-mvp-docs.py

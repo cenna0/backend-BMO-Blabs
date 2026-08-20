@@ -1,5 +1,9 @@
 # Chat Retention and Deletion
 
+> **HISTORICAL DESIGN SNAPSHOT — DO NOT TREAT OPEN ITEMS AS CURRENT STATUS**
+> Current source and integration status determine implemented behavior; this
+> file preserves the earlier privacy decision checkpoint.
+
 **Status:** `READY_TO_IMPLEMENT`; retention defaults are a named privacy blocker.
 
 ## Stored history

@@ -1,8 +1,8 @@
 # Mobile Endpoint and WebSocket Coverage Matrix
 
-**Audited:** 2026-08-19
+**Audited:** 2026-08-20
 **Source:** backend/src/p9/http/*.ts, backend/src/p9/websocket/mobile-events.ts, backend/src/p9/websocket/mobile-websocket.server.ts
-**Source status:** Code-only enrollment is on `main` at `d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
+**Deployed-image source revision:** `d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable provenance, not current Git HEAD).
 **Production status:** Code-only enrollment is `PRODUCTION_VERIFIED` in `bmo-p9.1:pairing-code-only-d1473d0`.
 **Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied in production; state is `7 completed, 0 unfinished, 0 rolled_back`.
 **Production verification:** Health and six-sample soak passed; Docker healthcheck resolves `BACKEND_PORT=3000`; old raw-credential Mobile pairing routes are absent.
@@ -26,7 +26,11 @@ BLOCKED, and PENDING_PHYSICAL_ESP retain their meanings from
 ## REST route inventory
 
 Auth is explicit per route row: `PUBLIC`, `BEARER`, or `OPERATOR_BEARER`.
-`PUBLIC` routes are the five auth bootstrap routes plus the avatar media route; `OPERATOR_BEARER` is reserved for the two authenticated WhatsApp setup surfaces marked `OUT_OF_SCOPE` for Mobile UI.
+`PUBLIC` routes are the five auth bootstrap routes plus the avatar media route.
+`OPERATOR_BEARER` is the product/UI policy label for the two authenticated
+WhatsApp setup surfaces marked `OUT_OF_SCOPE` for Mobile UI. Current source
+uses ordinary authenticated-user middleware for those routes; it does not
+enforce a separate operator RBAC role.
 
 | # | Method | Path | Auth | Request/query source | Response/status | Retry/idempotency | Mobile status/relevance |
 |---:|---|---|---|---|---|---|
@@ -123,6 +127,12 @@ GET /api/v1/ops/db/readyz                   internal operator route
 GET /api/v1/ops/db/migrations               internal operator route
 ~~~
 
+The `/api/v1/ops/db/*` routes are outside the Mobile count and Mobile/ESP must
+never call them. Source does not apply ordinary app bearer authentication to
+these internal/operator routes. A future defense-in-depth decision may add an
+edge deny or operator authentication; do not claim that hardening already
+exists.
+
 The production Spotify callback is exactly
 https://api.personalbmo.web.id/api/v1/integrations/spotify/callback. Mobile
 starts OAuth with /spotify/connect and does not call the callback itself.
@@ -171,18 +181,23 @@ the recovery source after reconnect.
 The hardware contract remains wss://api.personalbmo.web.id/ws with
 device_id/device_token, existing raw-WAV voice, and MP3 playback events. It is
 not interchangeable with Mobile /api/v1/ws. Additive Wi-Fi, telemetry, log,
-settings, and proactive events remain PENDING_PHYSICAL_ESP until firmware and
-real-device evidence exist. Pairing adds `pairing_code`,
+and settings events remain PENDING_PHYSICAL_ESP until firmware and real-device
+evidence exist. Current source defines no proactive hardware event family.
+Pairing adds `pairing_code`,
 `pairing_mode_request`, and `pairing_completed`; these are Backend-implemented
 but remain PENDING_PHYSICAL_ESP for firmware acceptance.
 
 ## Coverage result
 
 ~~~
-MOBILE_ROUTE_SOURCE_COUNT=79
-MOBILE_WS_EVENT_SOURCE_COUNT=12
-MOBILE_ROUTE_DOC_COVERAGE=100%
-MOBILE_WS_EVENT_DOC_COVERAGE=100%
+SOURCE_MOBILE_ROUTE_COUNT=79
+DOCUMENTED_MOBILE_ROUTE_COUNT=79
+MISSING=0
+PHANTOM=0
+SOURCE_MOBILE_WS_EVENT_COUNT=12
+DOCUMENTED_MOBILE_WS_EVENT_COUNT=12
+MISSING=0
+PHANTOM=0
 ~~~
 
 Any new registered route or event must update this matrix, the canonical Mobile

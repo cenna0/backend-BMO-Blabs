@@ -1,9 +1,10 @@
 # BMO Mobile ↔ Backend API Contract
 
 **Version:** 3.0.0
-**Audited:** 2026-08-19
-**Source status:** Code-only enrollment is on `main` at
-`d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
+**Audited:** 2026-08-20
+**Deployed-image source revision:**
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable provenance, not current
+Git HEAD).
 **Production status:** `PRODUCTION_VERIFIED` — image
 `bmo-p9.1:pairing-code-only-d1473d0`.
 **Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied in
@@ -58,10 +59,12 @@ token bearer header: `POST /api/v1/auth/register`, `POST
 /api/v1/auth/login`, `POST /api/v1/auth/password/recovery/verify`, `POST
 /api/v1/auth/password/recovery/reset`, and `POST /api/v1/auth/refresh`. The
 avatar media route `GET /media/avatars/:fileName` is also public. Every other
-route in the 79-route Mobile inventory requires a bearer access token, except
-the authenticated WhatsApp QR setup routes, which are `OPERATOR_BEARER` and
-`OUT_OF_SCOPE` for Mobile UI. The provider browser callback is outside the
-Mobile inventory and is separately public.
+route in the 79-route Mobile inventory requires a bearer access token. The two
+authenticated WhatsApp QR setup routes are labeled `OPERATOR_BEARER` as a
+product/UI policy and are `OUT_OF_SCOPE` for Mobile UI, but current source uses
+the ordinary authenticated-user middleware and does not enforce a distinct
+operator RBAC role. The provider browser callback is outside the Mobile
+inventory and is separately public.
 
 The access token is short-lived. The refresh token is opaque, rotated, and is
 sent only to `POST /api/v1/auth/refresh`. An invalid, expired, revoked, or
@@ -578,11 +581,13 @@ The send projection contains `id, conversationId, preview, status,
 confirmationExpiresAt, errorCode`.
 
 `/whatsapp/qr` and `/whatsapp/confirm-scanned` are registered authenticated
-operator setup surfaces, not Mobile UI features. Mark them `OUT_OF_SCOPE` for
-Mobile. Mobile never calls bridge `/health`, `/messages`, `/send`, the resolver,
-Hermes, or any provider/session path. WhatsApp provider/runtime availability is
-an independent `BLOCKED` or connected state; route registration is not proof of
-real-world delivery.
+setup surfaces, not Mobile UI features. `OPERATOR_BEARER` is the product/UI
+policy label; current source applies ordinary authenticated-user middleware and
+does not define a separate operator RBAC role. Mark both routes `OUT_OF_SCOPE`
+for Mobile. Mobile never calls bridge `/health`, `/messages`, `/send`, the
+resolver, Hermes, or any provider/session path. WhatsApp provider/runtime
+availability is an independent `BLOCKED` or connected state; route registration
+is not proof of real-world delivery.
 
 ## Spotify
 

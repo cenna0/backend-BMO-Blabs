@@ -11,7 +11,11 @@
 > Prudence primary, Kokoro fallback, and RVC disabled/removed from production.
 > Historical RVC test rows below are preserved as evidence boundaries and must
 > not be read as current production requirements. P9 application tests are
-> defined in [`../p9/23-test-acceptance-matrix.md`](../p9/23-test-acceptance-matrix.md).
+> currently tracked in
+> [`../integration/05-IMPLEMENTATION-STATUS.md`](../integration/05-IMPLEMENTATION-STATUS.md)
+> and
+> [`../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md).
+> The P9 matrix is a frozen historical checkpoint.
 
 
 ## Cara menggunakan file ini

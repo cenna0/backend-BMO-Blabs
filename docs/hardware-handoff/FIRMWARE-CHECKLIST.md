@@ -1,5 +1,11 @@
 # BMO MVP — Firmware Implementation Checklist
 
+> **CURRENT SUPPORTING CHECKLIST**
+> Begin at
+> [`../integration/ESP-AGENT-HANDOFF.md`](../integration/ESP-AGENT-HANDOFF.md).
+> Complete `HW_VPS_CONNECTION_STABLE` before pairing; source event names are
+> defined by `backend/src/websocket/events.ts`.
+
 Use together with [`README.md`](README.md) and the canonical [`../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md).
 
 Current gate: `DEPLOYMENT-CONFIG.md` is `VERIFIED` and the live endpoint is
@@ -78,6 +84,10 @@ recorded; `PHYSICAL_ESP32_STATUS` remains `NOT_RUN`.
 - [ ] `display_status` with `status: thinking`.
 - [ ] `audio_ready`.
 - [ ] `request_failed`.
+- [ ] `wifi_configuration` (physical apply remains pending).
+- [ ] `device_settings` (physical apply remains pending).
+- [ ] `pairing_code` (only after stable base connection).
+- [ ] `pairing_completed` (clear UI, then reconnect/re-authenticate).
 - [ ] Do not expect `audio_ready_received`.
 - [ ] Do not expect audio bytes through WebSocket.
 
@@ -86,6 +96,12 @@ recorded; `PHYSICAL_ESP32_STATUS` remains `NOT_RUN`.
 - [ ] `authenticate`.
 - [ ] `audio_playback_done`.
 - [ ] `audio_playback_failed`.
+- [ ] `wifi_configuration_received` (physical apply remains pending).
+- [ ] `wifi_configuration_result` (physical apply remains pending).
+- [ ] `device_log` (bounded and secret-free).
+- [ ] `device_telemetry`.
+- [ ] `device_settings_applied`.
+- [ ] `pairing_mode_request` (debounced, only when replacement/recovery is needed).
 - [ ] Failure reason is one of `DOWNLOAD_FAILED`, `DECODE_FAILED`, `PLAYBACK_FAILED`.
 - [ ] Completion/failure can be resent after reconnect when delivery is uncertain.
 
@@ -158,13 +174,19 @@ playback_state = waiting | downloading | playing | done_pending_send | failed_pe
 - [ ] Execute all physical tests in `ACCEPTANCE-TESTS.md`.
 - [ ] Record firmware build ID and request IDs used as evidence.
 
-## M. Additive integration — not yet implemented
+## M. Additive physical integration — not yet accepted
 
 All items here are `PENDING_PHYSICAL_ESP` and use the payloads in
 `../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`:
 
 - [ ] Wi-Fi pending/apply/rollback/reconnect/result without secret logging.
 - [ ] Bounded device logs and RSSI telemetry; battery omitted/null until proven.
-- [ ] Generic proactive MP3 dedupe and done/failed acknowledgement.
 - [ ] Versioned playback-volume application and acknowledgement.
+- [ ] After connection stability, display `pairing_code`, handle expiry/reissue,
+      clear on `pairing_completed`, and reconnect/re-authenticate with the
+      unchanged hardware credential.
 - [ ] Existing voice checklist remains green after each addition.
+
+Current source defines no `proactive_audio_ready` or
+`proactive_playback_done`/`failed` hardware events. Do not implement those
+names from historical plans.

@@ -1,5 +1,9 @@
 # Single-VPS Resource Budget
 
+> **HISTORICAL CANDIDATE CAPACITY SNAPSHOT — NOT CURRENT STATUS**
+> Preserve measured evidence; current production health/soak status is in the
+> canonical integration package.
+
 **Status:** Candidate baseline `EXISTING_VERIFIED`; final mixed-load caps `BLOCKED` pending evidence.
 
 ## Evidence baseline

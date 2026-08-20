@@ -1,5 +1,9 @@
 # Scheduler and Generic Proactive Speech
 
+> **SUPERSEDED HARDWARE-EVENT DESIGN — DO NOT IMPLEMENT EVENT NAMES BELOW**
+> Backend durable delivery exists, but current `backend/src/websocket/events.ts`
+> defines no proactive hardware event family. Use the current ESP handoff.
+
 **Backend:** `READY_TO_IMPLEMENT`
 **Physical playback:** `PENDING_PHYSICAL_ESP`
 

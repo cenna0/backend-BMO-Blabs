@@ -1,5 +1,9 @@
 # Mobile Chat and Realtime Architecture
 
+> **HISTORICAL IMPLEMENTATION CHECKPOINT — NOT CURRENT DEPLOYMENT STATUS**
+> Chat architecture remains useful context, but current production and Mobile
+> contract authority is integration `01`, `05`, and `09`.
+
 **Status:** `EXISTING_VERIFIED` at source/test tier; candidate/public deployment and physical proactive speech are absent.
 
 - REST owns durable commands/history. `POST /chat/sessions/:sessionId/messages` returns 202 after an idempotent accepted write.

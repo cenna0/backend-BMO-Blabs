@@ -1,5 +1,9 @@
 # Test and Acceptance Matrix — Frozen
 
+> **HISTORICAL ACCEPTANCE SNAPSHOT — NOT CURRENT STATUS**
+> Current source-derived route/event coverage and production status are in
+> integration `05` and `09`.
+
 | Area | Phase 1 evidence | Phase 2 acceptance |
 |---|---|---|
 | Backend tests | Node 22.23.1: 72 files passed; 400 tests passed, 1 skipped. Coverage includes schedules/proactive delivery, device additions, provider boundaries, plugin catalog, bug reports, and all prior account/chat/memory/mobile/device voice regressions | Disposable-Postgres authenticated HTTP acceptance remains separately opt-in and was not run |

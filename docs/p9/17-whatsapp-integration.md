@@ -1,5 +1,9 @@
 # WhatsApp Integration
 
+> **HISTORICAL PROVIDER/CANDIDATE CHECKPOINT — NOT CURRENT MOBILE AUTHORITY**
+> Current Mobile routes and provider boundaries are in integration `01`, `05`,
+> and `09`. Do not execute operator/provider actions from this record.
+
 **BMO adapter/API:** `SOURCE_VERIFIED` against the Hermes 0.20.0 bridge contract
 **Dedicated transport runtime:** `SOURCE_VERIFIED` in repository; not installed or started
 **Live candidate provider:** `BLOCKED_OPERATOR` pending protected configuration and QR pairing

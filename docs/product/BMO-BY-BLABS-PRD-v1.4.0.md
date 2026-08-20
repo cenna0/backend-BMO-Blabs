@@ -1,5 +1,12 @@
 # BMO by BLABS — Integration PRD v1.4.0
 
+> **HISTORICAL PRODUCT SNAPSHOT — NOT RUNTIME AUTHORITY**
+> This version is frozen at its 2026-08-11 product checkpoint. Freeze-time
+> `READY_TO_IMPLEMENT`, candidate, and deployment wording below is historical
+> and must not override current source or the canonical integration package.
+> Backend code-only pairing is now production-deployed; physical ESP pairing
+> remains `PENDING_PHYSICAL_ESP`. Start at `docs/README.md`.
+
 **Status:** Canonical integration requirement freeze
 **Date:** 2026-08-11
 **Supersedes for current integration scope:** v1.2.4, which remains a locked historical product baseline.

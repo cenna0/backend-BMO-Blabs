@@ -1,5 +1,8 @@
 # MemoryGateway Contract
 
+> **HISTORICAL IMPLEMENTATION CHECKPOINT — NOT CURRENT DEPLOYMENT STATUS**
+> Preserve this domain design; current source and integration status win.
+
 **Status:** `EXISTING_VERIFIED` at source/test tier; no candidate/public deployment.
 
 The Backend depends on an interface, initially `PostgresMemoryGateway`, for:

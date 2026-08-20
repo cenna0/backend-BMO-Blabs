@@ -1,11 +1,15 @@
 # BMO Backend MVP — Agent Execution Guide
 
+> **SUPERSEDED ONBOARDING — DO NOT USE FOR CURRENT MOBILE/ESP WORK**
+> This guide preserves the legacy voice/P1–P8 execution model. Start current
+> work at `docs/README.md` and the audience-specific integration handoff.
+
 **Backend reference lineage:** 1.0.1 (historical split-package lineage)  
 **Current docs audit:** 2026-08-04
-**Status dokumentasi:** CURRENT / AUDITED  
+**Status dokumentasi:** HISTORICAL / SUPERSEDED ONBOARDING
 **Active implementation phase:** lihat `IMPLEMENTATION-STATUS.md` — jangan gunakan status statis dari snapshot package lama
 
-> **Status:** Canonical backend MVP documentation package  
+> **Status:** Historical backend MVP voice package
 > **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
 > **Scope:** Active backend references in this folder primarily define the voice MVP. Firmware, mobile app, Spotify, WhatsApp, and the future application database are not silently pulled into a voice phase. P9 may implement PostgreSQL/Prisma only under its own authorized execution spec, while voice request state remains in-memory.
 

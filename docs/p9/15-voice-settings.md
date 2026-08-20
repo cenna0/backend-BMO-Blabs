@@ -1,5 +1,9 @@
 # Voice and Device Settings
 
+> **HISTORICAL TARGET SNAPSHOT — NOT CURRENT DEPLOYMENT STATUS**
+> Current Backend status is in integration `05`; physical settings application
+> remains `PENDING_PHYSICAL_ESP`.
+
 ## Existing verified behavior
 
 - Piper Prudence is production primary; Kokoro `af_heart` speed `0.80` is fallback; RVC is disabled.

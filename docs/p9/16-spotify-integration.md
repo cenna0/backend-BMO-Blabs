@@ -1,5 +1,9 @@
 # Spotify Integration
 
+> **HISTORICAL CANDIDATE DESIGN — DO NOT USE ITS CALLBACK/PORT IN PRODUCTION**
+> Current Mobile Spotify flow is in integration `01`; production uses the
+> public Backend callback and never candidate port `3010`.
+
 **Source state:** `SOURCE_READY`
 
 **Candidate runtime:** `CANDIDATE_RUNTIME_READY` only after the immutable

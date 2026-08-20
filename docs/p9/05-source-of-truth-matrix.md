@@ -1,5 +1,9 @@
 # Source-of-Truth Matrix — Frozen
 
+> **CURRENT / SUPPORTING**
+> These data-ownership boundaries remain current. Source and the canonical
+> integration package win on route, event, and runtime status.
+
 | Data/decision | Source of truth | Derived/cache only |
 |---|---|---|
 | Account/profile/DOB credential | PostgreSQL | access-token claims |
@@ -12,7 +16,7 @@
 | Curated memory | PostgreSQL via MemoryGateway | bounded prompt context |
 | Schedule/run/delivery | PostgreSQL | worker lease/in-memory timer |
 | Device telemetry current state/logs | PostgreSQL with bounded retention | observability metrics |
-| Generic proactive delivery | PostgreSQL | live socket attempt |
+| Generic proactive delivery | PostgreSQL | no current hardware sender/event family |
 | Spotify tokens/action audit | encrypted PostgreSQL + provider playback truth | normalized Hermes/mobile result |
 | WhatsApp session | Hermes/provider persistence | PostgreSQL connection metadata/rules/delivery audit |
 | Existing voice request lifecycle | Backend in-memory registry | temporary WAV/MP3 artifacts |

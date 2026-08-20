@@ -1,5 +1,9 @@
 # Archive — Historical Documents
 
+> **HISTORICAL INDEX — NOT CURRENT INSTRUCTIONS**
+> Everything routed from this page records an earlier checkpoint. Current
+> Mobile/ESP authority starts at `docs/README.md`.
+
 Files here are immutable/historical snapshots and are **not current runtime configuration sources**.
 
 - `BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md` preserves the original implementation instruction snapshot.

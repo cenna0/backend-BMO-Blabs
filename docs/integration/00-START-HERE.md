@@ -1,8 +1,13 @@
 # BMO Mobile Integration — Current Production Entry Point
 
-**Audited:** 2026-08-19
-**Source status:** Code-only enrollment is on `main` at
-`d1473d04f4b76ccb52cc8eeaff52a268504310f0` and is deployed.
+> **CURRENT / CANONICAL**
+> Use this page for current Mobile onboarding; dated plans/evidence do not
+> override current source.
+
+**Audited:** 2026-08-20
+**Deployed-image source revision:**
+`d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable provenance, not current
+Git HEAD).
 **Production state:** P9 Backend and PostgreSQL are live and healthy.
 **Production image:** `bmo-p9.1:pairing-code-only-d1473d0`.
 **Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied;
@@ -19,6 +24,8 @@ Its physical firmware acceptance remains `PENDING_PHYSICAL_ESP`; source and
 Backend rollout evidence do not substitute for a real ESP32 acceptance.
 
 ## Read in this order
+
+Audience entrypoint: `MOBILE-AGENT-HANDOFF.md`.
 
 1. `01-MOBILE-BACKEND-API-CONTRACT.md` — the canonical Mobile API contract.
 2. `05-IMPLEMENTATION-STATUS.md` — implementation and production-verification status.

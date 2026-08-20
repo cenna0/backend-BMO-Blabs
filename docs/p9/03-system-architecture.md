@@ -1,5 +1,10 @@
 # P9 System Architecture — Frozen
 
+> **HISTORICAL ARCHITECTURE SNAPSHOT — DO NOT IMPLEMENT STALE ROUTES**
+> The pairing and deployment prose below predates code-only enrollment. Current
+> architecture/contract authority is source plus integration `00`–`03`, `05`,
+> and `09`.
+
 ```text
 Mobile --HTTPS/WSS /api/v1/ws--> Caddy --> Backend API service
                                               |-- Prisma --> private PostgreSQL
