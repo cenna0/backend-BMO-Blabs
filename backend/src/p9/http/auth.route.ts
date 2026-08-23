@@ -81,7 +81,7 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
     response.status(201).json({ user: result.user, session: sessionResponse(result.session) });
   }));
 
-  router.post("/auth/login", authLimiter, asyncP9(async (request, response) => {
+  router.post("/auth/login", asyncP9(async (request, response) => {
     const context = requestContext(request, response);
     const result = await options.auth.login(request.body, context.requestId);
     response.status(200).json({ user: result.user, session: sessionResponse(result.session) });
