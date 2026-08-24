@@ -37,7 +37,6 @@ describe("backend health endpoints", () => {
           check: async () => ({
             hermesReady: true,
             audioReady: true,
-            rvcAvailable: true,
           }),
         },
       }),
@@ -48,7 +47,6 @@ describe("backend health endpoints", () => {
       backend: "ok",
       hermes: "ok",
       audio_service: "ok",
-      rvc: "available",
     };
     await request(app).get("/readyz").expect(200, expected);
     await request(app).get("/health").expect(200, expected);
@@ -64,7 +62,6 @@ describe("backend health endpoints", () => {
           check: async () => ({
             hermesReady: true,
             audioReady: true,
-            rvcAvailable: true,
             databaseReady: true,
           }),
         },
@@ -76,7 +73,6 @@ describe("backend health endpoints", () => {
       backend: "ok",
       hermes: "ok",
       audio_service: "ok",
-      rvc: "available",
       database: "ok",
     });
   });
@@ -91,7 +87,6 @@ describe("backend health endpoints", () => {
           check: async () => ({
             hermesReady: true,
             audioReady: true,
-            rvcAvailable: true,
             databaseReady: false,
           }),
         },
@@ -103,36 +98,9 @@ describe("backend health endpoints", () => {
       backend: "ok",
       hermes: "ok",
       audio_service: "ok",
-      rvc: "available",
       database: "error",
     });
     await request(app).get("/livez").expect(200, { status: "ok", backend: "ok" });
-  });
-
-  it("keeps readiness successful and degraded when optional RVC is unavailable", async () => {
-    const app = express();
-    app.use(
-      createHealthRouter({
-        hardwareTestMode: false,
-        readiness: {
-          check: async () => ({
-            hermesReady: true,
-            audioReady: true,
-            rvcAvailable: false,
-          }),
-        },
-      }),
-    );
-
-    const expected = {
-      status: "degraded",
-      backend: "ok",
-      hermes: "ok",
-      audio_service: "ok",
-      rvc: "unavailable",
-    };
-    await request(app).get("/readyz").expect(200, expected);
-    await request(app).get("/health").expect(200, expected);
   });
 
   it("returns sanitized not-ready responses while liveness remains healthy", async () => {
@@ -144,7 +112,6 @@ describe("backend health endpoints", () => {
           check: async () => ({
             hermesReady: false,
             audioReady: true,
-            rvcAvailable: false,
           }),
         },
       }),
@@ -155,7 +122,6 @@ describe("backend health endpoints", () => {
       backend: "ok",
       hermes: "error",
       audio_service: "ok",
-      rvc: "unavailable",
     };
     await request(app).get("/readyz").expect(503, expected);
     await request(app).get("/health").expect(503, expected);
@@ -181,7 +147,6 @@ describe("backend health endpoints", () => {
       backend: "ok",
       hermes: "error",
       audio_service: "error",
-      rvc: "unavailable",
     });
     expect(JSON.stringify(response.body)).not.toContain("sensitive dependency detail");
     await request(app).get("/livez").expect(200);
@@ -199,7 +164,6 @@ describe("backend health endpoints", () => {
       backend: "ok",
       hermes: "bypassed",
       audio_service: "bypassed",
-      rvc: "bypassed",
     });
     const response = await request(runtime.baseUrl).get("/health").expect(200);
 
@@ -208,7 +172,6 @@ describe("backend health endpoints", () => {
       backend: "ok",
       hermes: "bypassed",
       audio_service: "bypassed",
-      rvc: "bypassed",
     });
     expect(JSON.stringify(response.body)).not.toContain("test-device-secret");
   });

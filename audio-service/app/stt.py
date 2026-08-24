@@ -99,7 +99,6 @@ class FasterWhisperTranscriber:
             if factory is None:
                 configure_model_environment(
                     hf_home=self._settings.hf_home,
-                    torch_home=self._settings.torch_home,
                     xdg_cache_home=self._settings.xdg_cache_home,
                     downloads_allowed=self._settings.model_download_allowed,
                 )

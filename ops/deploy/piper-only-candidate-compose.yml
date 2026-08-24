@@ -1,53 +1,26 @@
-name: bmo-production
+# Compose override for the isolated Piper-only audio candidate.
+# Use with p9.1-compose.yml. It keeps production ports and workloads intact.
 
 services:
   backend:
-    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to an immutable name@sha256 digest}
-    network_mode: host
-    env_file:
-      - path: ${BACKEND_ENV_FILE:-/opt/bmo/config/backend.env}
-        required: true
+    image: ${P9_CANDIDATE_IMAGE:?Set P9_CANDIDATE_IMAGE to the verified candidate backend image}
     environment:
-      NODE_ENV: production
-      BACKEND_HOST: 127.0.0.1
-      BACKEND_PORT: "3000"
-      TRUST_PROXY_HOPS: "1"
-      HERMES_API_URL: http://127.0.0.1:8642
-      AUDIO_SERVICE_URL: http://127.0.0.1:8001
-      HARDWARE_TEST_MODE: "false"
-    volumes:
-      - type: bind
-        source: /opt/bmo/temp/audio
-        target: /opt/bmo/temp/audio
-        bind:
-          create_host_path: false
-    read_only: true
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,nodev,size=64m
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: "3"
+      AUDIO_SERVICE_URL: http://127.0.0.1:8002
 
   audio:
-    image: ${AUDIO_IMAGE:?Set AUDIO_IMAGE to an immutable name@sha256 digest}
+    image: ${AUDIO_CANDIDATE_IMAGE:?Set AUDIO_CANDIDATE_IMAGE to the verified candidate audio image}
     env_file:
       - path: ${AUDIO_ENV_FILE:-/opt/bmo/config/audio.env}
         required: true
     environment:
       AUDIO_SERVICE_HOST: 0.0.0.0
-      AUDIO_SERVICE_PORT: "8001"
+      AUDIO_SERVICE_PORT: "8002"
       MODEL_DOWNLOAD_ALLOWED: "false"
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
       HF_HUB_DISABLE_TELEMETRY: "1"
-      TTS_PRIMARY_ENGINE: "piper"
+      ORT_DISABLE_ALL_NETWORK: "1"
+      TTS_PRIMARY_ENGINE: piper
       PIPER_MODEL: en_GB-semaine-medium
       PIPER_SPEAKER: prudence
       PIPER_SPEAKER_ID: "0"
@@ -56,10 +29,10 @@ services:
       MODEL_MANIFEST_PATH: /opt/bmo/models/runtime/MODEL_MANIFEST.json
       HF_HOME: /opt/bmo/cache/audio/huggingface
       XDG_CACHE_HOME: /opt/bmo/cache/audio/xdg
-      TTS_TEMP_DIR: /opt/bmo/temp/tts
+      TTS_TEMP_DIR: /opt/bmo/temp/tts-candidate
     ports:
-      - target: 8001
-        published: "8001"
+      - target: 8002
+        published: "8002"
         host_ip: 127.0.0.1
         protocol: tcp
     volumes:
@@ -78,16 +51,13 @@ services:
       - type: bind
         source: /opt/bmo/cache/audio
         target: /opt/bmo/cache/audio
-        bind:
-          create_host_path: false
-      - type: bind
-        source: /opt/bmo/temp/tts
-        target: /opt/bmo/temp/tts
+        read_only: true
         bind:
           create_host_path: false
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=256m
+      - /opt/bmo/temp/tts-candidate:rw,noexec,nosuid,nodev,size=256m
     mem_limit: 5g
     memswap_limit: 5g
     cpus: "4.0"
@@ -96,9 +66,10 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: "3"
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/livez', timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      start_period: 30s
+      retries: 6

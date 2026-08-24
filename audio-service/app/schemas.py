@@ -5,8 +5,7 @@ from uuid import UUID
 class HealthResponse(BaseModel):
     status: str
     stt_loaded: bool
-    kokoro_loaded: bool
-    rvc_available: bool
+    piper_loaded: bool
     ffmpeg_available: bool
 
 
@@ -21,4 +20,3 @@ class TranscribeResponse(BaseModel):
 class TtsRequest(BaseModel):
     request_id: UUID
     text: str
-    use_rvc: bool = True

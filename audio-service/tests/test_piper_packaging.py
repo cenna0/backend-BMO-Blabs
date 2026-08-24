@@ -26,7 +26,6 @@ def test_production_compose_mounts_piper_read_only_and_bounds_audio_service():
     assert "memswap_limit: 5g" in compose
     assert 'cpus: "4.0"' in compose
     assert "pids_limit: 128" in compose
-    assert "RVC_ENABLED: \"false\"" in compose
     assert "TTS_PRIMARY_ENGINE: \"piper\"" in compose
     assert "PIPER_SPEAKER_ID: \"0\"" in compose
 

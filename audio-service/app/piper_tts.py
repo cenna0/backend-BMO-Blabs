@@ -16,7 +16,7 @@ WorkerFactory = Callable[..., PersistentWorker]
 
 
 class PiperSynthesisError(RuntimeError):
-    """A bounded, sanitized Piper failure eligible for Kokoro fallback."""
+    """A bounded, sanitized Piper failure that terminates TTS synthesis."""
 
 
 def _worker_environment() -> dict[str, str]:

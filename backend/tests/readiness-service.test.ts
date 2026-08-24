@@ -11,10 +11,9 @@ describe("BackendReadinessService", () => {
       }
       if (target === "http://127.0.0.1:8001/readyz") {
         return Response.json({
-          status: "degraded",
+          status: "ok",
           stt_loaded: true,
-          kokoro_loaded: true,
-          rvc_available: false,
+          piper_loaded: true,
           ffmpeg_available: true,
         });
       }
@@ -30,7 +29,6 @@ describe("BackendReadinessService", () => {
     await expect(readiness.check()).resolves.toEqual({
       hermesReady: true,
       audioReady: true,
-      rvcAvailable: false,
     });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
@@ -49,7 +47,6 @@ describe("BackendReadinessService", () => {
     await expect(readiness.check()).resolves.toEqual({
       hermesReady: true,
       audioReady: false,
-      rvcAvailable: false,
     });
   });
 
@@ -71,7 +68,6 @@ describe("BackendReadinessService", () => {
     await expect(readiness.check()).resolves.toEqual({
       hermesReady: false,
       audioReady: false,
-      rvcAvailable: false,
     });
   });
 
@@ -86,8 +82,7 @@ describe("BackendReadinessService", () => {
         : Response.json({
           status: "ok",
           stt_loaded: true,
-          kokoro_loaded: true,
-          rvc_available: true,
+          piper_loaded: true,
           ffmpeg_available: true,
         }),
       databaseReadiness,
@@ -96,7 +91,6 @@ describe("BackendReadinessService", () => {
     await expect(readiness.check()).resolves.toEqual({
       hermesReady: true,
       audioReady: true,
-      rvcAvailable: true,
       databaseReady: true,
     });
     expect(databaseReadiness).toHaveBeenCalledTimes(1);
@@ -110,10 +104,9 @@ describe("BackendReadinessService", () => {
       fetcher: async (url) => String(url).endsWith("/health")
         ? Response.json({ status: "ok" })
         : Response.json({
-          status: "degraded",
+          status: "ok",
           stt_loaded: true,
-          kokoro_loaded: true,
-          rvc_available: false,
+          piper_loaded: true,
           ffmpeg_available: true,
         }),
       databaseReadiness: vi.fn().mockRejectedValue(new Error("private database detail")),
@@ -122,7 +115,6 @@ describe("BackendReadinessService", () => {
     await expect(readiness.check()).resolves.toEqual({
       hermesReady: true,
       audioReady: true,
-      rvcAvailable: false,
       databaseReady: false,
     });
   });
@@ -138,8 +130,7 @@ describe("BackendReadinessService", () => {
         : Response.json({
           status: "ok",
           stt_loaded: true,
-          kokoro_loaded: true,
-          rvc_available: true,
+          piper_loaded: true,
           ffmpeg_available: true,
         }),
       databaseReadiness: () => new Promise<boolean>((_resolve, reject) => {
@@ -156,7 +147,6 @@ describe("BackendReadinessService", () => {
     expect(outcome).toEqual({
       hermesReady: true,
       audioReady: true,
-      rvcAvailable: true,
       databaseReady: false,
     });
     expect(performance.now() - startedAt).toBeLessThan(150);

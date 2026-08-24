@@ -15,7 +15,6 @@ const PUBLIC_HEALTH_FIELDS = new Set([
   "audio_service",
   "backend",
   "hermes",
-  "rvc",
   "status",
 ]);
 
@@ -514,16 +513,12 @@ export async function runP7PublicAcceptance(
         "HEALTH_UNEXPECTED_FIELD",
       );
       requireValue(
-        body.status === "ok" || body.status === "degraded",
+        body.status === "ok",
         "HEALTH_STATUS",
       );
       requireValue(body.backend === "ok", "HEALTH_BACKEND");
       requireValue(body.hermes === "ok", "HEALTH_HERMES");
       requireValue(body.audio_service === "ok", "HEALTH_AUDIO_SERVICE");
-      requireValue(
-        body.rvc === "available" || body.rvc === "unavailable",
-        "HEALTH_RVC",
-      );
       return { value: undefined, evidence: { http_status: response.status } };
     });
 

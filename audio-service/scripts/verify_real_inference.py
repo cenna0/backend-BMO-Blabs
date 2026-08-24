@@ -220,7 +220,6 @@ def main() -> int:
     settings = Settings(
         internal_service_token=token,
         hf_home=args.models_dir / "hf-cache",
-        torch_home=args.models_dir / "torch-cache",
     )
     transcriber = FasterWhisperTranscriber(settings)
     load_started = time.perf_counter()

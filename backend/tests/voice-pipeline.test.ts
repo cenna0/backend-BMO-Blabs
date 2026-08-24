@@ -63,8 +63,7 @@ async function makeRuntime(overrides: {
       }),
       synthesize: async () => ({
         audio: Buffer.from("mp3"),
-        rvcApplied: false,
-        ttsEngine: "kokoro",
+        ttsEngine: "piper",
       }),
       ...overrides.tts,
       ...overrides.stt,

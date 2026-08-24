@@ -97,7 +97,7 @@ describe("P5 security hardening", () => {
           languageProbability: 0.99,
           durationSeconds: 1,
         }),
-        synthesize: async () => ({ audio: Buffer.from("mp3"), rvcApplied: false, ttsEngine: "kokoro" }),
+        synthesize: async () => ({ audio: Buffer.from("mp3"), ttsEngine: "piper" }),
       },
       hermes: { generate: async () => "Hi! BMO can help." },
       conversationQueue: { run: (_key, work) => work() },

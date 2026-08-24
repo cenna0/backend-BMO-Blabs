@@ -40,10 +40,8 @@ class LoadingTranscriber:
 class ReadySynthesizer:
     def health_state(self):
         return TtsEngineState(
-            kokoro_loaded=True,
             ffmpeg_available=True,
-            rvc_available=True,
-            rvc_error=None,
+            piper_loaded=True,
         )
 
 
@@ -65,8 +63,7 @@ def test_health_reports_ready_p2_and_p3_components():
     assert response.json() == {
         "status": "ok",
         "stt_loaded": True,
-        "kokoro_loaded": True,
-        "rvc_available": True,
+        "piper_loaded": True,
         "ffmpeg_available": True,
     }
 
@@ -79,7 +76,7 @@ def test_health_reports_error_when_stt_unavailable():
     assert response.json()["status"] == "error"
     assert response.json()["stt_loaded"] is False
     assert client.get("/livez").status_code == 200
-    assert client.get("/health").status_code == 503
+    assert client.get("/health").status_code == 200
 
 
 def test_health_reports_loading_during_model_bootstrap():
@@ -90,6 +87,7 @@ def test_health_reports_loading_during_model_bootstrap():
     assert response.json()["status"] == "loading"
     assert response.json()["stt_loaded"] is False
     assert client.get("/livez").status_code == 200
+    assert client.get("/health").status_code == 200
 
 
 class WarmableTranscriber:
@@ -124,10 +122,8 @@ class WarmableSynthesizer:
 
     def health_state(self):
         return TtsEngineState(
-            kokoro_loaded=self.ready,
             ffmpeg_available=self.ready,
-            rvc_available=False,
-            rvc_error="RVC disabled",
+            piper_loaded=self.ready,
         )
 
 
@@ -138,7 +134,6 @@ def test_model_warmup_runs_in_background_without_blocking_liveness():
     app = create_app(
         settings=Settings(
             internal_service_token="test-internal-token",
-            rvc_enabled=False,
         ),
         transcriber=transcriber,
         synthesizer=synthesizer,
@@ -161,7 +156,7 @@ def test_model_warmup_runs_in_background_without_blocking_liveness():
                 break
             time.sleep(0.01)
         assert response.status_code == 200
-        assert response.json()["status"] == "degraded"
+        assert response.json()["status"] == "ok"
 
 
 class FailedWarmupTranscriber:
@@ -191,7 +186,7 @@ def test_warmup_failure_changes_readiness_without_stopping_liveness():
     with TestClient(app) as client:
         assert transcriber.finished.wait(timeout=1)
         assert client.get("/readyz").status_code == 503
-        assert client.get("/health").status_code == 503
+        assert client.get("/health").status_code == 200
         assert client.get("/livez").status_code == 200
         assert client.get("/livez").status_code == 200
 

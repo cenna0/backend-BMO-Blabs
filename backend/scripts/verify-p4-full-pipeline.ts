@@ -14,6 +14,7 @@ const audioDir = join(rootDir, "audio-service");
 const outputDir = join(audioDir, "temp", "p4-full-pipeline");
 const outputMp3 = join(outputDir, "pipeline-output.mp3");
 const token = "p4-full-pipeline-token";
+const serviceToken = process.env.P4_AUDIO_SERVICE_TOKEN ?? token;
 const deviceToken = "test-device-secret";
 const useRealHermes = process.env.P4_USE_REAL_HERMES === "1";
 const hermesKey = process.env.HERMES_API_KEY ?? (useRealHermes ? "p4-local-hermes-key" : "fixture-hermes-key");
@@ -184,6 +185,8 @@ async function main(): Promise<void> {
         onRequest: (log) => hermesRequests.push(log),
       });
   const managed: ManagedProcess[] = [];
+  const candidateAudioUrl = process.env.P4_AUDIO_SERVICE_URL?.replace(/\/$/, "");
+  let audio: ManagedProcess | null = null;
   let audioProxy: Server | null = null;
   const audioProxyEvidence: AudioProxyEvidence = {
     stt_response: null,
@@ -195,30 +198,33 @@ async function main(): Promise<void> {
     } else {
       await waitUrl(`${hermesUrl.replace(/\/$/, "")}/v1/models`, 30_000);
     }
-    const audioPython = join(audioDir, ".venv", "Scripts", "python.exe");
-    const audio = spawnManaged(
-      "audio-service",
-      audioPython,
-      ["-m", "uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", "8001", "--log-level", "info"],
-      {
-        cwd: audioDir,
-        env: {
-          ...process.env,
-          INTERNAL_SERVICE_TOKEN: token,
-          HF_HOME: join(audioDir, "models", "hf-cache"),
-          TORCH_HOME: join(audioDir, "models", "torch-cache"),
-          XDG_CACHE_HOME: join(audioDir, "temp", "cache"),
-          HF_HUB_OFFLINE: "1",
-          TTS_TEMP_DIR: join(audioDir, "temp", "p4-full-tts-work"),
-          RVC_MODEL_PATH: join(audioDir, "models", "rvc-bmo", "assets", "CGO_e420_s2520.pth"),
-          RVC_INDEX_PATH: join(audioDir, "models", "rvc-bmo", "assets", "added_IVF69_Flat_nprobe_1_CGO_v2.index"),
+    let audioServiceUrl = candidateAudioUrl;
+    if (!audioServiceUrl) {
+      const audioPython = join(audioDir, ".venv", "Scripts", "python.exe");
+      audio = spawnManaged(
+        "audio-service",
+        audioPython,
+        ["-m", "uvicorn", "app.main:create_app", "--factory", "--host", "127.0.0.1", "--port", "8001", "--log-level", "info"],
+        {
+          cwd: audioDir,
+          env: {
+            ...process.env,
+            INTERNAL_SERVICE_TOKEN: serviceToken,
+            HF_HOME: join(audioDir, "models", "hf-cache"),
+            XDG_CACHE_HOME: join(audioDir, "temp", "cache"),
+            HF_HUB_OFFLINE: "1",
+            TTS_TEMP_DIR: join(audioDir, "temp", "p4-full-tts-work"),
+          },
         },
-      },
-    );
-    managed.push(audio);
-    await waitUrl("http://127.0.0.1:8001/health", 30_000);
-    audioProxy = createAudioRecorderProxy("http://127.0.0.1:8001", audioProxyEvidence);
-    const audioProxyPort = await listen(audioProxy, "127.0.0.1", 8002);
+      );
+      managed.push(audio);
+      await waitUrl("http://127.0.0.1:8001/livez", 30_000);
+      audioProxy = createAudioRecorderProxy("http://127.0.0.1:8001", audioProxyEvidence);
+      const audioProxyPort = await listen(audioProxy, "127.0.0.1", 8002);
+      audioServiceUrl = `http://127.0.0.1:${audioProxyPort}`;
+    } else {
+      await waitUrl(`${audioServiceUrl}/livez`, 30_000);
+    }
 
     const backend = spawnManaged("backend", process.execPath, ["dist/src/server.js"], {
       cwd: backendDir,
@@ -233,8 +239,8 @@ async function main(): Promise<void> {
         TEMP_AUDIO_DIR: join(backendDir, "temp-audio", "p4-full-pipeline"),
         HARDWARE_TEST_MODE: "false",
         HARDWARE_TEST_MP3_PATH: join(backendDir, "tests", "fixtures", "test-response.mp3"),
-        AUDIO_SERVICE_URL: `http://127.0.0.1:${audioProxyPort}`,
-        INTERNAL_SERVICE_TOKEN: token,
+        AUDIO_SERVICE_URL: audioServiceUrl,
+        INTERNAL_SERVICE_TOKEN: serviceToken,
         HERMES_API_URL: hermesUrl,
         HERMES_API_KEY: hermesKey,
         HERMES_MODEL: "hermes-agent",
@@ -284,7 +290,7 @@ async function main(): Promise<void> {
         else rejectProbe(new Error(Buffer.concat(stderr).toString("utf8") || `ffprobe exited ${code}`));
       });
     });
-    const audioHealth = await (await fetch("http://127.0.0.1:8001/health")).json();
+    const audioHealth = await (await fetch(`${audioServiceUrl}/health`)).json();
     const backendHealth = await (await fetch("http://127.0.0.1:3000/health")).json();
     const hermesModels = useRealHermes
       ? await (
@@ -306,7 +312,7 @@ async function main(): Promise<void> {
       hermes_models: hermesModels,
       audio_proxy: audioProxyEvidence,
       pipeline_log: parsePipelineLog(backend.stdout),
-      audio_service_log_tail: lines(audio.stderr).slice(-20),
+      audio_service_log_tail: audio ? lines(audio.stderr).slice(-20) : [],
       backend_log_tail: lines(backend.stdout).slice(-20),
     };
     await writeFile(join(outputDir, "result.json"), JSON.stringify(result, null, 2) + "\n", "utf8");

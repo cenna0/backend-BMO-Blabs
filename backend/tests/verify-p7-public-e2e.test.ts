@@ -148,11 +148,10 @@ class FakePublicBackend {
     if (init.method === undefined || init.method === "GET") {
       if (url.pathname === "/health") {
         const body: Record<string, unknown> = {
-          status: this.#options.healthStatus === 200 ? "degraded" : "error",
+          status: this.#options.healthStatus === 200 ? "ok" : "error",
           backend: "ok",
           hermes: "ok",
           audio_service: "ok",
-          rvc: "unavailable",
         };
         if (this.#options.healthStatus !== 200) {
           body.detail = this.sensitiveResponseText;

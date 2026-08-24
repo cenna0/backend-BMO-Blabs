@@ -28,7 +28,7 @@ WORKDIR /app
 
 COPY requirements-runtime.lock ./
 RUN pip install --no-cache-dir --requirement requirements-runtime.lock \
-    && python -c 'import importlib.metadata as metadata; import spacy; assert metadata.version("en-core-web-sm") == "3.8.0"; spacy.load("en_core_web_sm")'
+    && python -c 'import fastapi, faster_whisper, onnxruntime, piper'
 
 COPY app ./app
 

@@ -19,7 +19,6 @@ class Settings(BaseSettings):
     internal_service_token: str = Field(min_length=16)
 
     hf_home: Path = Path("/opt/bmo/models/hf-cache")
-    torch_home: Path = Path("/opt/bmo/models/torch-cache")
     runtime_models_root: Path = Path("/opt/bmo/models/runtime")
     xdg_cache_home: Path = Path("/tmp/cache")
     model_download_allowed: bool = False
@@ -40,15 +39,6 @@ class Settings(BaseSettings):
     whisper_vad: bool = True
     whisper_hotwords: str | None = "BMO"
 
-    kokoro_lang_code: str = "a"
-    kokoro_voice: Literal["af_heart"] = "af_heart"
-    kokoro_model_repo: Literal["hexgrad/Kokoro-82M"] = "hexgrad/Kokoro-82M"
-    kokoro_model_revision: Literal["f3ff3571791e39611d31c381e3a41a3af07b4987"] = (
-        "f3ff3571791e39611d31c381e3a41a3af07b4987"
-    )
-    kokoro_sample_rate: int = Field(default=24_000, gt=0)
-    kokoro_speed: float = Field(default=0.80, gt=0)
-
     tts_primary_engine: Literal["piper"] = "piper"
     piper_model: Literal["en_GB-semaine-medium"] = PIPER_MODEL_NAME
     piper_speaker: Literal["prudence"] = PIPER_SPEAKER_NAME
@@ -61,7 +51,6 @@ class Settings(BaseSettings):
     ] = PIPER_VOICE_REVISION
     piper_manifest_path: Path = PIPER_MANIFEST_PATH
     piper_worker_timeout_seconds: float = Field(default=120.0, gt=0, le=180)
-    tts_fallback_engine: Literal["kokoro"] = "kokoro"
 
     tts_temp_dir: Path = Path("/tmp/bmo-tts")
     tts_max_characters: int = Field(default=600, gt=0)
@@ -71,18 +60,6 @@ class Settings(BaseSettings):
     ffprobe_binary: str = "ffprobe"
     output_mp3_sample_rate: int = Field(default=24_000, gt=0)
     output_mp3_bitrate: str = "96k"
-
-    rvc_enabled: bool = False
-    rvc_model_repo: str = "Freaky98/CGO-adventure-time-BMO-rvc-v2-420e"
-    rvc_model_revision: str = "82a8bc529bd41b930589188ead30f073d4f99fc0"
-    rvc_model_archive: str = "CGO-adventure-time-BMO-rvc-v2-420e.zip"
-    rvc_model_expected_size: int = 63_780_149
-    rvc_model_expected_sha256: str = "dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0"
-    rvc_model_path: Path | None = None
-    rvc_index_path: Path | None = None
-    rvc_f0_up_key: int = 0
-    rvc_f0_method: str = "rmvpe"
-    rvc_infer_command: str | None = None
 
     @model_validator(mode="after")
     def validate_fixed_piper_asset_path(self) -> "Settings":

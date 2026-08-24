@@ -35,20 +35,6 @@ WHISPER_SPEC = ModelSpec(
     license_source="https://huggingface.co/Systran/faster-whisper-medium",
 )
 
-KOKORO_SPEC = ModelSpec(
-    name="kokoro-82m-af-heart",
-    repository="hexgrad/Kokoro-82M",
-    revision="f3ff3571791e39611d31c381e3a41a3af07b4987",
-    required_artifacts=(
-        "config.json",
-        "kokoro-v1_0.pth",
-        "voices/af_heart.pt",
-    ),
-    license="Apache-2.0",
-    license_source="https://huggingface.co/hexgrad/Kokoro-82M",
-)
-
-
 def upstream_snapshot_path(hf_home: Path, spec: ModelSpec) -> Path:
     repository_dir = spec.repository.replace("/", "--")
     return hf_home / "hub" / f"models--{repository_dir}" / "snapshots" / spec.revision
@@ -186,12 +172,10 @@ def materialize_runtime_snapshot(
 def configure_model_environment(
     *,
     hf_home: Path,
-    torch_home: Path,
     xdg_cache_home: Path,
     downloads_allowed: bool,
 ) -> None:
     os.environ["HF_HOME"] = str(hf_home)
-    os.environ["TORCH_HOME"] = str(torch_home)
     os.environ["XDG_CACHE_HOME"] = str(xdg_cache_home)
     if not downloads_allowed:
         os.environ["HF_HUB_OFFLINE"] = "1"

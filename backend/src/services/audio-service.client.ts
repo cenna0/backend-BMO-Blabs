@@ -20,13 +20,12 @@ export interface SttResult {
 
 export interface TtsResult {
   audio: Buffer;
-  rvcApplied: boolean;
   ttsEngine: string;
 }
 
 export interface AudioServicePort {
   transcribe(wav: Buffer, signal?: AbortSignal): Promise<SttResult>;
-  synthesize(requestId: string, text: string, useRvc: boolean, signal?: AbortSignal): Promise<TtsResult>;
+  synthesize(requestId: string, text: string, signal?: AbortSignal): Promise<TtsResult>;
 }
 
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
@@ -140,7 +139,7 @@ export class AudioServiceClient implements AudioServicePort {
     );
   }
 
-  async synthesize(requestId: string, text: string, useRvc: boolean, signal?: AbortSignal): Promise<TtsResult> {
+  async synthesize(requestId: string, text: string, signal?: AbortSignal): Promise<TtsResult> {
     return withTimeout(
       this.options.ttsTimeoutMs,
       async (signal) => {
@@ -154,7 +153,6 @@ export class AudioServiceClient implements AudioServicePort {
           body: JSON.stringify({
             request_id: requestId,
             text,
-            use_rvc: useRvc,
           }),
           signal,
         });
@@ -167,8 +165,7 @@ export class AudioServiceClient implements AudioServicePort {
         }
         return {
           audio,
-          rvcApplied: response.headers.get("x-rvc-applied") === "true",
-          ttsEngine: response.headers.get("x-tts-engine") ?? "unknown",
+          ttsEngine: response.headers.get("x-tts-engine") ?? "piper",
         };
       },
       "TTS_FAILED",

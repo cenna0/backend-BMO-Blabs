@@ -47,14 +47,12 @@ describe("AudioServiceClient", () => {
       expect(JSON.parse(String(init.body))).toEqual({
         request_id: "550e8400-e29b-41d4-a716-446655440000",
         text: "Hi! BMO is ready.",
-        use_rvc: true,
       });
       return new Response(Buffer.from("mp3"), {
         status: 200,
         headers: {
           "content-type": "audio/mpeg",
-          "x-rvc-applied": "false",
-          "x-tts-engine": "kokoro",
+          "x-tts-engine": "piper",
         },
       });
     });
@@ -67,11 +65,10 @@ describe("AudioServiceClient", () => {
     });
 
     await expect(
-      client.synthesize("550e8400-e29b-41d4-a716-446655440000", "Hi! BMO is ready.", true),
+      client.synthesize("550e8400-e29b-41d4-a716-446655440000", "Hi! BMO is ready."),
     ).resolves.toEqual({
       audio: Buffer.from("mp3"),
-      rvcApplied: false,
-      ttsEngine: "kokoro",
+      ttsEngine: "piper",
     });
   });
 
@@ -85,7 +82,7 @@ describe("AudioServiceClient", () => {
     });
     await expect(failed.transcribe(Buffer.from("wav"))).rejects.toBeInstanceOf(AudioServiceClientError);
     await expect(failed.transcribe(Buffer.from("wav"))).rejects.toMatchObject({ code: "STT_FAILED" });
-    await expect(failed.synthesize("550e8400-e29b-41d4-a716-446655440000", "Hi.", true)).rejects.toMatchObject({
+    await expect(failed.synthesize("550e8400-e29b-41d4-a716-446655440000", "Hi.")).rejects.toMatchObject({
       code: "TTS_FAILED",
     });
 

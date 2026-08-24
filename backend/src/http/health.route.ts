@@ -14,7 +14,6 @@ interface HealthRouterOptions {
 const unavailable: BackendReadinessState = {
   hermesReady: false,
   audioReady: false,
-  rvcAvailable: false,
 };
 
 function sendReadiness(
@@ -25,11 +24,10 @@ function sendReadiness(
   const databaseReady = !databaseEnabled || state.databaseReady === true;
   const ready = state.hermesReady && state.audioReady && databaseReady;
   response.status(ready ? 200 : 503).json({
-    status: ready ? (state.rvcAvailable ? "ok" : "degraded") : "error",
+    status: ready ? "ok" : "error",
     backend: "ok",
     hermes: state.hermesReady ? "ok" : "error",
     audio_service: state.audioReady ? "ok" : "error",
-    rvc: state.rvcAvailable ? "available" : "unavailable",
     ...(databaseEnabled ? { database: databaseReady ? "ok" : "error" } : {}),
   });
 }
@@ -51,7 +49,6 @@ export function createHealthRouter(options: HealthRouterOptions): Router {
         backend: "ok",
         hermes: "bypassed",
         audio_service: "bypassed",
-        rvc: "bypassed",
         ...(options.databaseEnabled === true ? { database: "bypassed" } : {}),
       });
       return;

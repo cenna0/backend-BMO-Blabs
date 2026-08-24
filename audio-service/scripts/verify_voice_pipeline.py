@@ -1,224 +1,198 @@
 #!/usr/bin/env python3
+"""Verify the deployed candidate Audio Service over its HTTP contract."""
+
 from __future__ import annotations
 
 from argparse import ArgumentParser
 import json
 from pathlib import Path
-import shutil
+import subprocess
 import sys
-import time
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from app.config import Settings
-from app.ffmpeg import FfmpegConverter, probe_audio
-from app.kokoro_tts import KokoroSynthesizer
-from app.rvc import RVC_RELATIVE_DIR, RvcCommandConverter
-from app.tts import TtsEngineState, TtsOrchestrator
+from time import perf_counter
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+from uuid import uuid4
 
 
-SENTENCES = [
-    "Hi! BMO is ready to help.",
-    "Do not worry. BMO is right here with you.",
-    "Yay! BMO found the answer.",
-]
-
-
-class ForcedFailureRvc:
-    available = True
-    error = "forced verification failure"
-
-    def convert(self, input_wav: Path, output_wav: Path) -> float:
-        raise RuntimeError("forced RVC failure for fallback verification")
-
-
-def cache_stats(path: Path) -> dict[str, int]:
-    if not path.exists():
-        return {"file_count": 0, "bytes": 0}
-    files = [item for item in path.rglob("*") if item.is_file()]
-    return {"file_count": len(files), "bytes": sum(item.stat().st_size for item in files)}
-
-
-def discover_single_asset(directory: Path, suffix: str) -> Path | None:
-    matches = sorted(directory.glob(f"*{suffix}"))
-    if len(matches) == 1:
-        return matches[0]
-    return None
-
-
-def endpoint_health_status(stt_ready: bool, state: TtsEngineState) -> str:
-    if stt_ready and state.kokoro_loaded and state.ffmpeg_available:
-        return "ok" if state.rvc_available else "degraded"
-    return "error"
-
-
-def verify_mode(
+def request_bytes(
+    base_url: str,
+    path: str,
     *,
-    text: str,
-    mode: str,
-    orchestrator: TtsOrchestrator,
-    output_path: Path,
-    ffprobe_binary: str,
-) -> dict[str, object]:
-    started = time.perf_counter()
-    result = orchestrator.synthesize(text, use_rvc=mode == "kokoro-rvc")
-    generation_seconds = round(time.perf_counter() - started, 3)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(result.audio)
-    metadata = probe_audio(output_path, ffprobe_binary=ffprobe_binary)
-    pass_status = (
-        metadata["codec"] == "mp3"
-        and metadata["sample_rate"] == 24_000
-        and metadata["channels"] == 1
-        and 80_000 <= metadata["bit_rate"] <= 112_000
-        and output_path.stat().st_size > 0
-        and (mode == "kokoro-only" or result.rvc_applied)
+    method: str = "GET",
+    body: bytes | None = None,
+    content_type: str | None = None,
+    token: str,
+    accept: str = "application/json",
+) -> tuple[int, dict[str, str], bytes]:
+    headers = {
+        "accept": accept,
+        "x-internal-service-token": token,
+    }
+    if content_type:
+        headers["content-type"] = content_type
+    request = Request(
+        f"{base_url.rstrip('/')}{path}",
+        data=body,
+        headers=headers,
+        method=method,
     )
+    try:
+        with urlopen(request, timeout=240) as response:
+            return response.status, dict(response.headers.items()), response.read()
+    except HTTPError as error:
+        return error.code, dict(error.headers.items()), error.read()
+    except URLError as error:
+        raise RuntimeError(f"request failed for {path}: {error.reason}") from error
+
+
+def json_body(raw: bytes, path: str) -> dict[str, object]:
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError(f"{path} did not return JSON") from error
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{path} did not return an object")
+    return value
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise RuntimeError(message)
+
+
+def probe_mp3(path: Path) -> dict[str, object]:
+    completed = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_name,sample_rate,channels,bit_rate",
+            "-show_entries",
+            "format=duration,bit_rate",
+            "-of",
+            "json",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(completed.stdout)
+    stream = payload["streams"][0]
+    fmt = payload["format"]
     return {
-        "text": text,
-        "output_mode": mode,
-        "output_path": str(output_path),
-        "duration": metadata["duration"],
-        "generation_seconds": generation_seconds,
-        "kokoro_seconds": result.kokoro_seconds,
-        "rvc_seconds": result.rvc_seconds,
-        "ffmpeg_seconds": result.ffmpeg_seconds,
-        "output_size": output_path.stat().st_size,
-        "codec": metadata["codec"],
-        "sample_rate": metadata["sample_rate"],
-        "channels": metadata["channels"],
-        "bit_rate": metadata["bit_rate"],
-        "rvc_applied": result.rvc_applied,
-        "pass": pass_status,
+        "codec": stream["codec_name"],
+        "sample_rate": int(stream["sample_rate"]),
+        "channels": int(stream["channels"]),
+        "bit_rate": int(stream["bit_rate"]),
+        "duration": float(fmt["duration"]),
+        "format_bit_rate": int(fmt["bit_rate"]),
     }
 
 
 def main() -> int:
-    parser = ArgumentParser(description="Verify real Kokoro/FFmpeg/RVC P3 voice pipeline.")
-    parser.add_argument("--models-dir", type=Path, default=Path("models"))
-    parser.add_argument("--temp-dir", type=Path, default=Path("temp/p3-real-voice"))
-    parser.add_argument("--results", type=Path, default=Path("temp/p3-real-voice-results.json"))
+    parser = ArgumentParser(description="Verify candidate STT, Piper, and FFmpeg output.")
+    parser.add_argument("--base-url", default="http://127.0.0.1:8002")
+    parser.add_argument("--token-file", type=Path, required=True)
+    parser.add_argument("--wav", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--report", type=Path)
     args = parser.parse_args()
 
-    output_dir = args.temp_dir / "outputs"
-    work_dir = args.temp_dir / "work"
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
-    if work_dir.exists():
-        shutil.rmtree(work_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    work_dir.mkdir(parents=True, exist_ok=True)
+    token = args.token_file.read_text(encoding="utf-8").strip()
+    require(bool(token), "service token is empty")
+    wav = args.wav.read_bytes()
+    require(wav.startswith(b"RIFF") and b"WAVE" in wav[:16], "input is not a WAV file")
 
-    rvc_assets_dir = args.models_dir / RVC_RELATIVE_DIR / "assets"
-    discovered_model = discover_single_asset(rvc_assets_dir, ".pth")
-    discovered_index = discover_single_asset(rvc_assets_dir, ".index")
+    started = perf_counter()
+    live_status, _, live_raw = request_bytes(args.base_url, "/livez", token=token)
+    live = json_body(live_raw, "/livez")
+    require(live_status == 200 and live.get("status") == "ok", "candidate liveness failed")
 
-    settings = Settings(
-        internal_service_token="voice-verification-token",
-        hf_home=args.models_dir / "hf-cache",
-        torch_home=args.models_dir / "torch-cache",
-        tts_temp_dir=work_dir,
-        rvc_model_path=discovered_model,
-        rvc_index_path=discovered_index,
+    health_status, _, health_raw = request_bytes(args.base_url, "/health", token=token)
+    health = json_body(health_raw, "/health")
+    require(health_status == 200 and health == {"status": "ok"}, "candidate process health failed")
+
+    ready_status, _, ready_raw = request_bytes(args.base_url, "/readyz", token=token)
+    ready = json_body(ready_raw, "/readyz")
+    require(
+        ready_status == 200
+        and ready.get("status") == "ok"
+        and ready.get("stt_loaded") is True
+        and ready.get("piper_loaded") is True
+        and ready.get("ffmpeg_available") is True,
+        "candidate readiness failed",
     )
-    before_cache = {
-        "kokoro": cache_stats(args.models_dir / "hf-cache"),
-        "rvc": cache_stats(args.models_dir / RVC_RELATIVE_DIR),
-    }
 
-    kokoro = KokoroSynthesizer(settings)
-    ffmpeg = FfmpegConverter(settings)
-    rvc = RvcCommandConverter(settings)
-    orchestrator = TtsOrchestrator(settings=settings, kokoro=kokoro, ffmpeg=ffmpeg, rvc=rvc)
-
-    kokoro_only = [
-        verify_mode(
-            text=text,
-            mode="kokoro-only",
-            orchestrator=orchestrator,
-            output_path=output_dir / f"sentence-{index}-kokoro.mp3",
-            ffprobe_binary=settings.ffprobe_binary,
-        )
-        for index, text in enumerate(SENTENCES, start=1)
-    ]
-
-    rvc_results: list[dict[str, object]] = []
-    real_rvc_available = rvc.available
-    if real_rvc_available:
-        rvc_results = [
-            verify_mode(
-                text=text,
-                mode="kokoro-rvc",
-                orchestrator=orchestrator,
-                output_path=output_dir / f"sentence-{index}-kokoro-rvc.mp3",
-                ffprobe_binary=settings.ffprobe_binary,
-            )
-            for index, text in enumerate(SENTENCES, start=1)
-        ]
-
-    forced_fallback_orchestrator = TtsOrchestrator(
-        settings=settings,
-        kokoro=kokoro,
-        ffmpeg=ffmpeg,
-        rvc=ForcedFailureRvc(),
+    stt_started = perf_counter()
+    stt_status, _, stt_raw = request_bytes(
+        args.base_url,
+        "/stt/transcribe",
+        method="POST",
+        body=wav,
+        content_type="audio/wav",
+        token=token,
     )
-    forced_fallback = verify_mode(
-        text=SENTENCES[0],
-        mode="kokoro-only",
-        orchestrator=forced_fallback_orchestrator,
-        output_path=output_dir / "forced-rvc-fallback.mp3",
-        ffprobe_binary=settings.ffprobe_binary,
+    stt = json_body(stt_raw, "/stt/transcribe")
+    require(stt_status == 200 and stt.get("speech_detected") is True, "candidate STT failed")
+    transcript = stt.get("text")
+    require(isinstance(transcript, str) and transcript.strip(), "candidate STT returned no speech")
+
+    request_id = str(uuid4())
+    tts_started = perf_counter()
+    tts_status, tts_headers, tts_raw = request_bytes(
+        args.base_url,
+        "/tts/synthesize",
+        method="POST",
+        body=json.dumps({"request_id": request_id, "text": "BMO is ready."}).encode("utf-8"),
+        content_type="application/json",
+        accept="audio/mpeg",
+        token=token,
     )
-    forced_fallback["forced_rvc_failure"] = True
-    forced_fallback["pass"] = forced_fallback["pass"] and forced_fallback["rvc_applied"] is False
+    require(tts_status == 200 and tts_raw, "candidate Piper synthesis failed")
+    require(tts_headers.get("x-tts-engine") == "piper", "candidate TTS engine metadata is invalid")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_bytes(tts_raw)
+    metadata = probe_mp3(args.output)
+    require(
+        metadata["codec"] == "mp3"
+        and metadata["sample_rate"] == 24_000
+        and metadata["channels"] == 1
+        and 80_000 <= metadata["bit_rate"] <= 112_000,
+        "candidate MP3 contract is invalid",
+    )
 
-    health_after_kokoro = orchestrator.health_state()
-    health_states = {
-        "ok_if_rvc_ready": endpoint_health_status(True, TtsEngineState(True, True, True, None)),
-        "degraded_if_rvc_unavailable": endpoint_health_status(True, TtsEngineState(True, True, False, "RVC unavailable")),
-        "error_if_kokoro_missing": endpoint_health_status(True, TtsEngineState(False, True, False, None)),
-        "actual_after_run": endpoint_health_status(True, health_after_kokoro),
-    }
-    after_cache = {
-        "kokoro": cache_stats(args.models_dir / "hf-cache"),
-        "rvc": cache_stats(args.models_dir / RVC_RELATIVE_DIR),
-    }
-    temp_remaining = [str(path) for path in work_dir.rglob("*") if path.is_file()]
-
-    kokoro_ffmpeg_pass = all(item["pass"] for item in kokoro_only) and forced_fallback["pass"] and not temp_remaining
-    real_rvc_pass = bool(rvc_results) and all(item["pass"] for item in rvc_results)
-    payload = {
-        "model": {
-            "kokoro_language": settings.kokoro_lang_code,
-            "kokoro_voice": settings.kokoro_voice,
-            "kokoro_sample_rate": settings.kokoro_sample_rate,
-            "output_mp3_sample_rate": settings.output_mp3_sample_rate,
-            "output_mp3_bitrate": settings.output_mp3_bitrate,
-            "rvc_available": real_rvc_available,
-            "rvc_error": rvc.error,
-            "rvc_model_path": str(settings.rvc_model_path) if settings.rvc_model_path else None,
-            "rvc_index_path": str(settings.rvc_index_path) if settings.rvc_index_path else None,
-            "rvc_f0_up_key": settings.rvc_f0_up_key,
-            "rvc_f0_method": settings.rvc_f0_method,
+    report = {
+        "pass": True,
+        "base_url": args.base_url,
+        "ready": ready,
+        "stt": {
+            "status": stt_status,
+            "text": transcript,
+            "speech_detected": stt["speech_detected"],
+            "seconds": round(perf_counter() - stt_started, 3),
         },
-        "cache_before": before_cache,
-        "cache_after": after_cache,
-        "kokoro_only": kokoro_only,
-        "kokoro_rvc": rvc_results,
-        "forced_fallback": forced_fallback,
-        "health_states": health_states,
-        "temp_remaining": temp_remaining,
-        "kokoro_ffmpeg_pass": kokoro_ffmpeg_pass,
-        "real_rvc_pass": real_rvc_pass,
-        "p3_verified_local_functional": kokoro_ffmpeg_pass and real_rvc_pass,
+        "tts": {
+            "status": tts_status,
+            "engine": tts_headers.get("x-tts-engine"),
+            "bytes": len(tts_raw),
+            "seconds": round(perf_counter() - tts_started, 3),
+        },
+        "mp3": metadata,
+        "total_seconds": round(perf_counter() - started, 3),
+        "output": str(args.output),
     }
-    args.results.parent.mkdir(parents=True, exist_ok=True)
-    args.results.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(json.dumps(payload, ensure_ascii=False))
-    return 0 if kokoro_ffmpeg_pass else 1
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(report, ensure_ascii=False))
+    return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except (OSError, RuntimeError, subprocess.CalledProcessError, KeyError, TypeError, ValueError) as error:
+        print(json.dumps({"pass": False, "error": str(error)}), file=sys.stderr)
+        raise SystemExit(1) from error

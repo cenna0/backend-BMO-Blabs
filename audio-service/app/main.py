@@ -8,7 +8,6 @@ from fastapi.concurrency import run_in_threadpool
 from app.auth import require_internal_token
 from app.config import Settings
 from app.ffmpeg import FfmpegConverter
-from app.kokoro_tts import KokoroSynthesizer
 from app.piper_tts import PiperSynthesizer
 from app.schemas import HealthResponse, TranscribeResponse, TtsRequest
 from app.stt import FasterWhisperTranscriber, Transcriber
@@ -35,9 +34,7 @@ def create_app(
     resolved_transcriber = transcriber or FasterWhisperTranscriber(resolved_settings)
     resolved_synthesizer = synthesizer or TtsOrchestrator(
         settings=resolved_settings,
-        kokoro=KokoroSynthesizer(resolved_settings),
         ffmpeg=FfmpegConverter(resolved_settings),
-        rvc=None,
         piper=PiperSynthesizer(resolved_settings),
     )
 
@@ -82,11 +79,7 @@ def create_app(
             "ok" if stt_loaded else "error",
         )
         tts_state = app.state.synthesizer.health_state()
-        tts_ready = (
-            tts_state.piper_loaded
-            and tts_state.kokoro_loaded
-            and tts_state.ffmpeg_available
-        )
+        tts_ready = tts_state.piper_loaded and tts_state.ffmpeg_available
         tts_status = getattr(
             app.state.synthesizer,
             "health_status",
@@ -95,10 +88,9 @@ def create_app(
         if (
             stt_loaded
             and tts_state.piper_loaded
-            and tts_state.kokoro_loaded
             and tts_state.ffmpeg_available
         ):
-            status_value = "ok" if tts_state.rvc_available else "degraded"
+            status_value = "ok"
         elif stt_status == "loading" or tts_status == "loading":
             status_value = "loading"
         else:
@@ -106,14 +98,13 @@ def create_app(
         return HealthResponse(
             status=status_value,
             stt_loaded=stt_loaded,
-            kokoro_loaded=tts_state.kokoro_loaded,
-            rvc_available=tts_state.rvc_available,
+            piper_loaded=tts_state.piper_loaded,
             ffmpeg_available=tts_state.ffmpeg_available,
         )
 
     async def readiness(response: Response) -> HealthResponse:
         health = current_health()
-        if health.status not in {"ok", "degraded"}:
+        if health.status != "ok":
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return health
 
@@ -122,7 +113,10 @@ def create_app(
         return {"status": "ok"}
 
     app.get("/readyz", response_model=HealthResponse)(readiness)
-    app.get("/health", response_model=HealthResponse)(readiness)
+
+    @app.get("/health")
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
 
     @app.post("/stt/transcribe", response_model=TranscribeResponse)
     async def transcribe(
@@ -163,7 +157,6 @@ def create_app(
             result = await run_in_threadpool(
                 app.state.synthesizer.synthesize,
                 text,
-                payload.use_rvc,
             )
         except TextValidationError:
             raise HTTPException(status_code=422, detail="INVALID_TTS_TEXT") from None
@@ -172,10 +165,7 @@ def create_app(
         return Response(
             content=result.audio,
             media_type="audio/mpeg",
-            headers={
-                "X-RVC-Applied": str(result.rvc_applied).lower(),
-                "X-TTS-Engine": result.engine,
-            },
+            headers={"X-TTS-Engine": result.engine},
         )
 
     return app

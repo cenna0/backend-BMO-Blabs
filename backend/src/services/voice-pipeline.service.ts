@@ -38,7 +38,7 @@ export interface VoicePipelineResult {
   status: "audio_ready" | "failed";
   transcript?: string;
   responseText?: string;
-  tts?: Pick<TtsResult, "rvcApplied" | "ttsEngine">;
+  tts?: Pick<TtsResult, "ttsEngine">;
   errorCode?: RequestFailureCode;
   timingsMs?: Record<string, number>;
 }
@@ -118,7 +118,7 @@ export class VoicePipelineService {
 
     this.options.requestStore.setStatus(record.requestId, "generating_voice");
     const ttsStarted = performance.now();
-    const tts = await this.options.audioService.synthesize(record.requestId, responseText, true, signal);
+    const tts = await this.options.audioService.synthesize(record.requestId, responseText, signal);
     const ttsMs = Math.round(performance.now() - ttsStarted);
     this.#throwIfTimedOut(isTimedOut);
     const storeStarted = performance.now();
@@ -147,7 +147,6 @@ export class VoicePipelineService {
         request_id: record.requestId,
         language: stt.language,
         speech_detected: stt.speechDetected,
-        rvc_applied: tts.rvcApplied,
         tts_engine: tts.ttsEngine,
         timings_ms: timingsMs,
       },
@@ -158,7 +157,6 @@ export class VoicePipelineService {
       transcript: stt.text,
       responseText,
       tts: {
-        rvcApplied: tts.rvcApplied,
         ttsEngine: tts.ttsEngine,
       },
       timingsMs,

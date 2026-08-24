@@ -12,7 +12,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app.model_assets import (
-    KOKORO_SPEC,
     WHISPER_SPEC,
     ModelSpec,
     build_model_manifest,
@@ -24,7 +23,6 @@ from app.model_assets import (
 DEFAULT_MODELS_DIR = Path("/opt/bmo/models")
 MODEL_SPECS = {
     "whisper": WHISPER_SPEC,
-    "kokoro": KOKORO_SPEC,
 }
 Downloader = Callable[..., str]
 
@@ -89,8 +87,8 @@ def _dry_run_manifest(specs: Sequence[ModelSpec], manifest_path: Path) -> None:
 
 
 def main(argv: Sequence[str] | None = None, *, downloader: Downloader | None = None) -> int:
-    parser = ArgumentParser(description="Provision exact P7 Whisper and Kokoro snapshots.")
-    parser.add_argument("--model", choices=("whisper", "kokoro", "all"), default="all")
+    parser = ArgumentParser(description="Provision the exact faster-whisper snapshot.")
+    parser.add_argument("--model", choices=("whisper", "all"), default="all")
     parser.add_argument("--allow-download", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--models-dir", type=Path, default=DEFAULT_MODELS_DIR)

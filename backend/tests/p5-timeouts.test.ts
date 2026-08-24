@@ -17,7 +17,7 @@ describe("P5 explicit stage timeouts", () => {
     });
 
     await expect(client.transcribe(Buffer.from("wav"))).rejects.toMatchObject({ code: "STT_FAILED" });
-    await expect(client.synthesize("550e8400-e29b-41d4-a716-446655440000", "Hi.", true)).rejects.toMatchObject({
+    await expect(client.synthesize("550e8400-e29b-41d4-a716-446655440000", "Hi.")).rejects.toMatchObject({
       code: "TTS_FAILED",
     });
   });

@@ -19,21 +19,19 @@ class ReadyTranscriber:
 
 class FakeSynthesizer:
     def __init__(self, state: TtsEngineState | None = None):
-        self.state = state or TtsEngineState(True, True, True, None)
+        self.state = state or TtsEngineState(ffmpeg_available=True, piper_loaded=True)
         self.calls = []
 
     def health_state(self) -> TtsEngineState:
         return self.state
 
-    def synthesize(self, text: str, use_rvc: bool) -> TtsResult:
-        self.calls.append((text, use_rvc))
+    def synthesize(self, text: str) -> TtsResult:
+        self.calls.append(text)
         return TtsResult(
             audio=b"mp3-data",
-            rvc_applied=use_rvc,
-            engine="kokoro-rvc" if use_rvc else "kokoro",
-            kokoro_seconds=0.1,
-            rvc_seconds=0.2 if use_rvc else None,
+            engine="piper",
             ffmpeg_seconds=0.3,
+            piper_seconds=0.1,
         )
 
 
@@ -59,7 +57,6 @@ def test_tts_synthesize_returns_mp3_headers_and_bytes():
         json={
             "request_id": "33333333-3333-4333-8333-333333333333",
             "text": "Hi! BMO is ready to help.",
-            "use_rvc": True,
         },
         headers=auth_headers(),
     )
@@ -67,9 +64,8 @@ def test_tts_synthesize_returns_mp3_headers_and_bytes():
     assert response.status_code == 200
     assert response.content == b"mp3-data"
     assert response.headers["content-type"] == "audio/mpeg"
-    assert response.headers["x-rvc-applied"] == "true"
-    assert response.headers["x-tts-engine"] == "kokoro-rvc"
-    assert fake.calls == [("Hi! BMO is ready to help.", True)]
+    assert response.headers["x-tts-engine"] == "piper"
+    assert fake.calls == ["Hi! BMO is ready to help."]
 
 
 def test_tts_synthesize_rejects_missing_internal_token():
@@ -78,7 +74,6 @@ def test_tts_synthesize_rejects_missing_internal_token():
         json={
             "request_id": "33333333-3333-4333-8333-333333333333",
             "text": "Hi! BMO is ready to help.",
-            "use_rvc": False,
         },
     )
 
@@ -92,7 +87,6 @@ def test_tts_synthesize_rejects_invalid_text():
         json={
             "request_id": "33333333-3333-4333-8333-333333333333",
             "text": "One. Two. Three. Four.",
-            "use_rvc": False,
         },
         headers=auth_headers(),
     )
@@ -101,39 +95,37 @@ def test_tts_synthesize_rejects_invalid_text():
     assert response.json() == {"detail": "INVALID_TTS_TEXT"}
 
 
-def test_health_reports_ok_when_stt_kokoro_ffmpeg_and_rvc_ready():
-    response = make_client(FakeSynthesizer(TtsEngineState(True, True, True, None))).get("/health")
+def test_health_is_process_liveness_only():
+    response = make_client(FakeSynthesizer(TtsEngineState(ffmpeg_available=False, piper_loaded=False))).get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_readyz_requires_piper_and_ffmpeg():
+    client = make_client(FakeSynthesizer(TtsEngineState(ffmpeg_available=True, piper_loaded=False)))
+    response = client.get("/readyz")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "error",
+        "stt_loaded": True,
+        "piper_loaded": False,
+        "ffmpeg_available": True,
+    }
+
+
+def test_readyz_reports_all_core_dependencies_when_ready():
+    client = make_client(FakeSynthesizer(TtsEngineState(ffmpeg_available=True, piper_loaded=True)))
+    response = client.get("/readyz")
 
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
         "stt_loaded": True,
-        "kokoro_loaded": True,
-        "rvc_available": True,
+        "piper_loaded": True,
         "ffmpeg_available": True,
     }
-
-
-def test_health_reports_degraded_when_rvc_unavailable_only():
-    client = make_client(
-        FakeSynthesizer(TtsEngineState(True, True, False, "RVC unavailable")),
-    )
-    response = client.get("/readyz")
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "degraded"
-    assert response.json()["kokoro_loaded"] is True
-    assert response.json()["ffmpeg_available"] is True
-    assert response.json()["rvc_available"] is False
-
-
-def test_health_reports_error_when_kokoro_or_ffmpeg_required_component_unavailable():
-    client = make_client(FakeSynthesizer(TtsEngineState(False, True, False, None)))
-    response = client.get("/readyz")
-
-    assert response.status_code == 503
-    assert response.json()["status"] == "error"
-    assert response.json()["kokoro_loaded"] is False
     assert client.get("/livez").status_code == 200
 
 
@@ -143,10 +135,10 @@ class BlockingSynthesizer(FakeSynthesizer):
         self.started = threading.Event()
         self.release = threading.Event()
 
-    def synthesize(self, text: str, use_rvc: bool) -> TtsResult:
+    def synthesize(self, text: str) -> TtsResult:
         self.started.set()
         self.release.wait(timeout=2)
-        return super().synthesize(text, use_rvc)
+        return super().synthesize(text)
 
 
 def test_synthesis_does_not_block_liveness():
@@ -164,7 +156,6 @@ def test_synthesis_does_not_block_liveness():
             json={
                 "request_id": "33333333-3333-4333-8333-333333333333",
                 "text": "Hi! BMO is ready to help.",
-                "use_rvc": False,
             },
             headers=auth_headers(),
         )

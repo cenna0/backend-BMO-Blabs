@@ -1,7 +1,6 @@
 export interface BackendReadinessState {
   hermesReady: boolean;
   audioReady: boolean;
-  rvcAvailable: boolean;
   databaseReady?: boolean;
 }
 
@@ -24,7 +23,6 @@ interface BackendReadinessServiceOptions {
 
 interface AudioReadiness {
   ready: boolean;
-  rvcAvailable: boolean;
 }
 
 function endpoint(baseUrl: string, path: string): string {
@@ -67,17 +65,14 @@ export class BackendReadinessService implements BackendReadinessPort {
 
   async #checkAudio(): Promise<AudioReadiness> {
     const payload = await this.#getJson(endpoint(this.options.audioServiceBaseUrl, "/readyz"));
-    if (!isObject(payload)) return { ready: false, rvcAvailable: false };
+    if (!isObject(payload)) return { ready: false };
 
     const mandatoryReady =
-      (payload.status === "ok" || payload.status === "degraded") &&
+      payload.status === "ok" &&
       payload.stt_loaded === true &&
-      payload.kokoro_loaded === true &&
+      payload.piper_loaded === true &&
       payload.ffmpeg_available === true;
-    return {
-      ready: mandatoryReady,
-      rvcAvailable: mandatoryReady && payload.rvc_available === true,
-    };
+    return { ready: mandatoryReady };
   }
 
   async #checkDatabase(): Promise<boolean | undefined> {
@@ -106,7 +101,6 @@ export class BackendReadinessService implements BackendReadinessPort {
     return {
       hermesReady,
       audioReady: audio.ready,
-      rvcAvailable: audio.rvcAvailable,
       ...(databaseReady === undefined ? {} : { databaseReady }),
     };
   }

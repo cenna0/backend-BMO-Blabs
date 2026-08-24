@@ -15,11 +15,13 @@ from tests.helpers import write_wav_file
 
 class FakePiper:
     ready = True
-    calls = 0
+
+    def __init__(self):
+        self.calls = []
 
     def synthesize_to_wav(self, text: str, output_path: Path) -> float:
         assert text == "Hi! BMO is ready to help."
-        type(self).calls += 1
+        self.calls.append(text)
         write_wav_file(output_path, sample_rate=22_050)
         return 0.21
 
@@ -27,33 +29,13 @@ class FakePiper:
 class FakePiperFailure:
     ready = True
 
+    def __init__(self):
+        self.calls = []
+
     def synthesize_to_wav(self, text: str, output_path: Path) -> float:
+        self.calls.append(text)
         output_path.write_bytes(b"partial wav")
         raise RuntimeError("forced Piper worker failure")
-
-
-class FakeKokoro:
-    ready = True
-
-    def synthesize_to_wav(self, text: str, output_path: Path) -> float:
-        assert text == "Hi! BMO is ready to help."
-        write_wav_file(output_path)
-        return 0.11
-
-
-class FakeKokoroFailure:
-    ready = True
-
-    def synthesize_to_wav(self, text: str, output_path: Path) -> float:
-        output_path.write_bytes(b"partial wav")
-        raise RuntimeError("kokoro failed")
-
-
-class UnexpectedRvc:
-    available = True
-
-    def convert(self, *_args):
-        raise AssertionError("RVC must remain disabled")
 
 
 class FakeFfmpeg:
@@ -72,16 +54,14 @@ class FakeFfmpeg:
         return 0.33
 
 
-def make_orchestrator(tmp_path, piper=None, kokoro=None, ffmpeg=None):
+def make_orchestrator(tmp_path, piper=None, ffmpeg=None):
     return TtsOrchestrator(
         settings=Settings(
             internal_service_token="test-internal-token",
             tts_temp_dir=tmp_path,
         ),
-        piper=piper,
-        kokoro=kokoro or FakeKokoro(),
+        piper=piper or FakePiper(),
         ffmpeg=ffmpeg or FakeFfmpeg(),
-        rvc=UnexpectedRvc(),
     )
 
 
@@ -106,69 +86,42 @@ def test_validate_tts_text_rejects_invalid_input(text):
 
 def test_synthesize_uses_piper_as_primary_and_cleans_temp_files(tmp_path):
     piper = FakePiper()
-    result = make_orchestrator(tmp_path, piper=piper).synthesize(
-        "Hi! BMO is ready to help.", use_rvc=True
-    )
+    result = make_orchestrator(tmp_path, piper=piper).synthesize("Hi! BMO is ready to help.")
 
     assert result.audio == b"fake mp3 bytes"
     assert result.engine == "piper"
-    assert result.rvc_applied is False
-    assert result.fallback_used is False
-    assert result.fallback_from is None
     assert result.piper_seconds == 0.21
-    assert result.kokoro_seconds is None
+    assert piper.calls == ["Hi! BMO is ready to help."]
     assert not list(tmp_path.glob("*"))
 
 
-def test_synthesize_falls_back_to_kokoro_when_piper_fails(tmp_path):
-    result = make_orchestrator(tmp_path, piper=FakePiperFailure()).synthesize(
-        "Hi! BMO is ready to help.", use_rvc=True
-    )
+def test_synthesize_returns_tts_failed_when_piper_fails_without_fallback_or_ffmpeg(tmp_path):
+    piper = FakePiperFailure()
+    ffmpeg = FakeFfmpeg()
 
-    assert result.audio == b"fake mp3 bytes"
-    assert result.engine == "kokoro"
-    assert result.fallback_used is True
-    assert result.fallback_from == "piper"
-    assert result.rvc_applied is False
-    assert result.kokoro_seconds == 0.11
+    with pytest.raises(TtsSynthesisError, match="TTS_FAILED"):
+        make_orchestrator(tmp_path, piper=piper, ffmpeg=ffmpeg).synthesize(
+            "Hi! BMO is ready to help."
+        )
+
+    assert piper.calls == ["Hi! BMO is ready to help."]
+    assert ffmpeg.inputs == []
     assert not list(tmp_path.glob("*"))
-
-
-def test_synthesize_never_invokes_rvc(tmp_path):
-    result = make_orchestrator(tmp_path, piper=FakePiper()).synthesize(
-        "Hi! BMO is ready to help.", use_rvc=True
-    )
-
-    assert result.rvc_applied is False
 
 
 def test_synthesize_returns_tts_failed_when_ffmpeg_fails_and_cleans_temp_files(tmp_path):
     with pytest.raises(TtsSynthesisError):
         make_orchestrator(tmp_path, piper=FakePiper(), ffmpeg=FakeFfmpeg(fail=True)).synthesize(
-            "Hi! BMO is ready to help.", use_rvc=True
+            "Hi! BMO is ready to help."
         )
 
     assert not list(tmp_path.glob("*"))
 
 
-def test_synthesize_returns_tts_failed_when_both_engines_fail(tmp_path):
-    with pytest.raises(TtsSynthesisError):
-        make_orchestrator(
-            tmp_path,
-            piper=FakePiperFailure(),
-            kokoro=FakeKokoroFailure(),
-        ).synthesize("Hi! BMO is ready to help.", use_rvc=True)
-
-    assert not list(tmp_path.glob("*"))
-
-
-def test_health_state_requires_piper_and_reports_rvc_disabled(tmp_path):
+def test_health_state_requires_piper_and_ffmpeg(tmp_path):
     orchestrator = make_orchestrator(tmp_path, piper=FakePiper())
 
     assert orchestrator.health_state() == TtsEngineState(
-        kokoro_loaded=True,
         ffmpeg_available=True,
-        rvc_available=False,
-        rvc_error="RVC disabled",
         piper_loaded=True,
     )

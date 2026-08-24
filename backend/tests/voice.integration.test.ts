@@ -74,8 +74,7 @@ async function startPipelineFixtures(): Promise<PipelineFixtures> {
         ttsRequests.push(JSON.parse(Buffer.concat(chunks).toString("utf8")));
         response.writeHead(200, {
           "content-type": "audio/mpeg",
-          "x-rvc-applied": "false",
-          "x-tts-engine": "kokoro",
+          "x-tts-engine": "piper",
         });
         response.end(mp3);
         return;
@@ -367,7 +366,6 @@ describe("full voice pipeline mode", () => {
       expect(fixtures.ttsRequests[0]).toEqual({
         request_id: requestId,
         text: "Hi! BMO is ready to help.",
-        use_rvc: true,
       });
     } finally {
       await fixtures.close();
