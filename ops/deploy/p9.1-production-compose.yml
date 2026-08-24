@@ -59,6 +59,7 @@ services:
       AUDIO_SERVICE_URL: http://127.0.0.1:8001
       WHATSAPP_BRIDGE_URL: http://127.0.0.1:3001
       WHATSAPP_IDENTITY_RESOLVER_URL: http://127.0.0.1:3002
+      WHATSAPP_PAIRING_URL: http://127.0.0.1:3003
       SPOTIFY_CALLBACK_URL: https://api.personalbmo.web.id/api/v1/integrations/spotify/callback
       HARDWARE_TEST_MODE: "false"
       P9_ENABLED: "true"
