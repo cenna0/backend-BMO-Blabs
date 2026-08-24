@@ -18,7 +18,7 @@ semantic action. Neither component receives a Spotify access token, refresh
 token, client secret, provider URL, endpoint, or raw provider response.
 
 Spotify audio remains on the user's Spotify device. It never routes through the
-BMO speaker, Audio Service, Piper, Kokoro, or the device proactive-audio path.
+BMO speaker, Audio Service, Piper, or the device proactive-audio path.
 
 ## Exact scopes
 

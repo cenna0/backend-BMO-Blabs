@@ -8,7 +8,7 @@ import tempfile
 import time
 
 from .failure_suite import IMAGE, _base, _run
-from .kokoro_reference import _production_guard
+from .safety_guard import production_safety_guard
 
 
 def _wait_for(path: Path, timeout_seconds: float = 20) -> float:
@@ -52,7 +52,7 @@ def main() -> int:
     )
     records: list[dict[str, object]] = []
     for phase in ("startup", "model-loading", "synthesis", "ffmpeg", "idle"):
-        _production_guard(args.baseline_kernel_oom)
+        production_safety_guard(args.baseline_kernel_oom)
         output = Path(tempfile.mkdtemp(prefix=f"{phase}-", dir=shutdown_root))
         name = f"bmo-p8-piper-shutdown-{phase}"
         command = _base(name, assets, output)
@@ -104,7 +104,7 @@ def main() -> int:
                 "stderr_tail": log_tail,
             }
         )
-        _production_guard(args.baseline_kernel_oom)
+        production_safety_guard(args.baseline_kernel_oom)
     containers_after = _run(
         ["docker", "ps", "-aq", "--filter", "name=bmo-p8-piper-shutdown-"]
     ).stdout.split()

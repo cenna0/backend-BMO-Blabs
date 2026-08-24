@@ -1,5 +1,10 @@
 # BMO Backend MVP — Deployment and Operations
 
+> **DEPRECATED HISTORICAL PACKAGE — DO NOT IMPLEMENT FROM THIS FILE**
+> The current audio rollout and health contract are in
+> `CURRENT-RUNTIME-CONFIG.md` and the Piper-only purge design. Legacy audio
+> names below are historical evidence only.
+
 > **HISTORICAL P7/P8 DEPLOYMENT BASELINE — NOT CURRENT P9 INSTRUCTIONS**
 > Preserve this voice-runtime evidence, but use `docs/README.md` and
 > `docs/integration/05-IMPLEMENTATION-STATUS.md` for current production state.

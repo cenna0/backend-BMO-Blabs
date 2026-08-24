@@ -29,7 +29,6 @@ RUN groupadd --gid 10001 piper \
 
 WORKDIR /app
 COPY piper-candidate/bmo_piper/ /app/bmo_piper/
-COPY piper-candidate/comparison-text.json /app/comparison-text.json
 
 USER piper
 ENTRYPOINT ["/usr/bin/tini", "-g", "--"]

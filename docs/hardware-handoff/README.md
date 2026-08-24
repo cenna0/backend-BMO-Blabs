@@ -569,7 +569,7 @@ Firmware-relevant values:
 | MP3 TTL | `300 s` |
 | Backend request tombstone baseline | `10 min` |
 
-Backend-internal STT/Hermes/TTS/RVC/total pipeline timeouts are server implementation details. Firmware responds to the resulting `request_failed` event and does not reproduce those timers locally.
+Backend-internal STT/Hermes/TTS/total pipeline timeouts are server implementation details. Firmware responds to the resulting `request_failed` event and does not reproduce those timers locally.
 
 ---
 
@@ -712,20 +712,15 @@ WAV upload
 → faster-whisper STT
 → Hermes response
 → Piper Prudence TTS
-→ Kokoro `af_heart` speed `0.80` fallback if Piper fails
+→ Piper synthesis failure produces `TTS_FAILED`
 → FFmpeg MP3
 → audio_ready
 ```
 
 Current STT implementation uses `medium` multilingual CPU INT8 with `BMO` hotword after local accuracy tuning. This does not change the hardware contract.
 
-P8 production uses Piper Prudence speaker ID `0` as primary. Kokoro `af_heart`
-at speed `0.80` is the internal fallback; firmware still receives the same MP3
-contract.
-
-RVC runtime artifacts are removed from production and retained only as archived
-evidence/history. Firmware must not depend on RVC state; it always receives MP3
-through the same `audio_ready` contract.
+Piper Prudence speaker ID `0` is the only TTS selection. Firmware still
+receives the same MP3 contract and must not depend on internal engine metadata.
 
 ---
 

@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import time
 
-from .kokoro_reference import _production_guard
+from .safety_guard import production_safety_guard
 
 
 IMAGE = "bmo-piper:p8-prudence-candidate"
@@ -106,7 +106,7 @@ def main() -> int:
     records: list[dict[str, object]] = []
 
     for mode in ("missing-model", "hash-mismatch", "missing-config"):
-        _production_guard(args.baseline_kernel_oom)
+        production_safety_guard(args.baseline_kernel_oom)
         variant = _startup_assets(assets, failure_assets, mode)
         output = Path(tempfile.mkdtemp(prefix=f"{mode}-", dir=failure_output))
         started = time.perf_counter()
@@ -133,7 +133,7 @@ def main() -> int:
                 "output_file_count": sum(path.is_file() for path in output.rglob("*")),
             }
         )
-        _production_guard(args.baseline_kernel_oom)
+        production_safety_guard(args.baseline_kernel_oom)
 
     request_modes = (
         "invalid-speaker-id",
@@ -145,7 +145,7 @@ def main() -> int:
         "synthesis-timeout",
     )
     for mode in request_modes:
-        _production_guard(args.baseline_kernel_oom)
+        production_safety_guard(args.baseline_kernel_oom)
         output = Path(tempfile.mkdtemp(prefix=f"{mode}-", dir=failure_output))
         command = _base(
             f"bmo-p8-piper-failure-{mode}",
@@ -184,7 +184,7 @@ def main() -> int:
                 "sanitized_error": detail.get("sanitized_error"),
             }
         )
-        _production_guard(args.baseline_kernel_oom)
+        production_safety_guard(args.baseline_kernel_oom)
 
     passed = all(
         record.get("expected_failure_observed") is True

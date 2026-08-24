@@ -1,5 +1,10 @@
 # BMO Backend MVP — Local Audio Service
 
+> **DEPRECATED HISTORICAL PACKAGE — DO NOT IMPLEMENT FROM THIS FILE**
+> The current contract is Piper-only and is documented in
+> `CURRENT-RUNTIME-CONFIG.md` plus the dated Piper-only purge design. The
+> legacy engine names below are retained only as migration evidence.
+
 **Versi:** 1.0.1  
 **Status:** CANONICAL AUDIO IMPLEMENTATION REFERENCE
 

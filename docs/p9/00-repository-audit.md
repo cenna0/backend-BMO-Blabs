@@ -1,5 +1,9 @@
 # P9 Repository Audit
 
+> **HISTORICAL AUDIT — NOT CURRENT RUNTIME OR CONTRACT AUTHORITY**
+> The audio statements below describe the pre-migration checkpoint. Current
+> audio status is maintained in `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`.
+
 **Status:** `P9.1 LOCKED — AUDIT COMPLETE`
 **Audit date:** 2026-08-04
 **Base:** `159ce6d9081928eca6d68921c3f64cdb36fce5bb`

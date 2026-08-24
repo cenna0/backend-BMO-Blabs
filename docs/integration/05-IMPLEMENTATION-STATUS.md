@@ -101,7 +101,9 @@ fresh encrypted backup checkpoint.
 - Mobile WS: `wss://api.personalbmo.web.id/api/v1/ws`.
 - Hardware WS: `wss://api.personalbmo.web.id/ws`.
 - `/livez` and `/readyz` are internal health routes; the public `/health` route is the public smoke endpoint.
-- `rvc=unavailable` is the accepted readiness degradation; it does not block Mobile API use.
+- Audio source has migrated to the Piper-only contract; candidate promotion is
+  currently blocked by the host memory gate and the prior production image is
+  retained for rollback.
 - No candidate project, candidate port `3010`, candidate callback, or `/tmp/bmo-p9-1-validation-*` path is part of production.
 - Code-only enrollment is deployed and migration #7 is applied. Do not rerun
   production migrations as Mobile integration work; physical firmware

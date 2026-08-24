@@ -5,7 +5,7 @@
 > contract. If it conflicts with dated plans/evidence, current source and the
 > canonical integration package win.
 
-**Last audited:** 2026-08-20
+**Last audited:** 2026-08-24
 **Backend/VPS status:** code-only pairing is deployed and production-verified.
 **Physical pairing status:** `PENDING_PHYSICAL_ESP`.
 
@@ -57,8 +57,10 @@ Current Hardware boundary:
 - candidate port `3010` is historical/non-production
 - health and the six-sample production soak passed; the rollback image remains
   preserved.
-- real RVC inference is not verified; `rvc=unavailable` is an accepted
-  readiness limitation, not a Mobile/ESP outage
+- current audio source is migrated to the Piper-only target; candidate
+  promotion is blocked by the host memory gate and the immutable prior image
+  remains the rollback image
+- canonical audio path: faster-whisper → Hermes → Piper → FFmpeg → MP3
 - physical ESP32 integration is not verified; current firmware pairing status
   remains `PENDING_PHYSICAL_ESP`.
 

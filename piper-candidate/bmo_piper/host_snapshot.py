@@ -54,11 +54,6 @@ def _container(name: str) -> dict[str, Any]:
         f"/sys/fs/cgroup/system.slice/docker-{container_id}.scope/memory.current"
     )
     state = inspect["State"]
-    environment = inspect.get("Config", {}).get("Env", [])
-    rvc_enabled = next(
-        (item.split("=", 1)[1] for item in environment if item.startswith("RVC_ENABLED=")),
-        None,
-    )
     return {
         "name": name,
         "exists": True,
@@ -69,7 +64,6 @@ def _container(name: str) -> dict[str, Any]:
         "restart_count": int(inspect.get("RestartCount", 0)),
         "oom_killed": bool(state.get("OOMKilled")),
         "memory_current_bytes": int(memory_path.read_text(encoding="ascii")),
-        "rvc_enabled": rvc_enabled,
     }
 
 

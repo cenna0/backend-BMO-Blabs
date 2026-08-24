@@ -4,6 +4,10 @@
 **Tanggal:** 2026-08-04
 **Status:** P9.1 architecture locked and approved; P9 implementation not started
 
+> **HISTORICAL PRODUCT SNAPSHOT — NOT CURRENT AUDIO IMPLEMENTATION AUTHORITY**
+> This dated PRD predates the Piper-only migration. Use `docs/README.md` and
+> `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md` for the current audio contract.
+
 > Dokumen ini menjadi konteks produk utama BMO by B-Labs. Isinya menjelaskan visi, arsitektur, tech stack, scope, keputusan desain, roadmap, dan status project.
 >
 > Untuk detail voice MVP, gunakan hierarchy dokumentasi current di `docs/README.md`. Public firmware ↔ backend protocol dikunci oleh `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`; detail implementasi backend/audio berada pada active `docs/backend-mvp/` references. Snapshot `BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md` berada di archive dan bukan current execution authority.
