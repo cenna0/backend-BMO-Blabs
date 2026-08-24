@@ -152,3 +152,44 @@ export class HermesWhatsAppBridgeClient {
     return normalized;
   }
 }
+
+export class HermesWhatsAppPairingClient {
+  readonly #baseUrl: string;
+  readonly #fetcher: Fetcher;
+  readonly #timeoutMs: number;
+  constructor(options: HermesWhatsAppClientOptions) {
+    this.#baseUrl = loopbackBaseUrl(options.baseUrl).replace(/\/$/u, "");
+    this.#fetcher = options.fetcher ?? fetch;
+    this.#timeoutMs = options.timeoutMs ?? 30_000;
+  }
+  async pairingCode(phoneNumber: string): Promise<{ code: string; expiresAt: Date }> {
+    const payload = await this.#json("/pairing-code", { method: "POST", body: JSON.stringify({ phoneNumber }) }, 45_000);
+    if (!isObject(payload) || typeof payload.code !== "string" || typeof payload.expiresAt !== "string") {
+      throw new HermesWhatsAppProviderError("INVALID_PROVIDER_RESPONSE");
+    }
+    const code = payload.code.replace(/[^A-Za-z0-9]/gu, "").toUpperCase();
+    const expiresAt = new Date(payload.expiresAt);
+    if (code.length !== 8 || Number.isNaN(expiresAt.getTime())) {
+      throw new HermesWhatsAppProviderError("INVALID_PROVIDER_RESPONSE");
+    }
+    return { code, expiresAt };
+  }
+  async #json(path: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await this.#fetcher(`${this.#baseUrl}${path}`, { ...init, signal: controller.signal, headers: { ...init.headers, "content-type": "application/json" } });
+      if (!response.ok) throw new HermesWhatsAppProviderError(response.status === 503 ? "PROVIDER_UNAVAILABLE" : "PROVIDER_REQUEST_FAILED");
+      try {
+        return await response.json();
+      } catch {
+        throw new HermesWhatsAppProviderError("INVALID_PROVIDER_RESPONSE");
+      }
+    } catch (error) {
+      if (error instanceof HermesWhatsAppProviderError) throw error;
+      throw new HermesWhatsAppProviderError("PROVIDER_UNAVAILABLE");
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}

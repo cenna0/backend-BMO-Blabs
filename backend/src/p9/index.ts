@@ -31,7 +31,7 @@ import { IntegrationService } from "./services/integration.service.js";
 import { BugReportService } from "./services/bug-report.service.js";
 import type { HermesGenerateClient } from "../services/hermes.client.js";
 import { SpotifyApiClient } from "./providers/spotify.client.js";
-import { HermesWhatsAppBridgeClient } from "./providers/hermes-whatsapp.client.js";
+import { HermesWhatsAppBridgeClient, HermesWhatsAppPairingClient } from "./providers/hermes-whatsapp.client.js";
 import { HermesWhatsAppIdentityResolverClient } from "./providers/hermes-whatsapp-identity.client.js";
 
 export interface P9Runtime {
@@ -132,6 +132,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   // destructive queue is ingested here, while notification authorization is
   // owned by WhatsAppNotificationRule in the Backend.
   const whatsApp = new HermesWhatsAppBridgeClient({ baseUrl: config.whatsappBridgeUrl });
+  const whatsAppPairing = new HermesWhatsAppPairingClient({ baseUrl: config.whatsappPairingUrl });
   const whatsAppIdentity = new HermesWhatsAppIdentityResolverClient({ baseUrl: config.whatsappIdentityResolverUrl, token: config.whatsappIdentityResolverToken });
   const integrations = new IntegrationService({
     client,
@@ -143,6 +144,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
     ...(config.spotifyCallbackUrl === undefined ? {} : { spotifyCallbackUrl: config.spotifyCallbackUrl }),
     ...(spotify === undefined ? {} : { spotify }),
     whatsApp,
+    whatsAppPairing,
     whatsAppIdentity,
     mobileEvents: options.mobileEvents ?? noMobileEvents,
     whatsAppProactiveDelivery: async (input) => {

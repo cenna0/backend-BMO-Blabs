@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { IntegrationProvider } from "../../src/generated/prisma/enums.js";
+import { IntegrationProvider, IntegrationStatus } from "../../src/generated/prisma/enums.js";
 import { IntegrationService } from "../../src/p9/services/integration.service.js";
 
 const userA = "00000000-0000-4000-8000-000000000001";
@@ -13,7 +13,7 @@ const sendRequestA = "00000000-0000-4000-8000-000000000008";
 const conversationB = "00000000-0000-4000-8000-000000000010";
 const now = new Date("2026-08-13T00:00:00.000Z");
 
-function fixture(whatsAppIdentity?: any) {
+function fixture(whatsAppIdentity?: any, whatsAppPairing?: any) {
   const connection = { id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "CONNECTED", scopes: [], connectedAt: now };
   const delivery = { id: deliveryA, userId: userA, connectionId: connectionA, provider: IntegrationProvider.WHATSAPP, direction: "INBOUND", status: "RECEIVED", providerMessageRef: "message-1", metadata: null };
   const conversation = { id: conversationA, userId: userA, connectionId: connectionA, provider: IntegrationProvider.WHATSAPP, opaqueChatRef: "123@s.whatsapp.net", displayName: "Rangga", type: "DM", lastActivityAt: now };
@@ -73,8 +73,8 @@ function fixture(whatsAppIdentity?: any) {
     poll: vi.fn().mockResolvedValue([{ messageId: "message-1", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "hello", isGroup: false }]),
     send: vi.fn().mockResolvedValue({ providerMessageRef: "out-1" }),
   };
-  const service = new IntegrationService({ client: {} as any, repositories, publicBaseUrl: "http://127.0.0.1:3010", whatsApp: whatsApp as any, ...(whatsAppIdentity ? { whatsAppIdentity } : {}), whatsAppProactiveDelivery: proactive, mobileEvents });
-  return { repositories, whatsApp, proactive, mobileEvents, service, delivery, aliases, conversation, now };
+  const service = new IntegrationService({ client: {} as any, repositories, publicBaseUrl: "http://127.0.0.1:3010", whatsApp: whatsApp as any, ...(whatsAppIdentity ? { whatsAppIdentity } : {}), ...(whatsAppPairing ? { whatsAppPairing } : {}), whatsAppProactiveDelivery: proactive, mobileEvents });
+  return { repositories, whatsApp, whatsAppPairing, proactive, mobileEvents, service, delivery, aliases, conversation, now };
 }
 
 describe("WhatsApp IntegrationService", () => {
@@ -100,7 +100,7 @@ describe("WhatsApp IntegrationService", () => {
   it("persists connected status only after bridge health succeeds and downgrades a lost bridge", async () => {
     const f = fixture();
 
-    await expect(f.service.connectWhatsApp(userA)).resolves.toMatchObject({ blocked: false, connection: { status: "CONNECTED" } });
+    await expect(f.service.connectWhatsApp(userA, undefined)).resolves.toMatchObject({ blocked: false, connection: { status: "CONNECTED" } });
     expect(f.whatsApp.connect).toHaveBeenCalledWith(userA);
 
     f.whatsApp.status.mockResolvedValue({ status: "disconnected", queueLength: 0, uptime: 1, scriptHash: "bridge-hash", sendReadReceipts: false });
@@ -110,7 +110,7 @@ describe("WhatsApp IntegrationService", () => {
 
   it("rejects a second owner from claiming the single Hermes session or sending through it", async () => {
     const f = fixture();
-    await expect(f.service.connectWhatsApp(userB)).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
+    await expect(f.service.connectWhatsApp(userB, undefined)).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
     expect(f.whatsApp.connect).not.toHaveBeenCalled();
 
     f.repositories.integrationConnection.findUnique.mockResolvedValue({ ...f.delivery, id: "foreign-row", userId: userB, provider: IntegrationProvider.WHATSAPP, status: "DISCONNECTED" });
@@ -121,7 +121,7 @@ describe("WhatsApp IntegrationService", () => {
     const f = fixture();
     f.repositories.integrationConnection.findMany.mockResolvedValue([{ id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "DISCONNECTED", externalReference: "bridge:bound" }]);
 
-    await expect(f.service.connectWhatsApp(userB)).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
+    await expect(f.service.connectWhatsApp(userB, undefined)).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
     expect(f.whatsApp.connect).not.toHaveBeenCalled();
   });
 
@@ -133,7 +133,7 @@ describe("WhatsApp IntegrationService", () => {
     f.repositories.integrationConnection.findUnique.mockResolvedValue(current);
     f.repositories.integrationConnection.findUniqueOrThrow.mockResolvedValue(current);
 
-    await expect(f.service.connectWhatsApp(userA)).resolves.toMatchObject({ blocked: false, connection: { status: "CONNECTED" } });
+    await expect(f.service.connectWhatsApp(userA, undefined)).resolves.toMatchObject({ blocked: false, connection: { status: "CONNECTED" } });
     expect(f.whatsApp.connect).toHaveBeenCalledWith(userA);
   });
 
@@ -406,5 +406,46 @@ describe("WhatsApp IntegrationService", () => {
     });
     await expect(f.service.whatsappConfirm(userA, sendRequestA)).resolves.toMatchObject({ conversationId: conversationA });
     expect(f.whatsApp.send).toHaveBeenCalledWith(userA, "456@lid", "mapped outbound");
+  });
+
+  it("issues an 8-digit pairing code for a phone number and keeps the connection pending", async () => {
+    const expiresAt = new Date(Date.now() + 600_000);
+    const whatsAppPairing = { pairingCode: vi.fn().mockResolvedValue({ code: "ABCD1234", expiresAt }) };
+    const f = fixture(undefined, whatsAppPairing);
+    f.whatsApp.connect.mockResolvedValue({ status: "disconnected" });
+    f.repositories.integrationConnection.findUnique.mockResolvedValue({ id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "PENDING", scopes: [], connectedAt: null, externalReference: null });
+    await expect(f.service.connectWhatsApp(userA, "+628123456789")).resolves.toMatchObject({
+      blocked: true,
+      pairing: { code: "ABCD1234", status: "PENDING" },
+      connection: { status: "PENDING" },
+    });
+    expect(whatsAppPairing.pairingCode).toHaveBeenCalledWith("+628123456789");
+    expect(f.repositories.integrationConnection.update).toHaveBeenCalledWith({ where: { id: connectionA }, data: { status: IntegrationStatus.PENDING } });
+    await expect(f.service.whatsappPairing(userA)).resolves.toMatchObject({ code: "ABCD1234", status: "PENDING" });
+  });
+  it("skips the pairing code when the bridge already reports connected", async () => {
+    const whatsAppPairing = { pairingCode: vi.fn() };
+    const f = fixture(undefined, whatsAppPairing);
+    await expect(f.service.connectWhatsApp(userA, "+628123456789")).resolves.toMatchObject({ blocked: false, pairing: null });
+    expect(whatsAppPairing.pairingCode).not.toHaveBeenCalled();
+  });
+  it("maps pairing provider failures to SERVICE_UNAVAILABLE without changing the stored status", async () => {
+    const whatsAppPairing = { pairingCode: vi.fn().mockRejectedValue(new Error("sidecar down")) };
+    const f = fixture(undefined, whatsAppPairing);
+    f.whatsApp.connect.mockResolvedValue({ status: "disconnected" });
+    await expect(f.service.connectWhatsApp(userA, "+628123456789")).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", status: 503 });
+  });
+  it("stops serving the pairing code after expiry or confirmation", async () => {
+    const expired = { pairingCode: vi.fn().mockResolvedValue({ code: "ABCD1234", expiresAt: new Date(Date.now() - 1000) }) };
+    const f = fixture(undefined, expired);
+    f.whatsApp.connect.mockResolvedValue({ status: "disconnected" });
+    f.repositories.integrationConnection.findUnique.mockResolvedValue({ id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "PENDING", scopes: [], connectedAt: null, externalReference: null });
+    await f.service.connectWhatsApp(userA, "+628123456789");
+    await expect(f.service.whatsappPairing(userA)).resolves.toMatchObject({ code: null });
+    const confirmed = { pairingCode: vi.fn().mockResolvedValue({ code: "ABCD1234", expiresAt: new Date(Date.now() + 600_000) }) };
+    const g = fixture(undefined, confirmed);
+    g.whatsApp.connect.mockResolvedValue({ status: "disconnected" });
+    await g.service.connectWhatsApp(userA, "+628123456789");
+    await expect(g.service.whatsappPairing(userA)).resolves.toMatchObject({ code: null, status: "CONNECTED" });
   });
 });

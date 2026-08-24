@@ -63,6 +63,9 @@ export interface HermesWhatsAppBoundary {
   disconnect?(userId: string): Promise<void>;
   send?(userId: string, recipientRef: string, message: string): Promise<{ providerMessageRef?: string }>;
 }
+export interface HermesWhatsAppPairingBoundary {
+  pairingCode?(phoneNumber: string): Promise<{ code: string; expiresAt: Date }>;
+}
 
 export interface SpotifyProviderBoundary {
   exchangeCode?(code: string, redirectUri: string): Promise<{ accessToken: string; refreshToken?: string; expiresIn: number; scopes: string[] }>;
@@ -84,6 +87,7 @@ export class IntegrationService {
     spotifyClientSecret?: string;
     spotifyCallbackUrl?: string;
     whatsApp?: HermesWhatsAppBoundary;
+    whatsAppPairing?: HermesWhatsAppPairingBoundary;
     whatsAppIdentity?: WhatsAppIdentityResolverBoundary;
     whatsAppProactiveDelivery?: (input: { userId: string; deliveryId: string; deviceId: string; text: string }) => Promise<void>;
     mobileEvents?: MobileEvents;
@@ -93,25 +97,56 @@ export class IntegrationService {
   }
 
   #refreshFlights: Map<string, Promise<string>>;
+  #pairingCodes = new Map<string, { code: string; expiresAt: Date; phoneNumber: string }>();
 
   async connection(userId: string, provider: IntegrationProvider): Promise<PublicConnection> {
     const row = await this.options.repositories.integrationConnection.findUnique({ where: { userId_provider: { userId, provider } } });
     return publicConnection(row ?? { status: IntegrationStatus.DISCONNECTED, scopes: [] }, provider === IntegrationProvider.WHATSAPP ? "whatsapp" : "spotify");
   }
 
-  async connectWhatsApp(userId: string, requestId?: string): Promise<{ connection: PublicConnection; blocked: boolean }> {
+  async connectWhatsApp(userId: string, phoneNumber: string | undefined, requestId?: string): Promise<{ connection: PublicConnection; blocked: boolean; pairing: { code: string | null; expiresAt: string | null; status: string } | null }> {
     await this.#assertWhatsAppBindingAvailable(userId);
     const result = await this.#upsertConnection(userId, IntegrationProvider.WHATSAPP, requestId);
-    if (!this.options.whatsApp?.connect) return { connection: publicConnection(result, "whatsapp"), blocked: true };
+    if (!this.options.whatsApp?.connect) return { connection: publicConnection(result, "whatsapp"), blocked: true, pairing: null };
+    if (phoneNumber !== undefined && this.options.whatsAppPairing?.pairingCode) {
+      try {
+        const external = await this.options.whatsApp.connect(userId);
+        if (external.status === "connected") {
+          const updated = await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: IntegrationStatus.CONNECTED, connectedAt: new Date(), externalReference: external.externalReference ?? null } });
+          return { connection: publicConnection(updated, "whatsapp"), blocked: false, pairing: null };
+        }
+      } catch {
+        // Bridge health is temporarily unreadable; the pairing sidecar
+        // enforces the same bridge precondition, so fall through to it.
+      }
+      try {
+        const pairing = await this.options.whatsAppPairing.pairingCode(phoneNumber);
+        const updated = await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: IntegrationStatus.PENDING } });
+        this.#pairingCodes.set(userId, { code: pairing.code, expiresAt: pairing.expiresAt, phoneNumber });
+        return { connection: publicConnection(updated, "whatsapp"), blocked: true, pairing: { code: pairing.code, expiresAt: pairing.expiresAt.toISOString(), status: IntegrationStatus.PENDING } };
+      } catch {
+        throw new P9Error("SERVICE_UNAVAILABLE", 503, "WhatsApp pairing is unavailable");
+      }
+    }
     try {
       const external = await this.options.whatsApp.connect(userId);
       const connected = external.status === "connected";
       const updated = await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: connected ? IntegrationStatus.CONNECTED : IntegrationStatus.PENDING, ...(connected ? { connectedAt: new Date() } : {}), externalReference: external.externalReference ?? null } });
-      return { connection: publicConnection(updated, "whatsapp"), blocked: !connected };
+      return { connection: publicConnection(updated, "whatsapp"), blocked: !connected, pairing: null };
     } catch {
       await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: IntegrationStatus.ERROR } });
       throw new P9Error("SERVICE_UNAVAILABLE", 503, "WhatsApp provider is unavailable");
     }
+  }
+  async whatsappPairing(userId: string): Promise<{ code: string | null; expiresAt: string | null; status: string }> {
+    const row = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
+    const status: string = row?.status ?? IntegrationStatus.DISCONNECTED;
+    const entry = this.#pairingCodes.get(userId);
+    if (!entry || entry.expiresAt.getTime() <= Date.now() || status === IntegrationStatus.CONNECTED) {
+      this.#pairingCodes.delete(userId);
+      return { code: null, expiresAt: null, status };
+    }
+    return { code: entry.code, expiresAt: entry.expiresAt.toISOString(), status };
   }
 
   async whatsappConnection(userId: string): Promise<PublicConnection> {

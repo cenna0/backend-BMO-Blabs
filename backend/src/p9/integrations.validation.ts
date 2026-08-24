@@ -44,7 +44,7 @@ export const whatsappSendConfirmSchema = z.object({
   confirmed: z.literal(true),
 }).strict();
 
-export const whatsappConnectSchema = z.object({}).strict();
+export const whatsappConnectSchema = z.object({ phoneNumber: z.string().trim().min(1).max(32).transform(normalizePhoneNumber).optional() }).strict();
 export const whatsappConfirmScannedSchema = z.object({}).strict();
 
 const spotifyActions = z.enum(["PLAY", "PLAY_TRACK", "PLAY_ARTIST", "PLAY_ALBUM", "PLAY_PLAYLIST", "PAUSE", "RESUME", "NEXT", "PREVIOUS", "TRANSFER", "SEEK", "VOLUME", "SHUFFLE", "REPEAT", "SEARCH"]);
@@ -110,6 +110,7 @@ export function parseWhatsAppConversationQuery(value: unknown) { return whatsapp
 export function parseWhatsAppRecipientResolve(value: unknown) { return whatsappRecipientResolveSchema.parse(value); }
 export function parseWhatsAppRulesPatch(value: unknown) { return whatsappRulesPatchSchema.parse(value); }
 export function parseWhatsAppSendPreview(value: unknown) { return whatsappSendPreviewSchema.parse(value); }
+export function parseWhatsAppConnect(value: unknown) { return whatsappConnectSchema.parse(value); }
 export function parseSpotifyAction(value: unknown) { return spotifyActionSchema.parse(value); }
 export function parseSpotifySearchQuery(value: unknown) { return spotifySearchQuerySchema.parse(value); }
 export function parseBugReportInput(value: unknown) { return bugReportSchema.parse(value); }

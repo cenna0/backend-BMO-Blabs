@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { P9Error } from "../errors.js";
-import { parseBugReportInput, parseSpotifyAction, parseSpotifySearchQuery, parseWhatsAppConversationQuery, parseWhatsAppRecipientResolve, parseWhatsAppRulesPatch, spotifyPreferredDeviceSchema, whatsappSendConfirmSchema, whatsappSendPreviewSchema } from "../integrations.validation.js";
+import { parseBugReportInput, parseSpotifyAction, parseSpotifySearchQuery, parseWhatsAppConnect, parseWhatsAppConversationQuery, parseWhatsAppRecipientResolve, parseWhatsAppRulesPatch, spotifyPreferredDeviceSchema, whatsappSendConfirmSchema, whatsappSendPreviewSchema } from "../integrations.validation.js";
 import type { IntegrationService } from "../services/integration.service.js";
 import type { AccessTokenService, SessionService } from "../services/session.service.js";
 import { asyncP9, currentAuth, requireAuth } from "./middleware.js";
@@ -15,8 +15,9 @@ export function createIntegrationRouter(integration: IntegrationService, accessT
   const router = Router();
   const authenticated = requireAuth(accessTokens, sessions);
 
-  router.post("/integrations/whatsapp/connect", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); response.status(202).json(await integration.connectWhatsApp(auth.userId, auth.context.requestId)); }));
+  router.post("/integrations/whatsapp/connect", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); const input = parseWhatsAppConnect(request.body ?? {}); response.status(202).json(await integration.connectWhatsApp(auth.userId, input.phoneNumber, auth.context.requestId)); }));
   router.get("/integrations/whatsapp/status", authenticated, asyncP9(async (request, response) => { response.json(await integration.whatsappConnection(currentAuth(request).userId)); }));
+  router.get("/integrations/whatsapp/pairing", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); response.json(await integration.whatsappPairing(auth.userId)); }));
   router.get("/integrations/whatsapp/conversations", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); response.json(await integration.whatsappConversations(auth.userId, parseWhatsAppConversationQuery(request.query))); }));
   router.get("/integrations/whatsapp/conversations/:id", authenticated, asyncP9(async (request, response) => { response.json(await integration.whatsappConversation(currentAuth(request).userId, queryString(request.params.id))); }));
   router.post("/integrations/whatsapp/conversations/resolve", authenticated, asyncP9(async (request, response) => { response.json(await integration.resolveWhatsAppConversation(currentAuth(request).userId, parseWhatsAppRecipientResolve(request.body))); }));
