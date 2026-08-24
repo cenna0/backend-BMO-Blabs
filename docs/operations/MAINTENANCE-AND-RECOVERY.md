@@ -64,7 +64,7 @@ the cadence only with evidence and must not silently remove these controls.
 
 ### AI/model assets
 
-- Whisper/Kokoro/RVC/model runtime changes are deliberate releases, not routine unattended updates.
+- Audio model/runtime changes are deliberate releases, not routine unattended updates.
 - Record source, exact revision/file, size, and SHA-256 in the model manifest.
 - Never replace RVC weights or runtime in place without P8-style inference/fallback/resource verification.
 
@@ -125,7 +125,7 @@ Do not mark recovery complete because processes merely exist; check the service 
 | Hermes down | inspect its existing service/user/logs | recover existing Hermes runtime; do not migrate/reinstall as a first response |
 | Hermes absent on fresh/replacement VPS | confirm absence from process/service/path/runtime/listener evidence | perform the P6 host-runtime bootstrap, restore approved portable config/data if available, bind only to `127.0.0.1:8642`, then verify health/restart/recovery evidence |
 | Backend container crash (P7+) | inspect health/log/correlation IDs | restart known image; rollback to previous SHA-tagged image if release-related |
-| Audio Service crash/OOM (P7+) | inspect model load/RAM/swap/logs | restart; preserve model cache; use Kokoro fallback only according to existing backend behavior |
+| Audio Service crash/OOM (P7+) | inspect model load/RAM/swap/logs | restart only after the health/readiness contract is checked; preserve shared model cache |
 | Model/cache corruption (P7/P8+) | compare manifest/hash | re-download exact pinned revision; do not substitute a random newer model |
 | PostgreSQL unavailable (P9+) | inspect container/storage before mutation | recover service/data; restore verified dump only when necessary |
 | PostgreSQL corruption/data loss (P9+) | freeze destructive migration/writes | restore latest verified backup and replay only known migrations |
