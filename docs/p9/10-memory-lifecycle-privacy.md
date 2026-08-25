@@ -1,27 +1,21 @@
 # Memory Lifecycle and Privacy
 
-> **HISTORICAL IMPLEMENTATION CHECKPOINT — NOT CURRENT DEPLOYMENT STATUS**
-> Preserve the privacy design; current route/runtime status is in the canonical
-> integration package.
+> **CANONICAL MEMORY LIFECYCLE & PRIVACY SPECIFICATION**
+> Current route/runtime status is in the canonical integration package (`docs/integration/05-IMPLEMENTATION-STATUS.md`).
 
-**Status:** `EXISTING_VERIFIED` at source/test tier; not candidate/public deployed.
+**Status:** `PRODUCTION_VERIFIED` — deployed and active in production P9 runtime.
 
-Chat history, memory, schedules, and provider conversations are separate domains. Chat does not become memory automatically.
+Chat history, memory, schedules, and provider conversations are separate domains with strict per-user PostgreSQL isolation.
 
 ```text
-message -> policy/redaction -> candidate -> user/policy accept|reject
-        -> curated MemoryRecord -> edit|expire|delete|forget-topic|clear-all
+chat turn -> async post-turn extraction -> policy & forget check
+          -> dedup check -> MemoryRecord (source: "conversation") & MemoryCandidate (status: "ACCEPTED")
+          -> hybrid retrieval (search + top profile backfill) -> bounded chat context
 ```
 
-- Backend and `MemoryGateway` own memory policy/storage; Hermes receives only bounded relevant context.
-- Sensitive credentials, DOB, provider tokens, Wi-Fi passwords, raw audio, and unrequested WhatsApp content are ineligible.
-- Every mutation is user-scoped, auditable, idempotent where retried, and reflected in export/deletion.
-- Clear-all and forget-topic must prevent resurfacing, not merely hide UI rows.
-- Retention defaults and legal audit floor remain explicit product/privacy gates in `25-unresolved-decisions.md`.
-
-The source runtime now registers the frozen lifecycle/settings/summary APIs.
-Candidate acceptance is explicit and idempotent; ordinary chat creates no
-candidate. Deleted, expired, forgotten, and cleared content is excluded from
-normal retrieval and bounded chat context. Summary regeneration persists an
-explicit `generating` state with runtime status `not_configured`; it does not
-invent a Hermes summary provider.
+### Privacy & Isolation Invariants
+- **Stateless LLM Engine**: Hermes global disk memory (`/home/hermes/.hermes/memories/*`) is disabled (`memory_enabled: false`, `user_profile_enabled: false`). Hermes receives only ephemeral, bounded per-turn JSON context.
+- **Strict User Scope**: Every `MemoryRecord`, `MemoryCandidate`, and `MemoryTopicForget` row belongs to exactly one `userId`. PostgreSQL queries enforce `userId = $1::uuid` and `deletedAt IS NULL`.
+- **Automatic Post-Turn Extraction**: After assistant response generation and persistence, `#extractMemoriesAsync` identifies permanent facts/preferences, filters out trivial turns and forgotten topics, dedupes against active records, and persists accepted facts to `MemoryRecord` and `MemoryCandidate`.
+- **Sensitive Data Exclusion**: Sensitive credentials, DOB, provider tokens, Wi-Fi passwords, and raw audio remain strictly ineligible for memory storage.
+- **Forget & Deletion Guarantees**: `MemoryTopicForget` rows prevent matching topics from ever being extracted or resurfacing in chat context. Soft-deleted and expired memories are immediately excluded from retrieval.

@@ -15,6 +15,10 @@ function argument(name, fallback = "") {
   return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
 }
 
+function normalizeConnectionId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{1,128}$/u.test(value) ? value : null;
+}
+
 function normalizeBare(value) {
   const raw = String(value ?? "").trim().replace(/:.*@/u, "@");
   const [bare] = raw.split("@", 1);
@@ -140,7 +144,13 @@ function readBody(request) {
   });
 }
 
-export function createIdentityResolverServer({ sessionDir, token, port = 3002, host = "127.0.0.1" }) {
+export function createIdentityResolverServer({ sessionDir, sessionsRoot, token, port = 3002, host = "127.0.0.1" }) {
+  function selectedSessionDir(connectionId) {
+    if (!sessionsRoot) return sessionDir;
+    const normalized = normalizeConnectionId(connectionId);
+    return normalized ? join(sessionsRoot, normalized) : null;
+  }
+
   const server = createServer(async (request, response) => {
     if (!request.socket.remoteAddress || !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress)) {
       json(response, 403, { error: "LOOPBACK_ONLY" });
@@ -165,12 +175,17 @@ export function createIdentityResolverServer({ sessionDir, token, port = 3002, h
         json(response, 400, { error: "INVALID_INPUT" });
         return;
       }
+      const selected = selectedSessionDir(payload.connectionId);
+      if (!selected) {
+        json(response, 400, { error: "INVALID_INPUT" });
+        return;
+      }
       const identifiers = payload.identifiers.map(normalizeInput);
       if (identifiers.some((value) => value === null)) {
         json(response, 400, { error: "INVALID_INPUT" });
         return;
       }
-      const index = buildIdentityIndex(sessionDir);
+      const index = buildIdentityIndex(selected);
       json(response, 200, { groups: expandProviderIdentities(index, identifiers) });
     } catch {
       json(response, 400, { error: "INVALID_INPUT" });
@@ -182,12 +197,13 @@ export function createIdentityResolverServer({ sessionDir, token, port = 3002, h
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const sessionDir = argument("session");
+  const sessionsRoot = argument("sessions-root");
   const tokenFile = argument("token-file");
-  if (!sessionDir || !tokenFile) process.exit(78);
+  if ((!sessionDir && !sessionsRoot) || !tokenFile) process.exit(78);
   let token;
   try { token = readFileSync(tokenFile, "utf8").trim(); } catch { process.exit(78); }
   if (Buffer.byteLength(token) < 32) process.exit(78);
-  const server = createIdentityResolverServer({ sessionDir, token, port: Number(argument("port", "3002")) });
+  const server = createIdentityResolverServer({ ...(sessionDir ? { sessionDir } : {}), ...(sessionsRoot ? { sessionsRoot } : {}), token, port: Number(argument("port", "3002")) });
   const stop = () => server.close(() => process.exit(0));
   process.on("SIGTERM", stop);
   process.on("SIGINT", stop);

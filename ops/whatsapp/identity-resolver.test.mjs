@@ -65,3 +65,19 @@ test("requires the resolver token and returns only requested equivalence groups"
   });
   deepStrictEqual(await resolved.json(), { groups: [["123@s.whatsapp.net", "456@lid"]] });
 });
+
+test("selects the identity mapping directory by connection id", async (t) => {
+  const root = fixtureDirectory();
+  const connectionA = join(root, "connection-a");
+  mkdirSync(connectionA, { recursive: true });
+  writeFileSync(join(connectionA, "lid-mapping-123.json"), JSON.stringify("456"), { mode: 0o600 });
+  const server = createIdentityResolverServer({ sessionsRoot: root, token: "r".repeat(32), port: 0 });
+  await once(server, "listening");
+  t.after(() => server.close());
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/resolve`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-bmo-identity-resolver-token": "r".repeat(32) },
+    body: JSON.stringify({ connectionId: "connection-a", identifiers: ["123@s.whatsapp.net"] }),
+  });
+  deepStrictEqual(await response.json(), { groups: [["123@s.whatsapp.net", "456@lid"]] });
+});

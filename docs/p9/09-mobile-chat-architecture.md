@@ -1,18 +1,18 @@
 # Mobile Chat and Realtime Architecture
 
-> **HISTORICAL IMPLEMENTATION CHECKPOINT — NOT CURRENT DEPLOYMENT STATUS**
-> Chat architecture remains useful context, but current production and Mobile
-> contract authority is integration `01`, `05`, and `09`.
+> **CANONICAL CHAT ARCHITECTURE SPECIFICATION**
+> Current production and Mobile contract authority is integration `01`, `05`, and `09`.
 
-**Status:** `EXISTING_VERIFIED` at source/test tier; candidate/public deployment and physical proactive speech are absent.
+**Status:** `PRODUCTION_VERIFIED` — deployed and active in production P9 runtime.
 
 - REST owns durable commands/history. `POST /chat/sessions/:sessionId/messages` returns 202 after an idempotent accepted write.
-- Mobile WSS `/api/v1/ws` authenticates independently and emits completion/status events; it is not device `/ws` and carries no audio or token-by-token LLM stream.
-- Backend persists the user message, obtains bounded curated memory, calls Hermes `/v1/responses`, persists assistant text, then emits `chat_message` with `messageId`.
+- Mobile WSS `/api/v1/ws` authenticates independently and emits completion/status events (`chat_thinking`, `chat_message`); it is not device `/ws` and carries no audio or token-by-token LLM stream.
+- Backend persists the user message, obtains bounded curated memory via `PostgresMemoryGateway` hybrid search, calls Hermes `/v1/responses`, persists assistant text, emits `chat_message`, and triggers asynchronous post-turn memory extraction.
 - Stable cursor pagination and `(user, idempotency key)` deduplication make reconnect/retry safe.
 - Temporary sessions have explicit retention/deletion behavior and never silently seed long-term memory.
 - Voice transcripts may enter history only after a physical device is bound to an owner; raw WAV and MP3 remain temporary.
 
+### Durable Worker & Lease Orchestration
 Slice 5A implements the six frozen REST routes with bearer-derived ownership,
 strict bodies, a per-user transactional advisory lock, and the existing
 `(userId, idempotencyKey)` constraints. A first request persists its user
@@ -32,32 +32,17 @@ renews its exact lease with the DB clock after context assembly and immediately
 before Hermes; a failed renewal stops without provider work. Completion and
 failure transitions also require the exact lease.
 
-Recovery launches only after the HTTP listener binds, then scans repeated
-bounded 64-row pages without making startup wait for the backlog. PostgreSQL
-applies the lower-cursor `NOT EXISTS` session-head predicate before `LIMIT`, so
-64 or more blocked upper rows cannot hide an unrelated claimable session head.
-Each returned row is
-counted only after an atomic durable claim. A page with zero claims returns and
-defers blocked ordering work instead of hot-looping; claim failures for one
-session do not prevent unrelated session heads in the scan from progressing.
-Startup and maintenance calls share one process-local recovery flight, while
-periodic maintenance retries transient query failures. Session
-deletion cancels durable operations, aborts active in-process calls, and queued
-workers must pass session/operation lease renewal before any provider call.
+### Identity Resolution & Context Assembly
+Backend builds a bounded JSON context containing:
+1. `user`: Dynamic identity resolution checks `user.displayName`; if null, checks active identity memories (topic `name` / `identity`), passing the resolved name in `displayName` or `null` if none exist.
+2. `personalization`: The seven canonical personalization fields.
+3. `memory`: Hybrid memory context from `PostgresMemoryGateway` (exact keyword search + top active profile memories backfill up to 8 items).
+4. `history`: Twelve recent messages capped at 4,000 characters each.
 
-Hermes remains an internal dependency. Backend builds a bounded JSON context
-from the seven canonical personalization fields, an explicit empty
-`ChatMemoryContextProvider` result until the memory slice exists, and twelve
-recent messages capped at 4,000 characters each. Hermes conversations are
-server-owned and isolated as `chat:<userId>:<sessionId>`; URL, API key, database
-configuration, and client-supplied identity never enter the mobile response or
-context. The existing sanitizer and a local hard deadline protect persisted
-assistant output. Provider failures persist only `HERMES_FAILED` and safe audit
-metadata. Mobile events are best effort after durable state; REST history is
-the recovery authority.
+### Provider Call & Memory Extraction
+Hermes is an internal stateless generation engine (`memory_enabled: false` on daemon). Hermes calls are isolated with server-owned conversation IDs (`chat:<userId>:<sessionId>`) and session keys (`X-Hermes-Session-Key: bmo:user:<userId>`).
 
-Deletion is a soft delete because retention/purge defaults remain open. The
-slice rejects `speakOnDevice:true` with a sanitized service-unavailable result
-until generic proactive delivery is available; no physical protocol was added.
-
-All endpoints/events are enumerated in the integration coverage matrix.
+After assistant message persistence and realtime emission:
+- `#extractMemoriesAsync` executes asynchronously in the background.
+- Identifies factual statements/preferences from non-trivial user turns.
+- Checks against `MemoryTopicForget`, dedupes against active records, and persists accepted facts to `MemoryRecord` (`source: "conversation"`) and `MemoryCandidate` (`status: "ACCEPTED"`).

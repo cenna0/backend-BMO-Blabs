@@ -4,6 +4,12 @@
 services:
   backend:
     image: ${P9_CANDIDATE_IMAGE:?Set P9_CANDIDATE_IMAGE to the verified candidate backend image}
+    user: "0"
+    entrypoint:
+      - node
+      - dist/src/p9/entrypoint.js
+    group_add:
+      - "70"
     environment:
       AUDIO_SERVICE_URL: http://127.0.0.1:8002
 
@@ -14,7 +20,7 @@ services:
         required: true
     environment:
       AUDIO_SERVICE_HOST: 0.0.0.0
-      AUDIO_SERVICE_PORT: "8002"
+      AUDIO_SERVICE_PORT: "8001"
       MODEL_DOWNLOAD_ALLOWED: "false"
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
@@ -31,7 +37,7 @@ services:
       XDG_CACHE_HOME: /opt/bmo/cache/audio/xdg
       TTS_TEMP_DIR: /opt/bmo/temp/tts-candidate
     ports:
-      - target: 8002
+      - target: 8001
         published: "8002"
         host_ip: 127.0.0.1
         protocol: tcp
@@ -68,7 +74,7 @@ services:
       - no-new-privileges:true
     restart: "no"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/livez', timeout=2).read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/livez', timeout=2).read()"]
       interval: 10s
       timeout: 3s
       start_period: 30s

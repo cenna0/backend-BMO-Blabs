@@ -11,6 +11,7 @@ import { UserService } from "./services/user.service.js";
 import { DeviceBindingService, type ApplicationDeviceBinding } from "./services/device-binding.service.js";
 import { createP9Router } from "./http/router.js";
 import type { Router } from "express";
+import type { Logger } from "pino";
 import { areRequiredP9MigrationsFinished } from "./migration-manifest.js";
 import { RecoveryService } from "./services/recovery.service.js";
 import { ProfileService } from "./services/profile.service.js";
@@ -64,6 +65,7 @@ export interface P9RuntimeOptions {
   hermes?: HermesGenerateClient;
   mobileEvents?: MobileEventPublisher;
   chatHardTimeoutMs?: number;
+  logger?: Logger;
 }
 
 const unavailableHermes: HermesGenerateClient = {
@@ -120,7 +122,7 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
   });
   const deviceBinding = new DeviceBindingService(repositories);
   const memoryGateway = new PostgresMemoryGateway(repositories);
-  const memory = new MemoryService({ client, repositories });
+  const memory = new MemoryService({ client, repositories, hermes: options.hermes });
   const proactive = new ProactiveDeliveryService({ client, repositories, mobileEvents: options.mobileEvents ?? noMobileEvents });
   if (!config.wifiEncryptionKey) throw new Error("P9 runtime requires P9_WIFI_ENCRYPTION_KEY");
   const deviceAdditions = new DeviceAdditionsService({ client, repositories, encryptionKey: decodeWifiEncryptionKey(config.wifiEncryptionKey), deviceEvents: { sendToDevice: () => false } });
@@ -158,7 +160,16 @@ export function createP9Runtime(config: P9Config, options: P9RuntimeOptions = {}
       });
     },
   });
-  const bugReports = new BugReportService({ client, repositories, storageDir: config.bugReportStorageDir });
+  const bugReports = new BugReportService({
+    client,
+    repositories,
+    storageDir: config.bugReportStorageDir,
+    resendApiKey: config.resendApiKey,
+    supportNotificationEmail: config.supportNotificationEmail,
+    supportNotificationEmails: config.supportNotificationEmails,
+    supportFromEmail: config.supportFromEmail,
+    logger: options.logger,
+  });
   const chat = new ChatService({
     client,
     repositories,

@@ -152,10 +152,10 @@ describe("Spotify IntegrationService", () => {
 
   it("rejects expired, reused, and provider-denied OAuth callbacks after state validation", async () => {
     const f = fixture();
-    f.repositories.oAuthState.findFirst.mockResolvedValue({ id: "oauth", userId: userA, redirectUri: "https://api.personalbmo.web.id/api/v1/integrations/spotify/callback", expiresAt: f.now, usedAt: null });
-    f.repositories.oAuthState.updateMany.mockResolvedValue({ count: 0 });
+    f.repositories.oAuthState.findFirst.mockResolvedValue({ id: "oauth", userId: userA, redirectUri: "https://api.personalbmo.web.id/api/v1/integrations/spotify/callback", expiresAt: f.now, usedAt: f.now });
+    f.repositories.integrationConnection.findUnique.mockResolvedValue({ status: "DISCONNECTED" });
     await expect(f.service.spotifyCallback("a".repeat(64), "code")).rejects.toMatchObject({ code: "AUTHENTICATION_FAILED" });
-    f.repositories.oAuthState.updateMany.mockResolvedValue({ count: 1 });
+    f.repositories.oAuthState.findFirst.mockResolvedValue({ id: "oauth", userId: userA, redirectUri: "https://api.personalbmo.web.id/api/v1/integrations/spotify/callback", expiresAt: f.now, usedAt: null });
     await expect(f.service.spotifyCallback("a".repeat(64), undefined, "access_denied")).rejects.toMatchObject({ code: "CONFLICT" });
     f.repositories.oAuthState.findFirst.mockResolvedValue(null);
     await expect(f.service.spotifyCallback("a".repeat(64), "code")).rejects.toMatchObject({ code: "AUTHENTICATION_FAILED" });
@@ -179,7 +179,7 @@ describe("Spotify IntegrationService", () => {
       spotify: f.spotify as any,
     });
 
-    await expect(service.spotifyCallback("a".repeat(64), "authorization-code")).resolves.toEqual({ ok: true });
+    await expect(service.spotifyCallback("a".repeat(64), "authorization-code")).resolves.toEqual({ ok: true, returnTo: "bmomobile://plugin-detail?id=spotify" });
     expect(f.spotify.currentUser).toHaveBeenCalledWith("callback-access");
     expect(f.repositories.spotifyCredential.upsert).toHaveBeenCalledWith(expect.objectContaining({
       create: expect.objectContaining({

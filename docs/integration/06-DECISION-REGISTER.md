@@ -1,8 +1,11 @@
+> **HISTORICAL ONLY — DO NOT IMPLEMENT**
+> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+
 # Integration Decision Register
 
 **Frozen:** 2026-08-11
 
-**Current update:** Decisions INT-061 through INT-072 below record the
+**Current update:** Decisions INT-061 through INT-073 below record the
 post-promotion production and Mobile documentation state. Older entries retain
 their historical meaning unless explicitly superseded.
 
@@ -51,6 +54,7 @@ their historical meaning unless explicitly superseded.
 | INT-070 | `OPERATOR_BEARER` on WhatsApp QR/confirm rows is a product/UI policy label. Current source uses ordinary authenticated-user middleware and has no distinct operator RBAC role. | Ordinary Mobile UI still must not expose or call the QR/confirm setup routes; docs must not invent source-enforced RBAC. |
 | INT-071 | Login and pairing rate-limit state is process-local and acceptable for the current single-Backend production topology. | A future multi-replica Backend requires shared/distributed rate-limit state; this scaling note is not a current outage. |
 | INT-072 (supersedes the login portion of INT-071) | `POST /api/v1/auth/login` no longer has a Backend frequency rate limiter. Registration and all other existing rate limits remain unchanged. Pairing rate-limit behavior from INT-071 remains unchanged and process-local. No database migration or Mobile request/response schema change is required. | Remove only the local login frequency throttle while preserving registration, pairing, and every other protection. |
+| INT-073 | Memory & Identity Isolation: Hermes global disk memory (`/home/hermes/.hermes/memories/*`) is disabled and purged. Persistent memory is exclusively isolated in per-user PostgreSQL tables (`MemoryRecord`, `MemoryCandidate`). Backend implements automated post-turn memory extraction, hybrid context retrieval (keyword search + top active profile backfill), and dynamic identity fallback in `#buildContext`. | Prevent cross-user state leaks on disk and ensure consistent memory recall across new chat sessions. |
 | INT-047 | Prisma Studio on `*:5555` is a security blocker and is not part of declared production architecture. | Close before Phase 2/deploy. |
 | INT-048 (superseded by current source/integration authority) | `docs/product/BMO-BY-BLABS-PRD-v1.4.0.md` is a frozen product snapshot; v1.2.4 remains the locked historical baseline. | Current runtime/API/status authority is source plus integration `00`, `01`, `02`, `03`, `05`, `06`, `08`, and `09`; preserve PRD history without treating freeze-time status as current. |
 

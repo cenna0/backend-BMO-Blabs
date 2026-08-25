@@ -32,7 +32,7 @@ export function preferredWhatsAppDestination(values: string[]): string | null {
 }
 
 export interface WhatsAppIdentityResolverBoundary {
-  expand(providerRefs: string[]): Promise<string[]>;
+  expand(connectionId: string, providerRefs: string[]): Promise<string[]>;
 }
 
 interface HermesWhatsAppIdentityResolverOptions {
@@ -55,7 +55,7 @@ export class HermesWhatsAppIdentityResolverClient implements WhatsAppIdentityRes
     this.#timeoutMs = options.timeoutMs ?? 3_000;
   }
 
-  async expand(providerRefs: string[]): Promise<string[]> {
+  async expand(connectionId: string, providerRefs: string[]): Promise<string[]> {
     const requested = unique(providerRefs.map(providerIdentity).filter((value): value is string => value !== null));
     if (requested.length === 0 || !this.#baseUrl || !this.#token) return requested;
     const controller = new AbortController();
@@ -69,7 +69,7 @@ export class HermesWhatsAppIdentityResolverClient implements WhatsAppIdentityRes
           "content-type": "application/json",
           "x-bmo-identity-resolver-token": this.#token,
         },
-        body: JSON.stringify({ identifiers: requested }),
+        body: JSON.stringify({ connectionId, identifiers: requested }),
       });
       if (!response.ok) return requested;
       const payload: unknown = await response.json();

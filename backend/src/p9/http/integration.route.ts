@@ -1,7 +1,8 @@
 import { Router } from "express";
 
 import { P9Error } from "../errors.js";
-import { parseBugReportInput, parseSpotifyAction, parseSpotifySearchQuery, parseWhatsAppConnect, parseWhatsAppConversationQuery, parseWhatsAppRecipientResolve, parseWhatsAppRulesPatch, spotifyPreferredDeviceSchema, whatsappSendConfirmSchema, whatsappSendPreviewSchema } from "../integrations.validation.js";
+import { parseBugReportInput, parseSpotifyAction, parseSpotifyConnect, parseSpotifySearchQuery, parseWhatsAppConnect, parseWhatsAppConversationQuery, parseWhatsAppRecipientResolve, parseWhatsAppRulesPatch, spotifyPreferredDeviceSchema, whatsappSendConfirmSchema, whatsappSendPreviewSchema } from "../integrations.validation.js";
+import { DEFAULT_SPOTIFY_CLIENT_RETURN, spotifyClientReturnHtml } from "../spotify-return.js";
 import type { IntegrationService } from "../services/integration.service.js";
 import type { AccessTokenService, SessionService } from "../services/session.service.js";
 import { asyncP9, currentAuth, requireAuth } from "./middleware.js";
@@ -29,7 +30,7 @@ export function createIntegrationRouter(integration: IntegrationService, accessT
   router.post("/integrations/whatsapp/send-preview", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); response.status(201).json({ send: await integration.whatsappPreview(auth.userId, whatsappSendPreviewSchema.parse(request.body), auth.context.requestId) }); }));
   router.post("/integrations/whatsapp/send-confirm", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); const input = whatsappSendConfirmSchema.parse(request.body); response.json({ send: await integration.whatsappConfirm(auth.userId, input.requestId, auth.context.requestId) }); }));
 
-  router.post("/integrations/spotify/connect", authenticated, asyncP9(async (request, response) => { response.json(await integration.spotifyConnect(currentAuth(request).userId)); }));
+  router.post("/integrations/spotify/connect", authenticated, asyncP9(async (request, response) => { const input = parseSpotifyConnect(request.body ?? {}); response.json(await integration.spotifyConnect(currentAuth(request).userId, input.returnTo)); }));
   router.get("/integrations/spotify/status", authenticated, asyncP9(async (request, response) => { response.json(await integration.connection(currentAuth(request).userId, "SPOTIFY" as any)); }));
   router.get("/integrations/spotify/search", authenticated, asyncP9(async (request, response) => {
     const searchQuery = parseSpotifySearchQuery(request.query);
@@ -46,7 +47,17 @@ export function createIntegrationRouter(integration: IntegrationService, accessT
   router.get("/integrations/spotify/playback", authenticated, asyncP9(async (request, response) => { response.json({ playback: await integration.spotifyPlayback(currentAuth(request).userId) }); }));
   router.put("/integrations/spotify/preferred-device", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); const input = spotifyPreferredDeviceSchema.parse(request.body); response.json(await integration.spotifyPreferredDevice(auth.userId, input.deviceId)); }));
   router.post("/integrations/spotify/actions", authenticated, asyncP9(async (request, response) => { const auth = currentAuth(request); response.status(202).json({ action: await integration.spotifyAction(auth.userId, parseSpotifyAction(request.body), auth.context.requestId) }); }));
-  router.get("/integrations/spotify/callback", asyncP9(async (request, response) => { await integration.spotifyCallback(queryString(request.query.state), typeof request.query.code === "string" ? request.query.code : undefined, typeof request.query.error === "string" ? request.query.error : undefined); response.status(200).send("Spotify connection completed. You may return to BMO."); }));
+  router.get("/integrations/spotify/callback", async (request, response) => {
+    try {
+      const result = await integration.spotifyCallback(queryString(request.query.state), typeof request.query.code === "string" ? request.query.code : undefined, typeof request.query.error === "string" ? request.query.error : undefined);
+      response.status(200).type("html").send(spotifyClientReturnHtml(result.returnTo, true));
+    } catch (error) {
+      const code = error instanceof P9Error ? error.code : "CALLBACK_FAILED";
+      const message = error instanceof Error ? error.message : "Spotify callback failed";
+      console.error(JSON.stringify({ msg: "spotify.callback.failed", code, message }));
+      response.status(200).type("html").send(spotifyClientReturnHtml(DEFAULT_SPOTIFY_CLIENT_RETURN, false, `${code}: ${message}`));
+    }
+  });
   router.get("/plugins", authenticated, asyncP9(async (request, response) => { response.json({ items: await integration.pluginCatalog(currentAuth(request).userId) }); }));
   return router;
 }

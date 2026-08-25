@@ -72,6 +72,7 @@ function fixture(whatsAppIdentity?: any, whatsAppPairing?: any) {
     status: vi.fn().mockResolvedValue({ status: "connected", queueLength: 0, uptime: 1, scriptHash: "bridge-hash", sendReadReceipts: false }),
     poll: vi.fn().mockResolvedValue([{ messageId: "message-1", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "hello", isGroup: false }]),
     send: vi.fn().mockResolvedValue({ providerMessageRef: "out-1" }),
+    disconnect: vi.fn().mockResolvedValue(undefined),
   };
   const service = new IntegrationService({ client: {} as any, repositories, publicBaseUrl: "http://127.0.0.1:3010", whatsApp: whatsApp as any, ...(whatsAppIdentity ? { whatsAppIdentity } : {}), ...(whatsAppPairing ? { whatsAppPairing } : {}), whatsAppProactiveDelivery: proactive, mobileEvents });
   return { repositories, whatsApp, whatsAppPairing, proactive, mobileEvents, service, delivery, aliases, conversation, now };
@@ -101,28 +102,90 @@ describe("WhatsApp IntegrationService", () => {
     const f = fixture();
 
     await expect(f.service.connectWhatsApp(userA, undefined)).resolves.toMatchObject({ blocked: false, connection: { status: "CONNECTED" } });
-    expect(f.whatsApp.connect).toHaveBeenCalledWith(userA);
+    expect(f.whatsApp.connect).toHaveBeenCalledWith(connectionA);
 
     f.whatsApp.status.mockResolvedValue({ status: "disconnected", queueLength: 0, uptime: 1, scriptHash: "bridge-hash", sendReadReceipts: false });
-    await expect(f.service.whatsappConnection(userA)).resolves.toMatchObject({ status: "ERROR" });
-    expect(f.repositories.integrationConnection.update).toHaveBeenCalledWith({ where: { id: connectionA }, data: { status: "ERROR" } });
+    await expect(f.service.whatsappConnection(userA)).resolves.toMatchObject({ status: "DISCONNECTED" });
+    expect(f.repositories.integrationConnection.update).toHaveBeenCalledWith({ where: { id: connectionA }, data: expect.objectContaining({ status: "DISCONNECTED", disconnectedAt: expect.any(Date) }) });
   });
 
-  it("rejects a second owner from claiming the single Hermes session or sending through it", async () => {
+  it("auto-promotes pending connection to connected when bridge reports connected during status check", async () => {
     const f = fixture();
-    await expect(f.service.connectWhatsApp(userB, undefined)).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
-    expect(f.whatsApp.connect).not.toHaveBeenCalled();
+    const pendingConnection = { id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "PENDING", scopes: [], connectedAt: null };
+    f.repositories.integrationConnection.findUnique.mockResolvedValue(pendingConnection);
+    f.repositories.integrationConnection.findUniqueOrThrow.mockResolvedValue(pendingConnection);
+    f.whatsApp.status.mockResolvedValue({ status: "connected", queueLength: 0, uptime: 10, scriptHash: "bridge-hash", sendReadReceipts: false });
+
+    const result = await f.service.whatsappConnection(userA);
+
+    expect(result).toMatchObject({ provider: "whatsapp", status: "CONNECTED" });
+    expect(f.repositories.integrationConnection.update).toHaveBeenCalledWith({
+      where: { id: connectionA },
+      data: expect.objectContaining({ status: "CONNECTED", connectedAt: expect.any(Date), disconnectedAt: null }),
+    });
+    expect(f.repositories.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "whatsapp.status",
+        resourceType: "integration",
+        resourceId: connectionA,
+        userId: userA,
+      }),
+    });
+  });
+
+  it("binds a second owner to a separate WhatsApp connection and preserves conversation ownership", async () => {
+    const f = fixture();
+    const connectionB = { id: "00000000-0000-4000-8000-000000000011", userId: userB, provider: IntegrationProvider.WHATSAPP, status: "DISCONNECTED", scopes: [], connectedAt: null };
+    f.repositories.integrationConnection.findUnique.mockImplementation(async ({ where }: any) => where.userId_provider?.userId === userB ? connectionB : { ...f.delivery, id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "CONNECTED", scopes: [], connectedAt: now });
+    f.repositories.integrationConnection.findUniqueOrThrow.mockResolvedValue(connectionB);
+
+    await expect(f.service.connectWhatsApp(userB, undefined)).resolves.toMatchObject({ connection: { status: "CONNECTED" } });
+    expect(f.whatsApp.connect).toHaveBeenCalledWith(connectionB.id);
 
     f.repositories.integrationConnection.findUnique.mockResolvedValue({ ...f.delivery, id: "foreign-row", userId: userB, provider: IntegrationProvider.WHATSAPP, status: "DISCONNECTED" });
     await expect(f.service.whatsappPreview(userB, { conversationId: conversationA, message: "not yours", idempotencyKey: "wa-foreign" })).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
   });
 
-  it("keeps the persistent Hermes identity bound after BMO metadata disconnect", async () => {
+  it("polls each connected WhatsApp connection and routes inbound data to its owner", async () => {
+    const f = fixture();
+    const connectionB = "00000000-0000-4000-8000-000000000011";
+    const userBConnection = { id: connectionB, userId: userB, provider: IntegrationProvider.WHATSAPP, status: "CONNECTED", scopes: [] };
+    f.repositories.integrationConnection.findMany.mockResolvedValue([
+      { id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "CONNECTED" },
+      userBConnection,
+    ]);
+    f.repositories.whatsAppNotificationRule.findMany.mockResolvedValue([]);
+    f.repositories.whatsAppConversation.findFirst.mockImplementation(async ({ where }: any) => where.connectionId === connectionB ? null : f.conversation);
+    f.whatsApp.poll.mockImplementation(async (connectionId: string) => [{
+      messageId: connectionId === connectionA ? "message-a" : "message-b",
+      chatId: connectionId === connectionA ? "123@s.whatsapp.net" : "456@s.whatsapp.net",
+      senderId: connectionId === connectionA ? "123@s.whatsapp.net" : "456@s.whatsapp.net",
+      body: connectionId === connectionA ? "hello A" : "hello B",
+      isGroup: false,
+    }]);
+
+    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 2, queued: 0 });
+    expect(f.whatsApp.poll).toHaveBeenCalledWith(connectionA);
+    expect(f.whatsApp.poll).toHaveBeenCalledWith(connectionB);
+    expect(f.repositories.whatsAppDelivery.create).toHaveBeenCalledWith({ data: expect.objectContaining({ userId: userA, connectionId: connectionA, providerMessageRef: "message-a" }) });
+    expect(f.repositories.whatsAppDelivery.create).toHaveBeenCalledWith({ data: expect.objectContaining({ userId: userB, connectionId: connectionB, providerMessageRef: "message-b" }) });
+  });
+
+  it("allows another user to connect after a different user's metadata disconnect", async () => {
     const f = fixture();
     f.repositories.integrationConnection.findMany.mockResolvedValue([{ id: connectionA, userId: userA, provider: IntegrationProvider.WHATSAPP, status: "DISCONNECTED", externalReference: "bridge:bound" }]);
 
-    await expect(f.service.connectWhatsApp(userB, undefined)).rejects.toMatchObject({ code: "OWNERSHIP_DENIED", status: 404 });
-    expect(f.whatsApp.connect).not.toHaveBeenCalled();
+    await expect(f.service.connectWhatsApp(userB, undefined)).resolves.toMatchObject({ blocked: false, connection: { status: "CONNECTED" } });
+    expect(f.whatsApp.connect).toHaveBeenCalled();
+  });
+
+  it("unlinks Hermes and clears the bound identity on disconnect", async () => {
+    const f = fixture();
+    await expect(f.service.disconnectWhatsApp(userA)).resolves.toBeUndefined();
+    expect(f.whatsApp.disconnect).toHaveBeenCalledWith(connectionA);
+    expect(f.repositories.integrationConnection.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "DISCONNECTED", externalReference: null }),
+    }));
   });
 
   it("allows a new owner to claim an unbound stale pending metadata row", async () => {
@@ -134,10 +197,10 @@ describe("WhatsApp IntegrationService", () => {
     f.repositories.integrationConnection.findUniqueOrThrow.mockResolvedValue(current);
 
     await expect(f.service.connectWhatsApp(userA, undefined)).resolves.toMatchObject({ blocked: false, connection: { status: "CONNECTED" } });
-    expect(f.whatsApp.connect).toHaveBeenCalledWith(userA);
+    expect(f.whatsApp.connect).toHaveBeenCalledWith(connectionA);
   });
 
-  it("deduplicates provider message IDs and rejects ambiguous multi-owner sessions", async () => {
+  it("deduplicates provider message IDs independently for each owner connection", async () => {
     const f = fixture();
     f.repositories.whatsAppDelivery.findFirst.mockResolvedValue(f.delivery);
     await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 0, queued: 0 });
@@ -149,8 +212,8 @@ describe("WhatsApp IntegrationService", () => {
     ]);
     f.repositories.whatsAppDelivery.findFirst.mockResolvedValue(null);
     f.whatsApp.poll.mockResolvedValue([{ messageId: "message-2", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "secret", isGroup: false }]);
-    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 0, queued: 0 });
-    expect(f.proactive).not.toHaveBeenCalled();
+    await expect(f.service.pollWhatsApp()).resolves.toEqual({ processed: 2, queued: 2 });
+    expect(f.proactive).toHaveBeenCalledTimes(2);
   });
 
   it("ingests a group event but keeps it non-notifiable by default", async () => {
@@ -266,7 +329,7 @@ describe("WhatsApp IntegrationService", () => {
     expect(f.repositories.whatsAppSendRequest.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: conversationA, opaqueRecipientRef: "123@s.whatsapp.net" }) });
 
     await expect(f.service.whatsappConfirm(userA, sendRequestA)).resolves.toMatchObject({ id: sendRequestA, status: "SUCCEEDED", conversationId: conversationA });
-    expect(f.whatsApp.send).toHaveBeenCalledWith(userA, "123@s.whatsapp.net", "bounded outbound");
+    expect(f.whatsApp.send).toHaveBeenCalledWith(connectionA, "123@s.whatsapp.net", "bounded outbound");
     expect(f.repositories.whatsAppDelivery.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: conversationA, sendRequestId: sendRequestA, direction: "OUTBOUND" }) });
   });
 
@@ -375,7 +438,7 @@ describe("WhatsApp IntegrationService", () => {
     const f = fixture(whatsAppIdentity);
 
     await expect(f.service.resolveWhatsAppConversation(userA, { phoneNumber: "+123" })).resolves.toMatchObject({ id: conversationA });
-    expect(whatsAppIdentity.expand).toHaveBeenCalledWith(["123@s.whatsapp.net"]);
+    expect(whatsAppIdentity.expand).toHaveBeenCalledWith(connectionA, ["123@s.whatsapp.net"]);
     expect(f.repositories.whatsAppConversationAlias.create).toHaveBeenCalledWith({ data: expect.objectContaining({ conversationId: conversationA, providerRef: "456@lid" }) });
 
     f.repositories.whatsAppDelivery.findFirst.mockResolvedValue(null);
@@ -405,7 +468,7 @@ describe("WhatsApp IntegrationService", () => {
       errorCode: null,
     });
     await expect(f.service.whatsappConfirm(userA, sendRequestA)).resolves.toMatchObject({ conversationId: conversationA });
-    expect(f.whatsApp.send).toHaveBeenCalledWith(userA, "456@lid", "mapped outbound");
+    expect(f.whatsApp.send).toHaveBeenCalledWith(connectionA, "456@lid", "mapped outbound");
   });
 
   it("issues an 8-digit pairing code for a phone number and keeps the connection pending", async () => {
@@ -419,7 +482,7 @@ describe("WhatsApp IntegrationService", () => {
       pairing: { code: "ABCD1234", status: "PENDING" },
       connection: { status: "PENDING" },
     });
-    expect(whatsAppPairing.pairingCode).toHaveBeenCalledWith("+628123456789");
+    expect(whatsAppPairing.pairingCode).toHaveBeenCalledWith(connectionA, "+628123456789");
     expect(f.repositories.integrationConnection.update).toHaveBeenCalledWith({ where: { id: connectionA }, data: { status: IntegrationStatus.PENDING } });
     await expect(f.service.whatsappPairing(userA)).resolves.toMatchObject({ code: "ABCD1234", status: "PENDING" });
   });

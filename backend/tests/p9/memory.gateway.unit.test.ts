@@ -19,11 +19,48 @@ describe("PostgresMemoryGateway", () => {
     });
   });
 
-  it("returns safe empty context for blank queries without touching storage", async () => {
+  it("backfills top active memories when keyword search returns fewer than limit", async () => {
+    const searchActiveMemories = vi.fn().mockResolvedValue([
+      "Finn lives in Jakarta",
+    ]);
+    const listTopActiveMemories = vi.fn().mockResolvedValue([
+      "Suka makan ayam",
+      "Nama user adalah Rangga",
+    ]);
+    const gateway = new PostgresMemoryGateway({
+      searchActiveMemories,
+      listTopActiveMemories,
+    } as any);
+
+    const result = await gateway.search("owner", "Jakarta", 3);
+    expect(result).toEqual([
+      "Finn lives in Jakarta",
+      "Suka makan ayam",
+      "Nama user adalah Rangga",
+    ]);
+    expect(searchActiveMemories).toHaveBeenCalledWith({
+      userId: "owner", terms: ["Jakarta"], limit: 3,
+    });
+    expect(listTopActiveMemories).toHaveBeenCalledWith({
+      userId: "owner", limit: 2, excludeContents: ["Finn lives in Jakarta"],
+    });
+  });
+
+  it("backfills top active memories for blank queries without keyword search", async () => {
     const searchActiveMemories = vi.fn();
-    const gateway = new PostgresMemoryGateway({ searchActiveMemories } as any);
-    await expect(gateway.search("owner", "   ", 8)).resolves.toEqual([]);
+    const listTopActiveMemories = vi.fn().mockResolvedValue([
+      "Suka makan ayam",
+      "Nama user adalah Rangga",
+    ]);
+    const gateway = new PostgresMemoryGateway({ searchActiveMemories, listTopActiveMemories } as any);
+    await expect(gateway.search("owner", "   ", 8)).resolves.toEqual([
+      "Suka makan ayam",
+      "Nama user adalah Rangga",
+    ]);
     expect(searchActiveMemories).not.toHaveBeenCalled();
+    expect(listTopActiveMemories).toHaveBeenCalledWith({
+      userId: "owner", limit: 8, excludeContents: [],
+    });
   });
 
   it("excludes durable forgotten topics from chat retrieval", async () => {
@@ -51,5 +88,23 @@ describe("PostgresMemoryGateway", () => {
     expect(sql).toContain('lower(forgotten."normalizedTopic") = lower(memory.topic)');
     expect(sql).toContain('ORDER BY memory.importance DESC, memory."updatedAt" DESC, memory.id ASC');
     expect(values).toEqual(["owner-id", ["travel"], 8]);
+  });
+
+  it("implements listTopActiveMemories as owner-scoped parameterized SQL with exclusion", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([{ normalizedContent: "top memory" }]);
+    const repositories = new P9Repositories({ $queryRaw: queryRaw } as any);
+
+    await expect(repositories.listTopActiveMemories({ userId: "owner-id", limit: 5, excludeContents: ["already matched"] }))
+      .resolves.toEqual(["top memory"]);
+
+    const [strings, ...values] = queryRaw.mock.calls[0]!;
+    const sql = Array.from(strings as TemplateStringsArray).join("?");
+    expect(sql).toContain('memory."userId" = ?::uuid');
+    expect(sql).toContain('memory."deletedAt" IS NULL');
+    expect(sql).toContain('memory."expiresAt" > clock_timestamp()');
+    expect(sql).toContain('FROM "MemoryTopicForget" AS forgotten');
+    expect(sql).toContain('memory."normalizedContent" NOT IN (SELECT unnest(?::text[]))');
+    expect(sql).toContain('ORDER BY memory.importance DESC, memory."updatedAt" DESC, memory.id ASC');
+    expect(values).toEqual(["owner-id", ["already matched"], 5]);
   });
 });

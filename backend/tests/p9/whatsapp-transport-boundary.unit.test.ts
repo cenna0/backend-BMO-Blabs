@@ -8,7 +8,9 @@ const testsDir = dirname(fileURLToPath(import.meta.url));
 const backendRoot = join(testsDir, "../..");
 const sourceRoot = join(backendRoot, "src");
 const launcherPath = join(backendRoot, "../ops/whatsapp/bmo-whatsapp-bridge-launcher");
+const managerPath = join(backendRoot, "../ops/whatsapp/bmo-whatsapp-bridge-manager.mjs");
 const unitPath = join(backendRoot, "../ops/whatsapp/systemd/bmo-whatsapp-bridge.service");
+const pairingUnitPath = join(backendRoot, "../ops/whatsapp/systemd/bmo-whatsapp-pairing-manager.service");
 const resolverUnitPath = join(backendRoot, "../ops/whatsapp/systemd/bmo-whatsapp-identity-resolver.service");
 const runbookPath = join(backendRoot, "../ops/whatsapp/README.md");
 
@@ -29,7 +31,9 @@ describe("WhatsApp transport-only boundary", () => {
 
   it("keeps the dedicated runtime out of the destructive queue and shared Hermes unit", () => {
     const launcher = readFileSync(launcherPath, "utf8");
+    const manager = readFileSync(managerPath, "utf8");
     const unit = readFileSync(unitPath, "utf8");
+    const pairingUnit = readFileSync(pairingUnitPath, "utf8");
     const runbook = readFileSync(runbookPath, "utf8");
     expect(launcher).not.toMatch(/\/messages/u);
     expect(launcher).toContain("--port 3001");
@@ -45,6 +49,10 @@ describe("WhatsApp transport-only boundary", () => {
     expect(runbook).toContain("not a separate bot number");
     expect(launcher).toContain("export WHATSAPP_GROUP_POLICY=disabled");
     expect(unit).not.toMatch(/\/messages/u);
+    expect(unit).toContain("bmo-whatsapp-bridge-manager");
+    expect(manager).toContain("/connections");
+    expect(manager).toContain("--session");
+    expect(pairingUnit).toContain("bmo-whatsapp-pairing-manager");
     expect(unit).not.toMatch(/hermes-gateway\.service/u);
     expect(unit).toContain("User=hermes");
     expect(unit).toContain("Restart=on-failure");

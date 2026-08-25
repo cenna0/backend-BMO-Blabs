@@ -7,6 +7,7 @@ import { P9Error } from "../errors.js";
 import { decryptProviderToken, encryptProviderToken } from "../integrations.crypto.js";
 import { parseSpotifyAction, parseWhatsAppRulesPatch } from "../integrations.validation.js";
 import { SpotifyProviderError, type SpotifyCurrentUser, type SpotifySearchType } from "../providers/spotify.client.js";
+import { sanitizeSpotifyClientReturnUrl } from "../spotify-return.js";
 import type { HermesWhatsAppMessage } from "../providers/hermes-whatsapp.client.js";
 import { HermesWhatsAppProviderError } from "../providers/hermes-whatsapp.client.js";
 import { preferredWhatsAppDestination, type WhatsAppIdentityResolverBoundary } from "../providers/hermes-whatsapp-identity.client.js";
@@ -55,16 +56,16 @@ function uniqueProviderRefs(values: string[]): string[] {
 }
 
 export interface HermesWhatsAppBoundary {
-  connect?(userId: string): Promise<{ externalReference?: string; status?: string }>;
-  status?(): Promise<{ status: string; queueLength: number; uptime: number | null; scriptHash: string | null; sendReadReceipts: boolean | null }>;
-  poll?(): Promise<HermesWhatsAppMessage[]>;
-  qr?(userId: string): Promise<{ qr: string | null; expiresAt: Date | null }>;
-  confirmScanned?(userId: string): Promise<void>;
-  disconnect?(userId: string): Promise<void>;
-  send?(userId: string, recipientRef: string, message: string): Promise<{ providerMessageRef?: string }>;
+  connect?(connectionId: string): Promise<{ externalReference?: string; status?: string }>;
+  status?(connectionId: string): Promise<{ status: string; queueLength: number; uptime: number | null; scriptHash: string | null; sendReadReceipts: boolean | null }>;
+  poll?(connectionId: string): Promise<HermesWhatsAppMessage[]>;
+  qr?(connectionId: string): Promise<{ qr: string | null; expiresAt: Date | null }>;
+  confirmScanned?(connectionId: string): Promise<void>;
+  disconnect?(connectionId: string): Promise<void>;
+  send?(connectionId: string, recipientRef: string, message: string): Promise<{ providerMessageRef?: string }>;
 }
 export interface HermesWhatsAppPairingBoundary {
-  pairingCode?(phoneNumber: string): Promise<{ code: string; expiresAt: Date }>;
+  pairingCode?(connectionId: string, phoneNumber: string): Promise<{ code: string; expiresAt: Date }>;
 }
 
 export interface SpotifyProviderBoundary {
@@ -105,12 +106,11 @@ export class IntegrationService {
   }
 
   async connectWhatsApp(userId: string, phoneNumber: string | undefined, requestId?: string): Promise<{ connection: PublicConnection; blocked: boolean; pairing: { code: string | null; expiresAt: string | null; status: string } | null }> {
-    await this.#assertWhatsAppBindingAvailable(userId);
     const result = await this.#upsertConnection(userId, IntegrationProvider.WHATSAPP, requestId);
     if (!this.options.whatsApp?.connect) return { connection: publicConnection(result, "whatsapp"), blocked: true, pairing: null };
     if (phoneNumber !== undefined && this.options.whatsAppPairing?.pairingCode) {
       try {
-        const external = await this.options.whatsApp.connect(userId);
+        const external = await this.options.whatsApp.connect(result.id);
         if (external.status === "connected") {
           const updated = await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: IntegrationStatus.CONNECTED, connectedAt: new Date(), externalReference: external.externalReference ?? null } });
           return { connection: publicConnection(updated, "whatsapp"), blocked: false, pairing: null };
@@ -120,7 +120,7 @@ export class IntegrationService {
         // enforces the same bridge precondition, so fall through to it.
       }
       try {
-        const pairing = await this.options.whatsAppPairing.pairingCode(phoneNumber);
+        const pairing = await this.options.whatsAppPairing.pairingCode(result.id, phoneNumber);
         const updated = await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: IntegrationStatus.PENDING } });
         this.#pairingCodes.set(userId, { code: pairing.code, expiresAt: pairing.expiresAt, phoneNumber });
         return { connection: publicConnection(updated, "whatsapp"), blocked: true, pairing: { code: pairing.code, expiresAt: pairing.expiresAt.toISOString(), status: IntegrationStatus.PENDING } };
@@ -129,7 +129,7 @@ export class IntegrationService {
       }
     }
     try {
-      const external = await this.options.whatsApp.connect(userId);
+      const external = await this.options.whatsApp.connect(result.id);
       const connected = external.status === "connected";
       const updated = await this.options.repositories.integrationConnection.update({ where: { id: result.id }, data: { status: connected ? IntegrationStatus.CONNECTED : IntegrationStatus.PENDING, ...(connected ? { connectedAt: new Date() } : {}), externalReference: external.externalReference ?? null } });
       return { connection: publicConnection(updated, "whatsapp"), blocked: !connected, pairing: null };
@@ -153,14 +153,18 @@ export class IntegrationService {
     const row = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
     if (!row || row.status === IntegrationStatus.DISCONNECTED || !this.options.whatsApp?.status) return publicConnection(row ?? { status: IntegrationStatus.DISCONNECTED, scopes: [] }, "whatsapp");
     try {
-      const status = await this.options.whatsApp.status();
+      const status = await this.options.whatsApp.status(row.id);
+      if (status.status === "connected" && row.status !== IntegrationStatus.CONNECTED) {
+        const updated = await this.#setStatus(userId, IntegrationProvider.WHATSAPP, IntegrationStatus.CONNECTED);
+        return publicConnection(updated, "whatsapp");
+      }
       if (status.status !== "connected" && row.status === IntegrationStatus.CONNECTED) {
-        const updated = await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status: IntegrationStatus.ERROR } });
+        const updated = await this.#setStatus(userId, IntegrationProvider.WHATSAPP, IntegrationStatus.DISCONNECTED);
         return publicConnection(updated, "whatsapp");
       }
     } catch {
       if (row.status === IntegrationStatus.CONNECTED) {
-        const updated = await this.options.repositories.integrationConnection.update({ where: { id: row.id }, data: { status: IntegrationStatus.ERROR } });
+        const updated = await this.#setStatus(userId, IntegrationProvider.WHATSAPP, IntegrationStatus.DISCONNECTED);
         return publicConnection(updated, "whatsapp");
       }
     }
@@ -170,15 +174,16 @@ export class IntegrationService {
   async whatsappQr(userId: string): Promise<{ qr: string | null; expiresAt: string | null; status: string }> {
     const row = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
     if (!this.options.whatsApp?.qr) return { qr: null, expiresAt: null, status: row?.status ?? IntegrationStatus.DISCONNECTED };
-    const result = await this.options.whatsApp.qr(userId);
+    const result = await this.options.whatsApp.qr(row.id);
     return { qr: result.qr, expiresAt: result.expiresAt?.toISOString() ?? null, status: row?.status ?? IntegrationStatus.PENDING };
   }
 
   async confirmWhatsApp(userId: string, requestId?: string): Promise<PublicConnection> {
     if (!this.options.whatsApp?.confirmScanned) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "WhatsApp provider is not configured");
-    await this.#assertWhatsAppBindingAvailable(userId);
+    const connection = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
+    if (!connection) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp connection is not available");
     try {
-      await this.options.whatsApp.confirmScanned(userId);
+      await this.options.whatsApp.confirmScanned(connection.id);
     } catch (error) {
       if (error instanceof HermesWhatsAppProviderError && error.code === "NOT_CONNECTED") throw new P9Error("CONFLICT", 409, "WhatsApp is not connected");
       throw new P9Error("SERVICE_UNAVAILABLE", 503, "WhatsApp provider is unavailable");
@@ -188,59 +193,70 @@ export class IntegrationService {
   }
 
   async disconnectWhatsApp(userId: string, requestId?: string): Promise<void> {
-    await this.options.whatsApp?.disconnect?.(userId);
-    await this.#setStatus(userId, IntegrationProvider.WHATSAPP, IntegrationStatus.DISCONNECTED, requestId);
+    this.#pairingCodes.delete(userId);
+    const connection = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
+    try {
+      if (connection) await this.options.whatsApp?.disconnect?.(connection.id);
+    } catch {
+      // Unbind BMO even if the bridge is already gone.
+    }
+    await this.#setStatus(userId, IntegrationProvider.WHATSAPP, IntegrationStatus.DISCONNECTED, requestId, true);
   }
 
   async pollWhatsApp(): Promise<{ processed: number; queued: number }> {
     if (!this.options.whatsApp?.poll) return { processed: 0, queued: 0 };
-    const messages = await this.options.whatsApp.poll();
     const owners = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP, status: IntegrationStatus.CONNECTED }, select: { id: true, userId: true } });
-    if (owners.length !== 1 || !owners[0]) return { processed: 0, queued: 0 };
-    const owner = owners[0];
     let processed = 0;
     let queued = 0;
-    for (const message of messages) {
-      const duplicate = await this.options.repositories.whatsAppDelivery.findFirst({ where: { provider: IntegrationProvider.WHATSAPP, connectionId: owner.id, providerMessageRef: message.messageId } });
-      if (duplicate) continue;
-      const conversation = await this.#upsertWhatsAppConversation(owner.userId, owner.id, message);
-      const delivery = await this.options.repositories.whatsAppDelivery.create({ data: {
-        userId: owner.userId,
-        connectionId: owner.id,
-        provider: IntegrationProvider.WHATSAPP,
-        conversationId: conversation.id,
-        direction: "INBOUND",
-        status: "RECEIVED",
-        providerMessageRef: message.messageId,
-        metadata: JSON.stringify({ chatId: message.chatId, senderId: message.senderId, isGroup: message.isGroup, bodyLength: message.body.length, fromOwner: message.fromOwner === true }),
-      } });
-      processed += 1;
-      // The bridge marks owner-typed messages separately from /send echoes. They
-      // update bounded delivery metadata only; they never become BMO prompts,
-      // notifications, or proactive speech.
-      if (message.fromOwner === true) continue;
-      const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId: owner.userId, connectionId: owner.id, provider: IntegrationProvider.WHATSAPP } });
-      const notificationRule = whatsappNotificationRule(rules as WhatsAppRuleRow[], conversation);
-      if (!shouldNotifyWhatsApp(rules as WhatsAppRuleRow[], conversation)) continue;
-      if (this.options.mobileEvents) {
-        try {
-          this.options.mobileEvents.sendToUser(owner.userId, {
-            event: "whatsapp_notification",
-            conversationId: conversation.id,
-            displayName: conversation.displayName,
-            conversationType: conversation.type,
-            receivedAt: new Date().toISOString(),
-          });
-        } catch {
-          // A mobile socket failure must not make the provider poller unhealthy.
-        }
+    for (const owner of owners) {
+      let messages: HermesWhatsAppMessage[];
+      try {
+        messages = await this.options.whatsApp.poll(owner.id);
+      } catch {
+        continue;
       }
-      const shouldSpeak = notificationRule?.speakOnDevice === true;
-      if (!shouldSpeak || !this.options.whatsAppProactiveDelivery) continue;
-      const device = await this.options.repositories.device.findFirst({ where: { userId: owner.userId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, select: { id: true } });
-      if (!device) continue;
-      await this.options.whatsAppProactiveDelivery({ userId: owner.userId, deliveryId: delivery.id, deviceId: device.id, text: message.body });
-      queued += 1;
+      for (const message of messages) {
+        const duplicate = await this.options.repositories.whatsAppDelivery.findFirst({ where: { provider: IntegrationProvider.WHATSAPP, connectionId: owner.id, providerMessageRef: message.messageId } });
+        if (duplicate) continue;
+        const conversation = await this.#upsertWhatsAppConversation(owner.userId, owner.id, message);
+        const delivery = await this.options.repositories.whatsAppDelivery.create({ data: {
+          userId: owner.userId,
+          connectionId: owner.id,
+          provider: IntegrationProvider.WHATSAPP,
+          conversationId: conversation.id,
+          direction: "INBOUND",
+          status: "RECEIVED",
+          providerMessageRef: message.messageId,
+          metadata: JSON.stringify({ chatId: message.chatId, senderId: message.senderId, isGroup: message.isGroup, bodyLength: message.body.length, fromOwner: message.fromOwner === true }),
+        } });
+        processed += 1;
+        // The bridge marks owner-typed messages separately from /send echoes. They
+        // update bounded delivery metadata only; they never become BMO prompts,
+        // notifications, or proactive speech.
+        if (message.fromOwner === true) continue;
+        const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId: owner.userId, connectionId: owner.id, provider: IntegrationProvider.WHATSAPP } });
+        const notificationRule = whatsappNotificationRule(rules as WhatsAppRuleRow[], conversation);
+        if (!shouldNotifyWhatsApp(rules as WhatsAppRuleRow[], conversation)) continue;
+        if (this.options.mobileEvents) {
+          try {
+            this.options.mobileEvents.sendToUser(owner.userId, {
+              event: "whatsapp_notification",
+              conversationId: conversation.id,
+              displayName: conversation.displayName,
+              conversationType: conversation.type,
+              receivedAt: new Date().toISOString(),
+            });
+          } catch {
+            // A mobile socket failure must not make the provider poller unhealthy.
+          }
+        }
+        const shouldSpeak = notificationRule?.speakOnDevice === true;
+        if (!shouldSpeak || !this.options.whatsAppProactiveDelivery) continue;
+        const device = await this.options.repositories.device.findFirst({ where: { userId: owner.userId, status: "ACTIVE" }, orderBy: { createdAt: "asc" }, select: { id: true } });
+        if (!device) continue;
+        await this.options.whatsAppProactiveDelivery({ userId: owner.userId, deliveryId: delivery.id, deviceId: device.id, text: message.body });
+        queued += 1;
+      }
     }
     return { processed, queued };
   }
@@ -279,7 +295,7 @@ export class IntegrationService {
   async resolveWhatsAppConversation(userId: string, input: { phoneNumber: string; displayName?: string | undefined }): Promise<unknown> {
     const connection = await this.#requireConnectedWhatsAppOwner(userId);
     const opaqueChatRef = `${input.phoneNumber.slice(1)}@s.whatsapp.net`;
-    const providerRefs = await this.#expandWhatsAppRefs([opaqueChatRef]);
+    const providerRefs = await this.#expandWhatsAppRefs(connection.id, [opaqueChatRef]);
     const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP } });
     const candidates = await this.#conversationCandidates(userId, connection.id, providerRefs);
     const canonical = this.#chooseCanonicalConversation(candidates, rules as WhatsAppRuleRow[]);
@@ -329,7 +345,7 @@ export class IntegrationService {
     if (!isUuid(input.conversationId)) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp conversation not found");
     const conversation = await this.options.repositories.whatsAppConversation.findFirst({ where: { id: input.conversationId, userId, connectionId: connection.id, provider: IntegrationProvider.WHATSAPP } });
     if (!conversation) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp conversation not found");
-    const recipientRef = preferredWhatsAppDestination(await this.#expandWhatsAppRefs([conversation.opaqueChatRef])) ?? conversation.opaqueChatRef;
+    const recipientRef = preferredWhatsAppDestination(await this.#expandWhatsAppRefs(connection.id, [conversation.opaqueChatRef])) ?? conversation.opaqueChatRef;
     const now = await this.options.repositories.databaseNow();
     const existing = await this.options.repositories.whatsAppSendRequest.findUnique({ where: { userId_idempotencyKey: { userId, idempotencyKey: input.idempotencyKey } } });
     if (existing) return this.#publicSend(existing);
@@ -356,7 +372,7 @@ export class IntegrationService {
       return this.#publicSend(current);
     }
     try {
-      const sent = await this.options.whatsApp.send(userId, row.opaqueRecipientRef, row.preview);
+      const sent = await this.options.whatsApp.send(row.connectionId, row.opaqueRecipientRef, row.preview);
       const finished = await this.options.repositories.whatsAppSendRequest.update({ where: { id: row.id }, data: { status: WhatsAppSendStatus.SUCCEEDED } });
       if (row.conversationId) await this.options.repositories.whatsAppConversation.update({ where: { id: row.conversationId }, data: { lastActivityAt: now } });
       await this.options.repositories.whatsAppDelivery.create({ data: { userId, connectionId: row.connectionId, provider: IntegrationProvider.WHATSAPP, conversationId: row.conversationId ?? null, sendRequestId: row.id, direction: "OUTBOUND", status: "DELIVERED", providerMessageRef: sent.providerMessageRef ?? null, deliveredAt: now } });
@@ -367,32 +383,39 @@ export class IntegrationService {
     }
   }
 
-  async spotifyConnect(userId: string): Promise<{ authorizationUrl: string }> {
+  async spotifyConnect(userId: string, clientReturnUrl?: string): Promise<{ authorizationUrl: string }> {
     if (!this.options.spotify || !this.options.spotifyClientId || !this.options.spotifyClientSecret || !this.options.spotifyCallbackUrl) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
     const redirectUri = this.options.spotifyCallbackUrl;
     const state = randomBytes(32).toString("hex");
     const verifier = createHash("sha256").update(state).digest("hex");
-    await this.options.repositories.oAuthState.create({ data: { userId, provider: IntegrationProvider.SPOTIFY, stateVerifier: verifier, redirectUri, expiresAt: new Date(Date.now() + OAUTH_TTL_MS) } });
+    const requestId = sanitizeSpotifyClientReturnUrl(clientReturnUrl);
+    await this.options.repositories.oAuthState.create({ data: { userId, provider: IntegrationProvider.SPOTIFY, stateVerifier: verifier, redirectUri, requestId, expiresAt: new Date(Date.now() + OAUTH_TTL_MS) } });
     const params = new URLSearchParams({ response_type: "code", client_id: this.options.spotifyClientId, redirect_uri: redirectUri, state, scope: SPOTIFY_SCOPES.join(" ") });
     return { authorizationUrl: `https://accounts.spotify.com/authorize?${params.toString()}` };
   }
 
-  async spotifyCallback(state: string, code?: string, error?: string): Promise<{ ok: boolean }> {
+  async spotifyCallback(state: string, code?: string, error?: string): Promise<{ ok: boolean; returnTo: string }> {
     if (!/^[a-f0-9]{64}$/u.test(state)) throw new P9Error("AUTHENTICATION_FAILED", 401, "Invalid OAuth state");
     const verifier = createHash("sha256").update(state).digest("hex");
     const now = await this.options.repositories.databaseNow();
-    const oauth = await this.options.repositories.oAuthState.findFirst({ where: { stateVerifier: verifier, provider: IntegrationProvider.SPOTIFY, usedAt: null, expiresAt: { gt: now } } });
+    const oauth = await this.options.repositories.oAuthState.findFirst({ where: { stateVerifier: verifier, provider: IntegrationProvider.SPOTIFY, expiresAt: { gt: now } } });
     if (!oauth || oauth.redirectUri !== this.options.spotifyCallbackUrl) throw new P9Error("AUTHENTICATION_FAILED", 401, "Invalid OAuth state");
-    const used = await this.options.repositories.oAuthState.updateMany({ where: { id: oauth.id, usedAt: null }, data: { usedAt: now } });
-    if (used.count !== 1) throw new P9Error("AUTHENTICATION_FAILED", 401, "Invalid OAuth state");
+    if (oauth.usedAt) {
+      const existing = await this.#getConnection(oauth.userId, IntegrationProvider.SPOTIFY);
+      if (existing?.status === IntegrationStatus.CONNECTED) return { ok: true, returnTo: sanitizeSpotifyClientReturnUrl(oauth.requestId) };
+      throw new P9Error("AUTHENTICATION_FAILED", 401, "Invalid OAuth state");
+    }
     if (error) throw new P9Error("CONFLICT", 409, "Spotify authorization was denied");
     if (!code || !this.options.spotify?.exchangeCode || !this.options.spotifyTokenEncryptionKey) throw new P9Error("BLOCKED_EXTERNAL_SECRET", 503, "Spotify provider is not configured");
     let tokens: Awaited<ReturnType<NonNullable<SpotifyProviderBoundary["exchangeCode"]>>>;
     try {
       tokens = await this.options.spotify.exchangeCode(code, oauth.redirectUri);
-    } catch {
+    } catch (exchangeError) {
+      const existing = await this.#getConnection(oauth.userId, IntegrationProvider.SPOTIFY);
+      if (existing?.status === IntegrationStatus.CONNECTED) return { ok: true, returnTo: sanitizeSpotifyClientReturnUrl(oauth.requestId) };
+      console.error(JSON.stringify({ msg: "spotify.exchange.failed", err: exchangeError instanceof Error ? exchangeError.message : String(exchangeError), code: (exchangeError as { code?: string }).code }));
       await this.options.repositories.integrationConnection.updateMany({ where: { userId: oauth.userId, provider: IntegrationProvider.SPOTIFY }, data: { status: IntegrationStatus.ERROR } });
-      throw new P9Error("SERVICE_UNAVAILABLE", 503, "Spotify authorization is unavailable");
+      throw this.#asP9ProviderError(exchangeError);
     }
     const connection = await this.#ensureConnection(oauth.userId, IntegrationProvider.SPOTIFY);
     const key = this.#spotifyKey();
@@ -402,6 +425,7 @@ export class IntegrationService {
     try {
       account = await this.options.spotify.currentUser(tokens.accessToken);
     } catch (error) {
+      console.error(JSON.stringify({ msg: "spotify.currentUser.failed", err: error instanceof Error ? error.message : String(error), code: (error as { code?: string }).code, status: (error as { status?: number }).status }));
       throw this.#asP9ProviderError(error);
     }
     if (!account.accountId) throw new P9Error("SERVICE_UNAVAILABLE", 503, "Spotify account identity is unavailable");
@@ -429,7 +453,8 @@ export class IntegrationService {
       } });
       await repo.integrationConnection.update({ where: { id: connection.id }, data: { status: IntegrationStatus.CONNECTED, scopes: tokens.scopes, externalReference: account.accountId, connectedAt: now, disconnectedAt: null } });
     });
-    return { ok: true };
+    await this.options.repositories.oAuthState.updateMany({ where: { id: oauth.id, usedAt: null }, data: { usedAt: now } });
+    return { ok: true, returnTo: sanitizeSpotifyClientReturnUrl(oauth.requestId) };
   }
 
   async spotifyDisconnect(userId: string): Promise<void> { await this.options.repositories.spotifyCredential.deleteMany({ where: { userId } }); await this.#setStatus(userId, IntegrationProvider.SPOTIFY, IntegrationStatus.DISCONNECTED, undefined, true); }
@@ -489,11 +514,11 @@ export class IntegrationService {
     return [{ id: "whatsapp", title: "WhatsApp", installed: whatsapp.status !== IntegrationStatus.DISCONNECTED, status: whatsapp.status }, { id: "spotify", title: "Spotify", installed: spotify.status !== IntegrationStatus.DISCONNECTED, status: spotify.status }];
   }
 
-  async #expandWhatsAppRefs(refs: string[]): Promise<string[]> {
+  async #expandWhatsAppRefs(connectionId: string, refs: string[]): Promise<string[]> {
     const normalized = uniqueProviderRefs(refs);
     if (!this.options.whatsAppIdentity) return normalized;
     try {
-      return uniqueProviderRefs(await this.options.whatsAppIdentity.expand(normalized));
+      return uniqueProviderRefs(await this.options.whatsAppIdentity.expand(connectionId, normalized));
     } catch {
       return normalized;
     }
@@ -503,7 +528,7 @@ export class IntegrationService {
     const type = message.isGroup ? WhatsAppConversationType.GROUP : WhatsAppConversationType.DM;
     const providerName = message.isGroup ? message.chatName : message.senderName;
     const displayName = providerName?.trim().slice(0, 120) || (message.isGroup ? "WhatsApp group" : "WhatsApp contact");
-    const refs = message.isGroup ? [message.chatId] : await this.#expandWhatsAppRefs([message.chatId, message.senderId]);
+    const refs = message.isGroup ? [message.chatId] : await this.#expandWhatsAppRefs(connectionId, [message.chatId, message.senderId]);
     const rules = await this.options.repositories.whatsAppNotificationRule.findMany({ where: { userId, connectionId, provider: IntegrationProvider.WHATSAPP } });
     const candidates = await this.#conversationCandidates(userId, connectionId, refs);
     const canonical = this.#chooseCanonicalConversation(candidates, rules as WhatsAppRuleRow[]);
@@ -814,7 +839,8 @@ export class IntegrationService {
 
   #asP9ProviderError(error: unknown): P9Error {
     if (error instanceof P9Error) return error;
-    if (error instanceof SpotifyProviderError && error.code === "INVALID_GRANT") return new P9Error("RECONNECT_REQUIRED", 409, "Spotify requires reconnection");
+    if (error instanceof SpotifyProviderError && error.code === "USER_NOT_ALLOWLISTED") return new P9Error("CONFLICT", 409, "This Spotify account is not registered for the BMO app. Add it in the Spotify Developer Dashboard, then try again.");
+    if (error instanceof SpotifyProviderError && error.code === "INVALID_GRANT") return new P9Error("CONFLICT", 409, "Spotify authorization expired. Return to BMO and connect again.");
     if (error instanceof SpotifyProviderError && error.code === "PREMIUM_REQUIRED") return new P9Error("PREMIUM_REQUIRED", 403, "Spotify Premium is required for playback control");
     if (error instanceof SpotifyProviderError && error.code === "RATE_LIMITED") return new P9Error("RATE_LIMITED", 429, "Spotify is temporarily rate limited");
     if (error instanceof SpotifyProviderError && error.code === "AUTHORIZATION_REVOKED") return new P9Error("SERVICE_UNAVAILABLE", 503, "Spotify authorization is unavailable");
@@ -828,16 +854,9 @@ export class IntegrationService {
   }
 
   async #getConnection(userId: string, provider: IntegrationProvider): Promise<any | null> { return this.options.repositories.integrationConnection.findUnique({ where: { userId_provider: { userId, provider } } }); }
-  async #assertWhatsAppBindingAvailable(userId: string): Promise<void> {
-    const rows = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP }, select: { userId: true, status: true, externalReference: true } });
-    if (rows.some((row: any) => row.userId !== userId && (row.status === IntegrationStatus.CONNECTED || row.externalReference !== null))) {
-      throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp connection is not available");
-    }
-  }
   async #requireConnectedWhatsAppOwner(userId: string): Promise<any> {
     const connection = await this.#getConnection(userId, IntegrationProvider.WHATSAPP);
-    const owners = await this.options.repositories.integrationConnection.findMany({ where: { provider: IntegrationProvider.WHATSAPP, status: IntegrationStatus.CONNECTED }, select: { id: true, userId: true } });
-    if (!connection || connection.status !== IntegrationStatus.CONNECTED || owners.length !== 1 || owners[0]?.userId !== userId || owners[0]?.id !== connection.id) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp connection is not available");
+    if (!connection || connection.status !== IntegrationStatus.CONNECTED) throw new P9Error("OWNERSHIP_DENIED", 404, "WhatsApp connection is not available");
     return connection;
   }
   async #ensureConnection(userId: string, provider: IntegrationProvider): Promise<any> { const current = await this.#getConnection(userId, provider); if (current) return current; return this.options.repositories.integrationConnection.create({ data: { userId, provider, scopes: [], status: IntegrationStatus.DISCONNECTED } }); }

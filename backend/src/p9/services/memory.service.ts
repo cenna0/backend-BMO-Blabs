@@ -5,13 +5,32 @@ import { P9Error } from "../errors.js";
 import { decodeMemoryCursor, encodeMemoryCursor } from "../memory.validation.js";
 import { AuditService } from "./audit.service.js";
 import { createHash } from "node:crypto";
+import type { HermesGenerateClient } from "../../services/hermes.client.js";
 
 type Transaction = <T>(work: (repositories: P9Repositories) => Promise<T>) => Promise<T>;
+
+export const JOY_DREAM_SYSTEM_INSTRUCTIONS = `You are Joy, synthesizing a comprehensive long-term memory summary about the user.
+Write the memory summary directly from your perspective (Joy / "aku") addressing the user as "kamu".
+Consolidate the user's durable personal context, preferences, habits, speaking style, projects, commitments, and background into structured markdown sections starting with '## '.
+
+Rules:
+- 1 to 6 thematic sections. Each section MUST start with '## Section Title' followed by 1-3 concise, informative paragraphs.
+- Standard section headers: '## Profile & Identity', '## Work & Projects', '## Preferences & Interests', '## Habits & Routines', '## Communication & Style'.
+- Point of View: Always address the user directly as "kamu". When referencing yourself, use "aku" or "Joy".
+- Strictly FORBIDDEN clinical/third-person phrasing: NEVER use "pengguna", "user", "ia", "dia", "asistennya", "asisten AI", or "teman AI".
+- Language: Natural, warm Indonesian matching the user's conversation style.
+- Rewrite stale facts (past commitments that have passed, superseded plans).
+- Skip greetings, one-off moods, jokes, and system errors.
+- If the user provides a specific instruction/feedback, apply it directly.
+- Plain markdown only. No conversational replies, no intro commentary, no code fences.`;
+
+export const BMO_DREAM_SYSTEM_INSTRUCTIONS = JOY_DREAM_SYSTEM_INSTRUCTIONS;
 
 interface MemoryServiceOptions {
   client?: PrismaClient;
   repositories: P9Repositories;
   transaction?: Transaction;
+  hermes?: HermesGenerateClient | undefined;
 }
 
 interface ActionInput { idempotencyKey: string }
@@ -20,7 +39,56 @@ interface PatchInput extends ActionInput {
   topic?: string; category?: string; normalizedContent?: string; importance?: number; expiresAt?: string | null;
 }
 
-function publicMemory(row: any) {
+interface MemoryRecordRow {
+  id: string;
+  topic: string;
+  category: string;
+  normalizedContent: string;
+  importance: number;
+  source: string;
+  expiresAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface MemoryCandidateRow {
+  id: string;
+  sourceMessageId: string | null;
+  proposedContent: string;
+  topic: string | null;
+  status: string;
+  expiresAt: Date | null;
+  reviewedAt: Date | null;
+  createdAt: Date;
+}
+
+interface MemorySummaryRow {
+  id: string;
+  userId?: string;
+  content: string | null;
+  status: string;
+  version: number;
+  feedback: string | null;
+  generatedAt: Date | null;
+  expiresAt: Date | null;
+  deletedAt?: Date | null;
+  createdAt?: Date;
+  updatedAt: Date;
+}
+
+interface MemoryActionRow {
+  actionType: string;
+  resourceType: string;
+  resourceId?: string | null;
+  metadata?: unknown;
+}
+
+interface ChatMessageSummaryRow {
+  role: string;
+  content: string;
+}
+
+function publicMemory(row: MemoryRecordRow) {
   return {
     id: row.id, topic: row.topic, category: row.category, content: row.normalizedContent,
     importance: row.importance, source: row.source,
@@ -29,7 +97,7 @@ function publicMemory(row: any) {
   };
 }
 
-function publicCandidate(row: any) {
+function publicCandidate(row: MemoryCandidateRow) {
   return {
     id: row.id, sourceMessageId: row.sourceMessageId, proposedContent: row.proposedContent,
     topic: row.topic, status: row.status.toLowerCase(), expiresAt: row.expiresAt?.toISOString() ?? null,
@@ -37,7 +105,7 @@ function publicCandidate(row: any) {
   };
 }
 
-function publicSummary(row: any, now = new Date()) {
+function publicSummary(row: MemorySummaryRow | null | undefined, now = new Date()) {
   if (!row || row.deletedAt || (row.expiresAt && row.expiresAt <= now)) return null;
   return {
     content: row.content, status: row.status.toLowerCase(), version: row.version, feedback: row.feedback,
@@ -171,7 +239,7 @@ export class MemoryService {
         this.#assertAction(existing, "ACCEPT", "memory_candidate", undefined, candidateId);
         this.#assertFingerprint(existing, input);
         const metadata = existing.metadata && typeof existing.metadata === "object" && !Array.isArray(existing.metadata)
-          ? existing.metadata : {};
+          ? existing.metadata as Record<string, unknown> : {};
         if (typeof metadata.memoryId !== "string") throw new P9Error("CONFLICT", 409, "Idempotency replay is unavailable");
         return this.#ownedMemory(repositories, userId, metadata.memoryId);
       }
@@ -282,8 +350,8 @@ export class MemoryService {
       return {
         format: "json", exportedAt: now.toISOString(), memories: memories.map(publicMemory),
         candidates: candidates.map(publicCandidate),
-        actions: actions.map((row: any) => ({ actionType: row.actionType.toLowerCase(), resourceType: row.resourceType, resourceId: row.resourceId, createdAt: row.createdAt.toISOString() })),
-        topicForgets: topicForgets.map((row: any) => ({ topic: row.normalizedTopic, createdAt: row.createdAt.toISOString() })),
+        actions: actions.map((row: MemoryActionRow & { createdAt: Date }) => ({ actionType: row.actionType.toLowerCase(), resourceType: row.resourceType, resourceId: row.resourceId, createdAt: row.createdAt.toISOString() })),
+        topicForgets: topicForgets.map((row: { normalizedTopic: string; createdAt: Date }) => ({ topic: row.normalizedTopic, createdAt: row.createdAt.toISOString() })),
         summary: publicSummary(summary, now),
       };
     });
@@ -295,40 +363,230 @@ export class MemoryService {
     return { summary: publicSummary(row, new Date()) };
   }
 
-  regenerateSummary(userId: string, input: ActionInput, requestId?: string) {
+  async regenerateSummary(userId: string, input: ActionInput, requestId?: string) {
+    const existing = await this.options.repositories.memoryAction.findUnique({
+      where: { userId_idempotencyKey: { userId, idempotencyKey: input.idempotencyKey } },
+    });
+    if (existing) {
+      this.#assertAction(existing, "SUMMARY_REGENERATE", "memory_summary");
+      const current = await this.options.repositories.memorySummary.findUnique({ where: { userId } });
+      if (!current || current.deletedAt) throw new P9Error("OWNERSHIP_DENIED", 404, "Memory summary not found");
+      const metadata = existing.metadata && typeof existing.metadata === "object" && !Array.isArray(existing.metadata)
+        ? existing.metadata as Record<string, unknown>
+        : {};
+      const runtimeStatus = typeof metadata.status === "string" ? metadata.status : "completed";
+      return { summary: publicSummary(current), generation: { source: "memory_records", runtimeStatus } };
+    }
+
+    const { synthesizedContent, runtimeStatus } = await this.#synthesizeContent(this.options.repositories, userId);
+
     return this.#transaction(async (repositories) => {
       await repositories.lockUser(userId);
-      const existing = await this.#action(repositories, userId, input.idempotencyKey);
-      if (existing) {
-        this.#assertAction(existing, "SUMMARY_REGENERATE", "memory_summary");
+      const concurrent = await this.#action(repositories, userId, input.idempotencyKey);
+      if (concurrent) {
+        this.#assertAction(concurrent, "SUMMARY_REGENERATE", "memory_summary");
         const current = await repositories.memorySummary.findUnique({ where: { userId } });
         if (!current || current.deletedAt) throw new P9Error("OWNERSHIP_DENIED", 404, "Memory summary not found");
-        return { summary: publicSummary(current), generation: { source: "memory_records", runtimeStatus: "not_configured" } };
+        return { summary: publicSummary(current), generation: { source: "memory_records", runtimeStatus } };
       }
+
+      const now = await repositories.databaseNow();
       const summary = await repositories.memorySummary.upsert({
         where: { userId },
-        update: { status: "GENERATING", content: null, feedback: null, generatedAt: null, expiresAt: null, deletedAt: null, version: { increment: 1 } },
-        create: { userId, status: "GENERATING", version: 1 },
+        update: {
+          status: "READY",
+          content: synthesizedContent,
+          feedback: null,
+          generatedAt: now,
+          deletedAt: null,
+          expiresAt: null,
+          version: { increment: 1 },
+        },
+        create: {
+          userId,
+          status: "READY",
+          content: synthesizedContent,
+          feedback: null,
+          generatedAt: now,
+          version: 1,
+        },
       });
-      await repositories.memoryAction.create({ data: { userId, actionType: "SUMMARY_REGENERATE", resourceType: "memory_summary", resourceId: summary.id, idempotencyKey: input.idempotencyKey, metadata: { status: "not_configured" } } });
-      await this.#audit(repositories, userId, "MEMORY_SUMMARY_REGENERATE_REQUESTED", "memory_summary", summary.id, requestId, { status: "not_configured" });
-      return { summary: publicSummary(summary), generation: { source: "memory_records", runtimeStatus: "not_configured" } };
+
+      await repositories.memoryAction.create({
+        data: {
+          userId,
+          actionType: "SUMMARY_REGENERATE",
+          resourceType: "memory_summary",
+          resourceId: summary.id ?? null,
+          idempotencyKey: input.idempotencyKey,
+          metadata: { status: runtimeStatus },
+        },
+      });
+      await this.#audit(repositories, userId, "MEMORY_SUMMARY_REGENERATED", "memory_summary", summary.id, requestId, { status: runtimeStatus });
+      return { summary: publicSummary(summary), generation: { source: "memory_records", runtimeStatus } };
     });
   }
 
-  setSummaryFeedback(userId: string, input: ActionInput & { feedback: string }, requestId?: string) {
+  async setSummaryFeedback(userId: string, input: ActionInput & { feedback: string }, requestId?: string) {
+    const existing = await this.options.repositories.memoryAction.findUnique({
+      where: { userId_idempotencyKey: { userId, idempotencyKey: input.idempotencyKey } },
+    });
+    if (existing) {
+      this.#assertAction(existing, "SUMMARY_FEEDBACK", "memory_summary");
+      this.#assertFingerprint(existing, input);
+      return this.getSummary(userId);
+    }
+
+    const { synthesizedContent, runtimeStatus } = await this.#synthesizeContent(this.options.repositories, userId, { instruction: input.feedback });
+
     return this.#transaction(async (repositories) => {
       await repositories.lockUser(userId);
-      const existing = await this.#action(repositories, userId, input.idempotencyKey);
-      if (existing) { this.#assertAction(existing, "SUMMARY_FEEDBACK", "memory_summary"); this.#assertFingerprint(existing, input); return this.getSummary(userId); }
-      const summary = await repositories.memorySummary.findUnique({ where: { userId } });
-      if (!summary || summary.deletedAt) throw new P9Error("OWNERSHIP_DENIED", 404, "Memory summary not found");
-      const changed = await repositories.memorySummary.updateMany({ where: { id: summary.id, userId, deletedAt: null }, data: { feedback: input.feedback } });
-      if (changed.count !== 1) throw new P9Error("OWNERSHIP_DENIED", 404, "Memory summary not found");
-      await repositories.memoryAction.create({ data: { userId, actionType: "SUMMARY_FEEDBACK", resourceType: "memory_summary", resourceId: summary.id, idempotencyKey: input.idempotencyKey, metadata: { fingerprint: fingerprint(input) } } });
+      const concurrent = await this.#action(repositories, userId, input.idempotencyKey);
+      if (concurrent) {
+        this.#assertAction(concurrent, "SUMMARY_FEEDBACK", "memory_summary");
+        this.#assertFingerprint(concurrent, input);
+        return this.getSummary(userId);
+      }
+
+      const now = await repositories.databaseNow();
+      const summary = await repositories.memorySummary.upsert({
+        where: { userId },
+        update: {
+          status: "READY",
+          content: synthesizedContent,
+          feedback: input.feedback,
+          generatedAt: now,
+          deletedAt: null,
+          expiresAt: null,
+          version: { increment: 1 },
+        },
+        create: {
+          userId,
+          status: "READY",
+          content: synthesizedContent,
+          feedback: input.feedback,
+          generatedAt: now,
+          version: 1,
+        },
+      });
+
+      await repositories.memoryAction.create({
+        data: {
+          userId,
+          actionType: "SUMMARY_FEEDBACK",
+          resourceType: "memory_summary",
+          resourceId: summary.id ?? null,
+          idempotencyKey: input.idempotencyKey,
+          metadata: { fingerprint: fingerprint(input), status: runtimeStatus },
+        },
+      });
       await this.#audit(repositories, userId, "MEMORY_SUMMARY_FEEDBACK_UPDATED", "memory_summary", summary.id, requestId);
-      return { summary: publicSummary({ ...summary, feedback: input.feedback }) };
+      return { summary: publicSummary(summary) };
     });
+  }
+
+  async #synthesizeContent(
+    repositories: P9Repositories,
+    userId: string,
+    options: { instruction?: string } = {},
+  ): Promise<{ synthesizedContent: string; runtimeStatus: string }> {
+    const now = new Date();
+    const [user, personalization, memoryRecords, currentSummary, recentChats] = await Promise.all([
+      repositories.user.findUnique({ where: { id: userId }, select: { displayName: true, username: true } }).catch(() => null),
+      repositories.personalizationSettings.findUnique({ where: { userId }, select: { customInstructions: true, baseStyleTone: true, warmth: true, enthusiasm: true } }).catch(() => null),
+      repositories.memoryRecord.findMany({
+        where: { userId, deletedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+        orderBy: [{ importance: "desc" }, { updatedAt: "desc" }],
+        take: 30,
+      }),
+      repositories.memorySummary.findUnique({ where: { userId } }),
+      repositories.chatMessage.findMany({
+        where: { userId, deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 60,
+      }).catch(() => []),
+    ]);
+
+    const contextPayload = {
+      user: {
+        displayName: user?.displayName ?? null,
+        username: user?.username ?? null,
+        customInstructions: personalization?.customInstructions || null,
+      },
+      storedMemoryRecords: memoryRecords.map((m) => ({
+        topic: m.topic,
+        category: m.category,
+        content: m.normalizedContent,
+        importance: m.importance,
+      })),
+      previousSummary: currentSummary?.content ?? null,
+      userInstruction: options.instruction ?? null,
+      recentChatTranscript: (recentChats ?? [])
+        .slice()
+        .reverse()
+        .map((msg: ChatMessageSummaryRow) => `${msg.role}: ${msg.content}`)
+        .join("\n"),
+    };
+
+    let synthesizedContent: string;
+    let runtimeStatus = "completed";
+
+    if (this.options.hermes) {
+      try {
+        const prompt = JSON.stringify(contextPayload, null, 2);
+        const rawOutput = await this.options.hermes.generate(prompt, undefined, {
+          conversation: `memory-dream:${userId}`,
+          sessionKey: `bmo:user:${userId}`,
+          instructions: BMO_DREAM_SYSTEM_INSTRUCTIONS,
+          raw: true,
+        });
+        synthesizedContent = this.#formatDreamOutput(rawOutput, memoryRecords, user);
+      } catch {
+        synthesizedContent = this.#fallbackSynthesize(memoryRecords, user);
+        runtimeStatus = "fallback";
+      }
+    } else {
+      synthesizedContent = this.#fallbackSynthesize(memoryRecords, user);
+      runtimeStatus = "not_configured";
+    }
+
+    return { synthesizedContent, runtimeStatus };
+  }
+
+  #formatDreamOutput(
+    raw: string,
+    memoryRecords: Array<{ topic?: string; category?: string; normalizedContent: string }>,
+    user?: { displayName?: string | null } | null,
+  ): string {
+    const cleaned = raw
+      .replace(/^```(?:markdown|md)?\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    if (!cleaned) {
+      return this.#fallbackSynthesize(memoryRecords, user);
+    }
+    if (!cleaned.startsWith("## ")) {
+      return `## Overview\n${cleaned}`;
+    }
+    return cleaned;
+  }
+
+  #fallbackSynthesize(
+    memoryRecords: Array<{ topic?: string; category?: string; normalizedContent: string }>,
+    user?: { displayName?: string | null } | null,
+  ): string {
+    const sections: string[] = [];
+    if (user?.displayName) {
+      sections.push(`## Profile & Identity\nNama kamu ${user.displayName}.`);
+    }
+    if (memoryRecords.length > 0) {
+      const facts = memoryRecords.map((m) => `- ${m.normalizedContent}`).join("\n");
+      sections.push(`## Preferences & Interests\n${facts}`);
+    } else if (!user?.displayName) {
+      sections.push("## Overview\nJoy siap mengingat hal-hal tentang kamu.");
+    }
+    return sections.join("\n\n");
   }
 
   async #ownedMemory(repositories: P9Repositories, userId: string, id: string) {
@@ -362,8 +620,10 @@ export class MemoryService {
     if (forgotten.length > 0) throw new P9Error("CONFLICT", 409, "Memory topic was forgotten");
   }
 
-  #assertAction(action: any, type: string, resourceType: string, resourceId?: string, metadataIdentity?: string): void {
-    const metadata = action.metadata && typeof action.metadata === "object" ? action.metadata : {};
+  #assertAction(action: MemoryActionRow, type: string, resourceType: string, resourceId?: string, metadataIdentity?: string): void {
+    const metadata = action.metadata && typeof action.metadata === "object" && !Array.isArray(action.metadata)
+      ? action.metadata as Record<string, unknown>
+      : {};
     if (action.actionType !== type || action.resourceType !== resourceType ||
       (resourceId !== undefined && action.resourceId !== resourceId) ||
       (metadataIdentity !== undefined && metadata.candidateId !== metadataIdentity && metadata.topic !== metadataIdentity)) {
@@ -371,8 +631,10 @@ export class MemoryService {
     }
   }
 
-  #assertFingerprint(action: any, input: unknown, requireExisting = true): void {
-    const metadata = action.metadata && typeof action.metadata === "object" ? action.metadata : {};
+  #assertFingerprint(action: MemoryActionRow, input: unknown, requireExisting = true): void {
+    const metadata = action.metadata && typeof action.metadata === "object" && !Array.isArray(action.metadata)
+      ? action.metadata as Record<string, unknown>
+      : {};
     if ((requireExisting || metadata.fingerprint !== undefined) && metadata.fingerprint !== fingerprint(input)) {
       throw new P9Error("CONFLICT", 409, "Idempotency key was already used for different input");
     }

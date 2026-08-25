@@ -1,5 +1,5 @@
 [Unit]
-Description=BMO WhatsApp transport-only Hermes Baileys bridge
+Description=BMO WhatsApp connection-scoped Hermes Baileys bridge manager
 Wants=network-online.target
 After=network-online.target
 StartLimitIntervalSec=300
@@ -10,7 +10,7 @@ Type=simple
 User=hermes
 Group=hermes
 WorkingDirectory=/home/hermes/.hermes
-ExecStart=/usr/local/libexec/bmo-whatsapp-bridge-launcher
+ExecStart=/home/hermes/.hermes/node/bin/node /usr/local/libexec/bmo-whatsapp-bridge-manager --port 3001 --sessions-root /home/hermes/.hermes/whatsapp/sessions --port-base 3101
 Restart=on-failure
 RestartSec=10s
 RestartPreventExitStatus=78
@@ -31,8 +31,8 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 CapabilityBoundingSet=
-# Official bridge startup output can include provider identities. Health is read
-# from loopback /health and crash state from systemd; no bridge output is retained.
+# Manager and child bridge output can include provider identities. Health is read
+# from loopback and no bridge output is retained.
 StandardOutput=null
 StandardError=null
 

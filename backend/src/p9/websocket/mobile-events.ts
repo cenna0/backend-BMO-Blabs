@@ -27,6 +27,11 @@ export const mobileOutboundEventSchema = z.discriminatedUnion("event", [
     }).strict(),
   }).strict(),
   z.object({
+    event: z.literal("chat_title_updated"),
+    sessionId: uuid,
+    title: boundedText(200),
+  }).strict(),
+  z.object({
     event: z.literal("device_status"),
     deviceId: uuid,
     online: z.boolean(),

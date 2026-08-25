@@ -90,7 +90,7 @@ export function createP9Router(services: P9RouterServices): Router {
   router.use(createMemoryRouter(services.memory, services.accessTokens, services.sessions));
   router.use(createScheduleRouter(services.schedule, services.accessTokens, services.sessions));
   router.use(createIntegrationRouter(services.integrations, services.accessTokens, services.sessions));
-  const bugUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 5, fields: 3 } }).array("screenshots", 5);
+  const bugUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 5, fields: 10 } }).array("screenshots", 5);
   router.use(createSupportRouter(services.bugReports, services.accessTokens, services.sessions, bugUpload));
   if (services.includeOps === true) router.use(createOpsRouter(services.repositories));
   router.use(p9ErrorHandler);

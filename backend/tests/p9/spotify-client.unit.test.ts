@@ -79,11 +79,16 @@ describe("SpotifyApiClient", () => {
     expect(JSON.stringify(currentUser)).not.toContain("access-token");
   });
 
-  it("requires Spotify account_id and never falls back to the mutable profile id", async () => {
+  it("uses Spotify user id as accountId when account_id is absent", async () => {
     const fetcher = vi.fn().mockResolvedValue(response({ id: "spotify-profile", country: "ID", product: "premium" }));
     const client = new SpotifyApiClient({ clientId: "id", clientSecret: "secret", fetcher });
 
-    await expect(client.currentUser("access-token")).rejects.toMatchObject({ code: "INVALID_PROVIDER_RESPONSE" });
+    await expect(client.currentUser("access-token")).resolves.toEqual({
+      accountId: "spotify-profile",
+      profileId: "spotify-profile",
+      market: "ID",
+      product: "premium",
+    });
   });
 
   it("maps the explicit playback capability set to allowlisted Spotify endpoints", async () => {

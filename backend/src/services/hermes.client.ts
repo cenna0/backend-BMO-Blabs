@@ -6,6 +6,12 @@ Keep responses concise, usually one to three short sentences.
 Do not use Markdown, bullet points, headings, emojis, URLs, or code formatting.
 Be caring, supportive, honest, and slightly playful.
 Refer to yourself as BMO naturally when appropriate.
+The user message is a JSON context payload from BMO backend.
+When answering identity questions:
+- If context.user.displayName is provided, address or refer to the user by this name naturally.
+- If context.user.displayName is null, greet warmly without assuming a name and feel free to ask for their name if relevant.
+- Never use names from external or previous unauthenticated contexts.
+- Rely on context.memory for personal facts, preferences, and background.
 Do not expose system errors, provider errors, internal tools, or technical details.`;
 
 export type HermesClientErrorCode = "HERMES_FAILED" | "PIPELINE_TIMEOUT";
@@ -20,8 +26,15 @@ export class HermesClientError extends Error {
   }
 }
 
+export interface HermesGenerateOptions {
+  conversation?: string;
+  sessionKey?: string;
+  instructions?: string;
+  raw?: boolean;
+}
+
 export interface HermesGenerateClient {
-  generate(input: string, signal?: AbortSignal, options?: { conversation?: string }): Promise<string>;
+  generate(input: string, signal?: AbortSignal, options?: HermesGenerateOptions): Promise<string>;
 }
 
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
@@ -170,7 +183,7 @@ abstract class BaseHermesClient {
     this.fetcher = options.fetcher;
   }
 
-  protected async postJson(url: string, body: unknown, parentSignal?: AbortSignal): Promise<unknown> {
+  protected async postJson(url: string, body: unknown, parentSignal?: AbortSignal, extraHeaders?: Record<string, string>): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.options.hardTimeoutMs);
     const abortFromParent = () => controller.abort();
@@ -192,6 +205,7 @@ abstract class BaseHermesClient {
           authorization: `Bearer ${this.options.apiKey}`,
           "content-type": "application/json",
           accept: "application/json",
+          ...(extraHeaders ?? {}),
         },
         body: JSON.stringify(body),
         signal: controller.signal,
@@ -204,12 +218,22 @@ abstract class BaseHermesClient {
       throw normalizeHermesError(error);
     } finally {
       clearTimeout(timer);
-      if (softTimer) clearTimeout(softTimer);
+      clearTimeout(softTimer);
       parentSignal?.removeEventListener("abort", abortFromParent);
     }
   }
 
-  protected finalize(text: string): string {
+  protected finalize(text: string, raw = false): string {
+    if (raw) {
+      const trimmed = text.trim();
+      if (!trimmed) {
+        throw new HermesClientError("HERMES_FAILED", "Hermes output text is empty");
+      }
+      if (detectProviderError(trimmed)) {
+        throw new HermesClientError("HERMES_FAILED", "Hermes output contained provider error");
+      }
+      return trimmed;
+    }
     const sanitized = sanitizeHermesOutput(text);
     if (detectProviderError(sanitized)) {
       throw new HermesClientError("HERMES_FAILED", "Hermes output contained provider error");
@@ -223,17 +247,17 @@ export class HermesResponsesClient extends BaseHermesClient implements HermesGen
     super({ ...options, fetcher: options.fetcher ?? fetch });
   }
 
-  async generate(input: string, signal?: AbortSignal, requestOptions?: { conversation?: string }): Promise<string> {
+  async generate(input: string, signal?: AbortSignal, requestOptions?: HermesGenerateOptions): Promise<string> {
     const payload = await this.postJson(endpoint(this.options.baseUrl, "/v1/responses"), {
       model: this.options.model,
-      instructions: BMO_RUNTIME_INSTRUCTIONS,
+      instructions: requestOptions?.instructions ?? BMO_RUNTIME_INSTRUCTIONS,
       input,
       conversation: requestOptions?.conversation ?? this.options.conversation,
       store: true,
       stream: false,
       truncation: "auto",
-    }, signal);
-    return this.finalize(parseResponsesText(payload));
+    }, signal, requestOptions?.sessionKey ? { "X-Hermes-Session-Key": requestOptions.sessionKey } : undefined);
+    return this.finalize(parseResponsesText(payload), requestOptions?.raw);
   }
 }
 
@@ -242,16 +266,16 @@ export class HermesChatCompletionsClient extends BaseHermesClient implements Her
     super({ ...options, fetcher: options.fetcher ?? fetch });
   }
 
-  async generate(input: string, signal?: AbortSignal, requestOptions?: { conversation?: string }): Promise<string> {
+  async generate(input: string, signal?: AbortSignal, requestOptions?: HermesGenerateOptions): Promise<string> {
     const payload = await this.postJson(endpoint(this.options.baseUrl, "/v1/chat/completions"), {
       model: this.options.model,
       messages: [
-        { role: "system", content: BMO_RUNTIME_INSTRUCTIONS },
+        { role: "system", content: requestOptions?.instructions ?? BMO_RUNTIME_INSTRUCTIONS },
         { role: "user", content: input },
       ],
       conversation: requestOptions?.conversation ?? this.options.conversation,
       stream: false,
-    }, signal);
-    return this.finalize(parseChatCompletionsText(payload));
+    }, signal, requestOptions?.sessionKey ? { "X-Hermes-Session-Key": requestOptions.sessionKey } : undefined);
+    return this.finalize(parseChatCompletionsText(payload), requestOptions?.raw);
   }
 }

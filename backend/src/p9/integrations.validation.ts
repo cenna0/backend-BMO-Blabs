@@ -87,7 +87,7 @@ export const spotifyActionSchema = z.object({
   if (value.action === "REPEAT" && !["track", "context", "off"].includes(String(value.payload.state))) context.addIssue({ code: "custom", path: ["payload", "state"], message: "state must be track, context, or off" });
 });
 
-export const spotifyConnectSchema = z.object({}).strict();
+export const spotifyConnectSchema = z.object({ returnTo: z.string().trim().min(1).max(128).optional() }).strict();
 export const spotifySearchQuerySchema = z.object({ q: z.string().trim().min(1).max(200), type: z.string().optional() }).strict();
 export const spotifyPreferredDeviceSchema = z.object({ deviceId: z.string().trim().min(1).max(255).nullable() }).strict();
 export const spotifyCallbackSchema = z.object({
@@ -112,5 +112,6 @@ export function parseWhatsAppRulesPatch(value: unknown) { return whatsappRulesPa
 export function parseWhatsAppSendPreview(value: unknown) { return whatsappSendPreviewSchema.parse(value); }
 export function parseWhatsAppConnect(value: unknown) { return whatsappConnectSchema.parse(value); }
 export function parseSpotifyAction(value: unknown) { return spotifyActionSchema.parse(value); }
+export function parseSpotifyConnect(value: unknown) { return spotifyConnectSchema.parse(value); }
 export function parseSpotifySearchQuery(value: unknown) { return spotifySearchQuerySchema.parse(value); }
 export function parseBugReportInput(value: unknown) { return bugReportSchema.parse(value); }

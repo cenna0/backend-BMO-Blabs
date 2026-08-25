@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 
 import { P9Error } from "../../src/p9/errors.js";
 import { encodeMemoryCursor } from "../../src/p9/memory.validation.js";
-import { MemoryService } from "../../src/p9/services/memory.service.js";
+import { BMO_DREAM_SYSTEM_INSTRUCTIONS, JOY_DREAM_SYSTEM_INSTRUCTIONS, MemoryService } from "../../src/p9/services/memory.service.js";
+import type { HermesGenerateClient } from "../../src/services/hermes.client.js";
 
 const userId = "00000000-0000-4000-8000-000000000001";
 const otherUserId = "00000000-0000-4000-8000-000000000002";
@@ -27,10 +28,13 @@ const candidateRow = (overrides: Record<string, unknown> = {}) => ({
   reviewedAt: null, createdAt: now, updatedAt: now, ...overrides,
 });
 
-function fixture() {
-  const repositories: any = {
+function fixture(options: { hermes?: HermesGenerateClient } = {}) {
+  const repositories: Record<string, any> = {
     lockUser: vi.fn().mockResolvedValue(undefined),
     databaseNow: vi.fn().mockResolvedValue(now),
+    user: { findUnique: vi.fn().mockResolvedValue({ displayName: "Rangga", username: "rangga" }) },
+    personalizationSettings: { findUnique: vi.fn().mockResolvedValue({ customInstructions: "Be helpful" }) },
+    chatMessage: { findMany: vi.fn().mockResolvedValue([]) },
     userSettings: { findUnique: vi.fn(), update: vi.fn() },
     memoryRecord: {
       findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn(), create: vi.fn(),
@@ -41,12 +45,30 @@ function fixture() {
     },
     memoryAction: { findUnique: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]), create: vi.fn() },
     memoryTopicForget: { findMany: vi.fn().mockResolvedValue([]), create: vi.fn() },
-    memorySummary: { findUnique: vi.fn(), findFirst: vi.fn().mockResolvedValue(null), upsert: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    memorySummary: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      findFirst: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockImplementation(async ({ update, create }: any) => ({
+        id: "summary-id",
+        userId,
+        content: update?.content ?? create?.content ?? null,
+        status: update?.status ?? create?.status ?? "READY",
+        version: 1,
+        feedback: update?.feedback ?? create?.feedback ?? null,
+        generatedAt: now,
+        expiresAt: null,
+        deletedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      })),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     auditEvent: { create: vi.fn().mockResolvedValue(undefined) },
   };
   const service = new MemoryService({
-    repositories,
-    transaction: async (work) => work(repositories),
+    repositories: repositories as any,
+    transaction: async (work) => work(repositories as any),
+    ...(options.hermes ? { hermes: options.hermes } : {}),
   });
   return { service, repositories };
 }
@@ -258,24 +280,168 @@ describe("memory lifecycle service", () => {
     expect(exported.summary).toBeNull();
   });
 
-  it("persists an explicit provider-free summary regeneration boundary and bounded feedback", async () => {
+  it("synthesizes memory summary using Hermes dreaming and persists READY status", async () => {
+    const dreamMarkdown = "## Profile & Identity\nUser is Rangga.\n\n## Preferences & Interests\n- Likes robotics";
+    const generate = vi.fn().mockResolvedValue(dreamMarkdown);
+    const hermes: HermesGenerateClient = { generate };
+    const f = fixture({ hermes });
+
+    f.repositories.memoryRecord.findMany.mockResolvedValue([memoryRow()]);
+
+    const result = await f.service.regenerateSummary(userId, { idempotencyKey: key }, "request-dream-1");
+
+    expect(generate).toHaveBeenCalledWith(
+      expect.stringContaining("Prefers window seats"),
+      undefined,
+      expect.objectContaining({
+        conversation: `memory-dream:${userId}`,
+        sessionKey: `bmo:user:${userId}`,
+        instructions: BMO_DREAM_SYSTEM_INSTRUCTIONS,
+        raw: true,
+      }),
+    );
+
+    expect(f.repositories.memorySummary.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId },
+      update: expect.objectContaining({
+        status: "READY",
+        content: dreamMarkdown,
+      }),
+    }));
+
+    expect(result).toEqual({
+      summary: expect.objectContaining({
+        status: "ready",
+        content: dreamMarkdown,
+      }),
+      generation: {
+        source: "memory_records",
+        runtimeStatus: "completed",
+      },
+    });
+
+    expect(f.repositories.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId,
+        eventType: "MEMORY_SUMMARY_REGENERATED",
+        requestId: "request-dream-1",
+      }),
+    });
+  });
+
+  it("falls back gracefully to deterministic synthesis when Hermes throws", async () => {
+    const generate = vi.fn().mockRejectedValue(new Error("Hermes unavailable"));
+    const hermes: HermesGenerateClient = { generate };
+    const f = fixture({ hermes });
+
+    f.repositories.memoryRecord.findMany.mockResolvedValue([memoryRow()]);
+
+    const result = await f.service.regenerateSummary(userId, { idempotencyKey: key }, "request-fallback");
+
+    expect(result.summary).toEqual(expect.objectContaining({
+      status: "ready",
+      content: expect.stringContaining("## Preferences & Interests\n- Prefers window seats"),
+    }));
+    expect(result.generation).toEqual({
+      source: "memory_records",
+      runtimeStatus: "fallback",
+    });
+  });
+
+  it("synthesizes fallback summary when Hermes is not configured", async () => {
     const f = fixture();
-    f.repositories.memorySummary.upsert.mockResolvedValue({
-      id: "summary", userId, content: null, status: "GENERATING", version: 2, feedback: null,
-      generatedAt: null, expiresAt: null, deletedAt: null, createdAt: now, updatedAt: now,
+    f.repositories.memoryRecord.findMany.mockResolvedValue([memoryRow()]);
+
+    const result = await f.service.regenerateSummary(userId, { idempotencyKey: key }, "request-no-hermes");
+
+    expect(result.summary).toEqual(expect.objectContaining({
+      status: "ready",
+      content: expect.stringContaining("## Profile & Identity\nNama kamu Rangga."),
+    }));
+    expect(result.generation).toEqual({
+      source: "memory_records",
+      runtimeStatus: "not_configured",
     });
-    await expect(f.service.regenerateSummary(userId, { idempotencyKey: key }, "request-9")).resolves.toEqual({
-      summary: expect.objectContaining({ status: "generating", version: 2 }),
-      generation: { source: "memory_records", runtimeStatus: "not_configured" },
+  });
+
+  it("updates memory summary with user feedback and re-synthesizes", async () => {
+    const feedbackMarkdown = "## Profile & Identity\nUser is Rangga.\n\n## Interests\nEnjoys AI.";
+    const generate = vi.fn().mockResolvedValue(feedbackMarkdown);
+    const hermes: HermesGenerateClient = { generate };
+    const f = fixture({ hermes });
+
+    const result = await f.service.setSummaryFeedback(
+      userId,
+      { idempotencyKey: "feedback-key", feedback: "Include that I enjoy AI" },
+      "request-feedback-1",
+    );
+
+    expect(generate).toHaveBeenCalledWith(
+      expect.stringContaining("Include that I enjoy AI"),
+      undefined,
+      expect.objectContaining({ raw: true }),
+    );
+
+    expect(f.repositories.memorySummary.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({
+        feedback: "Include that I enjoy AI",
+        content: feedbackMarkdown,
+      }),
+    }));
+
+    expect(result).toEqual({
+      summary: expect.objectContaining({
+        status: "ready",
+        content: feedbackMarkdown,
+        feedback: "Include that I enjoy AI",
+      }),
     });
-    f.repositories.memoryAction.findUnique.mockResolvedValue(null);
+
+    expect(f.repositories.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId,
+        eventType: "MEMORY_SUMMARY_FEEDBACK_UPDATED",
+        requestId: "request-feedback-1",
+      }),
+    });
+  });
+
+  it("replays idempotent regenerateSummary without re-invoking synthesis", async () => {
+    const generate = vi.fn().mockResolvedValue("## Overview\nTest");
+    const hermes: HermesGenerateClient = { generate };
+    const f = fixture({ hermes });
+
+    f.repositories.memoryAction.findUnique.mockResolvedValue({
+      actionType: "SUMMARY_REGENERATE",
+      resourceType: "memory_summary",
+      resourceId: "summary-id",
+      metadata: { status: "completed" },
+    });
     f.repositories.memorySummary.findUnique.mockResolvedValue({
-      id: "summary", userId, content: null, status: "GENERATING", version: 2, feedback: null,
-      generatedAt: null, expiresAt: null, deletedAt: null, createdAt: now, updatedAt: now,
+      id: "summary-id",
+      userId,
+      content: "## Overview\nReplayed Content",
+      status: "READY",
+      version: 1,
+      feedback: null,
+      generatedAt: now,
+      expiresAt: null,
+      deletedAt: null,
+      updatedAt: now,
     });
-    f.repositories.memorySummary.updateMany.mockResolvedValue({ count: 1 });
-    const feedbackResult = await f.service.setSummaryFeedback(userId, { idempotencyKey: "feedback-key", feedback: "Accurate" }, "request-10");
-    expect(f.repositories.memorySummary.updateMany).toHaveBeenCalledWith({ where: { id: "summary", userId, deletedAt: null }, data: { feedback: "Accurate" } });
-    expect(feedbackResult).toEqual({ summary: expect.objectContaining({ feedback: "Accurate" }) });
+
+    const result = await f.service.regenerateSummary(userId, { idempotencyKey: key }, "request-replay");
+
+    expect(generate).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      summary: expect.objectContaining({
+        status: "ready",
+        content: "## Overview\nReplayed Content",
+      }),
+      generation: {
+        source: "memory_records",
+        runtimeStatus: "completed",
+      },
+    });
   });
 });

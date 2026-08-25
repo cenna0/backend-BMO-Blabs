@@ -375,6 +375,7 @@ model Device {
   logs                DeviceLog[]
 
   @@unique([id, userId])
+  // SQL migration enforces one ACTIVE physical BMO per user; REVOKED history remains allowed.
   @@index([hardwareId, status])
   @@index([userId, status])
 }

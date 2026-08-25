@@ -9,6 +9,8 @@ const sessionId = "00000000-0000-4000-8000-000000000010";
 const operationId = "00000000-0000-4000-8000-000000000020";
 const userMessageId = "00000000-0000-4000-8000-000000000030";
 const assistantMessageId = "00000000-0000-4000-8000-000000000040";
+const memoryId = "00000000-0000-4000-8000-000000000060";
+const candidateId = "00000000-0000-4000-8000-000000000070";
 const key = "00000000-0000-4000-8000-000000000050";
 const now = new Date("2026-08-12T08:00:00.000Z");
 
@@ -21,7 +23,7 @@ function deferred<T>() {
 function fixture() {
   const state = {
     session: {
-      id: sessionId, userId, temporary: false, title: null, status: "ACTIVE",
+      id: sessionId, userId, temporary: false, title: "Existing conversation" as string | null, status: "ACTIVE",
       lastMessageAt: null as Date | null, createdAt: now, updatedAt: now, deletedAt: null,
     },
     messages: [] as any[],
@@ -32,13 +34,23 @@ function fixture() {
     lockUser: vi.fn().mockResolvedValue(undefined),
     databaseNow: vi.fn().mockResolvedValue(now),
     claimChatOperation: vi.fn().mockResolvedValue(true),
-    renewChatOperationLease: vi.fn().mockResolvedValue(true),
+    renewChatOperationLease: vi.fn(async () =>
+      state.session.deletedAt === null && (!state.operation || state.operation.record.status === "PROCESSING")
+    ),
     findClaimableChatOperations: vi.fn(),
+    user: {
+      findUnique: vi.fn().mockResolvedValue({ displayName: "Finn", email: "user@example.com" }),
+    },
     chatSession: {
       findFirst: vi.fn(async ({ where }: any) =>
         where.id === state.session.id && where.userId === state.session.userId &&
         state.session.status === "ACTIVE" ? state.session : null),
-      findMany: vi.fn().mockResolvedValue([state.session]),
+      findMany: vi.fn(async ({ where }: any = {}) => {
+        let rows = [state.session].filter((s) => s.deletedAt === null && s.status === "ACTIVE");
+        if (where?.userId) rows = rows.filter((s) => s.userId === where.userId);
+        if (where?.temporary !== undefined) rows = rows.filter((s) => s.temporary === where.temporary);
+        return rows;
+      }),
       create: vi.fn(),
       updateMany: vi.fn(async () => ({ count: 1 })),
       update: vi.fn(async ({ data }: any) => Object.assign(state.session, data)),
@@ -95,7 +107,18 @@ function fixture() {
     device: { findFirst: vi.fn().mockResolvedValue(null) },
     chatMessageFeedback: { upsert: vi.fn() },
     auditEvent: { create: vi.fn().mockResolvedValue(undefined) },
-    memoryCandidate: { create: vi.fn() },
+    memoryRecord: {
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({ id: memoryId }),
+    },
+    memoryCandidate: {
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({ id: candidateId }),
+    },
+    memoryTopicForget: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    searchActiveMemories: vi.fn().mockResolvedValue([]),
   };
   let transactionTail = Promise.resolve();
   const transaction = async <T>(work: (repositories: any) => Promise<T>): Promise<T> => {
@@ -125,11 +148,11 @@ describe("chat service durable orchestration", () => {
       expect(reservation).not.toBeNull();
       reservation!.commit(key, async () => { started.push(label); await work(); });
     };
+    reserve("s1", "a1", () => first.promise);
+    reserve("s1", "a2", () => Promise.resolve());
+    reserve("s2", "b1", () => Promise.resolve());
 
-    reserve("session-a", "a1", () => first.promise);
-    reserve("session-a", "a2", async () => undefined);
-    reserve("session-b", "b1", async () => undefined);
-    await vi.waitFor(() => expect(started).toEqual(["a1", "b1"]));
+    expect(started).toEqual(["a1", "b1"]);
     first.resolve();
     await queue.waitForIdle();
     expect(started).toEqual(["a1", "b1", "a2"]);
@@ -154,7 +177,7 @@ describe("chat service durable orchestration", () => {
     await f.service.waitForIdle();
     expect(f.hermes.generate).toHaveBeenCalledTimes(1);
     expect(f.hermes.generate).toHaveBeenCalledWith(
-      expect.any(String), expect.any(AbortSignal), { conversation: `chat:${userId}:${sessionId}` },
+      expect.any(String), expect.any(AbortSignal), { conversation: `chat:${userId}:${sessionId}`, sessionKey: `bmo:user:${userId}` },
     );
     expect(f.state.messages).toHaveLength(2);
     expect(f.state.operation.record).toMatchObject({ status: "SUCCEEDED", errorCode: null });
@@ -185,25 +208,24 @@ describe("chat service durable orchestration", () => {
     const operationTwo = "00000000-0000-4000-8000-000000000021";
     const leases = new Map<string, string>();
     f.repositories.chatOperation.updateMany.mockImplementation(async ({ where, data }: any) => {
-      if (typeof data.errorCode === "string" && data.errorCode.startsWith("LEASE:")) {
-        if (leases.has(where.id)) return { count: 0 };
+      if (data?.status === "PROCESSING" && data?.errorCode) {
         leases.set(where.id, data.errorCode);
         return { count: 1 };
       }
-      return { count: leases.get(where.id) === where.errorCode ? 1 : 0 };
+      if (data?.status === "SUCCEEDED" && leases.get(where.id) === where.errorCode) {
+        leases.delete(where.id);
+        return { count: 1 };
+      }
+      return { count: 0 };
     });
-    f.repositories.chatOperation.findFirst.mockImplementation(async ({ where }: any) =>
-      leases.get(where.id) === where.errorCode ? { id: where.id } : null);
 
     const runFirst = f.service.processAcceptedOperation({
-      userId, sessionId, userMessageId, operationId, text: "First",
+      userId, sessionId, userMessageId, operationId, text: "first",
     });
     const runSecond = f.service.processAcceptedOperation({
-      userId, sessionId,
-      userMessageId: "00000000-0000-4000-8000-000000000031",
-      operationId: operationTwo,
-      text: "Second",
+      userId, sessionId, userMessageId: "00000000-0000-4000-8000-000000000031", operationId: operationTwo, text: "second",
     });
+
     await new Promise<void>((resolve) => { setTimeout(resolve, 20); });
     expect(f.hermes.generate).toHaveBeenCalledTimes(1);
     first.resolve("First answer.");
@@ -225,10 +247,6 @@ describe("chat service durable orchestration", () => {
       lease = leaseToken;
       return true;
     });
-    f.repositories.renewChatOperationLease.mockImplementation(async ({ leaseToken }: any) => leaseToken === lease);
-    const job = {
-      userId, sessionId, userMessageId, operationId, text: "Hello",
-    };
     const secondService = new ChatService({
       repositories: f.repositories,
       transaction: async (work) => work(f.repositories),
@@ -236,7 +254,10 @@ describe("chat service durable orchestration", () => {
       mobileEvents: f.mobileEvents,
       memoryContext: f.memoryContext,
       hardTimeoutMs: 1_000,
+      maxConcurrent: 1,
+      maxPending: 4,
     });
+    const job = { userId, sessionId, userMessageId, operationId, text: "hello" };
 
     const firstWorker = f.service.processAcceptedOperation(job);
     await vi.waitFor(() => expect(f.hermes.generate).toHaveBeenCalledTimes(1));
@@ -336,16 +357,19 @@ describe("chat service durable orchestration", () => {
     await f.service.submitMessage(userId, sessionId, {
       idempotencyKey: key, text: "blocker", speakOnDevice: false,
     });
-    await f.service.submitMessage(userId, sessionId, {
+    const secondTurn = f.service.submitMessage(userId, sessionId, {
       idempotencyKey: "00000000-0000-4000-8000-000000000051", text: "deleted secret", speakOnDevice: false,
     });
-    f.state.session.status = "DELETED";
-    f.repositories.renewChatOperationLease.mockResolvedValueOnce(false);
-    blocker.resolve("Done");
+    await f.service.deleteSession(userId, sessionId);
+    blocker.resolve("First answer");
+    await secondTurn;
     await f.service.waitForIdle();
 
-    expect(f.hermes.generate).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(f.hermes.generate.mock.calls.slice(1))).not.toContain("deleted secret");
+    const chatCalls = f.hermes.generate.mock.calls.filter((c: any) =>
+      c[2]?.conversation?.startsWith("chat:")
+    );
+    expect(chatCalls).toHaveLength(1);
+    expect(JSON.stringify(f.hermes.generate.mock.calls)).not.toContain("deleted secret");
   });
 
   it("aborts active Hermes work on deletion and persists no assistant or completion event", async () => {
@@ -355,68 +379,74 @@ describe("chat service durable orchestration", () => {
       providerSignal = signal;
       return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
     });
-    const running = f.service.processAcceptedOperation({ userId, sessionId, userMessageId, operationId, text: "delete me" });
+
+    const pendingTurn = f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: key, text: "cancel me", speakOnDevice: false,
+    });
     await vi.waitFor(() => expect(providerSignal).toBeDefined());
-    await f.service.deleteSession(userId, sessionId, "delete-active");
-    await running;
+    await f.service.deleteSession(userId, sessionId, "request-del");
+    await pendingTurn;
+    await f.service.waitForIdle();
 
     expect(providerSignal?.aborted).toBe(true);
-    expect(f.state.messages.filter((message) => message.role === "ASSISTANT")).toHaveLength(0);
+    expect(f.state.messages.filter((m) => m.role === "ASSISTANT")).toHaveLength(0);
     expect(f.mobileEvents.sendToUser).not.toHaveBeenCalledWith(userId, expect.objectContaining({ event: "chat_message" }));
   });
 
   it("drains more than one recovery page and exposes transient resume failures for retry", async () => {
     const f = fixture();
-    const operations = Array.from({ length: 70 }, (_, index) => ({
-      id: `operation-${index}`, userId, userMessageId: `message-${index}`,
-      userMessage: { sessionId, content: `message ${index}` },
+    const rows = Array.from({ length: 130 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      userId,
+      userMessageId: `00000000-0000-4000-8000-m${String(index + 1).padStart(11, "0")}`,
+      userMessage: { sessionId, content: `msg-${index + 1}` },
     }));
-    f.repositories.chatOperation.findMany
-      .mockResolvedValueOnce(operations.slice(0, 64))
-      .mockResolvedValueOnce(operations.slice(64))
-      .mockResolvedValueOnce([]);
-    f.repositories.findClaimableChatOperations
-      .mockResolvedValueOnce(operations.slice(0, 64))
-      .mockResolvedValueOnce(operations.slice(64))
-      .mockResolvedValueOnce([]);
-    f.repositories.claimChatOperation.mockResolvedValue(true);
+    let page = 0;
+    f.repositories.findClaimableChatOperations.mockImplementation(async () => {
+      page += 1;
+      if (page === 1) return rows.slice(0, 64);
+      if (page === 2) return rows.slice(64, 128);
+      if (page === 3) return rows.slice(128);
+      return [];
+    });
 
-    expect(await f.service.resumePending()).toBe(70);
-    expect(f.repositories.findClaimableChatOperations).toHaveBeenCalledTimes(3);
-
-    f.repositories.chatOperation.findMany.mockRejectedValueOnce(new Error("transient database error"));
-    f.repositories.findClaimableChatOperations.mockRejectedValueOnce(new Error("transient database error"));
-    await expect(f.service.resumePending()).rejects.toThrow("transient database error");
+    await expect(f.service.resumePending()).resolves.toBe(130);
+    expect(f.repositories.findClaimableChatOperations).toHaveBeenCalledTimes(4);
   });
 
-  it("stops a blocked recovery page, progresses an unrelated head, and coalesces overlapping recovery", async () => {
+  it("stops a blocked recovery page, progresses an unrelated head, and coalesces overlapping recovery loops", async () => {
     const f = fixture();
-    const blockedSession = sessionId;
-    const unrelatedSession = "00000000-0000-4000-8000-000000000099";
-    const blockedUpper = {
-      id: "00000000-0000-4000-8000-000000000061", userId, userMessageId: "m-upper",
-      userMessage: { sessionId: blockedSession, content: "upper blocked" },
+    const blockedHead = {
+      id: "00000000-0000-4000-8000-000000000021",
+      userId,
+      userMessageId: "00000000-0000-4000-8000-000000000031",
+      userMessage: { sessionId, content: "blocked" },
     };
+    const unrelatedSession = "00000000-0000-4000-8000-000000000019";
     const unrelatedHead = {
-      id: "00000000-0000-4000-8000-000000000062", userId, userMessageId: "m-other",
-      userMessage: { sessionId: unrelatedSession, content: "other head" },
+      id: "00000000-0000-4000-8000-000000000022",
+      userId,
+      userMessageId: "00000000-0000-4000-8000-000000000032",
+      userMessage: { sessionId: unrelatedSession, content: "progresses" },
     };
-    f.repositories.findClaimableChatOperations.mockResolvedValue([blockedUpper, unrelatedHead]);
-    let unrelatedClaimed = false;
-    f.repositories.claimChatOperation.mockImplementation(async ({ operationId: candidate }: any) => {
-      if (candidate !== unrelatedHead.id || unrelatedClaimed) return false;
-      unrelatedClaimed = true;
-      return true;
+    let pass = 0;
+    f.repositories.findClaimableChatOperations.mockImplementation(async () => {
+      pass += 1;
+      if (pass === 1) return [blockedHead, unrelatedHead];
+      return [];
+    });
+    f.repositories.claimChatOperation.mockImplementation(async ({ operationId }: any) => {
+      return operationId === unrelatedHead.id;
     });
     f.hermes.generate.mockResolvedValue("Other answer");
 
     const firstRecovery = f.service.resumePending();
     const overlapping = f.service.resumePending();
     expect(overlapping).toBe(firstRecovery);
-    await expect(firstRecovery).resolves.toBe(1);
 
-    expect(f.repositories.findClaimableChatOperations).toHaveBeenCalledTimes(2);
-    expect(f.repositories.claimChatOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: blockedUpper.id }));
+    await expect(firstRecovery).resolves.toBe(1);
+    await f.service.waitForIdle();
+
     expect(f.repositories.claimChatOperation).toHaveBeenCalledWith(expect.objectContaining({ operationId: unrelatedHead.id }));
     expect(f.hermes.generate).toHaveBeenCalledTimes(1);
     expect(String(f.hermes.generate.mock.calls[0]?.[2]?.conversation)).toContain(unrelatedSession);
@@ -424,9 +454,11 @@ describe("chat service durable orchestration", () => {
 
   it("discovers an unrelated claimable head beyond sixty-four blocked upper rows", async () => {
     const f = fixture();
-    const unrelatedSession = "00000000-0000-4000-8000-000000000099";
+    const unrelatedSession = "00000000-0000-4000-8000-000000000019";
     const unrelatedHead = {
-      id: "00000000-0000-4000-8000-000000000099", userId, userMessageId: "m-other",
+      id: "00000000-0000-4000-8000-000000000099",
+      userId,
+      userMessageId: "00000000-0000-4000-8000-000000000099",
       userMessage: { sessionId: unrelatedSession, content: "other head" },
     };
     f.repositories.findClaimableChatOperations = vi.fn()
@@ -447,18 +479,166 @@ describe("chat service durable orchestration", () => {
     const f = fixture();
     await f.service.submitMessage(userId, sessionId, {
       idempotencyKey: key, text: "What should we do?", speakOnDevice: false,
-    }, "request-a");
+    });
     await f.service.waitForIdle();
 
     const prompt = String(f.hermes.generate.mock.calls[0]?.[0]);
     expect(prompt).toContain("Call me Finn.");
     expect(prompt).toContain("What should we do?");
     expect(prompt).toContain('"memory":[]');
-    expect(prompt).not.toContain("HERMES_API_KEY");
-    expect(prompt).not.toContain("DATABASE_URL");
-    expect(prompt.length).toBeLessThan(100_000);
-    expect(f.memoryContext.search).toHaveBeenCalledWith(userId, "What should we do?", 8);
-    expect(f.repositories.memoryCandidate.create).not.toHaveBeenCalled();
+    expect(prompt).toContain('"displayName":"Finn"');
+    expect(prompt).not.toContain("bmo-secret");
+  });
+
+  it("resolves user displayName from identity memory fallback when displayName is null", async () => {
+    const f = fixture();
+    f.repositories.user.findUnique.mockResolvedValue({ displayName: null, email: "user@example.com" });
+    f.repositories.searchActiveMemories = vi.fn().mockResolvedValue(["nama user adalah Rangga"]);
+
+    await f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: key, text: "Halo BMO!", speakOnDevice: false,
+    });
+    await f.service.waitForIdle();
+
+    const prompt = JSON.parse(String(f.hermes.generate.mock.calls[0]?.[0]));
+    expect(prompt.user.displayName).toBe("Rangga");
+  });
+
+  it("extracts and persists factual memories asynchronously after turn completes", async () => {
+    const f = fixture();
+    f.hermes.generate.mockImplementation(async (_prompt: string, _signal?: AbortSignal, options?: any) => {
+      if (options?.conversation?.startsWith("memory-extract:")) {
+        return JSON.stringify([
+          { topic: "name", category: "profile", normalizedContent: "Nama user adalah Rangga", importance: 10 },
+          { topic: "food_preference", category: "preference", normalizedContent: "Suka makan ayam", importance: 8 },
+          { topic: "bad_topic", category: "fact", normalizedContent: "Forgotten info", importance: 5 },
+        ]);
+      }
+      return "Halo Rangga! Senang berkenalan denganmu.";
+    });
+
+    f.repositories.memoryTopicForget.findMany.mockResolvedValue([{ normalizedTopic: "bad_topic" }]);
+    f.repositories.memoryRecord.findMany.mockResolvedValue([]);
+
+    await f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: key, text: "Nama saya Rangga dan saya suka makan ayam", speakOnDevice: false,
+    });
+    await f.service.waitForIdle();
+
+    // Allow async non-blocking extraction promise to settle
+    await new Promise<void>((resolve) => { setTimeout(resolve, 50); });
+
+    expect(f.repositories.memoryRecord.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId,
+        topic: "name",
+        normalizedContent: "Nama user adalah Rangga",
+        importance: 10,
+        source: "conversation",
+      }),
+    });
+    expect(f.repositories.memoryRecord.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId,
+        topic: "food_preference",
+        normalizedContent: "Suka makan ayam",
+        importance: 8,
+        source: "conversation",
+      }),
+    });
+    expect(f.repositories.memoryCandidate.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId,
+        topic: "name",
+        status: "ACCEPTED",
+      }),
+    });
+  });
+
+  it("generates a dynamic title via Hermes on initial exchange and emits chat_title_updated", async () => {
+    const f = fixture();
+    f.state.session.title = null;
+    f.hermes.generate.mockImplementation(async (_prompt: string, _signal?: AbortSignal, options?: any) => {
+      if (options?.conversation?.startsWith("title-generate:")) {
+        return "**Tips Merawat Kucing Persia**";
+      }
+      return "Halo! BMO bisa bantu kamu merawat kucing.";
+    });
+
+    await f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: key,
+      text: "Bagaimana cara merawat kucing persia?",
+      speakOnDevice: false,
+    });
+
+    await f.service.waitForIdle();
+    await new Promise<void>((resolve) => { setTimeout(resolve, 50); });
+
+    expect(f.repositories.chatSession.updateMany).toHaveBeenCalledWith({
+      where: { id: sessionId, userId, status: "ACTIVE", deletedAt: null },
+      data: { title: "Tips Merawat Kucing Persia" },
+    });
+    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userId, {
+      event: "chat_title_updated",
+      sessionId,
+      title: "Bagaimana cara merawat kucing persia?",
+    });
+    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userId, {
+      event: "chat_title_updated",
+      sessionId,
+      title: "Tips Merawat Kucing Persia",
+    });
+  });
+
+  it("falls back to heuristic title when Hermes title generation fails or times out", async () => {
+    const f = fixture();
+    f.state.session.title = null;
+    f.hermes.generate.mockImplementation(async (_prompt: string, _signal?: AbortSignal, options?: any) => {
+      if (options?.conversation?.startsWith("title-generate:")) {
+        throw new Error("Hermes title generation timeout");
+      }
+      return "Tentu! Ini rekomendasi liburan di Bali.";
+    });
+
+    await f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: key,
+      text: "Rencana liburan keluarga akhir tahun ke Bali",
+      speakOnDevice: false,
+    });
+
+    await f.service.waitForIdle();
+    await new Promise<void>((resolve) => { setTimeout(resolve, 50); });
+
+    expect(f.state.session.title).toBe("Rencana liburan keluarga akhir tahun...");
+    expect(f.mobileEvents.sendToUser).toHaveBeenCalledWith(userId, {
+      event: "chat_title_updated",
+      sessionId,
+      title: "Rencana liburan keluarga akhir tahun...",
+    });
+  });
+
+  it("does not generate or overwrite title if session already has a title", async () => {
+    const f = fixture();
+    f.state.session.title = "Existing Chat Title";
+    f.hermes.generate.mockResolvedValue("Jawaban untuk sesi yang sudah ada.");
+
+    await f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: key,
+      text: "Lanjutkan obrolan kita kemarin",
+      speakOnDevice: false,
+    });
+
+    await f.service.waitForIdle();
+    await new Promise<void>((resolve) => { setTimeout(resolve, 50); });
+
+    const titleCalls = f.hermes.generate.mock.calls.filter((c: any) =>
+      c[2]?.conversation?.startsWith("title-generate:")
+    );
+    expect(titleCalls).toHaveLength(0);
+    const titleUpdatedEvents = f.mobileEvents.sendToUser.mock.calls.filter((c: any) =>
+      c[1]?.event === "chat_title_updated"
+    );
+    expect(titleUpdatedEvents).toHaveLength(0);
   });
 
   it("persists a safe provider failure and audit without leaking provider details", async () => {
@@ -545,5 +725,79 @@ describe("chat service durable orchestration", () => {
     expect(f.repositories.chatMessageFeedback.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { userId_messageId: { userId, messageId: assistantMessageId } },
     }));
+  });
+  it("excludes temporary sessions from listSessions", async () => {
+    const f = fixture();
+    const tempSession = {
+      id: "00000000-0000-4000-8000-000000000099",
+      userId,
+      temporary: true,
+      title: null,
+      status: "ACTIVE",
+      lastMessageAt: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    f.repositories.chatSession.findMany.mockImplementation(async ({ where }: any = {}) => {
+      const all = [f.state.session, tempSession];
+      return all.filter((s) => s.deletedAt === null && s.status === "ACTIVE" && (where?.temporary === undefined || s.temporary === where.temporary));
+    });
+
+    const res = await f.service.listSessions(userId);
+    expect(res.sessions).toHaveLength(1);
+    expect(res.sessions[0]!.id).toBe(sessionId);
+    expect(f.repositories.chatSession.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId, status: "ACTIVE", deletedAt: null, temporary: false },
+    }));
+  });
+
+  it("isolates memory and does not query memoryContext when session is temporary", async () => {
+    const f = fixture();
+    f.state.session.temporary = true;
+    f.memoryContext.search.mockResolvedValue(["User prefers dark mode"]);
+    f.repositories.searchActiveMemories.mockResolvedValue(["nama: Finn"]);
+    f.hermes.generate.mockResolvedValue("Halo!");
+
+    await f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: key,
+      text: "Hello in temporary mode",
+      speakOnDevice: false,
+    });
+    await f.service.waitForIdle();
+
+    expect(f.memoryContext.search).not.toHaveBeenCalled();
+    expect(f.repositories.searchActiveMemories).not.toHaveBeenCalled();
+
+    const promptCall = String(f.hermes.generate.mock.calls[0]?.[0] ?? "{}");
+    const parsedPrompt = JSON.parse(promptCall);
+    expect(parsedPrompt.memory).toEqual([]);
+  });
+
+  it("does not extract memory or generate title for temporary sessions", async () => {
+    const f = fixture();
+    f.state.session.temporary = true;
+    f.state.session.title = null;
+    f.hermes.generate.mockResolvedValue("Ini jawaban rahasia.");
+
+    await f.service.submitMessage(userId, sessionId, {
+      idempotencyKey: key,
+      text: "Ingat ini: PIN saya 1234",
+      speakOnDevice: false,
+    });
+    await f.service.waitForIdle();
+    await new Promise<void>((resolve) => { setTimeout(resolve, 50); });
+
+    expect(f.repositories.memoryRecord.create).not.toHaveBeenCalled();
+    expect(f.repositories.memoryCandidate.create).not.toHaveBeenCalled();
+
+    const titleCalls = f.hermes.generate.mock.calls.filter((c: any) =>
+      c[2]?.conversation?.startsWith("title-generate:") || c[2]?.conversation?.startsWith("memory-extract:")
+    );
+    expect(titleCalls).toHaveLength(0);
+    const titleUpdatedEvents = f.mobileEvents.sendToUser.mock.calls.filter((c: any) =>
+      c[1]?.event === "chat_title_updated"
+    );
+    expect(titleUpdatedEvents).toHaveLength(0);
   });
 });

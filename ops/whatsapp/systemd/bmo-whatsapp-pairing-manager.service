@@ -1,0 +1,36 @@
+[Unit]
+Description=BMO WhatsApp connection-scoped bmo-whatsapp-pairing-manager sidecar
+Requires=bmo-whatsapp-bridge.service
+After=bmo-whatsapp-bridge.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+WorkingDirectory=/home/hermes/.hermes/scripts/whatsapp-pairing
+ExecStart=/home/hermes/.hermes/node/bin/node /home/hermes/.hermes/scripts/whatsapp-pairing/pairing-manager.mjs
+Restart=on-failure
+RestartSec=10s
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+UMask=0077
+Environment=HOME=/home/hermes
+Environment=HERMES_HOME=/home/hermes/.hermes
+Environment=PATH=/home/hermes/.hermes/node/bin:/usr/bin:/bin
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

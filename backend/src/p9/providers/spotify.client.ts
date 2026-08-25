@@ -62,7 +62,8 @@ export type SpotifyProviderErrorCode =
   | "RATE_LIMITED"
   | "PROVIDER_UNAVAILABLE"
   | "INVALID_PROVIDER_RESPONSE"
-  | "PROVIDER_REQUEST_FAILED";
+  | "PROVIDER_REQUEST_FAILED"
+  | "USER_NOT_ALLOWLISTED";
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -82,6 +83,12 @@ function isObject(value: unknown): value is ProviderObject {
 function stringField(value: unknown, field: string): string {
   if (typeof value !== "string" || value.length === 0 || value.length > 2_048) throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
   return value;
+}
+
+function identifierField(value: unknown, field: string): string {
+  if (typeof value === "string" && value.length > 0) return stringField(value, field);
+  if (typeof value === "number" && Number.isFinite(value)) return stringField(String(value), field);
+  throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
 }
 
 function optionalString(value: unknown): string | null {
@@ -187,12 +194,40 @@ export class SpotifyApiClient {
   }
 
   async currentUser(accessToken: string): Promise<SpotifyCurrentUser> {
-    const payload = await this.#apiRequest("/me", accessToken, { method: "GET" });
-    if (!isObject(payload)) throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
+    const trimmedToken = accessToken.trim();
+    let payload: unknown;
+    try {
+      payload = await this.#apiRequest("/me", trimmedToken, { method: "GET" });
+    } catch (error) {
+      console.error(JSON.stringify({
+        msg: "spotify.me.request_failed",
+        err: error instanceof Error ? error.message : String(error),
+        code: (error as { code?: string }).code,
+        status: (error as { status?: number }).status,
+      }));
+      throw error;
+    }
+    if (!isObject(payload)) {
+      console.error(JSON.stringify({ msg: "spotify.me.invalid_payload", payloadType: payload === null ? "null" : typeof payload }));
+      throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
+    }
     const country = typeof payload.country === "string" && /^[A-Z]{2}$/u.test(payload.country) ? payload.country : null;
+    const profileId = optionalString(payload.id);
+    const accountId =
+      typeof payload.account_id === "string" && payload.account_id.length > 0
+        ? identifierField(payload.account_id, "account_id")
+        : profileId
+          ? identifierField(profileId, "id")
+          : (() => {
+              console.error(JSON.stringify({
+                msg: "spotify.me.missing_identity",
+                keys: Object.keys(payload).slice(0, 20),
+              }));
+              throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
+            })();
     return {
-      accountId: stringField(payload.account_id, "account_id"),
-      profileId: optionalString(payload.id),
+      accountId,
+      profileId,
       market: country,
       product: typeof payload.product === "string" && payload.product.length <= 32 ? payload.product : null,
     };
@@ -241,8 +276,8 @@ export class SpotifyApiClient {
     if (!response.ok) throw normalizeProviderError(response.status, payload, true);
     if (!isObject(payload)) throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
     return {
-      accessToken: stringField(payload.access_token, "access_token"),
-      ...(payload.refresh_token === undefined ? {} : { refreshToken: stringField(payload.refresh_token, "refresh_token") }),
+      accessToken: stringField(payload.access_token, "access_token").trim(),
+      ...(payload.refresh_token === undefined ? {} : { refreshToken: stringField(payload.refresh_token, "refresh_token").trim() }),
       expiresIn: integerField(payload.expires_in, "expires_in", 1),
       scopes: normalizeScopes(payload.scope),
     };
@@ -283,7 +318,18 @@ export class SpotifyApiClient {
     const text = await response.text();
     if (text.length > 2_000_000) throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
     const payload = parseJsonText(text);
-    if (payload === null && text.trim() !== "null") throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
+    if (payload === null && text.trim() !== "null") {
+      if (/not registered for this application/iu.test(text)) {
+        throw new SpotifyProviderError(response.status, "USER_NOT_ALLOWLISTED");
+      }
+      console.error(JSON.stringify({
+        msg: "spotify.response_json.failed",
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        bodyPreview: text.slice(0, 500),
+      }));
+      throw new SpotifyProviderError(502, "INVALID_PROVIDER_RESPONSE");
+    }
     return payload;
   }
 

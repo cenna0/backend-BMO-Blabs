@@ -5,25 +5,38 @@ paired, the dedicated bridge is active and enabled for reboot, and source/unit
 persistence is verified. It must not be used for `hermes-gateway.service`, production
 Caddy, production migrations, or the production Backend.
 
-The dedicated unit launches the installed Hermes `bridge.js` unchanged as
-`hermes`, with:
+The dedicated manager launches one installed Hermes `bridge.js` child per
+Backend `IntegrationConnection`, all as `hermes`, with one isolated session
+directory and loopback port per connection:
+
+Each user gets a personal WhatsApp account connection; it is not a separate
+bot number.
 
 ```text
---port 3001
---session /home/hermes/.hermes/whatsapp/session
---mode bot
+manager: 127.0.0.1:3001
+sessions: /home/hermes/.hermes/whatsapp/sessions/<connectionId>
+child: 127.0.0.1:3101+
+mode: bot
 ```
 
 `hermes-gateway.service` remains independent and must keep
 `WHATSAPP_ENABLED=false`. The paired account is the user's personal WhatsApp
 account; `--mode bot` is only the official bridge's contact-event transport
 behavior, not a separate bot number. BMO Backend is the only `GET /messages`
-consumer. The launcher uses `WHATSAPP_DM_POLICY=pairing` so the private bridge
+consumer. The manager uses `WHATSAPP_DM_POLICY=pairing` so each private bridge
 queue can receive contact events; Backend notification rules remain the product
 policy. A protected non-wildcard `WHATSAPP_ALLOWED_USERS` value is optional
 and is used only by the official bridge to permit forwarding manual owner
 messages for selected chats; it is never used as the Backend notification
 filter.
+
+Install `bmo-whatsapp-bridge-manager.mjs` as
+`/usr/local/libexec/bmo-whatsapp-bridge-manager` and
+`bmo-whatsapp-pairing-manager.mjs` as
+`/usr/local/libexec/bmo-whatsapp-pairing-manager`. Enable
+`bmo-whatsapp-bridge.service`, `bmo-whatsapp-pairing-manager.service`, and the
+connection-aware identity resolver service. The old single-session pairing
+sidecar must not remain the active pairing endpoint.
 
 ## Mobile-facing Backend contract
 
@@ -86,6 +99,8 @@ The source files are:
 
 ```text
 ops/whatsapp/bmo-whatsapp-identity-resolver.mjs
+ops/whatsapp/bmo-whatsapp-bridge-manager.mjs
+ops/whatsapp/bmo-whatsapp-pairing-manager.mjs
 ops/whatsapp/identity-resolver.test.mjs
 ops/whatsapp/systemd/bmo-whatsapp-identity-resolver.service
 ops/whatsapp/p9.1-identity-resolver.override.yml
@@ -269,9 +284,8 @@ sudo -u hermes -H sh -c '
   f="$h/.env"
   test -r "$f"
   test -x "$h/node/bin/node"
-  test -d "$h/whatsapp/session"
-  test "$(stat -c %U:%G "$h/whatsapp/session")" = hermes:hermes
-  test -z "$(find "$h/whatsapp/session" -xdev \( ! -user hermes -o ! -group hermes -o -perm /0077 \) -print -quit)"
+  test -d "$h/whatsapp/sessions"
+  test -z "$(find "$h/whatsapp/sessions" -mindepth 1 -maxdepth 1 -type d -xdev \( ! -user hermes -o ! -group hermes -o -perm /0077 \) -print -quit)"
   test -f "$h/hermes-agent/scripts/whatsapp-bridge/bridge.js" ||
     test -f "$h/scripts/whatsapp-bridge/bridge.js"
   enabled=$(sed -n 's/^WHATSAPP_ENABLED=//p' "$f" | head -n 1)
@@ -309,52 +323,27 @@ sudo -u hermes -H env BACKUP_DIR="$backup_dir" sh -c '
 '
 ```
 
-## Official pairing command — completed; do not repeat
+## Connection-scoped pairing
 
-This is the installed Hermes CLI flow. It requires a TTY and the physical QR
-scan. Pair the user's personal WhatsApp account. When the wizard presents the
-legacy mode labels, select `1` so the official bridge writes `WHATSAPP_MODE=bot`;
-this is transport behavior only and does not require a second number. If manual
-owner-message observation is required, configure only the operator-approved
-contact identities in the protected Hermes allowlist; this is not a BMO
-notification setting. Leaving it empty keeps manual owner forwarding disabled
-while inbound contact ingestion remains available through pairing policy. Never
-capture CLI output. The CLI's successful pairing path may write
-`WHATSAPP_ENABLED=true`; immediately set it back to false before starting the
-dedicated unit:
+Pairing is initiated by the authenticated Backend connection flow. The mobile
+client calls `POST /integrations/whatsapp/connect`; Backend supplies the
+connection identifier to the pairing manager, which writes only to the
+connection's isolated scratch and persistent session directories:
 
 ```bash
-sudo -u hermes -H env \
-  HOME=/home/hermes \
-  HERMES_HOME=/home/hermes/.hermes \
-  PATH=/home/hermes/.hermes/hermes-agent/venv/bin:/home/hermes/.hermes/node/bin:/usr/bin:/bin \
-  /home/hermes/.hermes/hermes-agent/venv/bin/python \
-  -m hermes_cli.main whatsapp
-
-sudo -u hermes -H sh -c '
-  set -eu
-  f=/home/hermes/.hermes/.env
-  if grep -q "^WHATSAPP_ENABLED=" "$f"; then
-    sed -i "s/^WHATSAPP_ENABLED=.*/WHATSAPP_ENABLED=false/" "$f"
-  else
-    printf "\\nWHATSAPP_ENABLED=false\\n" >> "$f"
-  fi
-  test "$(sed -n 's/^WHATSAPP_ENABLED=//p' "$f" | head -n 1)" = false
-'
+sessions=/home/hermes/.hermes/whatsapp/sessions/<connectionId>
+pairing=/home/hermes/.hermes/whatsapp/pairing-sessions/<connectionId>
 ```
 
-Do not use `hermes gateway` for this transport. Do not delete an existing
-session directory or run the pairing wizard with a re-pair confirmation unless
-the operator explicitly intends to replace that provider session.
+Never share pairing codes, session files, `creds.json`, provider tokens, phone
+numbers, JIDs, or message bodies. Do not use `hermes gateway` for this
+transport.
 
 ## Targeted unit installation and reboot persistence
 
-No Backend `WHATSAPP_ALLOWED_USERS` provisioning is required. If the operator
-wants manual replies from the phone observed for selected chats, the official
-CLI may store the approved non-wildcard identities in Hermes `.env`; the
-launcher passes that protected value only to the official bridge owner-forward
-gate. Backend still receives contact events independently and applies its own
-`ALL`/`CONTACT`/`GROUP` notification rules.
+No Backend `WHATSAPP_ALLOWED_USERS` provisioning is required. Backend still
+receives contact events independently and applies its own `ALL`/`CONTACT`/`GROUP`
+notification rules.
 
 The source unit contains `[Install] WantedBy=multi-user.target`; the installed
 unit is enabled and active. If a future candidate-only reinstall is required,
@@ -364,15 +353,33 @@ not restart `hermes-gateway.service`:
 ```bash
 cd /opt/bmo/app
 sudo install -o root -g root -m 0755 \
-  ops/whatsapp/bmo-whatsapp-bridge-launcher \
-  /usr/local/libexec/bmo-whatsapp-bridge-launcher
+  ops/whatsapp/bmo-whatsapp-bridge-manager.mjs \
+  /usr/local/libexec/bmo-whatsapp-bridge-manager
+sudo install -o root -g root -m 0755 \
+  ops/whatsapp/bmo-whatsapp-pairing-manager.mjs \
+  /usr/local/libexec/bmo-whatsapp-pairing-manager
+sudo install -o root -g root -m 0755 \
+  ops/whatsapp/bmo-whatsapp-identity-resolver.mjs \
+  /usr/local/libexec/bmo-whatsapp-identity-resolver
 sudo install -o root -g root -m 0644 \
   ops/whatsapp/systemd/bmo-whatsapp-bridge.service \
   /etc/systemd/system/bmo-whatsapp-bridge.service
+sudo install -o root -g root -m 0644 \
+  ops/whatsapp/systemd/bmo-whatsapp-pairing-manager.service \
+  /etc/systemd/system/bmo-whatsapp-pairing-manager.service
+sudo install -o root -g root -m 0644 \
+  ops/whatsapp/systemd/bmo-whatsapp-identity-resolver.service \
+  /etc/systemd/system/bmo-whatsapp-identity-resolver.service
 sudo systemd-analyze verify /etc/systemd/system/bmo-whatsapp-bridge.service
+sudo systemd-analyze verify /etc/systemd/system/bmo-whatsapp-pairing-manager.service
+sudo systemd-analyze verify /etc/systemd/system/bmo-whatsapp-identity-resolver.service
 sudo systemctl daemon-reload
 sudo systemctl enable bmo-whatsapp-bridge.service
+sudo systemctl enable bmo-whatsapp-pairing-manager.service
+sudo systemctl enable bmo-whatsapp-identity-resolver.service
 sudo systemctl start bmo-whatsapp-bridge.service
+sudo systemctl start bmo-whatsapp-pairing-manager.service
+sudo systemctl start bmo-whatsapp-identity-resolver.service
 curl -fsS http://127.0.0.1:3001/health
 sudo systemctl show bmo-whatsapp-bridge.service \
   -p MainPID -p ExecMainStatus -p NRestarts -p ActiveState -p SubState
@@ -423,13 +430,19 @@ by the shared-service check.
 
 ## Rollback — prepared, not executed
 
-Stop and remove only the dedicated unit and launcher. Do not stop or restart
-the shared Hermes gateway, and do not remove the session directory.
+Stop and remove only the dedicated WhatsApp units and manager binaries. Do not
+stop or restart the shared Hermes gateway, and do not remove the session root.
 
 ```bash
 sudo systemctl disable --now bmo-whatsapp-bridge.service
+sudo systemctl disable --now bmo-whatsapp-pairing-manager.service
+sudo systemctl disable --now bmo-whatsapp-identity-resolver.service
 sudo rm -f /etc/systemd/system/bmo-whatsapp-bridge.service
-sudo rm -f /usr/local/libexec/bmo-whatsapp-bridge-launcher
+sudo rm -f /etc/systemd/system/bmo-whatsapp-pairing-manager.service
+sudo rm -f /etc/systemd/system/bmo-whatsapp-identity-resolver.service
+sudo rm -f /usr/local/libexec/bmo-whatsapp-bridge-manager
+sudo rm -f /usr/local/libexec/bmo-whatsapp-pairing-manager
+sudo rm -f /usr/local/libexec/bmo-whatsapp-identity-resolver
 sudo systemctl daemon-reload
 ```
 
@@ -445,7 +458,7 @@ sudo -u hermes -H env BACKUP_DIR="$backup_dir" sh -c '
 '
 ```
 
-No rollback command deletes `/home/hermes/.hermes/whatsapp/session`.
+No rollback command deletes `/home/hermes/.hermes/whatsapp/sessions`.
 
 ## Current stop boundary
 

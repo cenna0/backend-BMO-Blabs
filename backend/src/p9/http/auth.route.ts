@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { ipKeyGenerator, rateLimit } from "express-rate-limit";
-
 import { sha256Hex } from "../crypto.js";
 import type { P9Config } from "../config.js";
 import { AuthService } from "../services/auth.service.js";
@@ -31,6 +30,7 @@ function sessionResponse(session: Awaited<ReturnType<SessionService["issueSessio
 
 export function createAuthRouter(options: AuthRouteOptions): Router {
   const router = Router();
+
   const authLimiter = rateLimit({
     windowMs: options.config.loginWindowMs,
     limit: options.config.loginLimit,
@@ -48,7 +48,28 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
     },
     handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
   });
-  const refreshLimiter = rateLimit({ windowMs: options.config.loginWindowMs, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
+
+  const googleAuthLimiter = rateLimit({
+    windowMs: options.config.loginWindowMs,
+    limit: options.config.loginLimit,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (request) => {
+      const tokenSample = typeof request.body?.idToken === "string" ? request.body.idToken.slice(-20) : (typeof request.body?.accessToken === "string" ? request.body.accessToken.slice(-20) : "");
+      return sha256Hex(`${ipKeyGenerator(request.ip ?? "0.0.0.0")}:${request.path}:${tokenSample}`);
+    },
+    handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
+  });
+
+  const refreshLimiter = rateLimit({
+    windowMs: options.config.loginWindowMs,
+    limit: 20,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (request) => ipKeyGenerator(request.ip ?? "0.0.0.0"),
+    handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
+  });
+
   const recoveryIpLimiter = rateLimit({
     windowMs: options.config.recoveryWindowMs,
     limit: options.config.recoveryIpLimit,
@@ -57,6 +78,7 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
     keyGenerator: (request) => ipKeyGenerator(request.ip ?? "0.0.0.0"),
     handler: (_request, response) => response.status(429).json({ error: "RATE_LIMITED" }),
   });
+
   const recoveryEmailLimiter = rateLimit({
     windowMs: options.config.recoveryWindowMs,
     limit: options.config.recoveryEmailLimit,
@@ -84,6 +106,12 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
   router.post("/auth/login", asyncP9(async (request, response) => {
     const context = requestContext(request, response);
     const result = await options.auth.login(request.body, context.requestId);
+    response.status(200).json({ user: result.user, session: sessionResponse(result.session) });
+  }));
+
+  router.post("/auth/google", googleAuthLimiter, asyncP9(async (request, response) => {
+    const context = requestContext(request, response);
+    const result = await options.auth.loginWithGoogle(request.body, context.requestId);
     response.status(200).json({ user: result.user, session: sessionResponse(result.session) });
   }));
 
@@ -116,6 +144,7 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
   }));
 
   const authenticated = requireAuth(options.accessTokens, options.sessions);
+
   router.post("/auth/logout", authenticated, asyncP9(async (request, response) => {
     const auth = currentAuth(request);
     await options.sessions.revokeCurrent(auth.userId, auth.sessionId, "logout", auth.context.requestId);
@@ -137,5 +166,6 @@ export function createAuthRouter(options: AuthRouteOptions): Router {
     }
     response.json({ user });
   }));
+
   return router;
 }

@@ -74,8 +74,8 @@ export class HermesWhatsAppBridgeClient {
     this.#timeoutMs = options.timeoutMs ?? 30_000;
   }
 
-  async status(): Promise<HermesWhatsAppStatus> {
-    const payload = await this.#json("/health", { method: "GET" }, 3_000);
+  async status(connectionId?: string): Promise<HermesWhatsAppStatus> {
+    const payload = await this.#json(this.#route(connectionId, "/health"), { method: "GET" }, 3_000);
     if (!isObject(payload) || typeof payload.status !== "string") throw new HermesWhatsAppProviderError("INVALID_PROVIDER_RESPONSE");
     const queueLength = payload.queueLength === undefined ? 0 : payload.queueLength;
     if (!Number.isInteger(queueLength) || Number(queueLength) < 0 || Number(queueLength) > 100_000) throw new HermesWhatsAppProviderError("INVALID_PROVIDER_RESPONSE");
@@ -88,21 +88,36 @@ export class HermesWhatsAppBridgeClient {
     };
   }
 
-  async connect(): Promise<{ externalReference?: string; status?: string }> {
-    const status = await this.status();
+  async connect(connectionId?: string): Promise<{ externalReference?: string; status?: string }> {
+    const status = await this.status(connectionId);
     return {
       status: status.status,
       ...(status.scriptHash === null ? {} : { externalReference: `bridge:${status.scriptHash}` }),
     };
   }
 
-  async confirmScanned(): Promise<void> {
-    const status = await this.status();
+  async disconnect(connectionId?: string): Promise<void> {
+    await this.#json(this.#route(connectionId, "/logout"), { method: "POST" }, 20_000);
+  }
+
+  async qr(connectionId?: string): Promise<{ qr: string | null; expiresAt: Date | null }> {
+    const payload = await this.#json(this.#route(connectionId, "/qr"), { method: "GET" }, 3_000);
+    if (!isObject(payload)) throw new HermesWhatsAppProviderError("INVALID_PROVIDER_RESPONSE");
+    const qr = boundedString(payload.qr, 8_192);
+    const expiresAt = typeof payload.expiresAt === "string" ? new Date(payload.expiresAt) : null;
+    return {
+      qr,
+      expiresAt: expiresAt !== null && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null,
+    };
+  }
+
+  async confirmScanned(connectionId?: string): Promise<void> {
+    const status = await this.status(connectionId);
     if (status.status !== "connected") throw new HermesWhatsAppProviderError("NOT_CONNECTED");
   }
 
-  async poll(): Promise<HermesWhatsAppMessage[]> {
-    const payload = await this.#json("/messages", { method: "GET" }, this.#timeoutMs);
+  async poll(connectionId?: string): Promise<HermesWhatsAppMessage[]> {
+    const payload = await this.#json(this.#route(connectionId, "/messages"), { method: "GET" }, this.#timeoutMs);
     if (!Array.isArray(payload)) throw new HermesWhatsAppProviderError("INVALID_PROVIDER_RESPONSE");
     return payload.map((value) => {
       if (!isObject(value)) return null;
@@ -117,14 +132,20 @@ export class HermesWhatsAppBridgeClient {
     }).filter((value): value is HermesWhatsAppMessage => value !== null);
   }
 
-  async send(_userId: string, recipientRef: string, message: string): Promise<{ providerMessageRef?: string }> {
+  async send(connectionId: string | undefined, recipientRef: string, message: string): Promise<{ providerMessageRef?: string }> {
     const chatId = this.#chatId(recipientRef);
     const body = message.trim();
     if (!body || body.length > 4_096) throw new HermesWhatsAppProviderError("PROVIDER_REQUEST_FAILED");
-    const payload = await this.#json("/send", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chatId, message: body }) }, this.#timeoutMs);
+    const payload = await this.#json(this.#route(connectionId, "/send"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chatId, message: body }) }, this.#timeoutMs);
     if (!isObject(payload) || payload.success !== true) throw new HermesWhatsAppProviderError("INVALID_PROVIDER_RESPONSE");
     const providerMessageRef = boundedString(payload.messageId, 255);
     return providerMessageRef === null ? {} : { providerMessageRef };
+  }
+
+  #route(connectionId: string | undefined, path: string): string {
+    if (connectionId === undefined) return path;
+    if (!/^[A-Za-z0-9_-]{1,128}$/u.test(connectionId)) throw new HermesWhatsAppProviderError("PROVIDER_REQUEST_FAILED");
+    return `/connections/${encodeURIComponent(connectionId)}${path}`;
   }
 
   async #json(path: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
@@ -162,8 +183,9 @@ export class HermesWhatsAppPairingClient {
     this.#fetcher = options.fetcher ?? fetch;
     this.#timeoutMs = options.timeoutMs ?? 30_000;
   }
-  async pairingCode(phoneNumber: string): Promise<{ code: string; expiresAt: Date }> {
-    const payload = await this.#json("/pairing-code", { method: "POST", body: JSON.stringify({ phoneNumber }) }, 45_000);
+  async pairingCode(connectionId: string, phoneNumber: string): Promise<{ code: string; expiresAt: Date }> {
+    if (!/^[A-Za-z0-9_-]{1,128}$/u.test(connectionId)) throw new HermesWhatsAppProviderError("PROVIDER_REQUEST_FAILED");
+    const payload = await this.#json("/pairing-code", { method: "POST", body: JSON.stringify({ connectionId, phoneNumber }) }, 45_000);
     if (!isObject(payload) || typeof payload.code !== "string" || typeof payload.expiresAt !== "string") {
       throw new HermesWhatsAppProviderError("INVALID_PROVIDER_RESPONSE");
     }

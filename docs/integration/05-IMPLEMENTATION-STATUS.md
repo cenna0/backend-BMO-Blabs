@@ -2,18 +2,18 @@
 
 > **CURRENT / CANONICAL**
 > This is the current implementation/runtime status; historical phase labels do
-> not override it.
+> not override it. Audio production is independently tracked by `../backend-mvp/CURRENT-RUNTIME-CONFIG.md` and the final Piper-only evidence.
 
-**Audited:** 2026-08-20
+**Audited:** 2026-08-25
 **Deployed-image source revision:**
 `d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable provenance, not current
 Git HEAD).
 **Production state:** `PRODUCTION_VERIFIED` — P9 Backend and PostgreSQL are live.
-**Production image:** `bmo-p9.1:pairing-code-only-d1473d0`.
+**Production image:** `bmo-p9.1:memory-isolation`.
 **Production status for code-only enrollment:** `PRODUCTION_VERIFIED`.
 **Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied in production; state is `7 completed, 0 unfinished, 0 rolled_back`.
 **Production verification:** Direct/public health, Mobile REST/WS smoke, pairing
-route absence checks, voice/integration continuity, and six soak samples passed.
+route absence checks, voice/integration continuity, memory/identity isolation E2E verification, and soak samples passed.
 **Physical status:** `PENDING_PHYSICAL_ESP`.
 
 This document separates implementation from production verification. A route
@@ -74,7 +74,7 @@ fresh encrypted backup checkpoint.
 | Device logs/telemetry API | `PRODUCTION_VERIFIED` | Sanitized, owner-scoped reads and Backend ingestion boundaries are implemented. Physical emission remains pending. |
 | Chat sessions/history/feedback | `PRODUCTION_VERIFIED` | REST history is authoritative; message submission is durable and returns `202`. |
 | Mobile `/api/v1/ws` | `PRODUCTION_VERIFIED` | Separate bearer-authenticated event stream with timeout, expiry, heartbeat, and reconnect contract. Five application events have direct current emitters; five additional outbound events are schema-defined with no current direct emitter. |
-| Memory records/candidates/summary | `PRODUCTION_VERIFIED` | Owner-scoped CRUD, idempotent actions, export/forget/clear, and explicitly `not_configured` summary generation boundary. |
+| Memory records/candidates/summary | `PRODUCTION_VERIFIED` | Owner-scoped CRUD, automatic post-turn memory extraction, hybrid context retrieval (keyword search + top active profile backfill), per-user PostgreSQL isolation with Hermes disk memory disabled, idempotent actions, export/forget/clear, and explicitly `not_configured` summary generation boundary. |
 | Schedules/runs | `PRODUCTION_VERIFIED` | CRUD and lifecycle routes with optimistic `version`, fixed `Asia/Jakarta` timezone, and Mobile/DEVICE delivery targets. |
 | WhatsApp application boundary | `PRODUCTION_VERIFIED` | Backend routes, safe BMO conversation projections, rules, preview/confirm, and internal bridge/resolver boundaries are deployed. Provider traffic acceptance remains separately controlled. |
 | Spotify application boundary | `PRODUCTION_VERIFIED` | OAuth callback/configuration, server-side credential lifecycle, safe search/device/playback/action projections are deployed. Mobile completes the browser callback by polling REST status; no Mobile deep-link or WebSocket completion event is implemented. No provider token is exposed. |
@@ -101,9 +101,7 @@ fresh encrypted backup checkpoint.
 - Mobile WS: `wss://api.personalbmo.web.id/api/v1/ws`.
 - Hardware WS: `wss://api.personalbmo.web.id/ws`.
 - `/livez` and `/readyz` are internal health routes; the public `/health` route is the public smoke endpoint.
-- Audio source has migrated to the Piper-only contract; candidate promotion is
-  currently blocked by the host memory gate and the prior production image is
-  retained for rollback.
+- Audio production is `PRODUCTION_VERIFIED` on Piper-only image `bmo-audio@sha256:24e1c4244ea8868f731d819ea75cb57c1e464b6df3bd9679d65fd4711643488c`; final evidence is `../operations/2026-08-24-piper-only-purge-evidence.md`. The prior image remains a rollback reference and Kokoro active artifacts are purged.
 - No candidate project, candidate port `3010`, candidate callback, or `/tmp/bmo-p9-1-validation-*` path is part of production.
 - Code-only enrollment is deployed and migration #7 is applied. Do not rerun
   production migrations as Mobile integration work; physical firmware

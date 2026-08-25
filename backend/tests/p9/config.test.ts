@@ -45,12 +45,9 @@ describe("P9 configuration", () => {
       wifiEncryptionKey: enabled.P9_WIFI_ENCRYPTION_KEY,
       providerEncryptionKey: undefined,
       spotifyTokenEncryptionKey: undefined,
-      spotifyClientId: undefined,
-      spotifyClientSecret: undefined,
-      spotifyCallbackUrl: undefined,
       whatsappBridgeUrl: "http://127.0.0.1:3001",
       whatsappIdentityResolverUrl: "http://127.0.0.1:3002",
-      whatsappIdentityResolverToken: undefined,
+      whatsappPairingUrl: "http://127.0.0.1:3003",
       canonicalTimezone: "Asia/Jakarta",
       accessTokenTtlSeconds: 900,
       refreshTokenTtlSeconds: 2_592_000,
@@ -78,6 +75,10 @@ describe("P9 configuration", () => {
       recoveryWindowMs: 15 * 60 * 1000,
       recoveryIpLimit: 5,
       recoveryEmailLimit: 3,
+      resendApiKey: "test-resend-api-key",
+      supportNotificationEmail: "rangga@binerlabs.com,cenna@binerlabs.com,wuwu@binerlabs.com,niefa@binerlabs.com",
+      supportNotificationEmails: ["rangga@binerlabs.com", "cenna@binerlabs.com", "wuwu@binerlabs.com", "niefa@binerlabs.com"],
+      supportFromEmail: "Joy from BinerLabs <joy@binerlabs.com>",
     });
   });
 

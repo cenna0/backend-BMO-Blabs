@@ -63,6 +63,7 @@ export function createBackendRuntime(config: BackendConfig): BackendRuntime {
     hermes,
     mobileEvents: { sendToUser: (userId, event) => mobileSockets?.sendToUser(userId, event) ?? 0 },
     chatHardTimeoutMs: config.HERMES_HARD_TIMEOUT_MS,
+    logger,
   }) : undefined;
 
   const removeOutput = async (deviceId: string, requestId: string, failed: boolean) => {

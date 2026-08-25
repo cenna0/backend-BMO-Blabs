@@ -29,8 +29,7 @@ RUN install -d -o node -g node -m 0700 /opt/bmo/data/avatars
 
 COPY --from=build /app/dist/src ./dist/src
 
-USER node
-
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 CMD ["node", "-e", "fetch('http://127.0.0.1:3000/livez').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"]
 
+ENTRYPOINT ["node", "dist/src/p9/entrypoint.js"]
 CMD ["node", "dist/src/server.js"]

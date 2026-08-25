@@ -21,6 +21,25 @@ vi.mock("../../src/p9/db/client.js", () => ({
 import { DeviceService } from "../../src/p9/services/device.service.js";
 
 describe("P9 device ownership lifecycle", () => {
+  it("rejects claiming a second active physical BMO for the same user", async () => {
+    const repositories = {
+      lockUser: vi.fn().mockResolvedValue(undefined),
+      device: {
+        count: vi.fn().mockResolvedValue(1),
+        create: vi.fn(),
+      },
+    };
+
+    await expect(new DeviceService({} as never, repositories as never).createClaimed({
+      userId: "user-1",
+      hardwareId: "bmo-002",
+      name: "BMO",
+      tokenHash: "token-hash",
+    })).rejects.toMatchObject({ code: "CONFLICT", status: 409 });
+
+    expect(repositories.device.create).not.toHaveBeenCalled();
+  });
+
   it("clears a revoked default before promoting the replacement", async () => {
     fakeDb.device.findFirst
       .mockResolvedValueOnce({ id: "00000000-0000-0000-0000-000000000001", userId: "user-1", hardwareId: "bmo-001", status: "ACTIVE", settings: { defaultDevice: true } })

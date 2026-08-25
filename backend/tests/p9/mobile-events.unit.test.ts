@@ -15,6 +15,11 @@ describe("mobile realtime outbound event contract", () => {
       message: { id: otherId, sender: "assistant", text: "Hi!", createdAt },
     },
     {
+      event: "chat_title_updated",
+      sessionId: id,
+      title: "New Conversation Topic",
+    },
+    {
       event: "device_status",
       deviceId: id,
       online: true,
@@ -86,6 +91,11 @@ describe("mobile realtime outbound event contract", () => {
       sessionId: id,
       messageId: otherId,
       accessToken: "must-not-pass",
+    }).success).toBe(false);
+    expect(mobileOutboundEventSchema.safeParse({
+      event: "chat_title_updated",
+      sessionId: id,
+      title: "x".repeat(201),
     }).success).toBe(false);
   });
 });

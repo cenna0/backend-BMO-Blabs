@@ -15,6 +15,14 @@ describe("HermesWhatsAppBridgeClient", () => {
     expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:3001/health", expect.objectContaining({ method: "GET" }));
   });
 
+  it("routes a connection-scoped health check to its isolated bridge session", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ status: "connected", queueLength: 0, scriptHash: "connection-hash" }));
+    const client = new HermesWhatsAppBridgeClient({ baseUrl: "http://127.0.0.1:3001", fetcher });
+
+    await expect(client.status("00000000-0000-4000-8000-000000000001")).resolves.toMatchObject({ status: "connected" });
+    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:3001/connections/00000000-0000-4000-8000-000000000001/health", expect.objectContaining({ method: "GET" }));
+  });
+
   it("normalizes only the documented inbound message fields and polls the destructive queue", async () => {
     const fetcher = vi.fn().mockResolvedValue(response([
       { messageId: "m1", chatId: "123@s.whatsapp.net", senderId: "123@s.whatsapp.net", body: "hello", isGroup: false, secret: "must-not-leak" },
@@ -61,7 +69,7 @@ describe("HermesWhatsAppBridgeClient", () => {
     const client = new HermesWhatsAppBridgeClient({ baseUrl: "http://127.0.0.1:3001", fetcher });
 
     await expect(client.send("owner-a", "123@s.whatsapp.net", "hello")).resolves.toEqual({ providerMessageRef: "out-1" });
-    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:3001/send", expect.objectContaining({
+    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:3001/connections/owner-a/send", expect.objectContaining({
       method: "POST",
       body: JSON.stringify({ chatId: "123@s.whatsapp.net", message: "hello" }),
     }));
@@ -74,5 +82,13 @@ describe("HermesWhatsAppBridgeClient", () => {
 
     await expect(client.status()).rejects.toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
     await expect(client.status()).rejects.not.toThrow("session-secret");
+  });
+
+  it("posts logout to unlink the WhatsApp session", async () => {
+    const fetcher = vi.fn().mockResolvedValue(response({ ok: true, status: "disconnected" }));
+    const client = new HermesWhatsAppBridgeClient({ baseUrl: "http://127.0.0.1:3001", fetcher });
+
+    await expect(client.disconnect()).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:3001/logout", expect.objectContaining({ method: "POST" }));
   });
 });

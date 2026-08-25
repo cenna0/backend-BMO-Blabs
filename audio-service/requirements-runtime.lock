@@ -1,6 +1,5 @@
 # Fully resolved for CPython 3.10 on Linux x86_64 from requirements.txt.
-# Kokoro, PyTorch, spaCy, Transformers, and their exclusive phonemizer
-# dependency graph are intentionally absent.
+# Legacy fallback dependency graph is intentionally absent.
 
 annotated-doc==0.0.5
 annotated-types==0.8.0

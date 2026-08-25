@@ -49,6 +49,9 @@ export class DeviceService {
   async createClaimed(input: ClaimedDeviceInput, repositories = this.repositories) {
     await repositories.lockUser(input.userId);
     const activeCount = await repositories.device.count({ where: { userId: input.userId, status: "ACTIVE" } });
+    if (activeCount > 0) {
+      throw new P9Error("CONFLICT", 409, "User already has an active BMO device");
+    }
     const device = await repositories.device.create({
       data: {
         userId: input.userId,

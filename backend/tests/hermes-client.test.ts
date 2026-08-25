@@ -114,6 +114,27 @@ describe("Hermes clients", () => {
     expect(bodies.map((body) => body.conversation)).toEqual(["chat-user-session", "voice-bmo-001"]);
   });
 
+  it("preserves markdown and headings when raw option is enabled", async () => {
+    const markdownOutput = "## Profile & Identity\nUser is Rangga.\n\n## Preferences\nLikes robotics.";
+    const client = new HermesResponsesClient({
+      baseUrl: "http://127.0.0.1:8642",
+      apiKey: "test-hermes-key",
+      model: "hermes-agent",
+      conversation: "dream-test",
+      hardTimeoutMs: 1_000,
+      fetcher: async () =>
+        new Response(
+          JSON.stringify({
+            status: "completed",
+            output: [{ type: "message", content: [{ type: "output_text", text: markdownOutput }] }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+
+    await expect(client.generate("dream payload", undefined, { raw: true })).resolves.toBe(markdownOutput);
+  });
+
   it("maps non-2xx, invalid JSON, provider error output, and timeout to HERMES_FAILED", async () => {
     const non2xx = new HermesResponsesClient({
       baseUrl: "http://local",

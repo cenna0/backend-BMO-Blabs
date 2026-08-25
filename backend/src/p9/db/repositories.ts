@@ -188,6 +188,45 @@ export class P9Repositories {
     return rows.map((row) => row.normalizedContent);
   }
 
+  async listTopActiveMemories(input: { userId: string; limit: number; excludeContents?: string[] }): Promise<string[]> {
+    const exclude = input.excludeContents ?? [];
+    if (exclude.length === 0) {
+      const rows = await this.db.$queryRaw<Array<{ normalizedContent: string }>>`
+        SELECT memory."normalizedContent"
+        FROM "MemoryRecord" AS memory
+        WHERE memory."userId" = ${input.userId}::uuid
+          AND memory."deletedAt" IS NULL
+          AND (memory."expiresAt" IS NULL OR memory."expiresAt" > clock_timestamp())
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "MemoryTopicForget" AS forgotten
+            WHERE forgotten."userId" = memory."userId"
+              AND lower(forgotten."normalizedTopic") = lower(memory.topic)
+          )
+        ORDER BY memory.importance DESC, memory."updatedAt" DESC, memory.id ASC
+        LIMIT ${input.limit}
+      `;
+      return rows.map((row) => row.normalizedContent);
+    }
+    const rows = await this.db.$queryRaw<Array<{ normalizedContent: string }>>`
+      SELECT memory."normalizedContent"
+      FROM "MemoryRecord" AS memory
+      WHERE memory."userId" = ${input.userId}::uuid
+        AND memory."deletedAt" IS NULL
+        AND (memory."expiresAt" IS NULL OR memory."expiresAt" > clock_timestamp())
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "MemoryTopicForget" AS forgotten
+          WHERE forgotten."userId" = memory."userId"
+            AND lower(forgotten."normalizedTopic") = lower(memory.topic)
+        )
+        AND memory."normalizedContent" NOT IN (SELECT unnest(${exclude}::text[]))
+      ORDER BY memory.importance DESC, memory."updatedAt" DESC, memory.id ASC
+      LIMIT ${input.limit}
+    `;
+    return rows.map((row) => row.normalizedContent);
+  }
+
   async claimChatOperation(input: {
     operationId: string;
     userId: string;

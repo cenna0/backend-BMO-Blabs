@@ -79,6 +79,15 @@ const rawSchema = z.object({
   AVATAR_STORAGE_DIR: avatarStoragePathSchema.default("/opt/bmo/data/avatars"),
   BUG_REPORT_STORAGE_DIR: avatarStoragePathSchema.default("/opt/bmo/data/bug-reports"),
   AVATAR_UPLOAD_RECEIVE_TIMEOUT_MS: avatarUploadReceiveTimeout,
+  RESEND_API_KEY: z.string().min(1).optional(),
+  SUPPORT_NOTIFICATION_EMAIL: z.string().trim().default("rangga@binerlabs.com,cenna@binerlabs.com,wuwu@binerlabs.com,niefa@binerlabs.com").refine(
+    (val) => {
+      const list = val.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
+      return list.length > 0 && list.every((email) => z.string().email().safeParse(email).success);
+    },
+    { message: "SUPPORT_NOTIFICATION_EMAIL must contain valid email address(es)" }
+  ),
+  SUPPORT_FROM_EMAIL: z.string().default("Joy from BinerLabs <joy@binerlabs.com>"),
 });
 
 const strongSecret = (name: string, value: string | undefined): string => {
@@ -130,6 +139,10 @@ export interface P9Config {
   recoveryWindowMs: 900_000;
   recoveryIpLimit: 5;
   recoveryEmailLimit: 3;
+  resendApiKey: string;
+  supportNotificationEmail: string;
+  supportNotificationEmails: string[];
+  supportFromEmail: string;
 }
 
 export function parseP9Config(input: Record<string, unknown>): P9Config {
@@ -177,6 +190,10 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
       recoveryWindowMs: 900_000,
       recoveryIpLimit: 5,
       recoveryEmailLimit: 3,
+      resendApiKey: parsed.RESEND_API_KEY,
+      supportNotificationEmail: parsed.SUPPORT_NOTIFICATION_EMAIL,
+      supportNotificationEmails: parsed.SUPPORT_NOTIFICATION_EMAIL.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean),
+      supportFromEmail: parsed.SUPPORT_FROM_EMAIL,
     };
   }
 
@@ -222,5 +239,9 @@ export function parseP9Config(input: Record<string, unknown>): P9Config {
     recoveryWindowMs: 900_000,
     recoveryIpLimit: 5,
     recoveryEmailLimit: 3,
+    resendApiKey: parsed.RESEND_API_KEY,
+    supportNotificationEmail: parsed.SUPPORT_NOTIFICATION_EMAIL,
+    supportNotificationEmails: parsed.SUPPORT_NOTIFICATION_EMAIL.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean),
+    supportFromEmail: parsed.SUPPORT_FROM_EMAIL,
   };
 }

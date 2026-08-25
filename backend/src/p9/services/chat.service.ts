@@ -121,7 +121,7 @@ class KeyedChatQueue {
     const current = new Promise<void>((resolve) => { release = resolve; });
     const tail = previous.catch(() => undefined).then(() => current);
     this.#tails.set(key, tail);
-    await previous.catch(() => undefined);
+    await previous;
     try {
       return await work();
     } finally {
@@ -215,7 +215,7 @@ export class ChatService {
 
   async listSessions(userId: string) {
     const sessions = await this.options.repositories.chatSession.findMany({
-      where: { userId, status: "ACTIVE", deletedAt: null },
+      where: { userId, status: "ACTIVE", deletedAt: null, temporary: false },
       orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
       take: 100,
     });
@@ -272,8 +272,8 @@ export class ChatService {
       const accepted = await this.#transaction(async (repositories) => {
         await repositories.lockUser(userId);
         const existing = await this.#findOperation(repositories, userId, input.idempotencyKey);
-        if (existing) return { response: this.#existingResponse(existing, sessionId, input), job: null };
-        await this.#requireOwnedSession(repositories, userId, sessionId);
+        if (existing) return { response: this.#existingResponse(existing, sessionId, input), job: null, heuristicTitle: null, shouldGenerateTitle: false };
+        const session = await this.#requireOwnedSession(repositories, userId, sessionId);
         if (input.deviceId) {
           const device = await repositories.device.findFirst({
             where: { id: input.deviceId, userId, status: "ACTIVE" }, select: { id: true },
@@ -291,8 +291,15 @@ export class ChatService {
         const operation = await repositories.chatOperation.create({
           data: { userId, userMessageId: userMessage.id, idempotencyKey: input.idempotencyKey },
         });
+        const isInitialTitle = session.title === null && !session.temporary;
+        const heuristicTitle = isInitialTitle ? this.#generateHeuristicTitle(input.text) : undefined;
         await repositories.chatSession.update({
-          where: { id: sessionId }, data: { lastMessageCursor: userMessage.cursor, lastMessageAt: userMessage.createdAt },
+          where: { id: sessionId },
+          data: {
+            lastMessageCursor: userMessage.cursor,
+            lastMessageAt: userMessage.createdAt,
+            ...(heuristicTitle !== undefined ? { title: heuristicTitle } : {}),
+          },
         });
         return {
           response: {
@@ -308,8 +315,20 @@ export class ChatService {
             userId, sessionId, userMessageId: userMessage.id, operationId: operation.id,
             text: input.text, ...(requestId === undefined ? {} : { requestId }),
           } satisfies ChatJob,
+          heuristicTitle: heuristicTitle ?? null,
+          shouldGenerateTitle: isInitialTitle,
         };
       });
+      if (accepted.heuristicTitle) {
+        this.#emit(userId, {
+          event: "chat_title_updated",
+          sessionId,
+          title: accepted.heuristicTitle,
+        });
+      }
+      if (accepted.shouldGenerateTitle) {
+        void this.#generateTitleAsync(userId, sessionId, input.text);
+      }
       if (accepted.job) reservation.commit(
         `${accepted.job.userId}:${accepted.job.sessionId}`,
         () => this.processAcceptedOperation(accepted.job!),
@@ -471,6 +490,7 @@ export class ChatService {
         raw = await Promise.race([
           this.options.hermes.generate(prompt, activeController.signal, {
             conversation: `chat:${job.userId}:${job.sessionId}`,
+            sessionKey: `bmo:user:${job.userId}`,
           }),
           deadline,
         ]);
@@ -484,7 +504,7 @@ export class ChatService {
           where: { id: job.operationId, userId: job.userId, status: "PROCESSING", errorCode: leaseToken }, select: { id: true },
         });
         const session = await repositories.chatSession.findFirst({
-          where: { id: job.sessionId, userId: job.userId, status: "ACTIVE", deletedAt: null }, select: { id: true },
+          where: { id: job.sessionId, userId: job.userId, status: "ACTIVE", deletedAt: null }, select: { id: true, temporary: true },
         });
         if (!operation || !session) return null;
         const message = await repositories.chatMessage.create({
@@ -501,13 +521,16 @@ export class ChatService {
         await repositories.chatSession.update({
           where: { id: job.sessionId }, data: { lastMessageCursor: message.cursor, lastMessageAt: message.createdAt },
         });
-        return message;
+        return { message, isTemporary: session.temporary };
       });
       if (assistant) {
         this.#emit(job.userId, {
           event: "chat_message", sessionId: job.sessionId,
-          message: { id: assistant.id, sender: "assistant", text: assistant.content, createdAt: assistant.createdAt.toISOString() },
+          message: { id: assistant.message.id, sender: "assistant", text: assistant.message.content, createdAt: assistant.message.createdAt.toISOString() },
         });
+        if (!assistant.isTemporary) {
+          void this.#extractMemoriesAsync(job.userId, job.userMessageId, job.text, assistant.message.content);
+        }
       }
     } catch {
       await this.#recordFailure(job, leaseToken);
@@ -576,21 +599,57 @@ export class ChatService {
   }
 
   async #buildContext(job: ChatJob): Promise<string> {
-    const [personalization, memory, recentDescending] = await Promise.all([
+    const session = await this.options.repositories.chatSession.findFirst({
+      where: { id: job.sessionId, userId: job.userId, status: "ACTIVE", deletedAt: null },
+      select: { temporary: true },
+    });
+    const isTemporary = session?.temporary ?? false;
+
+    const [user, personalization, memory, recentDescending, identityRecords] = await Promise.all([
+      this.options.repositories.user.findUnique({
+        where: { id: job.userId }, select: { displayName: true, email: true },
+      }),
       this.options.repositories.personalizationSettings.upsert({
         where: { userId: job.userId }, update: {}, create: { userId: job.userId },
       }),
-      this.#memory.search(job.userId, job.text, 8),
+      isTemporary ? Promise.resolve([]) : this.#memory.search(job.userId, job.text, 8),
       this.options.repositories.chatMessage.findMany({
         where: { userId: job.userId, sessionId: job.sessionId, deletedAt: null },
         orderBy: { cursor: "desc" }, take: 12,
         select: { role: true, content: true },
       }),
+      !isTemporary && typeof this.options.repositories.searchActiveMemories === "function"
+        ? this.options.repositories.searchActiveMemories({
+            userId: job.userId,
+            terms: ["name", "nama", "identity"],
+            limit: 3,
+          })
+        : Promise.resolve([]),
     ]);
+
+    let resolvedDisplayName: string | null = user?.displayName ?? null;
+    if (!resolvedDisplayName && Array.isArray(identityRecords)) {
+      for (const record of identityRecords) {
+        const match = record.match(/(?:nama\s+(?:user\s+adalah|saya\s+adalah|saya|ku|adalah)|name\s+(?:is|:))\s+([^\n.,!?;]+)/i);
+        if (match?.[1]?.trim()) {
+          resolvedDisplayName = match[1].trim();
+          break;
+        } else if (record.trim() && record.length <= 60 && !record.includes("\n")) {
+          resolvedDisplayName = record.trim();
+          break;
+        }
+      }
+    }
+
     const history = recentDescending.reverse().map((message) => ({
       role: message.role.toLowerCase(), content: message.content.slice(0, 4_000),
     }));
     return JSON.stringify({
+      user: {
+        displayName: resolvedDisplayName,
+        email: user?.email ?? null,
+      },
+      currentMessage: job.text,
       personalization: {
         baseStyleTone: personalization.baseStyleTone,
         warmth: personalization.warmth,
@@ -603,6 +662,224 @@ export class ChatService {
       memory: memory.slice(0, 8).map((item) => item.slice(0, 1_000)),
       history,
     });
+  }
+
+  #sanitizeTitle(raw: string): string {
+    const cleaned = sanitizeHermesOutput(raw)
+      .replace(/^[\s"“'«`#*]+|[\s"”'»`#*]+$/g, "")
+      .replace(/^[Tt]itle\s*:\s*/i, "")
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/[.]+$/, "")
+      .trim();
+    return cleaned.slice(0, 80).trim();
+  }
+
+  #generateHeuristicTitle(userText: string): string {
+    const firstLine = userText.trim().split(/\r?\n/)[0] ?? "";
+    const cleaned = firstLine
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (cleaned.length === 0) return "New chat";
+    return cleaned.length > 40 ? `${cleaned.slice(0, 37).trim()}...` : cleaned;
+  }
+
+  async #generateTitleAsync(
+    userId: string,
+    sessionId: string,
+    userText: string,
+  ): Promise<void> {
+    try {
+      const session = await this.options.repositories.chatSession.findFirst({
+        where: { id: sessionId, userId, status: "ACTIVE", deletedAt: null },
+        select: { id: true, title: true, temporary: true },
+      });
+      if (!session || session.temporary) {
+        return;
+      }
+
+      const heuristicTitle = this.#generateHeuristicTitle(userText);
+      let generatedTitle: string | null = null;
+      try {
+        const titlePrompt = `User message: ${userText.slice(0, 1000)}\n\nTitle:`;
+        const titleInstructions = `You are a chat title generator. Generate a concise, descriptive title (3 to 5 words maximum) for a chat conversation that begins with the user message. Output ONLY the title text with no quotes, no markdown, and no punctuation. Use Indonesian if the user message is primarily Indonesian, or English if English.`;
+
+        const controller = new AbortController();
+        const timeoutMs = 15000;
+        let rejectDeadline!: (error: Error) => void;
+        const deadline = new Promise<never>((_resolve, reject) => { rejectDeadline = reject; });
+        const timer = setTimeout(() => {
+          controller.abort();
+          rejectDeadline(new Error("Title generation deadline exceeded"));
+        }, timeoutMs);
+
+        try {
+          const raw = await Promise.race([
+            this.options.hermes.generate(titlePrompt, controller.signal, {
+              conversation: `title-generate:${sessionId}`,
+              sessionKey: `bmo:user:${userId}`,
+              instructions: titleInstructions,
+            }),
+            deadline,
+          ]);
+          generatedTitle = this.#sanitizeTitle(raw);
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch {
+        // Fallback: heuristic title is already active in database
+      }
+
+      if (!generatedTitle || generatedTitle.length === 0 || generatedTitle === heuristicTitle || generatedTitle === session.title) {
+        return;
+      }
+
+      const updated = await this.#transaction(async (repositories) => {
+        await repositories.lockUser(userId);
+        return repositories.chatSession.updateMany({
+          where: { id: sessionId, userId, status: "ACTIVE", deletedAt: null },
+          data: { title: generatedTitle },
+        });
+      });
+
+      if (updated.count > 0) {
+        this.#emit(userId, {
+          event: "chat_title_updated",
+          sessionId,
+          title: generatedTitle,
+        });
+      }
+    } catch {
+      // Title generation is best-effort and must never disrupt chat delivery.
+    }
+  }
+
+  async #extractMemoriesAsync(
+    userId: string,
+    userMessageId: string,
+    userText: string,
+    assistantText: string,
+  ): Promise<void> {
+    try {
+      const trimmed = userText.trim();
+      if (trimmed.length < 4) return;
+      if (/^(hi|halo|hello|hai|hey|test|tes|ok|oke|okay|siap|makasih|thanks|thank you|bye|dadah)(\s+(bmo|friend|there|all|bro|sis))?[!.?]*$/i.test(trimmed)) {
+        return;
+      }
+
+      const extractionPrompt = `You are a factual memory extraction engine for an AI companion.
+Analyze this single conversational exchange between a User and Assistant.
+Extract permanent or notable user facts, user preferences (e.g. favorite food, drinks, hobbies), user identity (name, job, location), relationships, or habits stated by the User.
+Do NOT extract:
+- Temporary states (e.g. "I am tired right now", "I am walking")
+- Greetings, acknowledgments, or questions asked by the user with no user facts
+- Assistant claims, personality traits, or assistant actions
+
+Output MUST be a valid JSON array of objects with keys: "topic", "category", "normalizedContent", "importance".
+- "topic": short lowercase string (e.g. "food_preference", "name", "job", "hobby", "location")
+- "category": "preference" | "profile" | "habit" | "fact"
+- "normalizedContent": concise statement of the fact in English or Indonesian (e.g. "Suka makan ayam", "Nama user adalah Rangga", "Lives in Jakarta")
+- "importance": integer from 1 to 10
+
+If NO user facts are present, output an empty JSON array: []
+
+User: ${userText}
+Assistant: ${assistantText}
+
+JSON Array:`;
+
+      let rawExtraction: string;
+      try {
+        rawExtraction = await this.options.hermes.generate(extractionPrompt, undefined, {
+          conversation: `memory-extract:${userId}`,
+          sessionKey: `bmo:user:${userId}`,
+          instructions: "You are a factual memory extraction engine for an AI companion. Output only a valid JSON array of objects.",
+        });
+      } catch {
+        return;
+      }
+
+      const cleaned = rawExtraction.replace(/```json/gi, "").replace(/```/g, "").trim();
+      const match = cleaned.match(/\[[\s\S]*\]/);
+      if (!match) return;
+
+      let extractedItems: Array<{
+        topic?: string;
+        category?: string;
+        normalizedContent?: string;
+        importance?: number;
+      }>;
+      try {
+        const parsed = JSON.parse(match[0]);
+        if (!Array.isArray(parsed) || parsed.length === 0) return;
+        extractedItems = parsed;
+      } catch {
+        return;
+      }
+
+      await this.#transaction(async (repositories) => {
+        await repositories.lockUser(userId);
+
+        const forgotten = await repositories.memoryTopicForget.findMany({
+          where: { userId },
+          select: { normalizedTopic: true },
+        });
+        const forgottenSet = new Set(forgotten.map((f: { normalizedTopic: string }) => f.normalizedTopic.toLowerCase().trim()));
+
+        const existingRecords = await repositories.memoryRecord.findMany({
+          where: { userId, deletedAt: null },
+          select: { topic: true, normalizedContent: true },
+        });
+
+        for (const item of extractedItems) {
+          if (!item || typeof item.normalizedContent !== "string" || !item.normalizedContent.trim()) {
+            continue;
+          }
+          const topic = (typeof item.topic === "string" && item.topic.trim()) ? item.topic.trim().toLowerCase().slice(0, 120) : "general";
+          if (forgottenSet.has(topic)) {
+            continue;
+          }
+
+          const normalizedContent = item.normalizedContent.trim().slice(0, 1000);
+          const category = (typeof item.category === "string" && item.category.trim()) ? item.category.trim().toLowerCase().slice(0, 64) : "fact";
+          const importance = Math.max(1, Math.min(Math.round(Number(item.importance) || 5), 10));
+
+          const isDuplicate = existingRecords.some((rec: { topic: string; normalizedContent: string }) =>
+            rec.normalizedContent.toLowerCase().trim() === normalizedContent.toLowerCase().trim() ||
+            (rec.topic.toLowerCase().trim() === topic && rec.normalizedContent.toLowerCase().includes(normalizedContent.toLowerCase()))
+          );
+          if (isDuplicate) {
+            continue;
+          }
+
+          await repositories.memoryRecord.create({
+            data: {
+              userId,
+              topic,
+              category,
+              normalizedContent,
+              importance,
+              source: "conversation",
+            },
+          });
+
+          await repositories.memoryCandidate.create({
+            data: {
+              userId,
+              sourceMessageId: userMessageId,
+              proposedContent: normalizedContent,
+              topic,
+              status: "ACCEPTED",
+            },
+          });
+
+          existingRecords.push({ topic, normalizedContent });
+        }
+      });
+    } catch {
+      // Memory extraction is best-effort and must never disrupt chat delivery.
+    }
   }
 
   async #requireOwnedSession(repositories: P9Repositories, userId: string, sessionId: string) {
