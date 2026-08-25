@@ -1,5 +1,9 @@
 # P8 Piper Prudence feasibility evidence
 
+> **HISTORICAL ONLY — SUPERSEDED BY 2025-08-25 PIPER-ONLY CUTOVER**
+> Preserve this file for audit lineage. Do not use its former Kokoro fallback, RVC, or P8 deployment values as current configuration.
+
+
 **Executed:** 2026-08-02
 **Classification:** `P8_PIPER_FEASIBILITY_VERIFIED_AWAITING_LISTENING_APPROVAL`
 **Prompt 5 recommendation:** deploy Piper only after explicit operator listening approval; until then retain the unchanged P7 Kokoro-only production runtime.

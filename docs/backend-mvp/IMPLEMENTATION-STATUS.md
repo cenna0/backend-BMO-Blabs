@@ -48,8 +48,7 @@ P9.2–P9.6 implementation state: NOT IMPLEMENTED
 P10 state: NOT_STARTED / dependency-gated after P9.6
 ```
 
-P6, P7, and P8 are verified. P8 fixed Piper Prudence as the production primary,
-retains Kokoro as automatic fallback, and preserves the public contract. Read
+P6, P7, and P8 are verified. P8 historically fixed Piper Prudence as the production primary and retained Kokoro fallback. That state is superseded by the 2025-08-25 Piper-only production cutover documented in `../operations/2026-08-24-piper-only-purge-evidence.md`. Read
 `P8-PRODUCTION-ROLLOUT-EVIDENCE.md` for source synchronization, deployment,
 acceptance, and soak evidence. P9.1 is implemented and validated only as an
 isolated/private candidate; production activation remains separately gated.
@@ -65,15 +64,15 @@ isolated/private candidate; production activation remains separately gated.
 | `01-SCOPE-AND-DECISIONS.md` | VERIFIED / LOCKED | Backend source §1–§3 termigrasi |
 | `02-API-AND-WEBSOCKET-CONTRACT.md` | VERIFIED / LOCKED | Backend source §15–§17, §22 dan hardware contract dicocokkan |
 | `03-BACKEND-ARCHITECTURE.md` | VERIFIED | Backend source §7–§8, §18–§21, §23–§24 termigrasi |
-| `04-AUDIO-SERVICE.md` | AUDITED / CURRENT TUNING | Current STT `medium` + `BMO`; RVC archived/disabled |
+| `04-AUDIO-SERVICE.md` | HISTORICAL — SUPERSEDED | Former P8 audio reference; current runtime is Piper-only |
 | `05-TESTING-AND-ACCEPTANCE.md` | AUDITED / UPDATED | Future verification ownership split P6–P10 |
-| `06-DEPLOYMENT-AND-OPERATIONS.md` | VERIFIED — PRODUCTION | P7 deployment provenance, topology, runtime paths, rollback, and operations baseline |
+| `06-DEPLOYMENT-AND-OPERATIONS.md` | HISTORICAL — SUPERSEDED | Former P7/P8 deployment baseline; current evidence is the Piper-only cutover report |
 | `REQUIREMENT-TRACEABILITY.md` | VERIFIED | Seluruh source §1–§33 memiliki target primary |
 | `VERIFICATION-REPORT.md` | HISTORICAL PASS | Original 2026-07-18 package verification; not current implementation status |
 | `CHANGELOG.md` | VERIFIED | Baseline package tercatat |
 | `P6-TEST-EVIDENCE.md` | VERIFIED | Sanitized VPS evidence, strict dual Telegram receipt proof, recovery commands, residual risks, and no-P7 proof |
 | `P7-TEST-EVIDENCE.md` | VERIFIED — PRODUCTION | Immutable deployment/images, public 23/23 acceptance, final soak, rollback retention, and repository synchronization |
-| `P8-PRODUCTION-ROLLOUT-EVIDENCE.md` | VERIFIED — PRODUCTION | Fixed Piper primary, Kokoro fallback, canary, regression, soak, and rollback |
+| `P8-PRODUCTION-ROLLOUT-EVIDENCE.md` | HISTORICAL — SUPERSEDED | Former Piper-primary/Kokoro-fallback canary and rollback evidence |
 | `../p9/README.md` | P9.1 CANDIDATE EVIDENCE ATTACHED | Architecture remains locked; isolated implementation evidence is in `../p9/P9.1-IMPLEMENTATION-EVIDENCE.md`; no production implementation claim |
 
 ## 3. Implementation phases
@@ -87,7 +86,7 @@ isolated/private candidate; production activation remains separately gated.
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P5-TEST-EVIDENCE.md`](P5-TEST-EVIDENCE.md) |
 | P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
 | P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | VERIFIED — PRODUCTION | COMPLETED | [`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md) |
-| P8 | Fixed Piper Prudence primary + Kokoro fallback + production acceptance; RVC remains disabled | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | VERIFIED — PRODUCTION | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
+| P8 | Historical Piper Prudence primary + Kokoro fallback; superseded by Piper-only production | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | HISTORICAL — SUPERSEDED | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
 | P9.1 | PostgreSQL + Prisma, invite auth, pairing, user/device settings, backup/restore baseline | PRD + `../p9/` + roadmap | IMPLEMENTED — ISOLATED / READY FOR REVIEW | AUTHORIZED | [`../p9/P9.1-IMPLEMENTATION-EVIDENCE.md`](../p9/P9.1-IMPLEMENTATION-EVIDENCE.md) |
 | P9.2–P9.6 | Chat/memory, scheduler, integrations, hardening, final acceptance | `../p9/` | PROPOSED; NOT_STARTED | DEPENDS ON PREDECESSOR GATES | — |
 | P10 | Activate verified hardware endpoint handoff + physical ESP32 acceptance | hardware contract + handoff | NOT_STARTED | DEPENDS ON P9.6 VERIFIED; ALSO REQUIRES P7 PUBLIC ENDPOINT + P8 STATUS | — |
@@ -110,8 +109,7 @@ isolated/private candidate; production activation remains separately gated.
 - STT accuracy investigation on 2026-07-25 selected `WHISPER_MODEL=medium` with `WHISPER_HOTWORDS=BMO`, while keeping CPU INT8, 4 threads, 1 worker, beam 5, VAD, and language auto-detect. The earlier `small` references in P2 evidence remain historical evidence of P2 at that time, not the current tuning target.
 - Kokoro manual listening selected `KOKORO_VOICE=af_heart` with `KOKORO_SPEED=0.80`; P8 verified this as the fallback value. Earlier evidence that production remained at `1.0` is historical. No RVC revalidation path is active.
 - Hermes real local `/v1/responses` integration is recorded in the P5 manual evidence addendum, and P7 subsequently verified Hermes integration in production.
-- P8 production fixed Piper Prudence as primary and retained Kokoro-only
-  fallback. RVC runtime and Docker artifacts were removed from production;
+- P8 production evidence is historical. Current production runs Piper-only; Kokoro runtime/cache artifacts are purged and RVC remains historical-only;
   compact evidence and Git history remain archived.
 - Real RVC inference remains unverified; this is an archived experimental
   status, not a production dependency.

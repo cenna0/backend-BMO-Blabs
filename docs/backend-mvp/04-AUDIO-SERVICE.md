@@ -6,18 +6,13 @@
 > legacy engine names below are retained only as migration evidence.
 
 **Versi:** 1.0.1  
-**Status:** CANONICAL AUDIO IMPLEMENTATION REFERENCE
+**Status:** HISTORICAL P8/P7 REFERENCE — NOT CURRENT
 
-> **2026-08-03 production note:** P8 deployed the fixed Piper Prudence voice as
-> primary TTS after explicit operator listening approval and a controlled
-> production canary. Kokoro `af_heart` at speed `0.80` remains the automatic
-> fallback. Real RVC inference remains unverified and RVC stays disabled.
-> Production-only values are authoritative; historical RVC sections below are
-> archived design constraints, not an enabled runtime.
+> **Historical P8 note:** This file records the former Piper-primary/Kokoro-fallback rollout. It is retained for audit only and must not be used to configure or deploy current production. Current production is Piper-only; see `CURRENT-RUNTIME-CONFIG.md` and the final purge evidence.
 
-> **Status:** Canonical backend MVP documentation package  
+> **Status:** Historical package; current authority is `CURRENT-RUNTIME-CONFIG.md` and the final Piper-only evidence.
 > **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
-> **Scope:** Backend voice MVP only. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
+> **Scope:** Historical Backend voice MVP only. Current production scope and runtime values are defined by `CURRENT-RUNTIME-CONFIG.md`; this file is not an active implementation reference. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
 
 
 ## Cara menggunakan file ini

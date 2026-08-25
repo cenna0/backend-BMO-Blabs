@@ -1,12 +1,14 @@
 # RVC Local Purge Design
 
+> **SUPERSEDED / HISTORICAL ONLY — DO NOT IMPLEMENT**
+> Superseded by the completed Piper-only production cutover. RVC archive evidence is retained separately; current production authority is the final Piper-only evidence.
+
 Date: 2026-08-24
 
 ## Goal
 
 Remove the local RVC implementation, artifacts, documentation, and Git refs
-from the BMO workspace while preserving the non-RVC audio path (Piper,
-Kokoro, STT, and FFmpeg).
+from the BMO workspace while preserving the Piper-only audio path (STT, Piper, and FFmpeg).
 
 ## Scope
 

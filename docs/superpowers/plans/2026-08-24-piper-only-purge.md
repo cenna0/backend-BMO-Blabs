@@ -1,5 +1,8 @@
 # BMO Piper-Only Audio Cleanup Implementation Plan
 
+> **HISTORICAL ONLY — COMPLETED 2025-08-25**
+> This plan has been executed with production evidence in `docs/operations/2026-08-24-piper-only-purge-evidence.md`. Unchecked boxes below describe the original task checklist; do not treat them as pending production work.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`-`) syntax for tracking.
 
 **Goal:** Remove active Kokoro/RVC runtime semantics and migrate BMO production to a verified faster-whisper → Hermes → Piper → FFmpeg → MP3 pipeline with memory-gated candidate promotion.

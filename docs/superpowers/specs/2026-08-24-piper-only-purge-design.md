@@ -1,7 +1,7 @@
 # BMO Piper-Only Audio Cleanup and Kokoro/RVC Purge Design
 
 Date: 2026-08-24
-Status: Approved design; implementation pending
+Status: IMPLEMENTED AND PRODUCTION-VERIFIED; final evidence: `docs/operations/2026-08-24-piper-only-purge-evidence.md`
 Supersedes the runtime scope of `2026-08-24-remove-rvc-design.md`.
 
 ## Goal
@@ -29,7 +29,7 @@ preserved.
 
 - Production audio is `bmo-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34`.
 - The production image is built from `audio-service/Dockerfile` and the
-  current service uses Piper primary with Kokoro fallback.
+  current service runs Piper-only; the former Kokoro fallback is historical.
 - The observed production audio RSS is approximately 2.217 GiB.
 - The observed host baseline is approximately 7.8 GiB total, 2.9 GiB
   `MemAvailable`, and no swap.

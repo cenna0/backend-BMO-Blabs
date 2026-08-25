@@ -1,5 +1,9 @@
 # P8 — Piper Prudence Production Rollout Evidence
 
+> **HISTORICAL ONLY — SUPERSEDED BY 2025-08-25 PIPER-ONLY CUTOVER**
+> Preserve this file for audit lineage. Do not use its former Kokoro fallback, RVC, or P8 deployment values as current configuration.
+
+
 **Classification:** `P8_PIPER_PRODUCTION_VERIFIED`
 **Execution date:** 2026-08-03
 **Operator approval:** explicit manual listening approval recorded in this report

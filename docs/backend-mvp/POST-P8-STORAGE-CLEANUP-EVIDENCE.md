@@ -1,6 +1,8 @@
 # BMO Post-P8 Storage Cleanup — Phase 1 Evidence
 
-Status: `BMO_STORAGE_CLEANUP_PHASE1_VERIFIED`
+Status: `HISTORICAL — SUPERSEDED BY PIPER-ONLY PURGE`
+
+Current final evidence: `../operations/2026-08-24-piper-only-purge-evidence.md`
 
 Date: 2026-08-03
 
@@ -30,11 +32,7 @@ image above. The final checks showed:
 - Listeners remained loopback-only on `127.0.0.1:3000`, `:8001`, and `:8642`.
 - `TTS_PRIMARY_ENGINE=piper`.
 - Piper model `en_GB-semaine-medium`, speaker `prudence`, speaker ID `0`.
-- Kokoro fallback `af_heart`, speed `0.80`.
-- `RVC_ENABLED=false`.
-- Audio readiness reported `rvc_available=false` and otherwise loaded STT,
-  Kokoro, and FFmpeg; Docker health remained healthy. This degraded readiness
-  state is expected while RVC is disabled.
+- The former Kokoro fallback and RVC-disabled readiness fields are historical only. Current readiness is `stt_loaded=true`, `piper_loaded=true`, and `ffmpeg_available=true`; no RVC/Kokoro runtime artifact remains active.
 
 A post-cleanup internal TTS probe returned HTTP 200 with Piper, `X-RVC-Applied:
 false`, and a mono 24 kHz 96 kbps MP3. The previously committed P8 evidence

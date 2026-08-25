@@ -10,15 +10,12 @@
 > `docs/integration/05-IMPLEMENTATION-STATUS.md` for current production state.
 
 **Versi:** 1.2.0
-**Status:** VERIFIED — PRODUCTION
+**Status:** HISTORICAL P7/P8 BASELINE — SUPERSEDED
 **Last audited:** 2026-08-03
 
-> This file records the verified P8 production runtime and ongoing operational
-> rules. Piper Prudence is fixed primary TTS; Kokoro `af_heart` at `0.80` is
-> automatic fallback; RVC remains disabled. P9 PostgreSQL/Prisma and P10
-> physical ESP32 work remain separate phases.
+> This file records the former P7/P8 deployment baseline. It is retained for audit only. Current production is Piper-only and is documented in `CURRENT-RUNTIME-CONFIG.md` plus `docs/operations/2026-08-24-piper-only-purge-evidence.md`. Do not execute stale P7/P8 audio instructions below.
 
-## 0.1 Current P8 TTS deployment
+## 0.1 Historical P8 TTS deployment
 
 ```text
 Primary        Piper en_GB-semaine-medium / prudence / speaker ID 0

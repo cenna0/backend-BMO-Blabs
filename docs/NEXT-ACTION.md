@@ -4,7 +4,7 @@
 > Current source and the canonical integration package override dated
 > plans/evidence.
 
-**Last updated:** 2026-08-20
+**Last updated:** 2026-08-25
 **Current executable boundary:** Mobile application integration against the live production P9 Backend.
 **Deployed-image source revision:** `d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable image provenance, not current Git HEAD).
 **Production status:** `PRODUCTION_VERIFIED` — Backend deployed as `bmo-p9.1:pairing-code-only-d1473d0`.
@@ -12,6 +12,7 @@
 **Production verification:** Direct/public health and the six-sample production soak passed. Mobile REST coverage is 79 routes and Mobile WebSocket coverage is 12 events.
 **Rollback anchor:** `bmo-p9.1:spotify-phase26-9819ef7` remains preserved.
 **Physical status:** `PENDING_PHYSICAL_ESP`.
+**Audio status:** `PRODUCTION_VERIFIED` — Piper-only production image `bmo-audio@sha256:24e1c4244ea8868f731d819ea75cb57c1e464b6df3bd9679d65fd4711643488c`; Kokoro active artifacts purged; the former fallback model is not retained on-host; final evidence is `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 P9 production promotion, PostgreSQL bootstrap, the seven migrations, encrypted
 backups, Backend cutover, source closure, and main fast-forward are complete.
@@ -43,9 +44,7 @@ ESP/Hardware work starts at
 immediate milestone is `HW_VPS_CONNECTION_STABLE`; pairing comes only after
 stable WSS/auth/reconnect/voice continuity.
 
-Current runtime context: production Hermes integration is verified on the
-private origins only boundary `127.0.0.1:8642`; Audio and Backend remain
-private dependencies. Real RVC inference is not verified.
+Current runtime context: Hermes, Audio, Backend, and PostgreSQL are healthy on private origins. Audio is Piper-only; Mobile and ESP clients never call Audio or Hermes directly. RVC is historical-only and not a production dependency.
 
 ## Current Mobile work
 

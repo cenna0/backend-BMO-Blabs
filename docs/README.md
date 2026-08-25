@@ -5,8 +5,8 @@
 > contract. If it conflicts with dated plans/evidence, current source and the
 > canonical integration package win.
 
-**Last audited:** 2026-08-24
-**Backend/VPS status:** code-only pairing is deployed and production-verified.
+**Last audited:** 2026-08-25
+**Backend/VPS status:** Backend, PostgreSQL, Hermes, and Piper-only Audio are production-verified.
 **Physical pairing status:** `PENDING_PHYSICAL_ESP`.
 
 ## Mobile agent start
@@ -57,9 +57,11 @@ Current Hardware boundary:
 - candidate port `3010` is historical/non-production
 - health and the six-sample production soak passed; the rollback image remains
   preserved.
-- current audio source is migrated to the Piper-only target; candidate
-  promotion is blocked by the host memory gate and the immutable prior image
-  remains the rollback image
+- Audio production status: `PRODUCTION_VERIFIED` — Piper-only on `127.0.0.1:8001`
+- Audio image: `bmo-audio@sha256:24e1c4244ea8868f731d819ea75cb57c1e464b6df3bd9679d65fd4711643488c`
+- final Audio readiness: `stt_loaded=true`, `piper_loaded=true`, `ffmpeg_available=true`
+- final evidence: [`operations/2026-08-24-piper-only-purge-evidence.md`](operations/2026-08-24-piper-only-purge-evidence.md)
+- old Audio image remains retained as a rollback reference; Kokoro runtime/cache artifacts are purged, so restoring the old image alone does not restore its former Kokoro model fallback
 - canonical audio path: faster-whisper → Hermes → Piper → FFmpeg → MP3
 - physical ESP32 integration is not verified; current firmware pairing status
   remains `PENDING_PHYSICAL_ESP`.
@@ -83,6 +85,8 @@ runbooks, and old phase prompts record their checkpoint only. They are not
 current Mobile or ESP implementation instructions. In particular, do not read
 every integration file `00` through `10` as an onboarding sequence: `04`, `07`,
 and `10` are completed historical operator records.
+
+Audio rollout authority is the final production evidence above. Historical verifier links are retained for audit only:
 
 Legacy verifier compatibility links (historical only):
 

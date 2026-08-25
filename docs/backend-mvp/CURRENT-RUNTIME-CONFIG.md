@@ -1,10 +1,17 @@
 # BMO Voice Runtime Configuration
 
-**Updated:** 2026-08-24
-**Status:** SOURCE MIGRATED; CANDIDATE BUILT; PROMOTION BLOCKED_RESOURCE
+**Updated:** 2026-08-25
+**Status:** PRODUCTION_VERIFIED; PIPER-ONLY CUTOVER COMPLETE
 
-This is the current runtime target. The immutable production Audio image remains
-available for rollback while the parallel candidate waits for the memory gate.
+This is the current production runtime. The immutable prior Audio image remains available as a rollback reference; the active production image is the Piper-only digest recorded below.
+
+## Production image
+
+```text
+bmo-audio@sha256:24e1c4244ea8868f731d819ea75cb57c1e464b6df3bd9679d65fd4711643488c
+```
+
+Final evidence: `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 ## Canonical pipeline
 
@@ -63,7 +70,4 @@ observability metadata only and is not a new consumer contract.
 
 ## Rollout state
 
-The candidate image was built from the Piper-only source. Candidate execution is
-allowed only after host `MemAvailable` is at least 4 GiB. After readiness, the
-measurement must remain at least 1.5 GiB with no OOM/resource pressure. The
-previous production image digest remains retained for deterministic rollback.
+Piper-only Audio is promoted and production-verified. Candidate testing required an authorized maintenance stop because this host has 8 GiB RAM and no swap. Final production checks passed; the previous production image digest remains retained as a rollback reference. Kokoro/RVC model artifacts are no longer present under active runtime paths, so an old-image restore does not recreate the former Kokoro fallback automatically.

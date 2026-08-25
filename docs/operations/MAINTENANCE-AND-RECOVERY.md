@@ -15,7 +15,7 @@
 ## 1. Authority and safety
 
 - `docs/NEXT-ACTION.md` decides the active phase.
-- `docs/backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` defines the verified P7 production baseline and operational controls.
+- `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md` and `docs/operations/2026-08-24-piper-only-purge-evidence.md` define the current Audio runtime and final production evidence. `docs/backend-mvp/06-DEPLOYMENT-AND-OPERATIONS.md` is historical only.
 - Public firmware/backend behavior remains governed by the canonical hardware contract.
 - Never delete data, volumes, users, or unrelated services just to make a health check green.
 - **Hermes present:** never reinstall/change/migrate its proven ownership, config, data, path, or listener merely for cleanliness.

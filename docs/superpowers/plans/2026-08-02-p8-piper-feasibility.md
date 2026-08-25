@@ -1,3 +1,6 @@
+> **HISTORICAL ONLY — DO NOT IMPLEMENT**
+> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+
 # P8 Piper Prudence Feasibility Implementation Plan
 
 **Status:** completed locally on 2026-08-02; no merge or push.
