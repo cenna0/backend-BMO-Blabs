@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P7 — Backend, Audio Service, and Hermes Production Integration — Test Evidence
 
@@ -73,8 +73,8 @@ Authoritative source gates passed:
 ## 3. Immutable production images
 
 ```text
-Backend  bmo-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7
-Audio    bmo-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e
+Backend  joy-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7
+Audio    joy-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e
 Revision 4d7b472adc4c2243d8f7364032a491ad70efb6d3
 ```
 
@@ -114,8 +114,8 @@ terminate either process or create restart loops.
 The protected runtime files are outside Git:
 
 ```text
-/opt/bmo/config/backend.env  bmo-admin:bmo-admin 0600 regular 30 variables
-/opt/bmo/config/audio.env    bmo-admin:bmo-admin 0600 regular 33 variables
+/opt/joy/config/backend.env  joy-admin:joy-admin 0600 regular 30 variables
+/opt/joy/config/audio.env    joy-admin:joy-admin 0600 regular 33 variables
 ```
 
 Provisioning validation passed without printing values:
@@ -190,9 +190,9 @@ Both application containers use:
 Required writable host paths:
 
 ```text
-/opt/bmo/cache/audio  10001:10001 0750
-/opt/bmo/temp/tts     10001:10001 0750
-/opt/bmo/temp/audio   1000:1000   0750
+/opt/joy/cache/audio  10001:10001 0750
+/opt/joy/temp/tts     10001:10001 0750
+/opt/joy/temp/audio   1000:1000   0750
 ```
 
 ## 7. Private deployment and private E2E
@@ -242,7 +242,7 @@ Inspection      read-only; no restore performed
 Rollback anchor:
 
 ```text
-Source  /opt/bmo/config/caddy/Caddyfile
+Source  /opt/joy/config/caddy/Caddyfile
 SHA-256 80150fb3cc50616638efdd4121a4061c18ad632e05d6e06d34448ddcf321554b
 ```
 
@@ -271,8 +271,8 @@ The committed verifier `backend/scripts/verify-p7-public-e2e.ts` passed all 23
 mandatory checks against:
 
 ```text
-API  https://api.personalbmo.web.id
-WSS  wss://api.personalbmo.web.id/ws
+API  https://api.personaljoy.web.id
+WSS  wss://api.personaljoy.web.id/ws
 ```
 
 ```text

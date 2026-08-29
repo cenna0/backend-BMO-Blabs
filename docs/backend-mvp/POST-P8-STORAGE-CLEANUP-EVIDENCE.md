@@ -1,4 +1,4 @@
-# BMO Post-P8 Storage Cleanup — Phase 1 Evidence
+# Joy Post-P8 Storage Cleanup — Phase 1 Evidence
 
 Status: `HISTORICAL — SUPERSEDED BY PIPER-ONLY PURGE`
 
@@ -74,8 +74,8 @@ The previously completed remote backups were re-used and remained equal:
 
 Removed clean worktrees:
 
-- `/opt/bmo/app/.worktrees/p8-rvc-foundation`
-- `/opt/bmo/app/.worktrees/p8-piper-feasibility`
+- `/opt/joy/app/.worktrees/p8-rvc-foundation`
+- `/opt/joy/app/.worktrees/p8-piper-feasibility`
 
 The local branches and remote branches remain. The Piper production worktree
 and all P7 worktrees remain.
@@ -84,7 +84,7 @@ and all P7 worktrees remain.
 
 RVC compact evidence:
 
-- Path: `/opt/bmo/archive/p8-rvc/p8-rvc-compact-evidence.tar.gz`
+- Path: `/opt/joy/archive/p8-rvc/p8-rvc-compact-evidence.tar.gz`
 - Archive file size: 273,348 apparent bytes
 - SHA-256: `40bf4923b0cfddc0dbb679a2eb34dd11e46721f714c68e18b5148d604d7259e5`
 - Archive directory allocated size: 290,816 bytes
@@ -95,7 +95,7 @@ RVC compact evidence:
 
 Piper feasibility evidence:
 
-- Directory: `/opt/bmo/archive/p8-piper-feasibility`
+- Directory: `/opt/joy/archive/p8-piper-feasibility`
 - Directory allocated size: 18,284,544 bytes
 - Canonical bundle: `p8-piper-listening-bundle.tar.gz`
 - Canonical bundle size: 17,952,821 apparent bytes
@@ -106,7 +106,7 @@ Piper feasibility evidence:
   listening guide, blind key, source text, model identity, model card, and
   DFKI license metadata were retained.
 
-Both archive directories are owned by `bmo-admin:bmo-admin` mode `0750`.
+Both archive directories are owned by `joy-admin:joy-admin` mode `0750`.
 Checksums and manifests validate successfully.
 
 ## Deleted filesystem targets
@@ -115,24 +115,24 @@ Successfully removed:
 
 | Exact path | Apparent bytes reclaimed |
 | --- | ---: |
-| `/opt/bmo/temp/p8-rvc-benchmark` | 4,612,096 |
-| `/opt/bmo/models/rvc` | 8,192 |
-| `/opt/bmo/temp/p8-piper-feasibility` | 1,499,971,584 |
-| `/opt/bmo/temp/p8-test-deps` | 2,572,288 |
+| `/opt/joy/temp/p8-rvc-benchmark` | 4,612,096 |
+| `/opt/joy/models/rvc` | 8,192 |
+| `/opt/joy/temp/p8-piper-feasibility` | 1,499,971,584 |
+| `/opt/joy/temp/p8-test-deps` | 2,572,288 |
 
 The RVC foundation candidate was partially removed. Its original measured
 size was 1,028,481,024 bytes; 63,807,488 bytes remain, consisting of:
 
-- `/opt/bmo/temp/p8-rvc-foundation-candidate/runtime/rvc/bmo/assets/CGO_e420_s2520.pth`
-- `/opt/bmo/temp/p8-rvc-foundation-candidate/runtime/rvc/bmo/assets/added_IVF69_Flat_nprobe_1_CGO_v2.index`
+- `/opt/joy/temp/p8-rvc-foundation-candidate/runtime/rvc/bmo/assets/CGO_e420_s2520.pth`
+- `/opt/joy/temp/p8-rvc-foundation-candidate/runtime/rvc/bmo/assets/added_IVF69_Flat_nprobe_1_CGO_v2.index`
 
 The containing directory is mode `0555`, so those exact files could not be
-removed by `bmo-admin` without an additional permission change. No permission
+removed by `joy-admin` without an additional permission change. No permission
 change was attempted. Apparent RVC foundation bytes reclaimed: 964,673,536.
 
 The exact RVC canary tree was skipped and remains present:
 
-`/opt/bmo/temp/p8-rvc-canary`
+`/opt/joy/temp/p8-rvc-canary`
 
 It contains root-owned and UID-10001 mode-0700 subdirectories. Its earlier
 readable accounting was 311,296 bytes, but the exact total is uncertain due to
@@ -179,8 +179,8 @@ Superseded Piper and historical Audio images:
 - `sha256:7b44e9c1e3cd6e944c30a3ad28b8fe2fe1b049e73aa6bc5d146909df485f20c7`
 
 The duplicate-tag image `fe805...` was removed through its exact tags
-`bmo-piper:p8-prudence-candidate` and
-`bmo-piper:p8-prudence-candidate-checkpoint`.
+`joy-piper:p8-prudence-candidate` and
+`joy-piper:p8-prudence-candidate-checkpoint`.
 
 ## Docker and filesystem results
 
@@ -215,10 +215,10 @@ the sum of virtual image sizes.
 
 Final sizes:
 
-- `/opt/bmo`: 4,086,763,520 bytes
-- `/opt/bmo/models`: 3,793,584,128 bytes
-- `/opt/bmo/temp`: 122,507,264 bytes
-- `/opt/bmo/archive`: 18,579,456 bytes
+- `/opt/joy`: 4,086,763,520 bytes
+- `/opt/joy/models`: 3,793,584,128 bytes
+- `/opt/joy/temp`: 122,507,264 bytes
+- `/opt/joy/archive`: 18,579,456 bytes
 
 ## Retained and deferred items
 
@@ -227,13 +227,13 @@ Retained active production and rollback assets:
 - final Piper Audio image and exact P7 rollback image;
 - running Backend, Telegram, Beszel agent, and Beszel hub images;
 - active Piper, Whisper, and Kokoro assets;
-- `/opt/bmo/models/hf-cache`;
-- `/opt/bmo/temp/p8-piper-production/rollback`;
-- `/opt/bmo/temp/p8-github-auth`;
-- `/opt/bmo/cache/audio` and `/opt/bmo/temp/tts`;
+- `/opt/joy/models/hf-cache`;
+- `/opt/joy/temp/p8-piper-production/rollback`;
+- `/opt/joy/temp/p8-github-auth`;
+- `/opt/joy/cache/audio` and `/opt/joy/temp/tts`;
 - Docker build cache, volumes, production containers, and networks.
 
-Deferred Phase 2 items include APT and npm caches, Codex data, `/home/bmo-admin`
+Deferred Phase 2 items include APT and npm caches, Codex data, `/home/joy-admin`
 local data, logs, build cache, Backend history, P7 branches/worktrees, and the
 remaining inaccessible RVC canary/model files.
 
@@ -253,8 +253,8 @@ The final commit SHA is recorded in the handoff after commit and push.
 The operator subsequently removed the two previously inaccessible residual
 paths:
 
-- `/opt/bmo/temp/p8-rvc-foundation-candidate`
-- `/opt/bmo/temp/p8-rvc-canary`
+- `/opt/joy/temp/p8-rvc-foundation-candidate`
+- `/opt/joy/temp/p8-rvc-canary`
 
 Final verification on 2026-08-04 confirmed:
 

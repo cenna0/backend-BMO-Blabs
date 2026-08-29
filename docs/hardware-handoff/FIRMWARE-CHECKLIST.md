@@ -1,4 +1,4 @@
-# BMO MVP — Firmware Implementation Checklist
+# Joy MVP — Firmware Implementation Checklist
 
 > **CURRENT SUPPORTING CHECKLIST**
 > Begin at
@@ -21,7 +21,7 @@ recorded; `PHYSICAL_ESP32_STATUS` remains `NOT_RUN`.
 - [ ] Connect ESP32-S3 to Wi-Fi.
 - [ ] Connect to the WSS URL from `DEPLOYMENT-CONFIG.md`.
 - [ ] Send `authenticate` within the authentication window after socket open.
-- [ ] Store/use `device_id=bmo-001` for current MVP.
+- [ ] Store/use `device_id=joy-001` for current MVP.
 - [ ] Store the real device token outside source-controlled documentation.
 - [ ] Never put the token in the WebSocket URL/query string.
 - [ ] Handle close codes `4001`, `4003`, and `4008`.

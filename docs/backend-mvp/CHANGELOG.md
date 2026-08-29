@@ -1,15 +1,22 @@
-# BMO Backend MVP — Changelog
+# Joy Backend MVP — Changelog
 
 > Entries under **Historical package changelog** preserve the phase ownership/runtime facts as they were recorded at that time. They are evidence, not current next-step authority. Use `../NEXT-ACTION.md` and `IMPLEMENTATION-STATUS.md` for current ownership.
+
+## 2026-08-26 — Hermes Streaming Integration & TTFA Optimization (~1.7s)
+- Implemented Hermes Streaming (`POST /v1/chat/completions` SSE stream with `stream: true`) in `FastVoiceLlmClient` and `HermesResponsesClient`.
+- Integrated `SentenceSplitter` in `VoicePipelineService` to incrementally parse token streams, strip thinking/reasoning tags, and segment text into sentences/clauses for pipelined TTS synthesis.
+- Integrated `LiveAudioStream` in `TempAudioService` with HTTP Chunked Transfer Encoding (`Transfer-Encoding: chunked`) for real-time audio chunk streaming.
+- Emitted WebSocket `audio_ready` on first audio chunk, reducing TTFA (Time-To-First-Audio) to ~1.7s.
+- Preserved 100% compatibility with existing ESP32 production contracts (WebSocket `audio_ready`, HTTP GET chunked MP3 streaming, Helix MP3 decoding, `audio_playback_done`).
 
 ## 2026-07-31 — P7 VERIFIED — PRODUCTION / P8 handoff
 
 - Closed P7 as `VERIFIED — PRODUCTION` from deployment source
   `4d7b472adc4c2243d8f7364032a491ad70efb6d3`.
 - Recorded immutable running images
-  `bmo-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7`
+  `joy-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7`
   and
-  `bmo-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e`.
+  `joy-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e`.
 - Public fake-ESP32 acceptance passed `23/23`; the final 3,665-second / 61m 5s
   production soak passed `13/13` samples with zero new OOM and zero
   backend/audio restarts.
@@ -25,8 +32,8 @@
 ## 2026-07-26 — Final execution-readiness audit
 
 - Reconciled P6 authorization semantics so one explicit `execute P6` instruction covers the planned non-destructive P6 installs/configuration while destructive/unexpected actions still require separate approval.
-- Locked Caddy as a host system service and Beszel infrastructure Compose path as `/opt/bmo/deploy/infra-compose.yml`.
-- Clarified secret env ownership/readability for `bmo-admin`, postponed `DATABASE_URL`/real `postgres.env` activation to P9, and required commit-SHA image tags for deterministic rollback.
+- Locked Caddy as a host system service and Beszel infrastructure Compose path as `/opt/joy/deploy/infra-compose.yml`.
+- Clarified secret env ownership/readability for `joy-admin`, postponed `DATABASE_URL`/real `postgres.env` activation to P9, and required commit-SHA image tags for deterministic rollback.
 - Added ESP32 production TLS prerequisite: trusted device time plus certificate-chain validation.
 
 ## 2026-07-26 — Next-action/P6 execution handoff
@@ -43,8 +50,8 @@
 - Added complete `docs/hardware-handoff/` pack for humans and firmware coding agents.
 - Added explicit `DEPLOYMENT_STATUS: NOT_VERIFIED` gate so the agreed production domain is not misrepresented as already live.
 - Added current backend capability/status matrix and 34 physical ESP32 acceptance tests.
-- Updated active STT implementation reference from historical `small` baseline to selected `medium` + hotword `BMO` based on P5 accuracy evidence.
-- Reworked deployment target around `/opt/bmo`, Git `main` production source, Docker image runtime, external config/secrets, Caddy, Tailscale admin access, Beszel + Telegram alerts, backup/restore, rollback, RVC ownership, PostgreSQL readiness, and hardware handoff gate.
+- Updated active STT implementation reference from historical `small` baseline to selected `medium` + hotword `Joy` based on P5 accuracy evidence.
+- Reworked deployment target around `/opt/joy`, Git `main` production source, Docker image runtime, external config/secrets, Caddy, Tailscale admin access, Beszel + Telegram alerts, backup/restore, rollback, RVC ownership, PostgreSQL readiness, and hardware handoff gate.
 - Split future deployment work into dependency-based P6–P10 roadmap.
 - Marked old static P1/P5 phase markers and the 2026-07-18 verification report as historical where appropriate.
 - Removed non-authoritative `docs/superpowers/` planning material from final handoff package because it referenced uncreated handoff files/scripts and was not intended as protocol authority.
@@ -79,7 +86,7 @@
 - Mengotorisasi hanya P3 dan mengubah active phase menjadi `P3`; P4–P6 tetap `NOT AUTHORIZED`.
 - Menambahkan Kokoro English TTS `af_heart`, validasi teks, merge seluruh waveform segment ke satu WAV, FFmpeg MP3 mono 24 kHz 96 kbps, dan internal `POST /tts/synthesize`.
 - Menambahkan header hasil `Content-Type: audio/mpeg`, `X-RVC-Applied`, dan `X-TTS-Engine`.
-- Menambahkan safe RVC bootstrap untuk model `Freaky98/CGO-adventure-time-BMO-rvc-v2-420e` revision `82a8bc529bd41b930589188ead30f073d4f99fc0`, termasuk verifikasi size/SHA-256 sebelum extract dan extract hanya `.pth`/`.index`.
+- Menambahkan safe RVC bootstrap untuk model `Freaky98/CGO-adventure-time-Joy-rvc-v2-420e` revision `82a8bc529bd41b930589188ead30f073d4f99fc0`, termasuk verifikasi size/SHA-256 sebelum extract dan extract hanya `.pth`/`.index`.
 - Menambahkan fallback Kokoro-only ketika RVC unavailable/gagal, plus cleanup intermediate files melalui `finally`.
 - Real Kokoro + real FFmpeg + forced RVC fallback terbukti lokal; real RVC inference belum terbukti karena runtime/CLI `rvc infer` belum tersedia.
 - P3 tetap `IMPLEMENTED — not VERIFIED`; tidak mengerjakan Express backend integration, Hermes integration, deployment VPS, firmware/hardware, public backend interface change, atau P4–P6.
@@ -150,7 +157,7 @@ Berikut changelog source sebelum packaging:
 | Versi | Perubahan |
 |---|---|
 | 1.0.0 | Instruksi implementasi awal |
-| 1.0.1 | Seluruh instruksi diubah ke Bahasa Indonesia; runtime personality dan jawaban suara BMO tetap English |
+| 1.0.1 | Seluruh instruksi diubah ke Bahasa Indonesia; runtime personality dan jawaban suara Joy tetap English |
 | 1.0.2 | Memperketat isolasi Docker/secret, pin aset RVC, kompatibilitas Python, tombstone idempotency, race HTTP/WS, kontrak MP3, dan cleanup state |
 | 1.0.3 | Menambah model cache persisten, idempotensi playback, deduplikasi `audio_ready`, `AUDIO_EXPIRED`, status duplicate upload yang exact, reconnect playback tests, sanitizer TTS, dan startup health grace period |
 | 1.0.4 | Memisahkan keputusan locked dari baseline, mengunci empat mode display tanpa `listening`, menghapus asumsi `/v1/models`, menambah capability test/adapter Hermes, schema event/HTTP canonical agar dokumen self-contained, canonical `WEBSOCKET_NOT_CONNECTED`, state sync setelah backend restart, hash WAV untuk idempotency, public status mapping, HTTP 410 audio expired, privacy log, dan validasi sample rate RVC |

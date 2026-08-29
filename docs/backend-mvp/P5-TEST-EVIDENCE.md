@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P5 Reliability, Security, Lifecycle Test Evidence
 
@@ -102,10 +102,10 @@ Result:
 
 - `pass: true`
 - fake ESP32 authenticated, uploaded WAV, saw `thinking`, saw `audio_ready`, downloaded MP3, and sent `playback_done`
-- STT: real local faster-whisper fixture, transcript `Hello BMO, please help me remember the meeting tomorrow.`
+- STT: real local faster-whisper fixture, transcript `Hello Joy, please help me remember the meeting tomorrow.`
 - Hermes: Hermes-compatible fixture via `/v1/responses`
 - TTS: real Kokoro + FFmpeg through Audio Service; RVC requested but fallback Kokoro-only because local RVC unavailable
-- Output MP3: `D:\codex\BMO\audio-service\temp\p4-full-pipeline\pipeline-output.mp3`
+- Output MP3: `D:\codex\Joy\audio-service\temp\p4-full-pipeline\pipeline-output.mp3`
 - Timings: STT 27955 ms; Hermes 14 ms; TTS 23541 ms; store MP3 17 ms; total 51531 ms
 
 Standalone ffprobe:

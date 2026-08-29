@@ -1,6 +1,6 @@
 > **SUPERSEDED NOTE (same-day final pass):** Product PRD was subsequently promoted to `v1.2.2` to remove stale active deployment assumptions. Use `2026-07-26-FINAL-REPLACEMENT-CHECK.md` as the final replacement verdict.
 
-# BMO Docs — Next-Action / Agent-Readiness Verification
+# Joy Docs — Next-Action / Agent-Readiness Verification
 
 **Date:** 2026-07-26  
 **Result:** PASS  
@@ -22,7 +22,7 @@ Updated:
 - `backend-mvp/IMPLEMENTATION-STATUS.md`
 - `backend-mvp/CHANGELOG.md`
 - `roadmap/P6-P10-ROADMAP.md`
-- `product/BMO-BY-BLABS-PRD-v1.2.1.md` (operator/runtime-role clarification only)
+- `product/Joy-BY-BLABS-PRD-v1.2.1.md` (operator/runtime-role clarification only)
 
 ## Agent-readiness checks
 
@@ -33,17 +33,17 @@ Updated:
 - PASS — agent is instructed to stop after P6 rather than collapse P6–P10 into one long context.
 - PASS — Codex is the implementation/infrastructure executor; Hermes is the runtime dependency to preserve.
 - PASS — no host Linux `docker` user is required.
-- PASS — target deployment root remains `/opt/bmo`; historical `/opt/bmo-mvp` is not an active deployment target.
+- PASS — target deployment root remains `/opt/joy`; historical `/opt/joy-mvp` is not an active deployment target.
 - PASS — `main` remains the production source branch and production runtime is image-based, not live source bind-mounted.
 - PASS — Caddy, Tailscale, Beszel, Telegram, firewall, backup framework, user model, and secrets boundary are explicit P6 decisions.
 - PASS — P6 does not silently deploy backend/audio, RVC, PostgreSQL, or physical HW integration; those remain P7/P8/P9/P10.
-- PASS — current runtime values remain `WHISPER_MODEL=medium`, hotword `BMO`, Kokoro `af_heart`, speed `0.80`.
+- PASS — current runtime values remain `WHISPER_MODEL=medium`, hotword `Joy`, Kokoro `af_heart`, speed `0.80`.
 - PASS — real RVC remains unverified and assigned to P8.
 - PASS — public HW endpoint is not declared usable until P7 verification updates the deployment handoff.
 
 ## Contract integrity
 
-`hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` was intentionally not modified.
+`hardware-contract/Joy-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` was intentionally not modified.
 
 SHA-256 before and after this revision:
 

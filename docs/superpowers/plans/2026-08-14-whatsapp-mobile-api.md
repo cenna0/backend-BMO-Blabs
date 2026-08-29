@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # WhatsApp Mobile API Implementation Plan
 
@@ -7,7 +7,7 @@
 
 **Goal:** Add a safe Backend-owned WhatsApp conversation/contact contract and complete candidate acceptance for the paired personal account without exposing Hermes/Baileys identities.
 
-**Architecture:** Add an owner-scoped conversation index keyed internally by provider chat reference and exposed as UUIDs. Evolve existing notification/send routes to use conversation IDs, add authenticated list/get/resolve routes, and emit metadata-only WhatsApp mobile events. Keep the official bridge unchanged, BMO as the sole queue consumer, and incoming text outside Hermes privileged paths.
+**Architecture:** Add an owner-scoped conversation index keyed internally by provider chat reference and exposed as UUIDs. Evolve existing notification/send routes to use conversation IDs, add authenticated list/get/resolve routes, and emit metadata-only WhatsApp mobile events. Keep the official bridge unchanged, Joy as the sole queue consumer, and incoming text outside Hermes privileged paths.
 
 **Tech Stack:** TypeScript, Express, Zod, Prisma/PostgreSQL additive migration, Vitest, systemd unit source.
 
@@ -69,7 +69,7 @@
 
 - [ ] Add strict schemas for `limit/cursor`, UUID conversation IDs, international phone resolve, optional display name, conversation-scoped send preview, and notification targets.
 - [ ] Add authenticated `GET /integrations/whatsapp/conversations`, `GET /integrations/whatsapp/conversations/:id`, and `POST /integrations/whatsapp/conversations/resolve`.
-- [ ] Return only BMO-safe conversation fields and derive `notificationEnabled` from owner rules.
+- [ ] Return only Joy-safe conversation fields and derive `notificationEnabled` from owner rules.
 - [ ] Evolve notification rules to use conversation IDs for new CONTACT/GROUP rules while retaining internal compatibility for historical rows.
 - [ ] Evolve send preview to require a conversation ID; reject raw `recipientRef` from the mobile contract.
 - [ ] Enforce ownership and bounded `OWNERSHIP_DENIED`/`INVALID_INPUT` errors.
@@ -90,7 +90,7 @@
 ### Task 6: Make the dedicated unit reboot-persistent
 
 **Files:**
-- Modify: `ops/whatsapp/systemd/bmo-whatsapp-bridge.service`
+- Modify: `ops/whatsapp/systemd/joy-whatsapp-bridge.service`
 - Modify: `backend/tests/p9/whatsapp-transport-boundary.unit.test.ts`
 
 - [ ] Add `[Install]` with `WantedBy=multi-user.target` while preserving `User=hermes`, loopback, bounded restart, privacy, and no Hermes gateway dependency.

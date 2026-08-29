@@ -14,7 +14,7 @@
 ## Phase 2 port-5555 remediation
 
 At the Phase 2 preflight, PID 217206 was confirmed as a manually started
-`bmo-admin` Node process running Prisma Studio from the Backend workspace. It
+`joy-admin` Node process running Prisma Studio from the Backend workspace. It
 was not owned by Docker, Compose, systemd, or a user service. Docker published
 no port 5555 and the active sanitized Caddy config contained no 5555 route.
 The process was terminated with `SIGTERM`; subsequent `ss`, `lsof`, process,

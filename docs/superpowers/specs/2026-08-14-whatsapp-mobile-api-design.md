@@ -9,7 +9,7 @@
 The current candidate implementation exposes connection/status, notification
 rules, and preview/confirm send routes, but it has no Backend-owned
 conversation index. The send route accepts a provider JID, and inbound
-notification events do not carry a BMO conversation identity. This prevents a
+notification events do not carry a Joy conversation identity. This prevents a
 mobile client from using WhatsApp without learning Hermes/Baileys details.
 
 The Hermes bridge remains the unchanged transport implementation. Its

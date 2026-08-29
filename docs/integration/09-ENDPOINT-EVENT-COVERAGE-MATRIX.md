@@ -1,207 +1,201 @@
-> **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
-
 # Mobile Endpoint and WebSocket Coverage Matrix
 
-**Audited:** 2026-08-20
-**Source:** backend/src/p9/http/*.ts, backend/src/p9/websocket/mobile-events.ts, backend/src/p9/websocket/mobile-websocket.server.ts
-**Deployed-image source revision:** `d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable provenance, not current Git HEAD).
-**Production status:** Code-only enrollment is `PRODUCTION_VERIFIED` in `bmo-p9.1:pairing-code-only-d1473d0`.
-**Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied in production; state is `7 completed, 0 unfinished, 0 rolled_back`.
-**Production verification:** Health and six-sample soak passed; Docker healthcheck resolves `BACKEND_PORT=3000`; old raw-credential Mobile pairing routes are absent.
-**Physical status:** `PENDING_PHYSICAL_ESP`.
+**Audited:** 2026-08-29
+**Status:** `PRODUCTION_VERIFIED`  
+**Deployed-image runtime:** `joy-p9.1:production`  
+**Base REST URL:** `https://api.personalbmo.web.id/api/v1`  
+**Base Mobile WS URL:** `wss://api.personalbmo.web.id/api/v1/ws`
 
-## Counting rule
+---
 
-The source registers 83 literal P9 HTTP routes. This Mobile inventory contains
-79 routes: every P9 route except the three internal /ops/db/* routes and the
-Spotify provider callback. The two authenticated WhatsApp QR setup routes are
-included so they cannot become undocumented, but are marked OUT_OF_SCOPE for
-the Mobile UI. The Spotify callback is documented separately as a provider
-browser callback, not a Mobile API.
+## Summary of Registered HTTP Endpoints
 
-PRODUCTION_VERIFIED means the route is in the promoted production image. It
-does not claim that a provider action or physical ESP behavior has been
-exercised. IMPLEMENTED, PARTIALLY_IMPLEMENTED, NOT_IMPLEMENTED, OUT_OF_SCOPE,
-BLOCKED, and PENDING_PHYSICAL_ESP retain their meanings from
-05-IMPLEMENTATION-STATUS.md.
+The Joy backend registers 98 HTTP routes in the current source/runtime inventory:
+- **93 registrations from the P9 router** (including /api/v1 routes, public avatar media, provider callbacks, and database-ops routes)
+- **1 hardware voice upload route** (/api/v1/voice)
+- **1 ephemeral audio download route** (/audio/:fileName)
+- **3 health routes** (/livez, /readyz, /health)
 
-## REST route inventory
 
-Auth is explicit per route row: `PUBLIC`, `BEARER`, or `OPERATOR_BEARER`.
-`PUBLIC` routes are the five auth bootstrap routes plus the avatar media route.
-`OPERATOR_BEARER` is the product/UI policy label for the two authenticated
-WhatsApp setup surfaces marked `OUT_OF_SCOPE` for Mobile UI. Current source
-uses ordinary authenticated-user middleware for those routes; it does not
-enforce a separate operator RBAC role.
 
-| # | Method | Path | Auth | Request/query source | Response/status | Retry/idempotency | Mobile status/relevance |
-|---:|---|---|---|---|---|---|
-| 1 | POST | /api/v1/auth/register | PUBLIC | strict registration body; DOB required, optional legacy invitation | {user,session} / 201 | no key; duplicate 409 | PRODUCTION_VERIFIED |
-| 2 | POST | /api/v1/auth/login | PUBLIC | {email,password,clientDeviceId?} | {user,session} / 200 | no key; invalid input is auth failure | PRODUCTION_VERIFIED |
-| 3 | POST | /api/v1/auth/password/recovery/verify | PUBLIC | {email,dateOfBirth} | {recoveryToken,expiresAt} / 200 | no key; IP/email rate limits | PRODUCTION_VERIFIED |
-| 4 | POST | /api/v1/auth/password/recovery/reset | PUBLIC | {recoveryToken,newPassword} | empty / 204 | token single-use | PRODUCTION_VERIFIED |
-| 5 | POST | /api/v1/auth/refresh | PUBLIC | {refreshToken} | {session} / 200 | refresh rotation/replay-family handling | PRODUCTION_VERIFIED |
-| 6 | POST | /api/v1/auth/logout | BEARER | bearer, no body required | empty / 204 | current session revoke | PRODUCTION_VERIFIED |
-| 7 | POST | /api/v1/auth/logout-all | BEARER | bearer, no body required | empty / 204 | all-session revoke | PRODUCTION_VERIFIED |
-| 8 | GET | /api/v1/me | BEARER | bearer | {user: SafeUser} / 200 | safe read | PRODUCTION_VERIFIED |
-| 9 | GET | /api/v1/chat/sessions | BEARER | no body | {sessions} / 200 | safe read; max 100 | PRODUCTION_VERIFIED |
-| 10 | POST | /api/v1/chat/sessions | BEARER | {temporary?: boolean} | {session} / 201 | no key | PRODUCTION_VERIFIED |
-| 11 | GET | /api/v1/chat/sessions/:sessionId/messages | BEARER | limit 1..100, positive int64 cursor | {messages,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
-| 12 | POST | /api/v1/chat/sessions/:sessionId/messages | BEARER | {idempotencyKey: UUID,text,speakOnDevice?,deviceId?} | {userMessage,assistant} / 202 | user/idempotency key replay | PRODUCTION_VERIFIED |
-| 13 | DELETE | /api/v1/chat/sessions/:sessionId | BEARER | no body | empty / 204 | durable soft delete/cancel | PRODUCTION_VERIFIED |
-| 14 | POST | /api/v1/chat/messages/:messageId/feedback | BEARER | {rating: positive\|negative,reason?} | {feedback} / 200 | owner-scoped upsert | PRODUCTION_VERIFIED |
-| 15 | GET | /api/v1/devices/:deviceId/wifi | BEARER | no body | {wifi} or null / 200 | safe read | PRODUCTION_VERIFIED |
-| 16 | PUT | /api/v1/devices/:deviceId/wifi | BEARER | {ssid,password?} | {wifi} / 202 | latest-write-wins, no client key | PRODUCTION_VERIFIED; physical apply PENDING_PHYSICAL_ESP |
-| 17 | DELETE | /api/v1/devices/:deviceId/wifi | BEARER | no body | empty / 204 | metadata delete | PRODUCTION_VERIFIED |
-| 18 | GET | /api/v1/devices/:deviceId/logs | BEARER | limit 1..100, default 50 | {logs} / 200 | safe bounded read | PRODUCTION_VERIFIED; physical emission pending |
-| 19 | GET | /api/v1/devices/:deviceId/telemetry | BEARER | no body | {telemetry} / 200 | safe read | PRODUCTION_VERIFIED; physical emission pending |
-| 20 | GET | /api/v1/devices | BEARER | no body | {devices: SafeDevice[]} / 200 | safe read | PRODUCTION_VERIFIED |
-| 21 | GET | /api/v1/devices/:deviceId | BEARER | UUID path | {device: SafeDevice} / 200 | safe read | PRODUCTION_VERIFIED |
-| 22 | PATCH | /api/v1/devices/:deviceId/settings | BEARER | strict device settings patch | {settings} / 200 | owner-scoped write | PRODUCTION_VERIFIED; firmware sync pending |
-| 23 | POST | /api/v1/devices/:deviceId/unpair | BEARER | no body | empty / 204 | durable revoke; revokes bound sessions | PRODUCTION_VERIFIED |
-| 24 | POST | /api/v1/integrations/whatsapp/connect | BEARER | {} | `{connection,blocked}` / 202 | provider operation | PRODUCTION_VERIFIED; provider gate separate |
-| 25 | GET | /api/v1/integrations/whatsapp/status | BEARER | no body | connection / 200 | safe read | PRODUCTION_VERIFIED |
-| 26 | GET | /api/v1/integrations/whatsapp/conversations | BEARER | limit 1..100, default 50, timestamp/UUID cursor | {conversations,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
-| 27 | GET | /api/v1/integrations/whatsapp/conversations/:id | BEARER | UUID path | safe conversation / 200 | safe read | PRODUCTION_VERIFIED |
-| 28 | POST | /api/v1/integrations/whatsapp/conversations/resolve | BEARER | {phoneNumber,displayName?} | safe conversation / 200 | provider mapping/idempotent convergence | PRODUCTION_VERIFIED |
-| 29 | GET | /api/v1/integrations/whatsapp/qr | OPERATOR_BEARER | no body | {qr,expiresAt,status} / 200 | operator setup only | OUT_OF_SCOPE for Mobile UI |
-| 30 | POST | /api/v1/integrations/whatsapp/confirm-scanned | OPERATOR_BEARER | {} | {connection} / 200 | operator setup only | OUT_OF_SCOPE for Mobile UI |
-| 31 | POST | /api/v1/integrations/whatsapp/disconnect | BEARER | no body | empty / 204 | provider/state mutation | PRODUCTION_VERIFIED; provider gate separate |
-| 32 | GET | /api/v1/integrations/whatsapp/notification-rules | BEARER | no body | {rules} / 200 | safe read | PRODUCTION_VERIFIED |
-| 33 | PATCH | /api/v1/integrations/whatsapp/notification-rules | BEARER | {rules: 1..100} | {rules} / 200 | replacement write | PRODUCTION_VERIFIED |
-| 34 | POST | /api/v1/integrations/whatsapp/send-preview | BEARER | {conversationId,message,idempotencyKey} | {send} / 201 | user/idempotency key | PRODUCTION_VERIFIED; provider send gate separate |
-| 35 | POST | /api/v1/integrations/whatsapp/send-confirm | BEARER | {requestId: UUID,confirmed:true} | {send} / 200 | confirmation expiry/claim | PRODUCTION_VERIFIED; provider send gate separate |
-| 36 | POST | /api/v1/integrations/spotify/connect | BEARER | {} | {authorizationUrl} / 200 | server OAuth state | PRODUCTION_VERIFIED |
-| 37 | GET | /api/v1/integrations/spotify/status | BEARER | no body | connection / 200 | safe read | PRODUCTION_VERIFIED |
-| 38 | GET | /api/v1/integrations/spotify/search | BEARER | q 1..200, optional types | {results} / 200 | safe read/provider retry policy | PRODUCTION_VERIFIED; provider gate separate |
-| 39 | POST | /api/v1/integrations/spotify/disconnect | BEARER | no body | empty / 204 | credential/state wipe | PRODUCTION_VERIFIED |
-| 40 | GET | /api/v1/integrations/spotify/devices | BEARER | no body | {devices} / 200 | safe read | PRODUCTION_VERIFIED |
-| 41 | GET | /api/v1/integrations/spotify/active-device | BEARER | no body | {device} / 200 | safe read | PRODUCTION_VERIFIED |
-| 42 | GET | /api/v1/integrations/spotify/playback | BEARER | no body | {playback} / 200 | safe read; NO_ACTIVE_DEVICE is typed | PRODUCTION_VERIFIED |
-| 43 | PUT | /api/v1/integrations/spotify/preferred-device | BEARER | {deviceId: string\|null} | {device} / 200 | owner-scoped write | PRODUCTION_VERIFIED |
-| 44 | POST | /api/v1/integrations/spotify/actions | BEARER | {action,idempotencyKey,payload?,confirmed?} | {action} / 202 | user/action idempotency | PRODUCTION_VERIFIED; provider gate separate |
-| 45 | GET | /api/v1/plugins | BEARER | no body | {items} / 200 | safe read | PRODUCTION_VERIFIED |
-| 46 | POST | /api/v1/support/bug-reports | BEARER | authenticated multipart; max 5 screenshots | {id,status:"received"} / 201 | new report per request | PRODUCTION_VERIFIED |
-| 47 | GET | /api/v1/settings/memory | BEARER | no body | {automaticMemoryCandidates} / 200 | safe read | PRODUCTION_VERIFIED |
-| 48 | PATCH | /api/v1/settings/memory | BEARER | {automaticMemoryCandidates:boolean} | same object / 200 | owner-scoped write | PRODUCTION_VERIFIED |
-| 49 | GET | /api/v1/memories | BEARER | limit 1..100, default 25, opaque cursor | {memories,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
-| 50 | GET | /api/v1/memories/:id | BEARER | UUID path | memory projection / 200 | safe read | PRODUCTION_VERIFIED |
-| 51 | PATCH | /api/v1/memories/:id | BEARER | idempotency key plus bounded memory fields | memory projection / 200 | idempotent action | PRODUCTION_VERIFIED |
-| 52 | DELETE | /api/v1/memories/:id | BEARER | idempotency key body or header | empty / 204 | idempotent action | PRODUCTION_VERIFIED |
-| 53 | GET | /api/v1/memory-candidates | BEARER | limit 1..100, default 25, opaque cursor | {candidates,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
-| 54 | POST | /api/v1/memory-candidates/:id/accept | BEARER | idempotency key plus optional category/importance/expiry | memory projection / 200 | idempotent accept | PRODUCTION_VERIFIED |
-| 55 | POST | /api/v1/memory-candidates/:id/reject | BEARER | {idempotencyKey} | candidate projection / 200 | idempotent reject | PRODUCTION_VERIFIED |
-| 56 | POST | /api/v1/memories/forget-topic | BEARER | {idempotencyKey,topic} | sanitized counts / 200 | idempotent action | PRODUCTION_VERIFIED |
-| 57 | POST | /api/v1/memories/clear-all | BEARER | {idempotencyKey} | sanitized counts / 200 | idempotent action | PRODUCTION_VERIFIED |
-| 58 | POST | /api/v1/memories/export | BEARER | {idempotencyKey} | JSON export / 200 | idempotent audit | PRODUCTION_VERIFIED |
-| 59 | GET | /api/v1/memory/summary | BEARER | no body | {summary} / 200 | safe read | PRODUCTION_VERIFIED |
-| 60 | POST | /api/v1/memory/summary/regenerate | BEARER | {idempotencyKey} | {summary,generation} / 202 | idempotent action | PRODUCTION_VERIFIED; runtime status not_configured |
-| 61 | POST | /api/v1/memory/summary/feedback | BEARER | {idempotencyKey,feedback} | {summary} / 200 | idempotent action | PRODUCTION_VERIFIED |
-| 62 | POST | /api/v1/pairing/claim | BEARER | strict {code: six digits} | {device} / 201; generic unusable-code 409; rate limit 429 | single-use transaction; user/session/IP limits | PRODUCTION_VERIFIED; physical completion PENDING_PHYSICAL_ESP |
-| 63 | GET | /api/v1/settings/personalization | BEARER | no body | seven-field object / 200 | safe read/upsert | PRODUCTION_VERIFIED |
-| 64 | PATCH | /api/v1/settings/personalization | BEARER | strict non-empty seven-field patch | seven-field object / 200 | owner-scoped write | PRODUCTION_VERIFIED |
-| 65 | PATCH | /api/v1/me/profile | BEARER | strict non-empty {displayName?,username?} | {user} / 200 | owner-scoped write; username conflict 409 | PRODUCTION_VERIFIED |
-| 66 | POST | /api/v1/me/avatar | BEARER | multipart one file; JPEG/PNG/WebP, max 5 MiB | {avatarUrl} / 200 | upload admission/rate limits | PRODUCTION_VERIFIED |
-| 67 | GET | /media/avatars/:fileName | PUBLIC | UUID .webp filename; no bearer required | WebP bytes / 200 | immutable cache read | PRODUCTION_VERIFIED |
-| 68 | GET | /api/v1/schedules | BEARER | limit 1..100, default 50, timestamp/UUID cursor | {schedules,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
-| 69 | POST | /api/v1/schedules | BEARER | Daily/Weekly/Once strict union | {schedule} / 201 | no key; new schedule | PRODUCTION_VERIFIED |
-| 70 | GET | /api/v1/schedules/:id | BEARER | UUID path | {schedule} / 200 | safe read | PRODUCTION_VERIFIED |
-| 71 | PATCH | /api/v1/schedules/:id | BEARER | current version plus mutable fields | {schedule} / 200 | optimistic version; 409 stale | PRODUCTION_VERIFIED |
-| 72 | POST | /api/v1/schedules/:id/pause | BEARER | {version} | {schedule} / 200 | optimistic version | PRODUCTION_VERIFIED |
-| 73 | POST | /api/v1/schedules/:id/resume | BEARER | {version} | {schedule} / 200 | optimistic version | PRODUCTION_VERIFIED |
-| 74 | DELETE | /api/v1/schedules/:id | BEARER | {version} | empty / 204 | durable cancel, optimistic version | PRODUCTION_VERIFIED |
-| 75 | GET | /api/v1/schedule-runs | BEARER | limit, cursor, optional scheduleId | {runs,nextCursor} / 200 | safe cursor read | PRODUCTION_VERIFIED |
-| 76 | GET | /api/v1/settings/user | BEARER | no body | user settings / 200 | safe read | PRODUCTION_VERIFIED |
-| 77 | PATCH | /api/v1/settings/user | BEARER | strict optional settings patch | user settings / 200 | owner-scoped write | PRODUCTION_VERIFIED |
-| 78 | GET | /api/v1/settings/devices/:deviceId | BEARER | UUID path | device settings / 200 | safe read | PRODUCTION_VERIFIED |
-| 79 | PATCH | /api/v1/settings/devices/:deviceId | BEARER | strict device settings patch | device settings / 200 | owner-scoped write | PRODUCTION_VERIFIED |
 
-The two registered device-settings PATCH routes are aliases to the same
-`SettingsService.updateDeviceSettings` behavior and remain separately
-documented; source and tests do not designate a canonical/deprecated one.
+---
 
-### Routes intentionally outside the Mobile count
+## Full REST Route Inventory
 
-~~~
-GET /api/v1/integrations/spotify/callback   provider browser callback, not Mobile API
-GET /api/v1/ops/db/livez                    internal operator route
-GET /api/v1/ops/db/readyz                   internal operator route
-GET /api/v1/ops/db/migrations               internal operator route
-~~~
+| # | Method | Path | Auth | Description | Status |
+|---:|---|---|---|---|---|
+| 1 | POST | `/api/v1/auth/register` | PUBLIC | User registration with DOB & password | PRODUCTION_VERIFIED |
+| 2 | POST | `/api/v1/auth/login` | PUBLIC | Standard email + password login | PRODUCTION_VERIFIED |
+| 3 | POST | `/api/v1/auth/google` | PUBLIC | Google OAuth ID token verification & sign-in | PRODUCTION_VERIFIED |
+| 4 | POST | `/api/v1/auth/password/recovery/verify` | PUBLIC | Step 1 recovery verification by email & DOB | PRODUCTION_VERIFIED |
+| 5 | POST | `/api/v1/auth/password/recovery/reset` | PUBLIC | Step 2 password reset with recovery token | PRODUCTION_VERIFIED |
+| 6 | POST | `/api/v1/auth/refresh` | PUBLIC | Refresh token rotation & access token issuance | PRODUCTION_VERIFIED |
+| 7 | POST | `/api/v1/auth/logout` | BEARER | Revoke current session token | PRODUCTION_VERIFIED |
+| 8 | POST | `/api/v1/auth/logout-all` | BEARER | Revoke all active sessions for user | PRODUCTION_VERIFIED |
+| 9 | GET | `/api/v1/me` | BEARER | Get current authenticated user profile | PRODUCTION_VERIFIED |
+| 10 | PATCH | `/api/v1/me/profile` | BEARER | Update user profile metadata | PRODUCTION_VERIFIED |
+| 11 | POST | `/api/v1/me/profile/avatar` | BEARER | Upload & process user avatar image | PRODUCTION_VERIFIED |
+| 12 | GET | `/media/avatars/:fileName` | PUBLIC | Serve avatar image files | PRODUCTION_VERIFIED |
+| 13 | GET | `/api/v1/chat/sessions` | BEARER | List user chat sessions | PRODUCTION_VERIFIED |
+| 14 | POST | `/api/v1/chat/sessions` | BEARER | Create new chat session (standard or temporary) | PRODUCTION_VERIFIED |
+| 15 | GET | `/api/v1/chat/sessions/:sessionId/messages` | BEARER | Paginated chat message history | PRODUCTION_VERIFIED |
+| 16 | POST | `/api/v1/chat/sessions/:sessionId/messages` | BEARER | Send message to AI companion (two-tier NLU + LLM) | PRODUCTION_VERIFIED |
+| 17 | DELETE | `/api/v1/chat/sessions/:sessionId` | BEARER | Archive / soft delete chat session | PRODUCTION_VERIFIED |
+| 18 | POST | `/api/v1/chat/messages/:messageId/feedback` | BEARER | Submit positive/negative feedback on AI turn | PRODUCTION_VERIFIED |
+| 19 | POST | `/api/v1/tts/synthesize` | BEARER | Synthesize plain text to temporary MP3 audio | PRODUCTION_VERIFIED |
+| 20 | POST | `/api/v1/settings/push-tokens` | BEARER | Register/upsert mobile Expo push token | PRODUCTION_VERIFIED |
+| 21 | DELETE | `/api/v1/settings/push-tokens` | BEARER | Unregister mobile Expo push token | PRODUCTION_VERIFIED |
+| 22 | GET | `/api/v1/settings/push-tokens` | BEARER | List registered push tokens for user | PRODUCTION_VERIFIED |
+| 23 | GET | `/api/v1/devices` | BEARER | List devices owned by user | PRODUCTION_VERIFIED |
+| 24 | GET | `/api/v1/devices/:deviceId` | BEARER | Get specific device details | PRODUCTION_VERIFIED |
+| 25 | PATCH | `/api/v1/devices/:deviceId/settings` | BEARER | Update device hardware settings (volume, mic) | PRODUCTION_VERIFIED |
+| 26 | POST | `/api/v1/devices/:deviceId/unpair` | BEARER | Unpair device & revoke hardware binding | PRODUCTION_VERIFIED |
+| 27 | POST | `/api/v1/pairing/claim` | BEARER | Claim 6-digit code to pair physical device | PRODUCTION_VERIFIED |
+| 28 | GET | `/api/v1/devices/:deviceId/wifi` | BEARER | Read configured device Wi-Fi profile | PRODUCTION_VERIFIED |
+| 29 | PUT | `/api/v1/devices/:deviceId/wifi` | BEARER | Queue new Wi-Fi credentials for device | PRODUCTION_VERIFIED |
+| 30 | DELETE | `/api/v1/devices/:deviceId/wifi` | BEARER | Clear saved Wi-Fi configuration | PRODUCTION_VERIFIED |
+| 31 | GET | `/api/v1/devices/:deviceId/logs` | BEARER | Query device diagnostic logs | PRODUCTION_VERIFIED |
+| 32 | GET | `/api/v1/devices/:deviceId/telemetry` | BEARER | Query latest device telemetry | PRODUCTION_VERIFIED |
+| 33 | GET | `/api/v1/settings/user` | BEARER | Read general user settings | PRODUCTION_VERIFIED |
+| 34 | PATCH | `/api/v1/settings/user` | BEARER | Update general user settings | PRODUCTION_VERIFIED |
+| 35 | GET | `/api/v1/settings/devices/:deviceId` | BEARER | Read device specific preferences | PRODUCTION_VERIFIED |
+| 36 | PATCH | `/api/v1/settings/devices/:deviceId` | BEARER | Update device specific preferences | PRODUCTION_VERIFIED |
+| 37 | GET | `/api/v1/settings/personalization` | BEARER | Read personality & conversation preferences | PRODUCTION_VERIFIED |
+| 38 | PATCH | `/api/v1/settings/personalization` | BEARER | Update personality & prompt preferences | PRODUCTION_VERIFIED |
+| 39 | GET | `/api/v1/settings/memory` | BEARER | Read long-term memory settings | PRODUCTION_VERIFIED |
+| 40 | PATCH | `/api/v1/settings/memory` | BEARER | Update memory auto-retention flags | PRODUCTION_VERIFIED |
+| 41 | GET | `/api/v1/memories` | BEARER | List stored memory records | PRODUCTION_VERIFIED |
+| 42 | GET | `/api/v1/memories/:id` | BEARER | Read single memory record | PRODUCTION_VERIFIED |
+| 43 | PATCH | `/api/v1/memories/:id` | BEARER | Edit memory record content | PRODUCTION_VERIFIED |
+| 44 | DELETE | `/api/v1/memories/:id` | BEARER | Delete specific memory record | PRODUCTION_VERIFIED |
+| 45 | GET | `/api/v1/memory-candidates` | BEARER | List unconfirmed memory candidates | PRODUCTION_VERIFIED |
+| 46 | POST | `/api/v1/memory-candidates/:id/accept` | BEARER | Accept and persist candidate to memory | PRODUCTION_VERIFIED |
+| 47 | POST | `/api/v1/memory-candidates/:id/reject` | BEARER | Reject candidate memory | PRODUCTION_VERIFIED |
+| 48 | POST | `/api/v1/memories/forget-topic` | BEARER | Mass delete memories matching a topic query | PRODUCTION_VERIFIED |
+| 49 | POST | `/api/v1/memories/clear-all` | BEARER | Clear entire user memory graph | PRODUCTION_VERIFIED |
+| 50 | POST | `/api/v1/memories/export` | BEARER | Export all user memories to JSON | PRODUCTION_VERIFIED |
+| 51 | GET | `/api/v1/memory/summary` | BEARER | Read user memory profile summary | PRODUCTION_VERIFIED |
+| 52 | POST | `/api/v1/memory/summary/regenerate` | BEARER | Request background summary regeneration | PRODUCTION_VERIFIED |
+| 53 | POST | `/api/v1/memory/summary/feedback` | BEARER | Submit summary accuracy feedback | PRODUCTION_VERIFIED |
+| 54 | GET | `/api/v1/schedules` | BEARER | List user schedules & reminders | PRODUCTION_VERIFIED |
+| 55 | POST | `/api/v1/schedules` | BEARER | Create new schedule/reminder | PRODUCTION_VERIFIED |
+| 56 | GET | `/api/v1/schedules/:id` | BEARER | Read schedule details | PRODUCTION_VERIFIED |
+| 57 | PATCH | `/api/v1/schedules/:id` | BEARER | Update schedule details/timing | PRODUCTION_VERIFIED |
+| 58 | POST | `/api/v1/schedules/:id/pause` | BEARER | Pause active schedule | PRODUCTION_VERIFIED |
+| 59 | POST | `/api/v1/schedules/:id/resume` | BEARER | Resume paused schedule | PRODUCTION_VERIFIED |
+| 60 | DELETE | `/api/v1/schedules/:id` | BEARER | Delete schedule | PRODUCTION_VERIFIED |
+| 61 | GET | `/api/v1/schedule-runs` | BEARER | Query schedule execution history | PRODUCTION_VERIFIED |
+| 62 | GET | `/api/v1/plugins` | BEARER | List available & connected plugins | PRODUCTION_VERIFIED |
+| 63 | POST | `/api/v1/integrations/spotify/connect` | BEARER | Initiate Spotify OAuth authorization | PRODUCTION_VERIFIED |
+| 64 | GET | `/api/v1/integrations/spotify/status` | BEARER | Read Spotify connection & token status | PRODUCTION_VERIFIED |
+| 65 | GET | `/api/v1/integrations/spotify/search` | BEARER | Search tracks/artists on Spotify | PRODUCTION_VERIFIED |
+| 66 | POST | `/api/v1/integrations/spotify/actions` | BEARER | Execute playback action (Play, Pause, Next, etc.) | PRODUCTION_VERIFIED |
+| 67 | GET | `/api/v1/integrations/spotify/devices` | BEARER | List active Spotify Connect devices | PRODUCTION_VERIFIED |
+| 68 | GET | `/api/v1/integrations/spotify/active-device` | BEARER | Get current active Spotify device | PRODUCTION_VERIFIED |
+| 69 | GET | `/api/v1/integrations/spotify/playback` | BEARER | Read current Spotify playback state | PRODUCTION_VERIFIED |
+| 70 | PUT | `/api/v1/integrations/spotify/preferred-device` | BEARER | Set user default playback device | PRODUCTION_VERIFIED |
+| 71 | POST | `/api/v1/integrations/spotify/disconnect` | BEARER | Disconnect Spotify and wipe tokens | PRODUCTION_VERIFIED |
+| 72 | GET | `/api/v1/integrations/spotify/callback` | PUBLIC | Provider browser OAuth callback | PRODUCTION_VERIFIED |
+| 73 | POST | `/api/v1/integrations/whatsapp/connect` | BEARER | Initiate WhatsApp session connection | PRODUCTION_VERIFIED |
+| 74 | GET | `/api/v1/integrations/whatsapp/status` | BEARER | Read WhatsApp connection status | PRODUCTION_VERIFIED |
+| 75 | GET | `/api/v1/integrations/whatsapp/pairing` | BEARER | Get WhatsApp pairing status | PRODUCTION_VERIFIED |
+| 76 | GET | `/api/v1/integrations/whatsapp/conversations` | BEARER | List synced WhatsApp chats | PRODUCTION_VERIFIED |
+| 77 | GET | `/api/v1/integrations/whatsapp/conversations/:id` | BEARER | Read single WhatsApp conversation | PRODUCTION_VERIFIED |
+| 78 | POST | `/api/v1/integrations/whatsapp/conversations/resolve` | BEARER | Resolve conversation by phone number | PRODUCTION_VERIFIED |
+| 79 | GET | `/api/v1/integrations/whatsapp/qr` | BEARER | Get WhatsApp pairing QR code | PRODUCTION_VERIFIED |
+| 80 | POST | `/api/v1/integrations/whatsapp/confirm-scanned` | BEARER | Confirm WhatsApp QR code scanned | PRODUCTION_VERIFIED |
+| 81 | POST | `/api/v1/integrations/whatsapp/disconnect` | BEARER | Disconnect WhatsApp bridge session | PRODUCTION_VERIFIED |
+| 82 | GET | `/api/v1/integrations/whatsapp/notification-rules` | BEARER | Read WhatsApp notification rules | PRODUCTION_VERIFIED |
+| 83 | PATCH | `/api/v1/integrations/whatsapp/notification-rules` | BEARER | Update WhatsApp notification rules | PRODUCTION_VERIFIED |
+| 84 | POST | `/api/v1/integrations/whatsapp/send-preview` | BEARER | Preview drafted WhatsApp message | PRODUCTION_VERIFIED |
+| 85 | POST | `/api/v1/integrations/whatsapp/send-confirm` | BEARER | Confirm & send WhatsApp message | PRODUCTION_VERIFIED |
+| 86 | POST | `/api/v1/support/bug-reports` | BEARER | Submit user bug report with attachments | PRODUCTION_VERIFIED |
+| 87 | GET | `/api/v1/ops/db/livez` | PUBLIC | Database connectivity liveness probe | PRODUCTION_VERIFIED |
+| 88 | GET | `/api/v1/ops/db/readyz` | PUBLIC | Database readiness probe | PRODUCTION_VERIFIED |
+| 89 | GET | /api/v1/ops/db/migrations | PUBLIC | Prisma migration status inspector | PRODUCTION_VERIFIED |
+| 90 | GET | /api/v1/auth/google/start | PUBLIC | Start Google OAuth browser flow | PRODUCTION_VERIFIED |
+| 91 | GET | /api/v1/auth/google/callback | PUBLIC | Complete Google OAuth browser callback | PRODUCTION_VERIFIED |
+| 92 | GET | /api/v1/chat/search | BEARER | Search user chat history | PRODUCTION_VERIFIED |
+| 93 | POST | /api/v1/integrations/whatsapp/dismiss-qr | BEARER | Dismiss WhatsApp pairing QR state | PRODUCTION_VERIFIED |
+| 94 | GET | /livez | INTERNAL | Backend liveness probe | PRODUCTION_VERIFIED |
+| 95 | GET | /readyz | INTERNAL | Backend readiness probe | PRODUCTION_VERIFIED |
+| 96 | GET | /health | PUBLIC | Aggregated public health status | PRODUCTION_VERIFIED |
+| 97 | POST | /api/v1/voice | DEVICE CREDENTIAL | Upload canonical WAV for hardware voice pipeline | PRODUCTION_VERIFIED |
+| 98 | GET | /audio/:fileName | PUBLIC | Download ephemeral MP3 speech audio | PRODUCTION_VERIFIED |
 
-The `/api/v1/ops/db/*` routes are outside the Mobile count and Mobile/ESP must
-never call them. Source does not apply ordinary app bearer authentication to
-these internal/operator routes. A future defense-in-depth decision may add an
-edge deny or operator authentication; do not claim that hardening already
-exists.
+---
 
-The production Spotify callback is exactly
-https://api.personalbmo.web.id/api/v1/integrations/spotify/callback. Mobile
-starts OAuth with /spotify/connect and does not call the callback itself.
+## Full Mobile WebSocket Event Inventory
 
-The source does not register GET /api/v1/devices/:deviceId/status or POST
-/api/v1/voice/preview; both are NOT_IMPLEMENTED.
+The Mobile server accepts one initial JSON authentication message:
+{"event":"authenticate","accessToken":"<access-token>"}
 
-## Mobile WebSocket event inventory
+The server returns an authenticated acknowledgement. After that, native
+WebSocket ping/pong maintains liveness; there is no application-level ping
+event and no token query parameter.
 
-The source defines 12 Mobile event names: one client authentication event, one
-server authentication acknowledgement, and ten additional server events.
+| Event Name | Direction | Payload Structure / Description |
+|---|---|---|
+| authenticate | Mobile → Backend | Initial auth message with accessToken |
+| authenticated | Backend → Mobile | Handshake acknowledgement with status ok and userId |
+| chat_thinking | Backend → Mobile | sessionId and messageId |
+| chat_message | Backend → Mobile | sessionId and SafeMessage |
+| chat_title_updated | Backend → Mobile | sessionId and title |
+| device_status | Backend → Mobile | deviceId, online, lastSeenAt, wifi, battery |
+| voice_processing_status | Backend → Mobile | deviceId, requestId, status, errorCode |
+| wifi_configuration_status | Backend → Mobile | deviceId, configurationId, status, errorCode |
+| proactive_delivery_status | Backend → Mobile | deviceId, deliveryId, source, status, errorCode |
+| schedule_status | Backend → Mobile | scheduleId, runId, status, statusLabel |
+| integration_status | Backend → Mobile | integration and status |
+| notification | Backend → Mobile | id, type GENERIC, title, body, createdAt |
+| whatsapp_notification | Backend → Mobile | conversationId, displayName, conversationType, receivedAt |
 
-| Direction | Event | Runtime evidence | Authentication | Payload | Trigger/source | Mobile behavior |
-|---|---|---|---|---|---|---|
-| Mobile → Backend | authenticate | RUNTIME_PROTOCOL | First message within 5 seconds | `{event,accessToken}` | Client opens exact `/api/v1/ws` path | Send once; never use query token or refresh token |
-| Backend → Mobile | authenticated | RUNTIME_PROTOCOL | After active JWT/session verification | `{event,status:"ok",userId}` | Successful authentication | Mark socket ready |
-| Backend → Mobile | chat_thinking | RUNTIME_EMITTED | Authenticated socket | `{sessionId,messageId}` | Durable chat accepted/processing | Show transient thinking; recover from history |
-| Backend → Mobile | chat_message | RUNTIME_EMITTED | Authenticated socket | `{sessionId,message:{id,sender:"assistant",text,createdAt}}` | Assistant message persisted | Insert/update chat; history remains authority |
-| Backend → Mobile | device_status | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | device UUID, online, lastSeenAt, Wi-Fi RSSI, nullable battery | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; use REST device state as fallback |
-| Backend → Mobile | voice_processing_status | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | device/request UUID, `thinking\|audio_ready\|completed\|failed`, nullable errorCode | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; do not require current delivery |
-| Backend → Mobile | wifi_configuration_status | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | device/config UUID, Wi-Fi lifecycle status, nullable errorCode | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; use REST Wi-Fi state as fallback |
-| Backend → Mobile | proactive_delivery_status | RUNTIME_EMITTED | Authenticated socket | device/delivery UUID, source, delivery status, nullable errorCode | Generic CHAT/SCHEDULE/WHATSAPP delivery | Show device delivery status; no fabricated device for MOBILE target |
-| Backend → Mobile | schedule_status | RUNTIME_EMITTED | Authenticated socket | schedule UUID, nullable run UUID, durable status, label | Schedule create/update/lifecycle | Refresh schedule state |
-| Backend → Mobile | integration_status | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | integration `whatsapp\|spotify`, status `CONNECTED\|DISCONNECTED\|PENDING\|ERROR\|RECONNECT_REQUIRED` | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; poll integration REST status |
-| Backend → Mobile | notification | SCHEMA_DEFINED_NO_CURRENT_EMITTER | Authenticated socket | UUID, `GENERIC`, bounded title/body, createdAt | Schema-defined; no direct current `sendToUser` emitter found | Forward-compatible handler only; do not require current delivery |
-| Backend → Mobile | whatsapp_notification | RUNTIME_EMITTED | Authenticated socket | conversation UUID, displayName, `DM\|GROUP`, receivedAt | Allowed inbound metadata notification | Refresh conversation; no message body/JID/phone/token |
+## Full Hardware WebSocket Event Inventory
 
-The five `RUNTIME_EMITTED` application events have direct current emitters:
-`chat_thinking`, `chat_message`, `proactive_delivery_status`,
-`schedule_status`, and `whatsapp_notification`. The five
-`SCHEMA_DEFINED_NO_CURRENT_EMITTER` events are forward-compatible schemas
-only; Mobile must not require them to arrive and should use authoritative
-REST state or reconnect reads where applicable.
+### Inbound Events (ESP32 → Backend)
 
-All outbound schemas are strict. The Mobile socket has a 32 KiB maximum
-payload, 60-second server ping, and termination after two missed pongs. Token
-expiry closes 4410 ACCESS_TOKEN_EXPIRED; invalid session closes 4403; auth
-timeout closes 4408; malformed pre-auth data closes 4401.
+| Event Name | Direction | Payload Structure / Description |
+|---|---|---|
+| authenticate | ESP32 → Backend | device_id and device_token |
+| audio_playback_done | ESP32 → Backend | request_id |
+| audio_playback_failed | ESP32 → Backend | request_id and reason DOWNLOAD_FAILED, DECODE_FAILED, or PLAYBACK_FAILED |
+| wifi_configuration_received | ESP32 → Backend | configuration_id |
+| wifi_configuration_result | ESP32 → Backend | configuration_id, status CONNECTED, ROLLED_BACK, or FAILED; optional rssi and reason |
+| device_log | ESP32 → Backend | level DEBUG, INFO, WARN, or ERROR; uppercase code; message; optional timestamp and metadata |
+| device_telemetry | ESP32 → Backend | wifi_connected; optional wifi_rssi, battery_percent, firmware_version |
+| device_settings_applied | ESP32 → Backend | positive version |
+| pairing_mode_request | ESP32 → Backend | Empty request payload |
+| voice_reserve | ESP32 → Backend | request_id |
+| voice_cancel | ESP32 → Backend | request_id, lease_id, reserve_receipt, and reason |
+| proactive_offer_accepted | ESP32 → Backend | delivery_id, attempt_id, and offer_receipt |
+| proactive_done | ESP32 → Backend | SCHEDULE source, delivery_id, attempt_id, lease_id, audio_receipt, reason COMPLETED |
+| proactive_failed | ESP32 → Backend | SCHEDULE source, delivery_id, attempt_id, lease_id, audio_receipt, and failure reason |
 
-/api/v1/ws is an event transport, not a chat-history authority, command
-channel, audio stream, or LLM token stream. REST history and resource reads are
-the recovery source after reconnect.
+### Outbound Events (Backend → ESP32)
 
-## Separate hardware WebSocket
+| Event Name | Direction | Payload Structure / Description |
+|---|---|---|
+| authenticated | Backend → ESP32 | status ok, device_id, backend_state, active_request_id |
+| authentication_failed | Backend → ESP32 | error INVALID_DEVICE_CREDENTIALS |
+| connection_replaced | Backend → ESP32 | reason NEW_CONNECTION_ESTABLISHED |
+| display_status | Backend → ESP32 | request_id and status thinking |
+| audio_ready | Backend → ESP32 | request_id, audio_url, format mp3, expiry, optional transcript and response text |
+| request_failed | Backend → ESP32 | request_id, error code, recoverable true |
+| wifi_configuration | Backend → ESP32 | configuration_id, ssid, security OPEN or WPA_PSK, optional password |
+| device_settings | Backend → ESP32 | version and playback_volume |
+| pairing_code | Backend → ESP32 | six-digit code and expires_at |
+| pairing_completed | Backend → ESP32 | status ok |
+| voice_reserve_accepted | Backend → ESP32 | request_id, lease_id, reserve_receipt, 45-second capture lease and expiry |
+| voice_reserve_rejected | Backend → ESP32 | request_id and reason UNAUTHENTICATED, NOT_IDLE, BUSY, or STALE_REQUEST |
+| voice_reserve_expired | Backend → ESP32 | request_id, lease_id, and reserve_receipt |
+| proactive_offer | Backend → ESP32 | delivery_id, attempt_id, offer_receipt, and expires_at_ms |
+| proactive_audio_ready | Backend → ESP32 | SCHEDULE source, delivery_id, attempt_id, lease_id, audio_url, audio_receipt, expires_at_ms |
+| proactive_cancel | Backend → ESP32 | SCHEDULE source, delivery_id, attempt_id, and lease_id |
+| display_qr | Backend → ESP32 | qr payload and expires_at |
+| clear_qr | Backend → ESP32 | Clear the WhatsApp QR overlay |
 
-The hardware contract remains wss://api.personalbmo.web.id/ws with
-device_id/device_token, existing raw-WAV voice, and MP3 playback events. It is
-not interchangeable with Mobile /api/v1/ws. Additive Wi-Fi, telemetry, log,
-and settings events remain PENDING_PHYSICAL_ESP until firmware and real-device
-evidence exist. Current source defines no proactive hardware event family.
-Pairing adds `pairing_code`,
-`pairing_mode_request`, and `pairing_completed`; these are Backend-implemented
-but remain PENDING_PHYSICAL_ESP for firmware acceptance.
-
-## Coverage result
-
-~~~
-SOURCE_MOBILE_ROUTE_COUNT=79
-DOCUMENTED_MOBILE_ROUTE_COUNT=79
-MISSING=0
-PHANTOM=0
-SOURCE_MOBILE_WS_EVENT_COUNT=12
-DOCUMENTED_MOBILE_WS_EVENT_COUNT=12
-MISSING=0
-PHANTOM=0
-~~~
-
-Any new registered route or event must update this matrix, the canonical Mobile
-contract, and implementation status in the same source change.
+Source authority: backend/src/p9/websocket/mobile-events.ts,
+backend/src/p9/websocket/mobile-websocket.server.ts, and
+backend/src/websocket/events.ts. Physical firmware acceptance remains
+PENDING_PHYSICAL_ESP.

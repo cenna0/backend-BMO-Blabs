@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Enforce one active physical BMO device per user and preserve strict user ownership across memory, chat, schedules, and plugin connections.
+**Goal:** Enforce one active physical Joy device per user and preserve strict user ownership across memory, chat, schedules, and plugin connections.
 
 **Architecture:** Keep one PostgreSQL database with tenant-style rows keyed by `userId`. The authenticated JWT remains the only source of user identity; provider credentials and application records are looked up through `(userId, provider)`. WhatsApp transport is connection-scoped: the manager launches one Hermes bridge child and one session directory per `IntegrationConnection`, while pairing and identity resolution carry the same connection identifier.
 
@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Enforce one active BMO device per user
+### Task 1: Enforce one active Joy device per user
 
 **Files:**
 - Modify: `backend/src/p9/services/device.service.ts:49-63`
@@ -30,7 +30,7 @@ Expected: FAIL because `createClaimed` currently creates another active device a
 
 - [ ] **Step 3: Implement the service guard**
 
-After `lockUser`, count active devices. If the count is non-zero, throw `new P9Error("CONFLICT", 409, "User already has an active BMO device")`; otherwise create the device.
+After `lockUser`, count active devices. If the count is non-zero, throw `new P9Error("CONFLICT", 409, "User already has an active Joy device")`; otherwise create the device.
 
 - [ ] **Step 4: Add the database invariant**
 

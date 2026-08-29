@@ -11,12 +11,12 @@ still pending.
 
 ```text
 commit: d1473d04f4b76ccb52cc8eeaff52a268504310f0
-image:  bmo-p9.1:pairing-code-only-d1473d0
+image:  joy-p9.1:pairing-code-only-d1473d0
 digest: sha256:203817f83a023f730ed5dfd71be8bc96d127001a727c5ebc3d8999e945769973
 ```
 
 The current production Compose reference uses the immutable deployed image
-above. The rollback image `bmo-p9.1:spotify-phase26-9819ef7` remains preserved
+above. The rollback image `joy-p9.1:spotify-phase26-9819ef7` remains preserved
 at digest `sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241`.
 Production migration state is `7 completed, 0 unfinished, 0 rolled_back`.
 
@@ -27,8 +27,8 @@ firewall, and secrets were preserved; no Docker cleanup or prune was performed.
 ## Compose structure
 
 ```text
-/opt/bmo/app/ops/deploy/p9.1-production-compose.yml
-project: bmo-production-p9
+/opt/joy/app/ops/deploy/p9.1-production-compose.yml
+project: joy-production-p9
 services: backend, postgres
 ```
 
@@ -47,8 +47,8 @@ the WhatsApp bridge, or the WhatsApp identity resolver. Their existing
 runtime ownership and state remain unchanged.
 
 The current voice-only `docker-compose.yml` had a stale bind for
-`/opt/bmo/data/avatars`. Read-only runtime evidence showed that the running
-voice Backend mounts only `/opt/bmo/temp/audio`, and the host avatar path is
+`/opt/joy/data/avatars`. Read-only runtime evidence showed that the running
+voice Backend mounts only `/opt/joy/temp/audio`, and the host avatar path is
 absent. The stale voice bind is removed. The frozen P9 Backend does use avatar
 storage and bug-report storage, so the P9 definition declares these future
 paths separately with `create_host_path: false`.
@@ -58,18 +58,18 @@ paths separately with `create_host_path: false`.
 | Property | Production definition |
 |---|---|
 | Service | `postgres` |
-| Compose project | `bmo-production-p9` |
-| Generated container | `bmo-production-p9-postgres-1`; no `container_name` is forced |
+| Compose project | `joy-production-p9` |
+| Generated container | `joy-production-p9-postgres-1`; no `container_name` is forced |
 | Image | `postgres:16.14-alpine3.22@sha256:786dab398303b8ce7cb76b407bb21ef2e4dfbbbd4c6abcf3d29b3130467ffdbc` |
 | Database/user | `bmo` / `bmo` |
-| Persistent data | host bind `/opt/bmo/data/postgres` → `/var/lib/postgresql/data` |
+| Persistent data | host bind `/opt/joy/data/postgres` → `/var/lib/postgresql/data` |
 | Socket | named volume `p9_production_postgres_socket` → `/var/run/postgresql` |
 | Network | internal Compose network `p9_private`; no host `ports` entry |
 | Backend connection | PostgreSQL Unix socket at `/var/run/postgresql`, with password loaded from `/run/secrets/postgres_password` |
 | Healthcheck | `pg_isready` against the configured database/user; 5s interval, 3s timeout, 12 retries |
 | Restart | `unless-stopped` after future authorization |
 | Limits | 768 MiB memory/swap, 1 CPU, 128 PIDs, max 20 connections |
-| Backup identity | encrypted `p9-daily-<UTC>.dump.gpg` / `p9-weekly-<UTC>.dump.gpg` in `/opt/bmo/backups/database` |
+| Backup identity | encrypted `p9-daily-<UTC>.dump.gpg` / `p9-weekly-<UTC>.dump.gpg` in `/opt/joy/backups/database` |
 
 The data directory is not created by preparation. The host path must be
 provisioned with PostgreSQL image UID/GID `70:70`, mode `0700`, after the
@@ -81,15 +81,15 @@ container was created for this definition.
 
 | Layer | Future live path/value | Meaning |
 |---|---|---|
-| Compose env file | `/opt/bmo/config/p9.1/production.compose.env` | Host-side interpolation: image tag, project, storage paths, and host secret source paths |
-| Backend env file | `/opt/bmo/config/p9.1/backend.env` | Protected application env values, including existing voice credentials plus P9 JWT/pairing values |
-| Database password source | `/opt/bmo/config/p9.1/postgres-password` | Host secret source; mounted RO as `/run/secrets/postgres_password` to PostgreSQL and Backend |
-| Wi-Fi key source | `/opt/bmo/config/p9.1/wifi-encryption-key` | Host secret source; mounted RO as `/run/secrets/wifi_encryption_key` |
-| Resolver token source | `/opt/bmo/config/whatsapp/identity-resolver.token` | Host secret source; mounted RO as `/run/secrets/whatsapp_identity_resolver_token` |
-| Spotify client ID source | `/opt/bmo/config/p9.1/spotify-client-id` | Host secret source; mounted RO as `/run/secrets/spotify_client_id` |
-| Spotify client secret source | `/opt/bmo/config/p9.1/spotify-client-secret` | Host secret source; mounted RO as `/run/secrets/spotify_client_secret` |
-| Spotify token key source | `/opt/bmo/config/p9.1/spotify-token-encryption-key` | Host secret source; mounted RO as `/run/secrets/spotify_token_encryption_key` |
-| Backup passphrase | `/opt/bmo/config/p9.1/backup-passphrase` | Host-only input to the existing backup/restore operator scripts; not mounted into the long-running Backend |
+| Compose env file | `/opt/joy/config/p9.1/production.compose.env` | Host-side interpolation: image tag, project, storage paths, and host secret source paths |
+| Backend env file | `/opt/joy/config/p9.1/backend.env` | Protected application env values, including existing voice credentials plus P9 JWT/pairing values |
+| Database password source | `/opt/joy/config/p9.1/postgres-password` | Host secret source; mounted RO as `/run/secrets/postgres_password` to PostgreSQL and Backend |
+| Wi-Fi key source | `/opt/joy/config/p9.1/wifi-encryption-key` | Host secret source; mounted RO as `/run/secrets/wifi_encryption_key` |
+| Resolver token source | `/opt/joy/config/whatsapp/identity-resolver.token` | Host secret source; mounted RO as `/run/secrets/whatsapp_identity_resolver_token` |
+| Spotify client ID source | `/opt/joy/config/p9.1/spotify-client-id` | Host secret source; mounted RO as `/run/secrets/spotify_client_id` |
+| Spotify client secret source | `/opt/joy/config/p9.1/spotify-client-secret` | Host secret source; mounted RO as `/run/secrets/spotify_client_secret` |
+| Spotify token key source | `/opt/joy/config/p9.1/spotify-token-encryption-key` | Host secret source; mounted RO as `/run/secrets/spotify_token_encryption_key` |
+| Backup passphrase | `/opt/joy/config/p9.1/backup-passphrase` | Host-only input to the existing backup/restore operator scripts; not mounted into the long-running Backend |
 
 Required application values include:
 
@@ -97,7 +97,7 @@ Required application values include:
 NODE_ENV=production
 BACKEND_HOST=127.0.0.1
 BACKEND_PORT=3000
-PUBLIC_BASE_URL=https://api.personalbmo.web.id
+PUBLIC_BASE_URL=https://api.personaljoy.web.id
 P9_ENABLED=true
 P9_DATABASE_PASSWORD_FILE=/run/secrets/postgres_password
 P9_POSTGRES_SOCKET_DIR=/var/run/postgresql
@@ -105,32 +105,32 @@ HERMES_API_URL=http://127.0.0.1:8642
 AUDIO_SERVICE_URL=http://127.0.0.1:8001
 WHATSAPP_BRIDGE_URL=http://127.0.0.1:3001
 WHATSAPP_IDENTITY_RESOLVER_URL=http://127.0.0.1:3002
-SPOTIFY_CALLBACK_URL=https://api.personalbmo.web.id/api/v1/integrations/spotify/callback
+SPOTIFY_CALLBACK_URL=https://api.personaljoy.web.id/api/v1/integrations/spotify/callback
 ```
 
 ## Secret and storage provisioning contract
 
 Secret files are provisioned out-of-band only. The intended owner/group is
-`bmo-admin:bmo-admin`, mode `0600`; the Docker daemon mounts them read-only,
+`joy-admin:joy-admin`, mode `0600`; the Docker daemon mounts them read-only,
 and the P9 entrypoint reads file-backed values before dropping the Backend
 process to runtime UID/GID `1000:1000`. No secret contents are present in the
 repository or this document.
 
 | Host path | Intended owner/mode | Container destination | Access |
 |---|---|---|---|
-| `/opt/bmo/config/p9.1/postgres-password` | `bmo-admin:bmo-admin`, `0600` | `/run/secrets/postgres_password` in PostgreSQL and Backend | RO |
-| `/opt/bmo/config/p9.1/wifi-encryption-key` | `bmo-admin:bmo-admin`, `0600` | `/run/secrets/wifi_encryption_key` in Backend | RO |
-| `/opt/bmo/config/whatsapp/identity-resolver.token` | `bmo-admin:bmo-admin`, `0600` | `/run/secrets/whatsapp_identity_resolver_token` in Backend | RO |
-| `/opt/bmo/config/p9.1/spotify-client-id` | `bmo-admin:bmo-admin`, `0600` | `/run/secrets/spotify_client_id` in Backend | RO |
-| `/opt/bmo/config/p9.1/spotify-client-secret` | `bmo-admin:bmo-admin`, `0600` | `/run/secrets/spotify_client_secret` in Backend | RO |
-| `/opt/bmo/config/p9.1/spotify-token-encryption-key` | `bmo-admin:bmo-admin`, `0600` | `/run/secrets/spotify_token_encryption_key` in Backend | RO |
-| `/opt/bmo/config/p9.1/backup-passphrase` | `bmo-admin:bmo-admin`, `0600` | none; host-only operator input | host read only |
-| `/opt/bmo/config/p9.1/backend.env` | `bmo-admin:bmo-admin`, `0600` | Compose `env_file`; not a bind mount | Compose read |
-| `/opt/bmo/data/postgres` | numeric `70:70`, `0700` | `/var/lib/postgresql/data` | PostgreSQL RW |
-| `/opt/bmo/data/avatars` | numeric `1000:1000`, `0700` | `/opt/bmo/data/avatars` | Backend RW |
-| `/opt/bmo/data/bug-reports` | numeric `1000:1000`, `0700` | `/opt/bmo/data/bug-reports` | Backend RW |
-| `/opt/bmo/temp/audio` | existing production ownership/policy | `/opt/bmo/temp/audio` | Backend RW; unchanged |
-| `/opt/bmo/backups/database` | `bmo-admin:bmo-admin`, `0700` | none; host-side backup output | host tool RW |
+| `/opt/joy/config/p9.1/postgres-password` | `joy-admin:joy-admin`, `0600` | `/run/secrets/postgres_password` in PostgreSQL and Backend | RO |
+| `/opt/joy/config/p9.1/wifi-encryption-key` | `joy-admin:joy-admin`, `0600` | `/run/secrets/wifi_encryption_key` in Backend | RO |
+| `/opt/joy/config/whatsapp/identity-resolver.token` | `joy-admin:joy-admin`, `0600` | `/run/secrets/whatsapp_identity_resolver_token` in Backend | RO |
+| `/opt/joy/config/p9.1/spotify-client-id` | `joy-admin:joy-admin`, `0600` | `/run/secrets/spotify_client_id` in Backend | RO |
+| `/opt/joy/config/p9.1/spotify-client-secret` | `joy-admin:joy-admin`, `0600` | `/run/secrets/spotify_client_secret` in Backend | RO |
+| `/opt/joy/config/p9.1/spotify-token-encryption-key` | `joy-admin:joy-admin`, `0600` | `/run/secrets/spotify_token_encryption_key` in Backend | RO |
+| `/opt/joy/config/p9.1/backup-passphrase` | `joy-admin:joy-admin`, `0600` | none; host-only operator input | host read only |
+| `/opt/joy/config/p9.1/backend.env` | `joy-admin:joy-admin`, `0600` | Compose `env_file`; not a bind mount | Compose read |
+| `/opt/joy/data/postgres` | numeric `70:70`, `0700` | `/var/lib/postgresql/data` | PostgreSQL RW |
+| `/opt/joy/data/avatars` | numeric `1000:1000`, `0700` | `/opt/joy/data/avatars` | Backend RW |
+| `/opt/joy/data/bug-reports` | numeric `1000:1000`, `0700` | `/opt/joy/data/bug-reports` | Backend RW |
+| `/opt/joy/temp/audio` | existing production ownership/policy | `/opt/joy/temp/audio` | Backend RW; unchanged |
+| `/opt/joy/backups/database` | `joy-admin:joy-admin`, `0700` | none; host-side backup output | host tool RW |
 
 If host policy disallows numeric UID/GID ownership for the data paths, the
 operator must provision equivalent ownership verified against the pinned
@@ -147,8 +147,8 @@ sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241
 Future operator command, **NOT EXECUTED**:
 
 ```bash
-docker image tag bmo-p9.1-candidate:spotify-phase26-9819ef7 bmo-p9.1:spotify-phase26-9819ef7
-test "$(docker image inspect bmo-p9.1:spotify-phase26-9819ef7 --format '{{.Id}}')" = 'sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241'
+docker image tag joy-p9.1-candidate:spotify-phase26-9819ef7 joy-p9.1:spotify-phase26-9819ef7
+test "$(docker image inspect joy-p9.1:spotify-phase26-9819ef7 --format '{{.Id}}')" = 'sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241'
 ```
 
 The command is a local metadata retag, not a rebuild, but remains outside
@@ -171,7 +171,7 @@ The frozen SHA contains exactly these six migration directories and no others:
 Future migration command, **NOT EXECUTED**:
 
 ```bash
-docker compose --project-name bmo-production-p9 --env-file /opt/bmo/config/p9.1/production.compose.env --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml run --rm --no-deps backend npm run prisma:migrate:deploy
+docker compose --project-name joy-production-p9 --env-file /opt/joy/config/p9.1/production.compose.env --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml run --rm --no-deps backend npm run prisma:migrate:deploy
 ```
 
 Post-migration verification, **NOT EXECUTED**:
@@ -195,8 +195,8 @@ The existing `backend/src/p9/operator/backup.ts` produces encrypted custom
 format PostgreSQL dumps and a sidecar checksum manifest:
 
 ```text
-/opt/bmo/backups/database/p9-daily-<UTC>.dump.gpg
-/opt/bmo/backups/database/p9-daily-<UTC>.dump.gpg.sha256
+/opt/joy/backups/database/p9-daily-<UTC>.dump.gpg
+/opt/joy/backups/database/p9-daily-<UTC>.dump.gpg.sha256
 ```
 
 Retention is seven daily backups and four weekly backups. The off-VPS copy
@@ -205,14 +205,14 @@ point remains an operator-selected encrypted destination outside this VPS.
 Future production backup command, **NOT EXECUTED**:
 
 ```bash
-cd /opt/bmo/app/backend
-P9_COMPOSE_FILE=/opt/bmo/app/ops/deploy/p9.1-production-compose.yml P9_COMPOSE_PROJECT=bmo-production-p9 P9_COMPOSE_ENV_FILE=/opt/bmo/config/p9.1/production.compose.env P9_BACKUP_DIR=/opt/bmo/backups/database P9_BACKUP_PASSPHRASE_FILE=/opt/bmo/config/p9.1/backup-passphrase npm run p9:backup
+cd /opt/joy/app/backend
+P9_COMPOSE_FILE=/opt/joy/app/ops/deploy/p9.1-production-compose.yml P9_COMPOSE_PROJECT=joy-production-p9 P9_COMPOSE_ENV_FILE=/opt/joy/config/p9.1/production.compose.env P9_BACKUP_DIR=/opt/joy/backups/database P9_BACKUP_PASSPHRASE_FILE=/opt/joy/config/p9.1/backup-passphrase npm run p9:backup
 ```
 
 Future checksum verification, **NOT EXECUTED**:
 
 ```bash
-cd /opt/bmo/backups/database
+cd /opt/joy/backups/database
 backup_file="$(find . -maxdepth 1 -type f -name 'p9-daily-*.dump.gpg' -printf '%T@ %f\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
 test -n "${backup_file}"
 sha256sum --check "${backup_file}.sha256"
@@ -225,21 +225,21 @@ command in this sequence is **NOT EXECUTED**:
 
 ```bash
 restore_stamp=<operator-chosen-UTC-stamp>
-restore_project="bmo-production-p9-restore-${restore_stamp}"
-restore_root="/opt/bmo/restore/p9/${restore_stamp}"
+restore_project="joy-production-p9-restore-${restore_stamp}"
+restore_root="/opt/joy/restore/p9/${restore_stamp}"
 restore_bootstrap_db=bmo_restore_bootstrap
 restore_database="bmo_restore_${restore_stamp}"
-backup_path=/opt/bmo/backups/database/p9-daily-<UTC>.dump.gpg
+backup_path=/opt/joy/backups/database/p9-daily-<UTC>.dump.gpg
 sudo install -d -o 70 -g 70 -m 0700 "${restore_root}/postgres"
-P9_POSTGRES_DATA_DIR="${restore_root}/postgres" P9_POSTGRES_DB="${restore_bootstrap_db}" docker compose --project-name "${restore_project}" --env-file /opt/bmo/config/p9.1/production.compose.env --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml up -d postgres
-cd /opt/bmo/app/backend
-P9_COMPOSE_FILE=/opt/bmo/app/ops/deploy/p9.1-production-compose.yml P9_COMPOSE_PROJECT="${restore_project}" P9_COMPOSE_ENV_FILE=/opt/bmo/config/p9.1/production.compose.env P9_POSTGRES_DB="${restore_bootstrap_db}" P9_RESTORE_DATABASE="${restore_database}" P9_BACKUP_PASSPHRASE_FILE=/opt/bmo/config/p9.1/backup-passphrase npm run p9:restore -- "${backup_path}"
+P9_POSTGRES_DATA_DIR="${restore_root}/postgres" P9_POSTGRES_DB="${restore_bootstrap_db}" docker compose --project-name "${restore_project}" --env-file /opt/joy/config/p9.1/production.compose.env --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml up -d postgres
+cd /opt/joy/app/backend
+P9_COMPOSE_FILE=/opt/joy/app/ops/deploy/p9.1-production-compose.yml P9_COMPOSE_PROJECT="${restore_project}" P9_COMPOSE_ENV_FILE=/opt/joy/config/p9.1/production.compose.env P9_POSTGRES_DB="${restore_bootstrap_db}" P9_RESTORE_DATABASE="${restore_database}" P9_BACKUP_PASSPHRASE_FILE=/opt/joy/config/p9.1/backup-passphrase npm run p9:restore -- "${backup_path}"
 ```
 
 Future isolated restore integrity verification, **NOT EXECUTED**:
 
 ```bash
-docker compose --project-name "${restore_project}" --env-file /opt/bmo/config/p9.1/production.compose.env --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml exec -T -e RESTORE_DATABASE="${restore_database}" postgres sh -ceu 'export PGPASSWORD="$(cat /run/secrets/postgres_password)"; test "$(psql -Atqc "SELECT 1" -U "$POSTGRES_USER" -d "$POSTGRES_DB")" = 1; test "$(psql -Atqc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL" -U "$POSTGRES_USER" -d "$RESTORE_DATABASE")" = 6; psql -Atqc "SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY started_at" -U "$POSTGRES_USER" -d "$RESTORE_DATABASE"'
+docker compose --project-name "${restore_project}" --env-file /opt/joy/config/p9.1/production.compose.env --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml exec -T -e RESTORE_DATABASE="${restore_database}" postgres sh -ceu 'export PGPASSWORD="$(cat /run/secrets/postgres_password)"; test "$(psql -Atqc "SELECT 1" -U "$POSTGRES_USER" -d "$POSTGRES_DB")" = 1; test "$(psql -Atqc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL" -U "$POSTGRES_USER" -d "$RESTORE_DATABASE")" = 6; psql -Atqc "SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY started_at" -U "$POSTGRES_USER" -d "$RESTORE_DATABASE"'
 ```
 
 After evidence is recorded, the isolated project and data directory may be
@@ -251,7 +251,7 @@ performed by this task.
 Future application rollback, **NOT EXECUTED**:
 
 ```bash
-docker compose --project-name bmo-production-p9 --env-file /opt/bmo/config/p9.1/production.compose.env --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml up -d --no-deps backend
+docker compose --project-name joy-production-p9 --env-file /opt/joy/config/p9.1/production.compose.env --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml up -d --no-deps backend
 ```
 
 This does not recreate Audio, Hermes, WhatsApp, or PostgreSQL, and it does not
@@ -262,7 +262,7 @@ run a migration.
 `NO_CADDY_CHANGE_REQUIRED`.
 
 ```text
-https://api.personalbmo.web.id -> 127.0.0.1:3000
+https://api.personaljoy.web.id -> 127.0.0.1:3000
 ```
 
 No candidate `:3010` callback patch is installed or referenced. The Spotify
@@ -273,14 +273,14 @@ production callback is the HTTPS URL declared above.
 The following path commands are future operator actions, **NOT EXECUTED**:
 
 ```bash
-sudo install -d -o 70 -g 70 -m 0700 /opt/bmo/data/postgres
-sudo install -d -o 1000 -g 1000 -m 0700 /opt/bmo/data/avatars
-sudo install -d -o 1000 -g 1000 -m 0700 /opt/bmo/data/bug-reports
-sudo install -d -o bmo-admin -g bmo-admin -m 0700 /opt/bmo/backups/database
-sudo chown bmo-admin:bmo-admin /opt/bmo/config/p9.1/backend.env
-sudo chmod 0600 /opt/bmo/config/p9.1/backend.env
-sudo chown bmo-admin:bmo-admin /opt/bmo/config/p9.1/postgres-password /opt/bmo/config/p9.1/wifi-encryption-key /opt/bmo/config/p9.1/spotify-client-id /opt/bmo/config/p9.1/spotify-client-secret /opt/bmo/config/p9.1/spotify-token-encryption-key /opt/bmo/config/p9.1/backup-passphrase /opt/bmo/config/whatsapp/identity-resolver.token
-sudo chmod 0600 /opt/bmo/config/p9.1/postgres-password /opt/bmo/config/p9.1/wifi-encryption-key /opt/bmo/config/p9.1/spotify-client-id /opt/bmo/config/p9.1/spotify-client-secret /opt/bmo/config/p9.1/spotify-token-encryption-key /opt/bmo/config/p9.1/backup-passphrase /opt/bmo/config/whatsapp/identity-resolver.token
+sudo install -d -o 70 -g 70 -m 0700 /opt/joy/data/postgres
+sudo install -d -o 1000 -g 1000 -m 0700 /opt/joy/data/avatars
+sudo install -d -o 1000 -g 1000 -m 0700 /opt/joy/data/bug-reports
+sudo install -d -o joy-admin -g joy-admin -m 0700 /opt/joy/backups/database
+sudo chown joy-admin:joy-admin /opt/joy/config/p9.1/backend.env
+sudo chmod 0600 /opt/joy/config/p9.1/backend.env
+sudo chown joy-admin:joy-admin /opt/joy/config/p9.1/postgres-password /opt/joy/config/p9.1/wifi-encryption-key /opt/joy/config/p9.1/spotify-client-id /opt/joy/config/p9.1/spotify-client-secret /opt/joy/config/p9.1/spotify-token-encryption-key /opt/joy/config/p9.1/backup-passphrase /opt/joy/config/whatsapp/identity-resolver.token
+sudo chmod 0600 /opt/joy/config/p9.1/postgres-password /opt/joy/config/p9.1/wifi-encryption-key /opt/joy/config/p9.1/spotify-client-id /opt/joy/config/p9.1/spotify-client-secret /opt/joy/config/p9.1/spotify-token-encryption-key /opt/joy/config/p9.1/backup-passphrase /opt/joy/config/whatsapp/identity-resolver.token
 ```
 
 These commands do not create or populate secret files. Secret delivery,
@@ -300,24 +300,24 @@ verify metadata without printing file contents:
 
 ```bash
 stat -c 'mode=%a owner=%U:%G path=%n' \
-  /opt/bmo/config/p9.1/production.compose.env \
-  /opt/bmo/config/p9.1/backend.env \
-  /opt/bmo/config/p9.1/postgres-password \
-  /opt/bmo/config/p9.1/wifi-encryption-key \
-  /opt/bmo/config/whatsapp/identity-resolver.token \
-  /opt/bmo/config/p9.1/spotify-client-id \
-  /opt/bmo/config/p9.1/spotify-client-secret \
-  /opt/bmo/config/p9.1/spotify-token-encryption-key \
-  /opt/bmo/config/p9.1/backup-passphrase
+  /opt/joy/config/p9.1/production.compose.env \
+  /opt/joy/config/p9.1/backend.env \
+  /opt/joy/config/p9.1/postgres-password \
+  /opt/joy/config/p9.1/wifi-encryption-key \
+  /opt/joy/config/whatsapp/identity-resolver.token \
+  /opt/joy/config/p9.1/spotify-client-id \
+  /opt/joy/config/p9.1/spotify-client-secret \
+  /opt/joy/config/p9.1/spotify-token-encryption-key \
+  /opt/joy/config/p9.1/backup-passphrase
 ```
 
 ### PHASE B — verify and promote the frozen image tag
 
 ```bash
-candidate_id="$(docker image inspect bmo-p9.1-candidate:spotify-phase26-9819ef7 --format '{{.Id}}')"
+candidate_id="$(docker image inspect joy-p9.1-candidate:spotify-phase26-9819ef7 --format '{{.Id}}')"
 test "$candidate_id" = 'sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241'
-docker image tag bmo-p9.1-candidate:spotify-phase26-9819ef7 bmo-p9.1:spotify-phase26-9819ef7
-production_id="$(docker image inspect bmo-p9.1:spotify-phase26-9819ef7 --format '{{.Id}}')"
+docker image tag joy-p9.1-candidate:spotify-phase26-9819ef7 joy-p9.1:spotify-phase26-9819ef7
+production_id="$(docker image inspect joy-p9.1:spotify-phase26-9819ef7 --format '{{.Id}}')"
 test "$production_id" = "$candidate_id"
 test "$production_id" = 'sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241'
 ```
@@ -327,23 +327,23 @@ Stop if any check fails. This is a local metadata retag, never a rebuild.
 ### PHASE C — start only production PostgreSQL
 
 ```bash
-docker compose --project-name bmo-production-p9 \
-  --env-file /opt/bmo/config/p9.1/production.compose.env \
-  --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml \
+docker compose --project-name joy-production-p9 \
+  --env-file /opt/joy/config/p9.1/production.compose.env \
+  --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml \
   up -d postgres
 ```
 
 ### PHASE D — verify PostgreSQL health and private exposure
 
 ```bash
-docker compose --project-name bmo-production-p9 \
-  --env-file /opt/bmo/config/p9.1/production.compose.env \
-  --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml ps postgres
-docker inspect bmo-production-p9-postgres-1 \
+docker compose --project-name joy-production-p9 \
+  --env-file /opt/joy/config/p9.1/production.compose.env \
+  --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml ps postgres
+docker inspect joy-production-p9-postgres-1 \
   --format 'ports={{json .NetworkSettings.Ports}} health={{.State.Health.Status}}'
-docker compose --project-name bmo-production-p9 \
-  --env-file /opt/bmo/config/p9.1/production.compose.env \
-  --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml \
+docker compose --project-name joy-production-p9 \
+  --env-file /opt/joy/config/p9.1/production.compose.env \
+  --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml \
   exec -T postgres sh -ceu 'export PGPASSWORD="$(cat /run/secrets/postgres_password)"; pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; test "$(psql -Atqc "SELECT to_regclass(\$\$public._prisma_migrations\$\$)" -U "$POSTGRES_USER" -d "$POSTGRES_DB")" = ""'
 ```
 
@@ -359,12 +359,12 @@ meaningful data-bearing checkpoint is the latter because the new database is
 otherwise empty.
 
 ```bash
-cd /opt/bmo/app/backend
-P9_COMPOSE_FILE=/opt/bmo/app/ops/deploy/p9.1-production-compose.yml \
-P9_COMPOSE_PROJECT=bmo-production-p9 \
-P9_COMPOSE_ENV_FILE=/opt/bmo/config/p9.1/production.compose.env \
-P9_BACKUP_DIR=/opt/bmo/backups/database \
-P9_BACKUP_PASSPHRASE_FILE=/opt/bmo/config/p9.1/backup-passphrase \
+cd /opt/joy/app/backend
+P9_COMPOSE_FILE=/opt/joy/app/ops/deploy/p9.1-production-compose.yml \
+P9_COMPOSE_PROJECT=joy-production-p9 \
+P9_COMPOSE_ENV_FILE=/opt/joy/config/p9.1/production.compose.env \
+P9_BACKUP_DIR=/opt/joy/backups/database \
+P9_BACKUP_PASSPHRASE_FILE=/opt/joy/config/p9.1/backup-passphrase \
 npm run p9:backup
 ```
 
@@ -375,18 +375,18 @@ schema-bearing pre-cutover checkpoint.
 ### PHASE F — deploy exactly six migrations
 
 ```bash
-docker compose --project-name bmo-production-p9 \
-  --env-file /opt/bmo/config/p9.1/production.compose.env \
-  --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml \
+docker compose --project-name joy-production-p9 \
+  --env-file /opt/joy/config/p9.1/production.compose.env \
+  --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml \
   run --rm --no-deps backend npm run prisma:migrate:deploy
 ```
 
 ### PHASE G — verify migration history, schema, and integrity
 
 ```bash
-docker compose --project-name bmo-production-p9 \
-  --env-file /opt/bmo/config/p9.1/production.compose.env \
-  --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml \
+docker compose --project-name joy-production-p9 \
+  --env-file /opt/joy/config/p9.1/production.compose.env \
+  --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml \
   exec -T postgres sh -ceu 'export PGPASSWORD="$(cat /run/secrets/postgres_password)"; test "$(psql -Atqc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL" -U "$POSTGRES_USER" -d "$POSTGRES_DB")" = 6; psql -Atqc "SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY started_at" -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 ```
 
@@ -400,15 +400,15 @@ production Backend so the new project can bind port 3000; do not stop Audio.
 Then start only the new Backend with `--no-deps`:
 
 ```bash
-BACKEND_IMAGE=bmo-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7 \
-AUDIO_IMAGE=bmo-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34 \
-BACKEND_ENV_FILE=/opt/bmo/config/backend.env \
-AUDIO_ENV_FILE=/opt/bmo/config/audio.env \
-docker compose --project-name bmo-production --file /opt/bmo/app/docker-compose.yml stop backend
+BACKEND_IMAGE=joy-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7 \
+AUDIO_IMAGE=joy-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34 \
+BACKEND_ENV_FILE=/opt/joy/config/backend.env \
+AUDIO_ENV_FILE=/opt/joy/config/audio.env \
+docker compose --project-name joy-production --file /opt/joy/app/docker-compose.yml stop backend
 
-docker compose --project-name bmo-production-p9 \
-  --env-file /opt/bmo/config/p9.1/production.compose.env \
-  --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml \
+docker compose --project-name joy-production-p9 \
+  --env-file /opt/joy/config/p9.1/production.compose.env \
+  --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml \
   up -d --no-deps backend
 ```
 
@@ -424,7 +424,7 @@ curl --fail --silent --show-error http://127.0.0.1:3000/api/v1/ops/db/readyz >/d
 ### PHASE J — verify public health
 
 ```bash
-curl --fail --silent --show-error https://api.personalbmo.web.id/health >/dev/null
+curl --fail --silent --show-error https://api.personaljoy.web.id/health >/dev/null
 ```
 
 ### PHASE K — minimal mobile auth and DB-backed reads
@@ -433,10 +433,10 @@ Use an already authorized test account and keep its access token only in the
 operator shell. Do not print response bodies or the token:
 
 ```bash
-: "${BMO_ACCESS_TOKEN:?set an operator-held access token without printing it}"
-curl --fail --silent --show-error -H "Authorization: Bearer ${BMO_ACCESS_TOKEN}" https://api.personalbmo.web.id/api/v1/me | jq -e '.user.id != null' >/dev/null
-curl --fail --silent --show-error -H "Authorization: Bearer ${BMO_ACCESS_TOKEN}" https://api.personalbmo.web.id/api/v1/devices | jq -e '.devices | type == "array"' >/dev/null
-curl --fail --silent --show-error -H "Authorization: Bearer ${BMO_ACCESS_TOKEN}" https://api.personalbmo.web.id/api/v1/chat/sessions | jq -e 'type == "array"' >/dev/null
+: "${JOY_ACCESS_TOKEN:?set an operator-held access token without printing it}"
+curl --fail --silent --show-error -H "Authorization: Bearer ${JOY_ACCESS_TOKEN}" https://api.personaljoy.web.id/api/v1/me | jq -e '.user.id != null' >/dev/null
+curl --fail --silent --show-error -H "Authorization: Bearer ${JOY_ACCESS_TOKEN}" https://api.personaljoy.web.id/api/v1/devices | jq -e '.devices | type == "array"' >/dev/null
+curl --fail --silent --show-error -H "Authorization: Bearer ${JOY_ACCESS_TOKEN}" https://api.personaljoy.web.id/api/v1/chat/sessions | jq -e 'type == "array"' >/dev/null
 ```
 
 ### PHASE L — verify mobile WebSocket upgrade/auth
@@ -445,12 +445,12 @@ Send only the protocol authentication event; do not send chat or provider
 actions:
 
 ```bash
-: "${BMO_ACCESS_TOKEN:?set an operator-held access token without printing it}"
+: "${JOY_ACCESS_TOKEN:?set an operator-held access token without printing it}"
 node --input-type=module <<'NODE'
-import WebSocket from "/opt/bmo/app/backend/node_modules/ws/index.js";
-const socket = new WebSocket("wss://api.personalbmo.web.id/api/v1/ws");
+import WebSocket from "/opt/joy/app/backend/node_modules/ws/index.js";
+const socket = new WebSocket("wss://api.personaljoy.web.id/api/v1/ws");
 const timer = setTimeout(() => { socket.terminate(); process.exit(1); }, 10000);
-socket.on("open", () => socket.send(JSON.stringify({ event: "authenticate", accessToken: process.env.BMO_ACCESS_TOKEN })));
+socket.on("open", () => socket.send(JSON.stringify({ event: "authenticate", accessToken: process.env.JOY_ACCESS_TOKEN })));
 socket.on("message", (data) => {
   const value = JSON.parse(data.toString());
   if (value.event !== "authenticated" || value.status !== "ok") process.exit(1);
@@ -467,7 +467,7 @@ NODE
 ```bash
 curl --fail --silent --show-error http://127.0.0.1:3001/health >/dev/null
 curl --fail --silent --show-error http://127.0.0.1:3002/health >/dev/null
-curl --fail --silent --show-error -H "Authorization: Bearer ${BMO_ACCESS_TOKEN}" https://api.personalbmo.web.id/api/v1/integrations/whatsapp/status >/dev/null
+curl --fail --silent --show-error -H "Authorization: Bearer ${JOY_ACCESS_TOKEN}" https://api.personaljoy.web.id/api/v1/integrations/whatsapp/status >/dev/null
 ```
 
 Do not call the bridge `/messages` endpoint and do not send or receive a
@@ -476,7 +476,7 @@ WhatsApp message during this phase.
 ### PHASE N — verify Spotify read-only status
 
 ```bash
-curl --fail --silent --show-error -H "Authorization: Bearer ${BMO_ACCESS_TOKEN}" https://api.personalbmo.web.id/api/v1/integrations/spotify/status >/dev/null
+curl --fail --silent --show-error -H "Authorization: Bearer ${JOY_ACCESS_TOKEN}" https://api.personaljoy.web.id/api/v1/integrations/spotify/status >/dev/null
 ```
 
 Do not start OAuth, playback, action, refresh, or disconnect flows.

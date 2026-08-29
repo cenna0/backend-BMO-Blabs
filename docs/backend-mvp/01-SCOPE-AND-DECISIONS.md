@@ -1,7 +1,7 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO Backend MVP — Scope and Locked Decisions
+# Joy Backend MVP — Scope and Locked Decisions
 
 **Versi:** 1.0.1  
 **Status:** LOCKED REFERENCE  
@@ -22,7 +22,7 @@
 
 File ini menentukan batas backend MVP, keputusan yang tidak boleh diubah, baseline yang wajib dibenchmark, dan guardrail terhadap Hermes host runtime. Coding agent wajib membaca file ini pada setiap phase.
 
-Dokumen awal v1.0.5 menggunakan istilah Hermes sebagai agent/orchestrator implementasi. **Model operasional project saat ini telah diklarifikasi:** Codex adalah coding/infrastructure executor untuk P6 dan phase implementasi berikutnya, sedangkan Hermes adalah host runtime service/dependency BMO. P6 mempertahankan instalasi yang ada atau melakukan initial bootstrap jika preflight membuktikan Hermes tidak ada. Referensi historical P1–P5 yang menyebut Hermes sebagai executor tidak mengubah ownership saat ini.
+Dokumen awal v1.0.5 menggunakan istilah Hermes sebagai agent/orchestrator implementasi. **Model operasional project saat ini telah diklarifikasi:** Codex adalah coding/infrastructure executor untuk P6 dan phase implementasi berikutnya, sedangkan Hermes adalah host runtime service/dependency Joy. P6 mempertahankan instalasi yang ada atau melakukan initial bootstrap jika preflight membuktikan Hermes tidak ada. Referensi historical P1–P5 yang menyebut Hermes sebagai executor tidak mengubah ownership saat ini.
 
 ## 1. Peran Codex dan Hermes
 
@@ -37,9 +37,9 @@ Saat phase telah diotorisasi, Codex bertugas:
 5. Menghasilkan evidence sebelum menyatakan phase selesai.
 6. Berhenti pada boundary phase dan tidak mengerjakan phase berikutnya tanpa authorization.
 
-Codex adalah tooling/operator. BMO tidak boleh bergantung pada Codex untuk runtime normal.
+Codex adalah tooling/operator. Joy tidak boleh bergantung pada Codex untuk runtime normal.
 
-### Hermes — runtime service BMO
+### Hermes — runtime service Joy
 
 Hermes:
 
@@ -47,7 +47,7 @@ Hermes:
 - diaudit dan dipertahankan jika ditemukan pada preflight P6;
 - di-bootstrap oleh P6 jika preflight membuktikan belum terpasang;
 - menerima transcript dari backend melalui API lokal;
-- menghasilkan jawaban BMO;
+- menghasilkan jawaban Joy;
 - menjaga personality/context/memory/capability runtime;
 - merupakan dependency yang harus tetap sehat selama perubahan infrastructure/backend.
 
@@ -98,7 +98,7 @@ State request pipeline suara MVP disimpan in-memory. Hilangnya request aktif saa
 - UUID v4 dari ESP32 sebagai request ID dan idempotency key;
 - state request in-memory, tanpa PostgreSQL untuk voice MVP;
 - faster-whisper multilingual dengan auto-detect Indonesia/English/mixed;
-- BMO selalu menjawab dalam English;
+- Joy selalu menjawab dalam English;
 - Piper Prudence primary dengan fallback Kokoro-only; RVC production disabled;
 - MP3 dikirim sebagai URL dan diambil melalui HTTP;
 - mode display MVP hanya `idle`, `thinking`, `speaking`, dan `error`; backend hanya mengirim `thinking`;
@@ -108,7 +108,7 @@ State request pipeline suara MVP disimpan in-memory. Hilangnya request aktif saa
 
 **Verified P7 production runtime baseline:**
 
-- faster-whisper `medium` multilingual, CPU INT8, 4 threads, 1 worker, beam size 5, VAD aktif, language auto-detect, hotword `BMO`;
+- faster-whisper `medium` multilingual, CPU INT8, 4 threads, 1 worker, beam size 5, VAD aktif, language auto-detect, hotword `Joy`;
 - Kokoro `af_heart` dengan `KOKORO_SPEED=0.80`.
 
 **Baseline teknis lain yang masih boleh disesuaikan setelah benchmark:**
@@ -147,7 +147,7 @@ Aturan wajib:
 - Jangan expose port `8642` ke internet.
 - Jangan mencetak API key aktif ke log atau laporan.
 - Jangan mengubah global `SOUL.md` tanpa persetujuan user.
-- Backend wajib mengirim personality/instructions BMO pada setiap request.
+- Backend wajib mengirim personality/instructions Joy pada setiap request.
 
 Evidence local historical yang diberikan user sudah memverifikasi `/v1/responses`, `/v1/chat/completions`, dan `/v1/models`. Evidence tersebut tidak membuktikan instalasi production VPS. Model pada body saat ini hanya label/cosmetic; model LLM aktual tetap ditentukan konfigurasi Hermes. Karena itu `/v1/models` boleh dipakai untuk diagnosis, tetapi jangan dijadikan dependency runtime backend.
 

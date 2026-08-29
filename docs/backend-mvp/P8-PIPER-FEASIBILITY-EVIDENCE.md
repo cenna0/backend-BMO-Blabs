@@ -9,7 +9,7 @@
 **Prompt 5 recommendation:** deploy Piper only after explicit operator listening approval; until then retain the unchanged P7 Kokoro-only production runtime.
 **Production status:** P7 Kokoro remained running; `RVC_ENABLED=false`; Piper was never publicly exposed or permanently deployed.
 
-This is technical feasibility evidence, not subjective BMO voice approval, a
+This is technical feasibility evidence, not subjective Joy voice approval, a
 replacement canary, a production deployment, or `P8 VERIFIED`.
 
 ## 1. Branch boundaries and RVC closure
@@ -18,12 +18,12 @@ replacement canary, a production deployment, or `P8 VERIFIED`.
 |---|---|
 | Main/base | `cfbd718f3206ccdc1ea8157b2dc177f235d8181f` |
 | RVC branch | `feat/p8-rvc-foundation` |
-| RVC worktree | `/opt/bmo/app/.worktrees/p8-rvc-foundation` |
+| RVC worktree | `/opt/joy/app/.worktrees/p8-rvc-foundation` |
 | RVC checkpoint | `d7c207cef2c68c05a8799a6cd87d6d2fb906934b` |
 | RVC closure commit | `8420d4192a16025f439c040cd7a32a50b41fe52b` |
 | RVC result | `P8_CANARY_NEEDS_LARGER_HOST` |
 | Piper branch | `feat/p8-piper-feasibility` |
-| Piper worktree | `/opt/bmo/app/.worktrees/p8-piper-feasibility` |
+| Piper worktree | `/opt/joy/app/.worktrees/p8-piper-feasibility` |
 
 The RVC closure commit contains exactly:
 
@@ -50,7 +50,7 @@ none is in the five-file post-checkpoint scope and none was represented as a pas
 ## 2. Production gate and timeline
 
 Pre-benchmark evidence is private at
-`/opt/bmo/temp/p8-piper-feasibility/evidence/host-pre-benchmark.json`.
+`/opt/joy/temp/p8-piper-feasibility/evidence/host-pre-benchmark.json`.
 
 | Measurement | Pre-benchmark value |
 |---|---:|
@@ -92,7 +92,7 @@ decision. Ports 3000, 8001, and 8642 remained bound only to `127.0.0.1`.
 
 The final post-benchmark hashes still matched the preflight values:
 
-- `/opt/bmo/config/audio.env`: `3ced8033d38533d473abdbe53cacb6c3cf3ea58fb40fb2368a50abcc0b3af15c`
+- `/opt/joy/config/audio.env`: `3ced8033d38533d473abdbe53cacb6c3cf3ea58fb40fb2368a50abcc0b3af15c`
 - production Compose: `3040cf3ea479536cbae0cfd7a0d35d11ab9bed7df69ba285e6496cf6354b855c`
 
 The Audio cgroup retained 4,302,393,344 bytes after the bounded long Kokoro
@@ -380,7 +380,7 @@ hash-verified, and ffprobe-validated:
 | Prompt 2 baseline index 0.75 | `7d305d…df6` / `5efb29…5244` | same duration/format |
 | Prompt 2 no retrieval | `c0ebbf…2252` / `356fcd…6ef` | same duration/format |
 
-Their recorded source is `Hi! BMO is ready to help.` Even though that phrase is
+Their recorded source is `Hi! Joy is ready to help.` Even though that phrase is
 also in the new set, these are historical short diagnostics from different
 runs and are not a controlled same-runtime, same-duration, or long-form
 competitor. They provide no completed replacement peak, warm soak, 20-request,
@@ -390,8 +390,8 @@ or 30-second RVC evidence.
 
 | Item | Value |
 |---|---|
-| Listening directory | `/opt/bmo/temp/p8-piper-feasibility/listening/` |
-| Archive | `/opt/bmo/temp/p8-piper-feasibility/p8-piper-listening-bundle.tar.gz` |
+| Listening directory | `/opt/joy/temp/p8-piper-feasibility/listening/` |
+| Archive | `/opt/joy/temp/p8-piper-feasibility/p8-piper-listening-bundle.tar.gz` |
 | Archive bytes | 17,952,821 |
 | Archive SHA-256 | `41c2e1846dcbf9a93d628fbea24b6f54ae5597942d111be885129dd5d5a2179c` |
 | Tailscale IPv4 | `100.107.88.120` |
@@ -399,7 +399,7 @@ or 30-second RVC evidence.
 Safe operator command:
 
 ```bash
-scp bmo-admin@100.107.88.120:/opt/bmo/temp/p8-piper-feasibility/p8-piper-listening-bundle.tar.gz ./
+scp joy-admin@100.107.88.120:/opt/joy/temp/p8-piper-feasibility/p8-piper-listening-bundle.tar.gz ./
 ```
 
 The archive has 84 files and 68 audio files. Its checksums pass and ffprobe
@@ -412,7 +412,7 @@ cache, private log, internal service configuration, or unrelated system data.
 
 The guide asks the operator to use fixed equipment/volume, listen blind first,
 record first impressions, replay the continuous pair at least twice, and assess
-BMO similarity, friendliness, playfulness, intelligibility, naturalness, pitch,
+Joy similarity, friendliness, playfulness, intelligibility, naturalness, pitch,
 consonants, vowels, metallic/robotic artifacts, calm/excited stability,
 names/numbers, punctuation, pauses, clipping, and long-form acceptability.
 
@@ -455,7 +455,7 @@ personal/noncommercial licensing documentation.
 
 Unresolved risks:
 
-- operator BMO-similarity and voice-quality approval is absent;
+- operator Joy-similarity and voice-quality approval is absent;
 - Piper has not replaced production and no replacement canary exists;
 - API integration, concurrency, and recovery in the permanent service are not tested;
 - ONNX Runtime retains about 687 MiB after long-form allocation, though the

@@ -1,4 +1,4 @@
-# BMO Backend MVP — Voice Lineage and Integration Overlay
+# Joy Backend MVP — Voice Lineage and Integration Overlay
 
 > **HISTORICAL CONTROL RECORD — NOT CURRENT STATUS**
 > Legacy verifier text below is intentionally preserved. P9 Backend and seven
@@ -84,7 +84,7 @@ isolated/private candidate; production activation remains separately gated.
 | P3 | Historical Kokoro + FFmpeg + optional RVC fallback boundary | 01, 03, 04, 05, 06 | IMPLEMENTED — not VERIFIED | AUTHORIZED BY USER | [`P3-TEST-EVIDENCE.md`](P3-TEST-EVIDENCE.md); RVC is archived and not production |
 | P4 | Hermes adapter + full voice pipeline orchestration | 01, 02, 03, 04, 05 | VERIFIED — LOCAL FUNCTIONAL | AUTHORIZED BY USER | [`P4-TEST-EVIDENCE.md`](P4-TEST-EVIDENCE.md); real local Hermes pipeline passed and P7 later verified host/VPS integration in production |
 | P5 | Reliability, security, lifecycle, full automated test, reconnect/idempotency/TTL | 01, 02, 03, 05, 06 | VERIFIED — BACKEND | AUTHORIZED BY USER | [`P5-TEST-EVIDENCE.md`](P5-TEST-EVIDENCE.md) |
-| P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/bmo`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
+| P6 | VPS foundation: conditional Hermes host preserve/bootstrap, users, `/opt/joy`, Docker/Compose, Caddy/TLS, Tailscale, firewall, Beszel/Telegram, backup | `../NEXT-ACTION.md` + `../roadmap/P6-EXECUTION-SPEC.md` + 06 | VERIFIED | COMPLETED | [`P6-TEST-EVIDENCE.md`](P6-TEST-EVIDENCE.md) |
 | P7 | Deploy backend/audio on VPS, integrate with P6-verified Hermes host API, public HTTPS/WSS, fake ESP32 public E2E | 02–06 + handoff | VERIFIED — PRODUCTION | COMPLETED | [`P7-TEST-EVIDENCE.md`](P7-TEST-EVIDENCE.md) |
 | P8 | Historical Piper Prudence primary + Kokoro fallback; superseded by Piper-only production | 04–06 + `../roadmap/P8-EXECUTION-SPEC.md` | HISTORICAL — SUPERSEDED | COMPLETED | [`P8-PRODUCTION-ROLLOUT-EVIDENCE.md`](P8-PRODUCTION-ROLLOUT-EVIDENCE.md) |
 | P9.1 | PostgreSQL + Prisma, invite auth, pairing, user/device settings, backup/restore baseline | PRD + `../p9/` + roadmap | IMPLEMENTED — ISOLATED / READY FOR REVIEW | AUTHORIZED | [`../p9/P9.1-IMPLEMENTATION-EVIDENCE.md`](../p9/P9.1-IMPLEMENTATION-EVIDENCE.md) |
@@ -106,7 +106,7 @@ isolated/private candidate; production activation remains separately gated.
   independent Hermes timer with a three-failure threshold and single recovery
   notification. Both labeled receipts were confirmed and sanitized secret
   scans passed.
-- STT accuracy investigation on 2026-07-25 selected `WHISPER_MODEL=medium` with `WHISPER_HOTWORDS=BMO`, while keeping CPU INT8, 4 threads, 1 worker, beam 5, VAD, and language auto-detect. The earlier `small` references in P2 evidence remain historical evidence of P2 at that time, not the current tuning target.
+- STT accuracy investigation on 2026-07-25 selected `WHISPER_MODEL=medium` with `WHISPER_HOTWORDS=Joy`, while keeping CPU INT8, 4 threads, 1 worker, beam 5, VAD, and language auto-detect. The earlier `small` references in P2 evidence remain historical evidence of P2 at that time, not the current tuning target.
 - Kokoro manual listening selected `KOKORO_VOICE=af_heart` with `KOKORO_SPEED=0.80`; P8 verified this as the fallback value. Earlier evidence that production remained at `1.0` is historical. No RVC revalidation path is active.
 - Hermes real local `/v1/responses` integration is recorded in the P5 manual evidence addendum, and P7 subsequently verified Hermes integration in production.
 - P8 production evidence is historical. Current production runs Piper-only; Kokoro runtime/cache artifacts are purged and RVC remains historical-only;
@@ -116,7 +116,7 @@ isolated/private candidate; production activation remains separately gated.
 - P9 architecture now separates PostgreSQL-backed chat/memory/scheduler data
   from Hermes runtime context. None of those application features is
   implemented by this documentation branch.
-- The public production endpoint `api.personalbmo.web.id` is live and verified.
+- The public production endpoint `api.personaljoy.web.id` is live and verified.
   Public fake-ESP32 acceptance passed `23/23`, and the P7 resource soak passed;
   this does not verify a physical ESP32.
 - Runtime maintenance on 2026-08-11 verified Codex CLI `0.147.0`, Hermes Agent
@@ -266,7 +266,7 @@ Started at: 2026-07-19
 Verified at: 2026-07-19
 Commit: `feat: implement P2 audio service and faster-whisper STT`  
 Files changed: recorded in `P2-TEST-EVIDENCE.md`  
-Requirements implemented at P2: FastAPI bootstrap, env validation, internal token auth, health state, raw WAV STT endpoint, WAV validation, faster-whisper adapter boundary, real faster-whisper `small` multilingual CPU INT8 inference, auto language detection, language/no-speech normalization, model cache/bootstrap, unit/integration tests. **Historical note:** P5 accuracy work later superseded the runtime default to `medium` + hotword `BMO`.
+Requirements implemented at P2: FastAPI bootstrap, env validation, internal token auth, health state, raw WAV STT endpoint, WAV validation, faster-whisper adapter boundary, real faster-whisper `small` multilingual CPU INT8 inference, auto language detection, language/no-speech normalization, model cache/bootstrap, unit/integration tests. **Historical note:** P5 accuracy work later superseded the runtime default to `medium` + hotword `Joy`.
 Commands run: `verify_real_inference.py`, `bootstrap_whisper.py --allow-download`, offline cache rerun with `HF_HUB_OFFLINE=1`, `pytest`, `compileall`, `pip check`, `python scripts/verify-backend-mvp-docs.py`, plus P1 regression `npm test`, `npm run typecheck`, `npm run build`, `npm audit`, and `npm run fake-esp32`
 Test result: latest 2026-07-19 final rerun: real faster-whisper inference passed English, Indonesian, mixed Indonesian-English, silence, and noise fixtures; P1 10 files / 50 tests passed; P2 22 tests passed; typecheck/build/audit/docs verifier/fake ESP32/compileall/pip check passed
 Contract consistency: internal Audio Service API matches P2 subset of `04-AUDIO-SERVICE.md` §14.1–§14.2; public hardware contract unchanged  
@@ -298,7 +298,7 @@ Started at: 2026-07-19
 Verified at: 2026-07-19
 Commit: `feat: implement P4 Hermes adapter and voice pipeline orchestration`
 Files changed: recorded in `P4-TEST-EVIDENCE.md`
-Requirements implemented: backend Audio Service client, Hermes `/v1/responses` runtime adapter, documented chat-completions fallback adapter, safe output parser, BMO runtime instructions, output sanitizer, provider-error detection, async STT→Hermes→TTS orchestration, MP3 temp storage, `audio_ready`, input WAV cleanup, canonical error mapping, per-conversation serialization, and full local fake-device verification
+Requirements implemented: backend Audio Service client, Hermes `/v1/responses` runtime adapter, documented chat-completions fallback adapter, safe output parser, Joy runtime instructions, output sanitizer, provider-error detection, async STT→Hermes→TTS orchestration, MP3 temp storage, `audio_ready`, input WAV cleanup, canonical error mapping, per-conversation serialization, and full local fake-device verification
 Commands run: `npm test`, `npm run typecheck`, `npm run build`, `npm audit`, `npm run fake-esp32`, `npm run verify-p4-full-pipeline`, real local Hermes full-pipeline verification, `ffprobe`, audio-service `pytest`, `compileall`, `pip check`, and `python scripts/verify-backend-mvp-docs.py`
 Test result: latest 2026-07-19 rerun: backend 14 files / 70 tests passed; audio-service 47 tests passed; full local pipeline passed with Hermes fixture and real local Hermes; typecheck/build/audit/docs verifier/fake ESP32/ffprobe/compileall/pip check passed
 Contract consistency: public backend interface, WebSocket event set, hardware contract, PRD locked decisions unchanged

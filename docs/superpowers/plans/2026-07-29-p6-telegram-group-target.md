@@ -23,25 +23,25 @@ Telegram Bot API.
 
 ## File structure
 
-- `tests/operations/test_bmo_telegram_notify.py`: proves the static Hermes test
+- `tests/operations/test_joy_telegram_notify.py`: proves the static Hermes test
   action selects the exact group-test label.
-- `ops/telegram/bmo_telegram_notify.py`: changes only the static test label;
+- `ops/telegram/joy_telegram_notify.py`: changes only the static test label;
   health alert and recovery behavior remain unchanged.
 - `tests/operations/test_beszel_telegram_relay.py`: proves exact test-body
   relabeling and fail-closed handling of normal and near-match payloads.
 - `ops/telegram/beszel_telegram_relay.py`: formats an exact Beszel built-in test
   body with the group-test label and every other payload with the existing
   normal label.
-- `/usr/local/libexec/bmo-hermes-health-notify`: verified deployed notifier.
-- `/usr/local/libexec/bmo-beszel-telegram-relay`: verified deployed relay.
-- `/opt/bmo/config/telegram/chat-id`: atomically replaced root-owned group
+- `/usr/local/libexec/joy-hermes-health-notify`: verified deployed notifier.
+- `/usr/local/libexec/joy-beszel-telegram-relay`: verified deployed relay.
+- `/opt/joy/config/telegram/chat-id`: atomically replaced root-owned group
   destination; the value is intentionally absent from tracked files.
 
 ### Task 1: Fixed Hermes group-test label
 
 **Files:**
-- Modify: `tests/operations/test_bmo_telegram_notify.py`
-- Modify: `ops/telegram/bmo_telegram_notify.py`
+- Modify: `tests/operations/test_joy_telegram_notify.py`
+- Modify: `ops/telegram/joy_telegram_notify.py`
 
 - [ ] **Step 1: Write the failing CLI behavior test**
 
@@ -68,7 +68,7 @@ class CommandTests(unittest.TestCase):
                     {"CREDENTIALS_DIRECTORY": credentials_directory},
                 ),
                 patch(
-                    "ops.telegram.bmo_telegram_notify.send_telegram",
+                    "ops.telegram.joy_telegram_notify.send_telegram",
                 ) as sender,
                 redirect_stdout(output),
             ):
@@ -92,7 +92,7 @@ Run:
 
 ```bash
 python3 -m unittest -v \
-  tests.operations.test_bmo_telegram_notify.CommandTests
+  tests.operations.test_joy_telegram_notify.CommandTests
 ```
 
 Expected: failure showing the current first line is
@@ -114,8 +114,8 @@ credential validation, HTTP validation, or error sanitization.
 Run:
 
 ```bash
-python3 -m unittest -v tests.operations.test_bmo_telegram_notify
-python3 -m py_compile ops/telegram/bmo_telegram_notify.py
+python3 -m unittest -v tests.operations.test_joy_telegram_notify
+python3 -m py_compile ops/telegram/joy_telegram_notify.py
 ```
 
 Expected: all notifier tests pass and compilation exits zero.
@@ -149,7 +149,7 @@ def test_exact_beszel_builtin_test_payload_uses_group_test_label(self) -> None:
     self.assertEqual(
         messages,
         [
-            "[BMO BESZEL GROUP TEST]\n"
+            "[JOY BESZEL GROUP TEST]\n"
             "This is a notification from Beszel.",
         ],
     )
@@ -174,8 +174,8 @@ near_matches = (
 For each body, require HTTP `204` and:
 
 ```python
-self.assertEqual(messages, [f"[BMO BESZEL]\n{payload}"])
-self.assertNotIn("[BMO BESZEL GROUP TEST]", messages[0])
+self.assertEqual(messages, [f"[JOY BESZEL]\n{payload}"])
+self.assertNotIn("[JOY BESZEL GROUP TEST]", messages[0])
 ```
 
 This proves there is no trim, case-fold, substring, prefix, or normalized
@@ -190,7 +190,7 @@ python3 -m unittest -v tests.operations.test_beszel_telegram_relay
 ```
 
 Expected: only the exact built-in test case fails because it receives the
-existing `[BMO BESZEL]` label.
+existing `[JOY BESZEL]` label.
 
 - [ ] **Step 4: Implement exact formatting**
 
@@ -198,8 +198,8 @@ Add:
 
 ```python
 BESZEL_BUILT_IN_TEST_PAYLOAD = "This is a notification from Beszel."
-BESZEL_ALERT_LABEL = "[BMO BESZEL]"
-BESZEL_GROUP_TEST_LABEL = "[BMO BESZEL GROUP TEST]"
+BESZEL_ALERT_LABEL = "[JOY BESZEL]"
+BESZEL_GROUP_TEST_LABEL = "[JOY BESZEL GROUP TEST]"
 
 
 def format_telegram_message(message: str) -> str:
@@ -227,11 +227,11 @@ Run:
 ```bash
 python3 -m unittest -v \
   tests.operations.test_beszel_telegram_relay \
-  tests.operations.test_bmo_telegram_notify \
+  tests.operations.test_joy_telegram_notify \
   tests.operations.test_configure_beszel_telegram
 python3 -m py_compile \
   ops/telegram/beszel_telegram_relay.py \
-  ops/telegram/bmo_telegram_notify.py \
+  ops/telegram/joy_telegram_notify.py \
   ops/telegram/configure_beszel_telegram.py
 git diff --check
 ```
@@ -242,9 +242,9 @@ clean.
 ### Task 3: Secure host activation
 
 **Files:**
-- Install: `/usr/local/libexec/bmo-hermes-health-notify`
-- Install: `/usr/local/libexec/bmo-beszel-telegram-relay`
-- Replace: `/opt/bmo/config/telegram/chat-id`
+- Install: `/usr/local/libexec/joy-hermes-health-notify`
+- Install: `/usr/local/libexec/joy-beszel-telegram-relay`
+- Replace: `/opt/joy/config/telegram/chat-id`
 
 - [ ] **Step 1: Snapshot safe pre-change evidence**
 
@@ -263,7 +263,7 @@ the deployed paths. Verify deployed hashes equal repository hashes.
 - [ ] **Step 3: Atomically replace the chat credential**
 
 Use a network-disabled root-equivalent helper container with only
-`/opt/bmo/config/telegram` mounted read-write. Set `umask 077`, create the
+`/opt/joy/config/telegram` mounted read-write. Set `umask 077`, create the
 temporary file in that directory, write the approved group identifier with one
 trailing newline, set `root:root` mode `0600`, and rename it over `chat-id`.
 The approved value is supplied only to the live command and is not stored in
@@ -277,7 +277,7 @@ approved group identifier. Do not output either value.
 
 - [ ] **Step 5: Recreate and verify the relay**
 
-Recreate only `bmo-telegram-relay` through the existing Compose project so its
+Recreate only `joy-telegram-relay` through the existing Compose project so its
 read-only bind mount references the replaced inode. Verify:
 
 ```text
@@ -332,7 +332,7 @@ body.
 
 - [ ] **Step 3: Send the Hermes group test**
 
-Start `bmo-telegram-test.service`. Accept only service success and the sanitized
+Start `joy-telegram-test.service`. Accept only service success and the sanitized
 journal line:
 
 ```text

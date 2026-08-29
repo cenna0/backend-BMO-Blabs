@@ -1,7 +1,7 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO — P8 Execution Spec and Piper Production Closure
+# Joy — P8 Execution Spec and Piper Production Closure
 
 **Status:** `P8_PIPER_PRODUCTION_VERIFIED`
 **Dependency:** P7 `VERIFIED — PRODUCTION`
@@ -22,7 +22,7 @@ Verify real RVC inference and its resource cost while preserving the already
 verified P7 public voice pipeline, immutable deployment provenance,
 Kokoro-only fallback, secret boundaries, and Hardware Contract v1.0.5.
 
-P8 resolves whether the experimental BMO RVC path can be safely enabled. It
+P8 resolves whether the experimental Joy RVC path can be safely enabled. It
 does not assume that RVC will pass, and it does not require protocol changes if
 RVC remains unavailable.
 
@@ -34,8 +34,8 @@ Current verified P7 production state:
 RVC_ENABLED=false
 Audio runtime: Python 3.10
 Deployment source: 4d7b472adc4c2243d8f7364032a491ad70efb6d3
-Backend image: bmo-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7
-Audio image: bmo-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e
+Backend image: joy-backend@sha256:e981751498fca13bf1f1c1c046a6874a490b3e681aeef9787a53181059506fd7
+Audio image: joy-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e
 Final P7 soak: 3,665 seconds / 61m 5s; 13/13 samples passed
 Backend RestartCount: 0
 Audio RestartCount: 0
@@ -49,7 +49,7 @@ Minimum relevant free disk: 59.137 GiB
   the selected real RVC runtime.
 - Whisper uses `Systran/faster-whisper-medium` revision
   `08e178d48790749d25932bbc082711ddcfdfbc4f`; the current production tuning is
-  CPU INT8, 4 threads, 1 worker, beam 5, VAD enabled, hotword `BMO`, and
+  CPU INT8, 4 threads, 1 worker, beam 5, VAD enabled, hotword `Joy`, and
   language auto-detect.
 - Kokoro uses `hexgrad/Kokoro-82M` revision
   `f3ff3571791e39611d31c381e3a41a3af07b4987`, voice `af_heart`, speed `0.80`,
@@ -63,21 +63,19 @@ Minimum relevant free disk: 59.137 GiB
 P8 measurements must compare against the complete P7 evidence, not infer
 capacity from nominal VPS specifications alone.
 
-## C. Existing RVC foundation
+## C. Former RVC foundation
 
-Inspect the current implementation and tests before selecting a runtime:
+The experimental RVC files referenced by this historical spec were removed by
+the completed Piper-only purge. They are retained here as historical context,
+not as current source paths. See
+../operations/2026-08-24-piper-only-purge-evidence.md.
 
-- [`../../audio-service/app/rvc.py`](../../audio-service/app/rvc.py)
-- [`../../audio-service/scripts/bootstrap_rvc.py`](../../audio-service/scripts/bootstrap_rvc.py)
-- [`../../audio-service/tests/test_rvc.py`](../../audio-service/tests/test_rvc.py)
-- [`../../audio-service/tests/test_rvc_bootstrap.py`](../../audio-service/tests/test_rvc_bootstrap.py)
-
-The currently locked experimental BMO model asset is:
+The currently locked experimental Joy model asset is:
 
 ```text
-Repository: Freaky98/CGO-adventure-time-BMO-rvc-v2-420e
+Repository: Freaky98/CGO-adventure-time-Joy-rvc-v2-420e
 Revision: 82a8bc529bd41b930589188ead30f073d4f99fc0
-Archive: CGO-adventure-time-BMO-rvc-v2-420e.zip
+Archive: CGO-adventure-time-Joy-rvc-v2-420e.zip
 Size: 63,780,149 bytes
 SHA-256: dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0
 ```

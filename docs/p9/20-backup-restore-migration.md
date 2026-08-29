@@ -21,7 +21,7 @@ to production.
 | Model/cache provenance | manifest/hash, not mandatory full copy | reproducible source and revision |
 | Pre-deploy snapshot | before every DB-affecting rollout | commit/image/schema/config record |
 
-The current single-VPS `/opt/bmo/backups` layout remains the target operational
+The current single-VPS `/opt/joy/backups` layout remains the target operational
 shape. Checksums and encryption are mandatory. No backup is complete until an
 isolated restore has been exercised and verified. An off-VPS destination is
 required before final production sign-off, but its provider/location remains

@@ -1,4 +1,4 @@
-# BMO Phase 2.5 Candidate Acceptance Plan
+# Joy Phase 2.5 Candidate Acceptance Plan
 
 > **For agentic workers:** Execute the candidate-only gates with verification checkpoints.
 

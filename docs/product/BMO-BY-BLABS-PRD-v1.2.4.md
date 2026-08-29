@@ -1,7 +1,7 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO BY B-LABS — Product Requirements Document (PRD)
+# Joy BY B-LABS — Product Requirements Document (PRD)
 
 **Versi:** 1.3.1
 **Tanggal:** 2026-08-04
@@ -11,9 +11,9 @@
 > This dated PRD predates the Piper-only migration. Use `docs/README.md` and
 > `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md` for the current audio contract.
 
-> Dokumen ini menjadi konteks produk utama BMO by B-Labs. Isinya menjelaskan visi, arsitektur, tech stack, scope, keputusan desain, roadmap, dan status project.
+> Dokumen ini menjadi konteks produk utama Joy by B-Labs. Isinya menjelaskan visi, arsitektur, tech stack, scope, keputusan desain, roadmap, dan status project.
 >
-> Untuk detail voice MVP, gunakan hierarchy dokumentasi current di `docs/README.md`. Public firmware ↔ backend protocol dikunci oleh `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`; detail implementasi backend/audio berada pada active `docs/backend-mvp/` references. Snapshot `BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md` berada di archive dan bukan current execution authority.
+> Untuk detail voice MVP, gunakan hierarchy dokumentasi current di `docs/README.md`. Public firmware ↔ backend protocol dikunci oleh `docs/hardware-contract/Joy-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`; detail implementasi backend/audio berada pada active `docs/backend-mvp/` references. Snapshot `Joy-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md` berada di archive dan bukan current execution authority.
 >
 > Jika terdapat perbedaan pada endpoint, event, payload, timeout, retry, lifecycle file, runtime config, atau deployment status, gunakan hierarchy pada Bab 18 dan jangan menyelesaikan konflik dengan membuat behavior baru.
 >
@@ -26,27 +26,27 @@
 
 ## 1. Project Overview
 
-**Project Name:** BMO by B-Labs  
+**Project Name:** Joy by B-Labs  
 **Type:** Physical AI Personal Assistant — IoT + backend + mobile app  
-**Inspirasi:** BMO dari *Adventure Time*
+**Inspirasi:** Joy dari *Adventure Time*
 
 ### 1.1 Vision
 
-BMO by B-Labs adalah replika fisik BMO yang berfungsi sebagai:
+Joy by B-Labs adalah replika fisik Joy yang berfungsi sebagai:
 
 - personal AI assistant berbasis suara;
 - Spotify controller;
 - WhatsApp notification hub;
-- perangkat fisik dengan ekspresi dan personality BMO.
+- perangkat fisik dengan ekspresi dan personality Joy.
 
-User berinteraksi melalui voice command. BMO memahami Bahasa Indonesia, English, dan campuran keduanya. Jawaban suara BMO selalu menggunakan English, dibacakan melalui TTS lokal dengan karakter suara yang diarahkan mendekati BMO.
+User berinteraksi melalui voice command. Joy memahami Bahasa Indonesia, English, dan campuran keduanya. Jawaban suara Joy selalu menggunakan English, dibacakan melalui TTS lokal dengan karakter suara yang diarahkan mendekati Joy.
 
 ### 1.2 Core Goals
 
-- BMO mendengar perintah suara, memprosesnya melalui Hermes, lalu menjawab melalui speaker.
-- BMO memiliki ekspresi visual yang mengikuti state interaksi.
-- BMO mengontrol Spotify pada perangkat aktif user.
-- BMO menerima dan memfilter notifikasi WhatsApp sesuai preferensi user.
+- Joy mendengar perintah suara, memprosesnya melalui Hermes, lalu menjawab melalui speaker.
+- Joy memiliki ekspresi visual yang mengikuti state interaksi.
+- Joy mengontrol Spotify pada perangkat aktif user.
+- Joy menerima dan memfilter notifikasi WhatsApp sesuai preferensi user.
 - User mengatur sistem melalui aplikasi React Native.
 - Sistem modular, dapat diuji per komponen, dan dikembangkan bertahap melalui sprint.
 
@@ -79,7 +79,7 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 
 ### 2.1 Koordinasi SW ↔ HW
 
-- Kontrak teknis voice MVP berada di `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`.
+- Kontrak teknis voice MVP berada di `docs/hardware-contract/Joy-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`.
 - Tim hardware dan software harus memakai versi kontrak yang sama.
 - Perubahan pada endpoint, event, format audio, atau ownership state wajib disepakati bersama.
 - Bab 9 PRD hanya memberikan ringkasan. Bab tersebut tidak menggantikan kontrak teknis canonical.
@@ -102,12 +102,12 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 | Mobile App | React Native | Satu codebase untuk iOS dan Android |
 | State Management | Zustand | State aplikasi mobile yang ringan dan modular |
 | Mobile Auth | Invite-only email/password | Backend verifies Argon2id password, issues short-lived access token, and rotates opaque refresh tokens by hash |
-| STT | faster-whisper lokal | Current selected runtime: `medium` multilingual, CPU INT8, auto-detect Indonesia/English/mixed, hotword `BMO` |
+| STT | faster-whisper lokal | Current selected runtime: `medium` multilingual, CPU INT8, auto-detect Indonesia/English/mixed, hotword `Joy` |
 | TTS | Piper lokal | `en_GB-semaine-medium`, Prudence, speaker ID `0`; fixed P8 production primary |
 | TTS fallback | Kokoro lokal | Voice `af_heart`, speed `0.80`; automatic fallback |
 | Voice Conversion | Archived only | RVC runtime/Docker artifacts removed from production; compact evidence and Git history retained |
 | Audio Processing | FFmpeg | Normalisasi, resampling, dan output MP3 untuk ESP32 |
-| Spotify | Spotify Web API | BMO bertindak sebagai controller; playback berlangsung pada perangkat Spotify user |
+| Spotify | Spotify Web API | Joy bertindak sebagai controller; playback berlangsung pada perangkat Spotify user |
 | WhatsApp | Hermes WhatsApp gateway | Session dan gateway dikelola internal Hermes |
 | Deployment MVP | Single VPS + Docker Compose | Hermes pada host; backend dan Audio Service dalam container |
 | SW ↔ HW Communication | WebSocket + HTTP | WebSocket untuk auth/event, HTTP POST untuk WAV, HTTP GET untuk MP3 |
@@ -119,7 +119,7 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
 | MCU | ESP32-S3 |
 | Audio input | Microphone onboard/external sesuai desain tim HW |
 | Audio output | Speaker + amplifier sesuai desain tim HW |
-| Display | Layar badan BMO untuk ekspresi dan informasi |
+| Display | Layar badan Joy untuk ekspresi dan informasi |
 | Wake word | Berjalan lokal pada ESP32-S3 dan sudah menjadi tanggung jawab tim HW |
 | Connectivity | Wi-Fi; ESP32 menjadi client ke backend VPS |
 
@@ -165,7 +165,7 @@ Spotify, WhatsApp, mobile app lengkap, dan database aplikasi tetap bagian dari v
                         │ WS auth/events + HTTP POST WAV + HTTP GET MP3
                         ▼
               ┌──────────────────────────────┐
-              │ ESP32-S3 BMO Device          │
+              │ ESP32-S3 Joy Device          │
               │ - wake word lokal            │
               │ - rekam WAV                  │
               │ - display state              │
@@ -228,11 +228,11 @@ the existing voice transport.
 #### Hermes Agent
 
 - Berjalan pada `127.0.0.1:8642` dan tidak diekspos ke internet.
-- **Runtime role:** bertindak sebagai personal assistant BMO yang menerima transcript melalui endpoint `/v1/responses`.
+- **Runtime role:** bertindak sebagai personal assistant Joy yang menerima transcript melalui endpoint `/v1/responses`.
 - Deployment/development VPS dieksekusi oleh Codex/operator project; Hermes diperlakukan sebagai runtime dependency existing yang harus tetap sehat, bukan sebagai executor infrastructure.
 - Memahami input Indonesia, English, dan campuran.
 - Selalu menghasilkan jawaban suara dalam English.
-- Menjaga personality BMO, reasoning context, skills, dan kemampuan agent.
+- Menjaga personality Joy, reasoning context, skills, dan kemampuan agent.
 - Tidak menjadi source of truth untuk chat history atau application memory;
   Backend menyediakan scoped context melalui application contracts.
 - Mengembalikan teks jawaban yang akan diproses TTS.
@@ -242,7 +242,7 @@ the existing voice transport.
 #### Local Audio Service
 
 - Berjalan hanya pada localhost.
-- Menjalankan faster-whisper `medium` multilingual, CPU INT8, auto-detect, dengan hotword `BMO`.
+- Menjalankan faster-whisper `medium` multilingual, CPU INT8, auto-detect, dengan hotword `Joy`.
 - Menjalankan Piper Prudence sebagai production primary.
 - Menggunakan Kokoro `af_heart` speed `0.80` sebagai fallback otomatis.
 - Tidak menjalankan RVC; archived evidence is not a runtime dependency.
@@ -252,7 +252,7 @@ the existing voice transport.
 
 #### PostgreSQL + Prisma
 
-- Menjadi database utama aplikasi BMO pada fase integrasi fitur.
+- Menjadi database utama aplikasi Joy pada fase integrasi fitur.
 - Menyimpan user, device, Spotify account, notification settings, dan konfigurasi aplikasi.
 - Tidak menyimpan state request aktif voice MVP.
 - Tidak menyimpan memory internal Hermes sebagai source of truth; P9
@@ -336,13 +336,13 @@ Batas ukuran awal 3 MB adalah baseline teknis dan boleh disesuaikan setelah tes 
 - Input dapat menggunakan English.
 - Input dapat berupa code-switching Indonesia–English.
 - faster-whisper menggunakan model `medium` multilingual, CPU INT8, dengan language auto-detection.
-- Hotword `BMO` dikirim melalui parameter library-supported `hotwords`; ini konteks decoding, bukan hardcoded transcript replacement.
+- Hotword `Joy` dikirim melalui parameter library-supported `hotwords`; ini konteks decoding, bukan hardcoded transcript replacement.
 - Jangan memaksa bahasa ke `id` atau `en`.
 - Transcript kosong/noise tidak dikirim ke Hermes.
 
-### 5.3 BMO Output Language
+### 5.3 Joy Output Language
 
-- Jawaban BMO selalu English.
+- Jawaban Joy selalu English.
 - Jawaban pendek, natural, plain text, umumnya 1–3 kalimat.
 - Tidak menggunakan Markdown, bullet, URL, emoji, atau code formatting untuk output suara.
 
@@ -381,13 +381,13 @@ Sample rate dan bitrate tetap configurable sampai tes decoder ESP32 dinyatakan s
 Jika STT mendeteksi tidak ada speech yang berguna atau noise terlalu tinggi, firmware menampilkan ekspresi error dan memainkan audio lokal:
 
 ```text
-“Sorry, it is too noisy. BMO cannot hear you.”
+“Sorry, it is too noisy. Joy cannot hear you.”
 ```
 
 Untuk error recoverable lain, gunakan audio lokal generik:
 
 ```text
-“Oh no. BMO could not answer. Please try again.”
+“Oh no. Joy could not answer. Please try again.”
 ```
 
 Audio error disimpan di device agar tetap tersedia ketika backend, Hermes, atau TTS gagal.
@@ -399,9 +399,9 @@ Audio error disimpan di device agar tetap tersedia ketika backend, Hermes, atau 
 ### 6.1 Requirement
 
 - Spotify Premium diperlukan untuk playback control endpoint.
-- BMO bertindak sebagai voice remote control.
-- Audio Spotify keluar dari perangkat Spotify aktif user, bukan speaker BMO.
-- Speaker BMO hanya dipakai untuk suara BMO dan audio error lokal.
+- Joy bertindak sebagai voice remote control.
+- Audio Spotify keluar dari perangkat Spotify aktif user, bukan speaker Joy.
+- Speaker Joy hanya dipakai untuk suara Joy dan audio error lokal.
 
 ### 6.2 OAuth Flow
 
@@ -422,7 +422,7 @@ User memberi voice command
 → STT
 → Hermes mengidentifikasi intent Spotify
 → backend mengeksekusi Spotify Web API
-→ BMO memberi jawaban English melalui TTS
+→ Joy memberi jawaban English melalui TTS
 → mobile/device state diperbarui
 ```
 
@@ -442,7 +442,7 @@ User memberi voice command
 
 ### 6.5 Known Limitation
 
-Spotify memerlukan active device. Jika tidak ada perangkat Spotify aktif, BMO memberi jawaban English yang meminta user membuka Spotify pada HP atau laptop.
+Spotify memerlukan active device. Jika tidak ada perangkat Spotify aktif, Joy memberi jawaban English yang meminta user membuka Spotify pada HP atau laptop.
 
 ---
 
@@ -450,7 +450,7 @@ Spotify memerlukan active device. Jika tidak ada perangkat Spotify aktif, BMO me
 
 ### 7.1 Stack
 
-Hermes mengelola WhatsApp gateway dan session. Backend bertindak sebagai bridge ke mobile app dan BMO device.
+Hermes mengelola WhatsApp gateway dan session. Backend bertindak sebagai bridge ke mobile app dan Joy device.
 
 ### 7.2 Setup Flow
 
@@ -467,7 +467,7 @@ Mobile app meminta QR
 
 | Behavior | Aksi |
 |---|---|
-| `tts` | BMO membacakan notifikasi dan menampilkan informasi |
+| `tts` | Joy membacakan notifikasi dan menampilkan informasi |
 | `display` | Hanya menampilkan informasi |
 | `silent` | Mengabaikan notifikasi |
 
@@ -505,7 +505,7 @@ Backend hanya mengirim perintah/state `thinking` untuk voice MVP. Firmware berta
 
 ## 9. Ringkasan SW ↔ HW Interface
 
-Kontrak lengkap berada pada `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`.
+Kontrak lengkap berada pada `docs/hardware-contract/Joy-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`.
 
 ### 9.1 Protokol
 
@@ -572,9 +572,9 @@ Content-Type: application/json
 ```json
 {
   "model": "hermes-agent",
-  "instructions": "<BMO_RUNTIME_INSTRUCTIONS>",
+  "instructions": "<JOY_RUNTIME_INSTRUCTIONS>",
   "input": "<hasil STT>",
-  "conversation": "bmo-001",
+  "conversation": "joy-001",
   "store": true,
   "stream": false,
   "truncation": "auto"
@@ -583,7 +583,7 @@ Content-Type: application/json
 
 ### 10.3 Rules
 
-- `conversation` stabil untuk MVP satu device: `bmo-001`.
+- `conversation` stabil untuk MVP satu device: `joy-001`.
 - Request pada conversation yang sama diserialisasi.
 - `stream:false` karena TTS menunggu jawaban utuh.
 - Runtime instructions dikirim pada setiap request.
@@ -596,7 +596,7 @@ Content-Type: application/json
 ```text
 - Always answer in natural English.
 - Understand Indonesian, English, and mixed input.
-- Speak as BMO: warm, playful, childlike, friendly, and helpful.
+- Speak as Joy: warm, playful, childlike, friendly, and helpful.
 - Keep the answer to one to three short sentences.
 - Plain text only.
 - Do not expose internal system/provider errors.
@@ -665,7 +665,7 @@ model Device {
   id              String    @id @default(uuid()) @db.Uuid
   userId          String    @map("user_id") @db.Uuid
   deviceId        String    @unique @map("device_id")
-  name            String    @default("BMO")
+  name            String    @default("Joy")
   isOnline        Boolean   @default(false) @map("is_online")
   lastSeen        DateTime? @map("last_seen")
   firmwareVersion String?   @map("firmware_version")
@@ -777,7 +777,7 @@ App
 │
 └── MainStack
     ├── HomeScreen
-    │   - BMO online/offline
+    │   - Joy online/offline
     │   - Voice state: idle/thinking/speaking/error
     │   - Future state: music/notification
     │   - Spotify status
@@ -789,7 +789,7 @@ App
         ├── SpotifySettingsScreen
         ├── WhatsAppSettingsScreen
         ├── WhatsAppQRScreen
-        └── BMOSettingsScreen
+        └── JoySettingsScreen
 ```
 
 ### 12.4 Planned Mobile API
@@ -801,7 +801,7 @@ App
 | POST | `/api/v1/auth/refresh` | Rotate refresh token and issue access token |
 | POST | `/api/v1/auth/logout` | Revoke current session |
 | POST | `/api/v1/auth/sessions/:sessionId/revoke` | Revoke one client/device session |
-| GET | `/api/bmo/status` | Status BMO dan current mode |
+| GET | `/api/bmo/status` | Status Joy dan current mode |
 | GET | `/api/spotify/auth-url` | Spotify authorization URL |
 | GET | `/api/spotify/status` | Status koneksi Spotify |
 | DELETE | `/api/spotify/disconnect` | Disconnect Spotify |
@@ -816,11 +816,11 @@ Endpoint mobile berada di luar scope voice MVP pertama.
 
 ---
 
-## 13. BMO Personality and Voice
+## 13. Joy Personality and Voice
 
 ### 13.1 Character
 
-BMO bersifat childlike, enthusiastic, friendly, loyal, caring, sedikit naif, tetapi tetap membantu dan jujur.
+Joy bersifat childlike, enthusiastic, friendly, loyal, caring, sedikit naif, tetapi tetap membantu dan jujur.
 
 ### 13.2 Language Rules
 
@@ -830,7 +830,7 @@ Input yang dipahami:
 - English
 - campuran Indonesia–English
 
-Jawaban suara BMO:
+Jawaban suara Joy:
 - selalu English
 ```
 
@@ -865,9 +865,9 @@ Status per 2026-08-04:
 - voice backend P1, P2, P4, dan P5 memiliki verification evidence sesuai
   scope; P8 production is verified with Piper Prudence primary and Kokoro
   fallback; RVC runtime artifacts are removed and archived;
-- faster-whisper menggunakan `medium` multilingual + hotword `BMO` sebagai current runtime target;
+- faster-whisper menggunakan `medium` multilingual + hotword `Joy` sebagai current runtime target;
 - Kokoro menggunakan `af_heart` dengan speed `0.80` sebagai fallback;
-- backend BMO public HTTPS/WSS dan Hermes integration are verified by P7/P8;
+- backend Joy public HTTPS/WSS dan Hermes integration are verified by P7/P8;
 - PostgreSQL/Prisma, mobile, memory, scheduler, Spotify, WhatsApp, and
   editable voice settings remain unimplemented P9 scope.
 
@@ -878,7 +878,7 @@ Operational execution authority berada di `docs/NEXT-ACTION.md` dan roadmap P6�
 Source code, config/secrets, model, persistent data, temp file, dan backup dipisahkan:
 
 ```text
-/opt/bmo/
+/opt/joy/
 ├── app/                     # Git checkout; main = production source
 │   ├── backend/
 │   ├── audio-service/
@@ -919,20 +919,20 @@ Source code, config/secrets, model, persistent data, temp file, dan backup dipis
     └── history/
 ```
 
-`/opt/bmo/app` bersifat replaceable dari Git/build. `config`, `models`, `data`, dan `backups` tidak boleh bergantung pada checkout Git dan tidak boleh hilang saat source di-update. Archived RVC evidence is outside the production model tree.
+`/opt/joy/app` bersifat replaceable dari Git/build. `config`, `models`, `data`, dan `backups` tidak boleh bergantung pada checkout Git dan tidak boleh hilang saat source di-update. Archived RVC evidence is outside the production model tree.
 
 ### 14.3 Target VPS Topology
 
 ```text
 Internet
    │
-   ├── https://api.personalbmo.web.id
-   └── https://monitor.personalbmo.web.id
+   ├── https://api.personaljoy.web.id
+   └── https://monitor.personaljoy.web.id
               │
               ▼
           Caddy :80/:443
               │
-              ├── BMO Backend origin
+              ├── Joy Backend origin
               └── Beszel origin
 
 VPS host
@@ -940,8 +940,8 @@ VPS host
 │   └── 127.0.0.1:8642
 ├── Tailscale (admin/private management path)
 └── Docker Compose
-    ├── bmo-backend
-    ├── bmo-audio-service
+    ├── joy-backend
+    ├── joy-audio-service
     ├── beszel
     └── postgres             # added/activated in P9
 ```
@@ -949,7 +949,7 @@ VPS host
 Rules:
 
 - Hermes existing tetap host service dan tidak dimigrasi ke Docker hanya demi kerapihan.
-- Codex adalah executor infrastructure/deployment P6+; Hermes adalah runtime dependency BMO.
+- Codex adalah executor infrastructure/deployment P6+; Hermes adalah runtime dependency Joy.
 - Backend/audio source dibangun menjadi immutable Docker image. Source host tidak di-bind-mount live ke production runtime.
 - Audio Service memakai pinned Piper assets plus Kokoro fallback; RVC is not a
   production model path. Express backend only calls Audio Service through the
@@ -968,7 +968,7 @@ TCP 443 → Caddy HTTPS + WSS
 Target non-public service ports:
 
 ```text
-3000 → BMO backend origin
+3000 → Joy backend origin
 8001 → Audio Service
 8642 → Hermes
 5432 → PostgreSQL
@@ -980,44 +980,44 @@ SSH admin saat ini berasal dari public IP. P6 harus menyiapkan dan membuktikan T
 ### 14.5 Production Hostnames
 
 ```text
-BMO API / WSS : api.personalbmo.web.id
-Monitoring    : monitor.personalbmo.web.id
+Joy API / WSS : api.personaljoy.web.id
+Monitoring    : monitor.personaljoy.web.id
 ```
 
 Target firmware setelah P7 deployment verification:
 
 ```text
-HTTPS base : https://api.personalbmo.web.id
-WSS        : wss://api.personalbmo.web.id/ws
-Upload     : https://api.personalbmo.web.id/api/v1/voice
-Audio      : https://api.personalbmo.web.id/audio/<audio-uuid>.mp3
+HTTPS base : https://api.personaljoy.web.id
+WSS        : wss://api.personaljoy.web.id/ws
+Upload     : https://api.personaljoy.web.id/api/v1/voice
+Audio      : https://api.personaljoy.web.id/audio/<audio-uuid>.mp3
 ```
 
 Hostname di atas adalah target production. Hardware tidak boleh menganggap endpoint live sampai `docs/hardware-handoff/DEPLOYMENT-CONFIG.md` berstatus `VERIFIED` setelah public-domain E2E P7.
 
 ### 14.6 Runtime Configuration Ownership
 
-Real secret/config berada di `/opt/bmo/config` dan tidak masuk Git. Repository hanya menyimpan `.env.example` atau schema/template config.
+Real secret/config berada di `/opt/joy/config` dan tidak masuk Git. Repository hanya menyimpan `.env.example` atau schema/template config.
 
 Backend config mencakup antara lain:
 
 ```env
 NODE_ENV=production
 BACKEND_PORT=3000
-PUBLIC_BASE_URL=https://api.personalbmo.web.id
+PUBLIC_BASE_URL=https://api.personaljoy.web.id
 
-DEVICE_ID=bmo-001
+DEVICE_ID=joy-001
 DEVICE_TOKEN=<secret-out-of-band>
 
 HERMES_API_URL=http://127.0.0.1:8642
 HERMES_API_KEY=<secret>
 HERMES_MODEL=hermes-agent
-HERMES_CONVERSATION=bmo-001
+HERMES_CONVERSATION=joy-001
 
 AUDIO_SERVICE_URL=http://127.0.0.1:8001
 INTERNAL_SERVICE_TOKEN=<shared-internal-secret>
 
-TEMP_AUDIO_DIR=/opt/bmo/temp/audio
+TEMP_AUDIO_DIR=/opt/joy/temp/audio
 TEMP_AUDIO_TTL_SECONDS=300
 MAX_AUDIO_DURATION_SECONDS=60
 MAX_AUDIO_BYTES=3145728
@@ -1030,11 +1030,11 @@ Audio Service config mencakup:
 AUDIO_SERVICE_PORT=8001
 INTERNAL_SERVICE_TOKEN=<shared-internal-secret>
 
-HF_HOME=/opt/bmo/models/hf-cache
-TORCH_HOME=/opt/bmo/models/torch-cache
+HF_HOME=/opt/joy/models/hf-cache
+TORCH_HOME=/opt/joy/models/torch-cache
 
 WHISPER_MODEL=medium
-WHISPER_HOTWORDS=BMO
+WHISPER_HOTWORDS=Joy
 WHISPER_DEVICE=cpu
 WHISPER_COMPUTE_TYPE=int8
 WHISPER_CPU_THREADS=4
@@ -1064,7 +1064,7 @@ be provisioned or enabled by P9.
 
 P6 target:
 
-- Beszel melalui `https://monitor.personalbmo.web.id` dengan authentication;
+- Beszel melalui `https://monitor.personaljoy.web.id` dengan authentication;
 - monitoring CPU, RAM, disk, swap, dan service/container state;
 - Telegram sebagai alert destination menggunakan bot token yang diberikan out-of-band;
 - token Telegram tidak masuk Git/docs;
@@ -1092,7 +1092,7 @@ Production source of truth:
 
 ```text
 Git branch : main
-Checkout   : /opt/bmo/app
+Checkout   : /opt/joy/app
 Runtime    : Docker image built from selected Git commit
 ```
 
@@ -1137,14 +1137,14 @@ and disabled. Evidence remains in `docs/backend-mvp/`.
 
 ### 15.2 P6 — VPS Foundation and Operations Baseline — READY
 
-Goal: menyiapkan host foundation tanpa mengklaim public BMO voice API sudah live.
+Goal: menyiapkan host foundation tanpa mengklaim public Joy voice API sudah live.
 
 Scope inti:
 
 - read-only VPS/Hermes/Codex audit;
-- `bmo-admin`/permissions + Codex usable from the admin account;
+- `joy-admin`/permissions + Codex usable from the admin account;
 - Docker + Compose foundation;
-- `/opt/bmo` layout;
+- `/opt/joy` layout;
 - Caddy + DNS/TLS foundation;
 - Tailscale admin path + safe SSH transition;
 - firewall exposure baseline;
@@ -1167,7 +1167,7 @@ Goal:
 - jalankan health/smoke/fake ESP32 E2E dari luar VPS;
 - record deployed commit and benchmark baseline.
 
-`api.personalbmo.web.id` baru boleh disebut live setelah P7 evidence pass. Pada titik itu deployment config boleh berubah menjadi `VERIFIED` dan tim HW dapat mulai live endpoint integration; final physical acceptance tetap P10.
+`api.personaljoy.web.id` baru boleh disebut live setelah P7 evidence pass. Pada titik itu deployment config boleh berubah menjadi `VERIFIED` dan tim HW dapat mulai live endpoint integration; final physical acceptance tetap P10.
 
 ### 15.4 P8 — Piper Production TTS and Resource Closure — VERIFIED
 
@@ -1232,7 +1232,7 @@ Spotify, WhatsApp, full mobile app integration, device provisioning, settings, a
 | Request ID | Final voice MVP | UUID v4 dibuat ESP32; retry memakai ID yang sama |
 | Request state | Final voice MVP | In-memory, satu request aktif per device |
 | Voice display modes | Final voice MVP | `idle`, `thinking`, `speaking`, `error` |
-| BMO response language | Final | Selalu English |
+| Joy response language | Final | Selalu English |
 | STT language | Final voice MVP | Auto-detect Indonesia, English, dan mixed |
 | STT runtime | Final MVP | faster-whisper lokal |
 | TTS runtime | Final MVP | Piper Prudence lokal |
@@ -1242,10 +1242,10 @@ Spotify, WhatsApp, full mobile app integration, device provisioning, settings, a
 | Download retry | Final voice MVP | Satu retry dari awal, tanpa HTTP Range |
 | Database aplikasi | Final | PostgreSQL + Prisma |
 | Voice request database | Final voice MVP | Tidak memakai PostgreSQL |
-| Spotify audio output | Final | Perangkat Spotify user, bukan speaker BMO |
+| Spotify audio output | Final | Perangkat Spotify user, bukan speaker Joy |
 | Spotify active device | Accepted limitation | User harus memiliki perangkat Spotify aktif |
 | WhatsApp session | Final | Dikelola Hermes pada persistent volume |
-| Single user per BMO | Current decision | Satu BMO terhubung ke satu user/account utama pada fase awal |
+| Single user per Joy | Current decision | Satu Joy terhubung ke satu user/account utama pada fase awal |
 | Single VPS | Current decision | Cost-efficient untuk MVP; dapat dipisah saat load meningkat |
 | React Native | Final | Mobile app iOS/Android |
 | Zustand | Final | State management mobile |
@@ -1254,7 +1254,7 @@ Spotify, WhatsApp, full mobile app integration, device provisioning, settings, a
 
 - Batas upload 3 MB.
 - MP3 mono 24 kHz/96 kbps.
-- faster-whisper `medium` multilingual, CPU INT8, 4 threads, beam size 5, VAD aktif, dan hotword `BMO`; konfigurasi ini sudah dipilih dari investigasi akurasi lokal tetapi latency/resource tetap wajib dibenchmark di VPS.
+- faster-whisper `medium` multilingual, CPU INT8, 4 threads, beam size 5, VAD aktif, dan hotword `Joy`; konfigurasi ini sudah dipilih dari investigasi akurasi lokal tetapi latency/resource tetap wajib dibenchmark di VPS.
 - Kokoro voice `af_heart` dengan speed `0.80` is the verified fallback value;
   decoder compatibility remains a P10 hardware gate.
 - Timeout per tahap; total pipeline baseline maksimal 300 detik.
@@ -1280,7 +1280,7 @@ Baseline boleh berubah berdasarkan hasil benchmark tanpa mengubah kontrak produk
 | Spotify no-active-device UX | Medium | SW | Future |
 | WhatsApp persistent session reliability | Medium | SW | Future |
 | P9 mobile screen/API traceability and ControlScreen scope | High | SW/mobile | Proposed in `docs/p9/` |
-| Push notification mobile saat BMO offline/error | Low | SW | Future |
+| Push notification mobile saat Joy offline/error | Low | SW | Future |
 | OTA firmware update | Low | HW + SW | Future |
 
 ### 17.1 Closed / Locked Items
@@ -1296,14 +1296,14 @@ Baseline boleh berubah berdasarkan hasil benchmark tanpa mengubah kontrak produk
 | Hermes deployment | Existing host runtime; bukan container migration target |
 | Deployment executor P6+ | Codex/operator |
 | Production Git source | `main` |
-| Production root | `/opt/bmo` |
-| Public API target | `api.personalbmo.web.id` setelah P7 verification |
-| Monitoring target | Beszel at `monitor.personalbmo.web.id` |
+| Production root | `/opt/joy` |
+| Public API target | `api.personaljoy.web.id` setelah P7 verification |
+| Monitoring target | Beszel at `monitor.personaljoy.web.id` |
 | Reverse proxy | Caddy |
 | Admin private network | Tailscale |
 | Portainer | Tidak digunakan saat ini |
 | Input language | Auto-detect Indonesia/English/mixed |
-| STT current target | faster-whisper `medium`, CPU INT8, hotword `BMO` |
+| STT current target | faster-whisper `medium`, CPU INT8, hotword `Joy` |
 | Output language | English |
 | Kokoro current target | `af_heart`, speed `0.80` |
 | Voice display modes | `idle`, `thinking`, `speaking`, `error` |
@@ -1319,7 +1319,7 @@ Baseline boleh berubah berdasarkan hasil benchmark tanpa mengubah kontrak produk
 
 Urutan authority current:
 
-1. `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — public firmware/backend protocol.
+1. `docs/hardware-contract/Joy-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` — public firmware/backend protocol.
 2. `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md` — active STT/TTS runtime values.
 3. `docs/backend-mvp/IMPLEMENTATION-STATUS.md` + latest evidence — what is actually implemented/verified.
 4. Active `docs/backend-mvp/` references — backend/audio implementation details.
@@ -1341,8 +1341,8 @@ Jika dokumen bertentangan, jangan mengubah firmware/backend contract secara diam
 | 2026-08-04 | 1.3.0 | P9 final architecture/product lock: current Piper Prudence production, removed/archived RVC boundary, Backend-owned PostgreSQL application source of truth, chat/history versus curated memory, scheduler/proactive speech proposal, additive future hardware events, auth/pairing, mobile API mapping, Spotify/WhatsApp boundaries, voice settings, security/recovery/resource/acceptance plan; Hardware Contract v1.0.5 unchanged. |
 | 2026-07-26 | 1.2.4 | Authority/operations hardening: memperbaiki canonical document references, mengunci execution order P6→P10, menambah maintenance/update/recovery policy, source-audit gate sebelum P7 public verification, Beszel Hub+Agent/private-origin guidance, Caddy config permission model, dan coverage HW acceptance; public HW protocol tetap v1.0.5. |
 | 2026-07-26 | 1.2.3 | Final execution-readiness sync: memperjelas Caddy host service, infra Compose Beszel, secret deploy permissions, P9-only database activation, deterministic image tagging/rollback, dan TLS prerequisite firmware; public HW protocol tidak berubah. |
-| 2026-07-26 | 1.2.2 | Menyelaraskan product context dengan operational docs current: `/opt/bmo`, `main` production source, Caddy, `api.personalbmo.web.id`, Beszel/Telegram, Tailscale, backup/rollback, Codex executor, dan dependency-based P6–P10; public HW contract tidak berubah. |
-| 2026-07-26 | 1.2.1 | Menyelaraskan current voice runtime setelah P5 (`medium` + hotword `BMO`, Kokoro `af_heart` speed `0.80`) serta memperjelas Codex sebagai executor P6+ dan Hermes sebagai runtime host service; public HW contract tidak berubah. |
+| 2026-07-26 | 1.2.2 | Menyelaraskan product context dengan operational docs current: `/opt/joy`, `main` production source, Caddy, `api.personaljoy.web.id`, Beszel/Telegram, Tailscale, backup/rollback, Codex executor, dan dependency-based P6–P10; public HW contract tidak berubah. |
+| 2026-07-26 | 1.2.1 | Menyelaraskan current voice runtime setelah P5 (`medium` + hotword `Joy`, Kokoro `af_heart` speed `0.80`) serta memperjelas Codex sebagai executor P6+ dan Hermes sebagai runtime host service; public HW contract tidak berubah. |
 | 2026-07-18 | 1.2.0 | Menyelaraskan voice MVP dengan kontrak HW/backend v1.0.5: raw WAV melalui HTTP, WebSocket untuk auth/event, request ID dan idempotency, silence 2,5 detik, hard limit 60 detik, empat mode display voice MVP, Hermes `/v1/responses` pada port 8642, input multilingual auto-detect, jawaban English, Kokoro + RVC dengan fallback, TTL MP3 5 menit, state request in-memory, deployment host/containers, serta hierarchy source of truth. |
 | 2026-07-18 | 1.1.0 | Database dipindahkan ke PostgreSQL + Prisma; STT/TTS dibuat lokal menggunakan faster-whisper, Kokoro, dan RVC. |
 | 2026-06 | 1.0.1 | Format audio output dikunci menjadi MP3. |

@@ -1,4 +1,4 @@
-# BMO MVP — Hardware Integration Handoff
+# Joy MVP — Hardware Integration Handoff
 
 > **VOICE-SPECIFIC SUPPORTING GUIDE**
 > Start current firmware work at
@@ -11,7 +11,7 @@
 **Deployment values:** [`DEPLOYMENT-CONFIG.md`](DEPLOYMENT-CONFIG.md)
 
 This file answers one question: **what does the ESP32 need to preserve for the
-existing BMO voice path?**
+existing Joy voice path?**
 
 > Do not invent endpoint, event, state, acknowledgment, field, or retry behavior. If this summary ever conflicts with the canonical hardware contract, stop and use the canonical contract.
 
@@ -91,7 +91,7 @@ certificate chain, and never disable certificate verification as a workaround.
 Avoid pinning a short-lived leaf certificate; P10 records physical-device TLS
 evidence.
 
-The physical BMO communicates through public HTTPS/WSS. Tailscale is an infrastructure/admin access mechanism and is **not** part of the firmware protocol.
+The physical Joy communicates through public HTTPS/WSS. Tailscale is an infrastructure/admin access mechanism and is **not** part of the firmware protocol.
 
 Public routes used by hardware:
 
@@ -116,7 +116,7 @@ Hardware must not call Hermes `:8642`, Audio Service `:8001`, PostgreSQL `:5432`
 MVP identity:
 
 ```text
-device_id    = bmo-001
+device_id    = joy-001
 device_token = PROVIDED_OUT_OF_BAND
 ```
 
@@ -134,7 +134,7 @@ Send immediately after socket open, within the backend auth window:
 ```json
 {
   "event": "authenticate",
-  "device_id": "bmo-001",
+  "device_id": "joy-001",
   "device_token": "<device-secret>"
 }
 ```
@@ -145,7 +145,7 @@ Success:
 {
   "event": "authenticated",
   "status": "ok",
-  "device_id": "bmo-001",
+  "device_id": "joy-001",
   "backend_state": "idle",
   "active_request_id": null
 }
@@ -211,7 +211,7 @@ Wake word detection and recording are local firmware behavior. There is no publi
 ```http
 POST /api/v1/voice HTTP/1.1
 Host: api.personalbmo.web.id
-X-Device-Id: bmo-001
+X-Device-Id: joy-001
 X-Device-Token: <device-secret>
 X-Request-Id: <uuid-v4>
 Content-Type: audio/wav
@@ -242,7 +242,7 @@ used. This is not the complete current `/ws` inventory; see
 {
   "event": "authenticated",
   "status": "ok",
-  "device_id": "bmo-001",
+  "device_id": "joy-001",
   "backend_state": "idle | thinking | audio_ready",
   "active_request_id": null
 }
@@ -320,7 +320,7 @@ The current additive/pairing inventory is in
 ```json
 {
   "event": "authenticate",
-  "device_id": "bmo-001",
+  "device_id": "joy-001",
   "device_token": "<device-secret>"
 }
 ```
@@ -542,10 +542,10 @@ Suggested local audio text from the canonical contract:
 
 ```text
 NO_SPEECH:
-“Sorry, it is too noisy. BMO cannot hear you.”
+“Sorry, it is too noisy. Joy cannot hear you.”
 
 Other recoverable error:
-“Oh no. BMO could not answer. Please try again.”
+“Oh no. Joy could not answer. Please try again.”
 ```
 
 Provider/Hermes/TTS internal details are not sent to firmware as raw provider errors.
@@ -717,7 +717,7 @@ WAV upload
 → audio_ready
 ```
 
-Current STT implementation uses `medium` multilingual CPU INT8 with `BMO` hotword after local accuracy tuning. This does not change the hardware contract.
+Current STT implementation uses `medium` multilingual CPU INT8 with `Joy` hotword after local accuracy tuning. This does not change the hardware contract.
 
 Piper Prudence speaker ID `0` is the only TTS selection. Firmware still
 receives the same MP3 contract and must not depend on internal engine metadata.
@@ -833,5 +833,5 @@ separate and remain `PENDING_PHYSICAL_ESP`; read
 [`../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md`](../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md).
 Do not merge their acceptance status into the existing public fake-client result.
 
-Current source defines no proactive hardware event family; do not implement
+The current source defines proactive hardware events; physical implementation remains PENDING_PHYSICAL_ESP; do not implement
 proactive event names from historical plans.

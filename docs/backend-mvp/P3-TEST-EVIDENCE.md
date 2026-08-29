@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P3 — Kokoro + FFmpeg + RVC fallback Evidence
 
@@ -62,9 +62,9 @@ No Express backend integration, Hermes integration, public backend interface cha
 
 | Field | Value |
 |---|---|
-| Repository | `Freaky98/CGO-adventure-time-BMO-rvc-v2-420e` |
+| Repository | `Freaky98/CGO-adventure-time-Joy-rvc-v2-420e` |
 | Revision | `82a8bc529bd41b930589188ead30f073d4f99fc0` |
-| Archive | `CGO-adventure-time-BMO-rvc-v2-420e.zip` |
+| Archive | `CGO-adventure-time-Joy-rvc-v2-420e.zip` |
 | Expected size | `63780149` |
 | Actual size | `63780149` |
 | Expected SHA-256 | `dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0` |
@@ -87,10 +87,10 @@ Exit code: 0
 
 | Text | Output mode | Duration | Kokoro time | RVC time | FFmpeg time | Size | Codec | Sample rate | Channels | Bitrate | `rvc_applied` | Result |
 |---|---|---:|---:|---:|---:|---:|---|---:|---:|---:|---|---|
-| `Hi! BMO is ready to help.` | Kokoro-only | 2.350s | 19.728s | — | 0.083s | 29133 | mp3 | 24000 | 1 | 96000 | false | PASS |
-| `Do not worry. BMO is right here with you.` | Kokoro-only | 3.100s | 2.341s | — | 0.104s | 38349 | mp3 | 24000 | 1 | 96000 | false | PASS |
-| `Yay! BMO found the answer.` | Kokoro-only | 2.425958s | 1.844s | — | 0.083s | 30285 | mp3 | 24000 | 1 | 96000 | false | PASS |
-| `Hi! BMO is ready to help.` | forced RVC failure fallback | 2.350s | 1.499s | — | 0.082s | 29133 | mp3 | 24000 | 1 | 96000 | false | PASS |
+| `Hi! Joy is ready to help.` | Kokoro-only | 2.350s | 19.728s | — | 0.083s | 29133 | mp3 | 24000 | 1 | 96000 | false | PASS |
+| `Do not worry. Joy is right here with you.` | Kokoro-only | 3.100s | 2.341s | — | 0.104s | 38349 | mp3 | 24000 | 1 | 96000 | false | PASS |
+| `Yay! Joy found the answer.` | Kokoro-only | 2.425958s | 1.844s | — | 0.083s | 30285 | mp3 | 24000 | 1 | 96000 | false | PASS |
+| `Hi! Joy is ready to help.` | forced RVC failure fallback | 2.350s | 1.499s | — | 0.082s | 29133 | mp3 | 24000 | 1 | 96000 | false | PASS |
 
 `ffprobe` was run against every generated MP3 and confirmed `codec_name=mp3`, `sample_rate=24000`, `channels=1`, and `bit_rate=96000`.
 
@@ -212,6 +212,6 @@ Result: fake ESP32 authenticated, uploaded WAV, saw thinking/audio_ready, downlo
 
 ## Blocker for verification
 
-P3 remains `IMPLEMENTED — not VERIFIED` because real RVC inference did not run. The exact BMO RVC model archive was downloaded, hash-verified, inspected, and extracted, but local environment has no configured/installed RVC inference runtime command (`rvc infer`). The implemented adapter will run documented RVC CLI inference when `RVC_INFER_COMMAND` is configured, using the inspected `.pth` and optional `.index`.
+P3 remains `IMPLEMENTED — not VERIFIED` because real RVC inference did not run. The exact Joy RVC model archive was downloaded, hash-verified, inspected, and extracted, but local environment has no configured/installed RVC inference runtime command (`rvc infer`). The implemented adapter will run documented RVC CLI inference when `RVC_INFER_COMMAND` is configured, using the inspected `.pth` and optional `.index`.
 
 P3 can only become `VERIFIED — LOCAL FUNCTIONAL` after real Kokoro + real RVC + real FFmpeg succeeds end-to-end and all regressions remain pass.

@@ -3,7 +3,7 @@
 **Status:** APPROVED
 
 **Goal:** Move both existing P6 Telegram notification paths to the
-`monitorvpsBMO` group, prove them with exact labeled receipt tests, and preserve
+`monitorvpsJoy` group, prove them with exact labeled receipt tests, and preserve
 all existing P6 security controls without starting P7.
 
 ## Scope
@@ -33,14 +33,14 @@ The private relay compares the decoded request body to that exact string. Only
 an exact match is relabeled:
 
 ```text
-[BMO BESZEL GROUP TEST]
+[JOY BESZEL GROUP TEST]
 This is a notification from Beszel.
 ```
 
 Every other nonempty payload retains the existing behavior:
 
 ```text
-[BMO BESZEL]
+[JOY BESZEL]
 <original payload>
 ```
 
@@ -59,7 +59,7 @@ behavior for labeling.
    P6 notification test suite.
 3. Install the verified notifier and relay scripts without changing their
    owners, modes, credential-loading model, network exposure, or sandboxing.
-4. Atomically replace `/opt/bmo/config/telegram/chat-id` using a temporary
+4. Atomically replace `/opt/joy/config/telegram/chat-id` using a temporary
    mode-`0600`, root-owned file in the same directory followed by rename.
 5. Validate the credential directory and both credential files using metadata
    and booleans only. Never print either credential value.
@@ -79,7 +79,7 @@ behavior for labeling.
 
 - The bot token and complete Shoutrrr target never appear in output, logs,
   process arguments, shell history, repository changes, or evidence.
-- `/opt/bmo/config/telegram` remains `root:root` mode `0700`.
+- `/opt/joy/config/telegram` remains `root:root` mode `0700`.
 - Both credential files remain regular, nonempty, single-line `root:root`
   mode-`0600` files.
 - Systemd credential loading and every existing service sandbox directive
@@ -98,7 +98,7 @@ Automated verification must prove:
 
 - exact Hermes group-test label selection;
 - exact Beszel built-in payload relabeling;
-- near-match and ordinary alert payloads retain `[BMO BESZEL]`;
+- near-match and ordinary alert payloads retain `[JOY BESZEL]`;
 - notification unit syntax and sandbox properties remain valid;
 - repository tests, compilation, and diff checks pass;
 - protected credential metadata and requested-chat match return booleans only;

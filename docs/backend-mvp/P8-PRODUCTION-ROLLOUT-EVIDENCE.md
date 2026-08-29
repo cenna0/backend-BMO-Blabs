@@ -23,7 +23,7 @@ raw environment file, listening sample, model archive, or secret value.
 ## 1. Decision and locked MVP scope
 
 The operator manually listened to the Piper Prudence comparison bundle and
-explicitly approved the voice for BMO for personal, noncommercial use. This is
+explicitly approved the voice for Joy for personal, noncommercial use. This is
 an operator listening approval, not a numeric score; no numeric listening score
 is claimed.
 
@@ -50,7 +50,7 @@ the next major phase and requires separate authorization.
 Original main                 cfbd718f3206ccdc1ea8157b2dc177f235d8181f
 Piper feasibility commit      c82b21287d8893a5a090464b6126c5e42e45cd8e
 Production branch             feat/p8-piper-production
-Production worktree           /opt/bmo/app/.worktrees/p8-piper-production
+Production worktree           /opt/joy/app/.worktrees/p8-piper-production
 Production implementation     4e2cbda3f8eb02e27120821a11233e7848699249
 ```
 
@@ -72,7 +72,7 @@ automatic restart loop during the initial canary.
 
 ## 3. Immutable Piper assets
 
-Production assets are outside Git at `/opt/bmo/models/piper`, mounted read-only.
+Production assets are outside Git at `/opt/joy/models/piper`, mounted read-only.
 The model directory is not writable by the runtime user and no model archive,
 weight, listening audio, or cache is in Git.
 
@@ -110,7 +110,7 @@ The model emits mono 22,050 Hz WAV. The production contract remains mono
 The exact P7 Kokoro rollback bundle is protected outside Git at:
 
 ```text
-/opt/bmo/temp/p8-piper-production/rollback
+/opt/joy/temp/p8-piper-production/rollback
 ```
 
 It includes a sanitized P7 snapshot, exact local image reference, configuration
@@ -118,7 +118,7 @@ references and checksums, a rollback procedure, and an offline verifier. The
 P7 image remains locally available:
 
 ```text
-bmo-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e
+joy-audio@sha256:62d8b48feb978e303831e20dc558cb95d3240af9a3cf09e8dcd0c82142986e7e
 Audio env checksum: 3ced8033d38533d473abdbe53cacb6c3cf3ea58fb40fb2368a50abcc0b3af15c
 P7 Compose checksum: 3040cf3ea479536cbae0cfd7a0d35d11ab9bed7df69ba285e6496cf6354b855c
 ```
@@ -131,7 +131,7 @@ available and were retained after the successful Piper deployment.
 
 ```text
 Candidate source: ff55eb4ea1c8d58e96b647d0c03f471dd4c58994
-Candidate tag:    bmo-audio:p8-piper-candidate-ff55eb4
+Candidate tag:    joy-audio:p8-piper-candidate-ff55eb4
 Candidate image:  sha256:024f2035e185e2b1b3ee35ae0f30668b5373d5d334fa65a6b5edb47a8ceee367
 Image size:       736893724 bytes
 Runtime user:     bmo
@@ -240,15 +240,15 @@ cleanup; the 20 GB stop gate remained satisfied.
 
 ## 8. Repository authentication and synchronization
 
-GitHub repository: `cenna0/backend-BMO-Blabs` (public; `main` unprotected at
+GitHub repository: `cenna0/backend-Joy-Blabs` (public; `main` unprotected at
 the time of integration). Repository access was established with the existing
 dedicated Ed25519 deploy key; no key was regenerated.
 
 ```text
-Deploy-key title:       BMO Production VPS
+Deploy-key title:       Joy Production VPS
 Public fingerprint:     SHA256:4s/5+Ehv8qA2+6dKTBuSSf7sko43oJBazAavWP6PyAw
-Private-key path:       /home/bmo-admin/.ssh/github_bmo_deploy
-Origin:                 git@github-bmo:cenna0/backend-BMO-Blabs.git
+Private-key path:       /home/joy-admin/.ssh/github_bmo_deploy
+Origin:                 git@github-bmo:cenna0/backend-Joy-Blabs.git
 Remote main before work: cfbd718f3206ccdc1ea8157b2dc177f235d8181f
 Feature branch pushed:  4e2cbda3f8eb02e27120821a11233e7848699249
 ```

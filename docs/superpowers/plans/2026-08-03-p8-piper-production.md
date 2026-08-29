@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P8 Piper Production Integration Implementation Plan
 
@@ -74,14 +74,14 @@
 
 - [ ] Add failing packaging/offline tests for the pinned Piper/ONNX dependencies, no runtime downloads, no model in Git image context, non-root execution, read-only asset mount, no-new-privileges, dropped capabilities, PID/CPU/memory/log bounds, and loopback-only port.
 - [ ] Add exact locked Piper runtime requirements using the existing feasibility wheel hashes/provenance and copy the pinned asset manifest metadata into source without committing model bytes.
-- [ ] Update the Audio image to install the pinned Piper runtime offline-compatible with the existing lock, copy only application code, run as `bmo`, and retain the existing healthcheck/entrypoint. Add Compose mounts for `/opt/bmo/models/piper` read-only and narrow writable temp/cache paths, plus explicit `pids_limit`, CPU, and memory controls sized for the observed host.
+- [ ] Update the Audio image to install the pinned Piper runtime offline-compatible with the existing lock, copy only application code, run as `bmo`, and retain the existing healthcheck/entrypoint. Add Compose mounts for `/opt/joy/models/piper` read-only and narrow writable temp/cache paths, plus explicit `pids_limit`, CPU, and memory controls sized for the observed host.
 - [ ] Run packaging, offline, compileall, and dependency checks; expected result is no network access and no secret/model/audio artifact in the image context.
 
 ### Task 5: Build and validate the production candidate offline
 
 **Files:**
-- Create outside Git: `/opt/bmo/models/piper/`
-- Create outside Git: `/opt/bmo/rollback/p8-piper-production/`
+- Create outside Git: `/opt/joy/models/piper/`
+- Create outside Git: `/opt/joy/rollback/p8-piper-production/`
 - Create: `ops/deploy/p8_piper_production.py`
 - Test: `tests/operations/test_p8_piper_production.py`
 
@@ -101,7 +101,7 @@
 - Modify: `docs/hardware-handoff/DEPLOYMENT-CONFIG.md`
 - Modify: `docs/hardware-handoff/CURRENT-STATUS.md`
 - Modify: `docs/hardware-handoff/ACCEPTANCE-TESTS.md`
-- Create outside Git: `/opt/bmo/temp/p8-piper-production/`
+- Create outside Git: `/opt/joy/temp/p8-piper-production/`
 
 - [ ] Run the complete Audio/Backend tests, Piper/fallback/failure/shutdown/process-tree tests, compileall, pip checks, offline/no-download checks, ffprobe checks, documentation verifier, secret/artifact/model/audio/cache/large-file scans, Hardware Contract hash, and PRD consistency checks before touching production.
 - [ ] Capture the exact P7 rollback bundle and validate restoration offline before the maintenance window.

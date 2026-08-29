@@ -1,73 +1,37 @@
-# BMO P9 — Current Architecture and Scope Authority
+# Joy P9 — Current Architecture and Scope Authority
 
-> **CURRENT / CANONICAL NAVIGATION**
-> Current runtime/API/status authority is source plus the canonical integration
-> package. Numbered P9 files retain domain design and checkpoint context; follow
-> their status banners and never let a frozen candidate statement override the
-> current integration docs.
+> **CURRENT / CANONICAL NAVIGATION**  
+> Current runtime/API/status authority is source plus the canonical integration package. Numbered P9 files retain domain design and checkpoint context; follow their status banners and never let a frozen candidate statement override the current integration docs.
 
-**Audited:** 2026-08-20
+**Audited:** 2026-08-29  
+**Production Status:** `PRODUCTION_VERIFIED` — Image `joy-p9.1:production`.  
+**Database Migrations:** 10 migrations completed and applied in production (including `one_active_device_per_user`, `joy_speech_and_schedule_dialog`, and `mobile_push_tokens`).  
+**HTTP Inventory:** 98 registered HTTP routes: 93 `/api/v1` P9 registrations, plus hardware voice upload, audio download, and three health routes.
+**WebSocket Inventory:** Mobile uses an initial `authenticate` handshake, an `authenticated` acknowledgement, and 11 schema-defined application events; hardware has 14 inbound and 18 outbound source-defined events.
 
-P9 Backend and PostgreSQL are live in production. Code-only pairing is deployed
-in `bmo-p9.1:pairing-code-only-d1473d0`; production has seven completed
-migrations, including `20260818110000_pairing_code_only_enrollment`. Mobile has
-79 registered REST routes and 12 Mobile WebSocket event names. Production uses
-Backend port `3000`; candidate port `3010` is historical/non-production.
+---
 
-The immutable deployed image was built from source revision
-`d1473d04f4b76ccb52cc8eeaff52a268504310f0`. That is not a claim about current
-Git HEAD. Use `git rev-parse HEAD` to discover the repository revision.
-
-Physical ESP pairing, display, completion handling, and real-device acceptance
-remain `PENDING_PHYSICAL_ESP`. Backend deployment is not pending.
-
-## Current integration authority
-
-For Mobile, start at
-[`../integration/MOBILE-AGENT-HANDOFF.md`](../integration/MOBILE-AGENT-HANDOFF.md).
-For ESP/Hardware, start at
-[`../integration/ESP-AGENT-HANDOFF.md`](../integration/ESP-AGENT-HANDOFF.md).
+## Current Integration Authority
+For Mobile, start at [`../integration/MOBILE-AGENT-HANDOFF.md`](../integration/MOBILE-AGENT-HANDOFF.md).  
+For ESP/Hardware, start at [`../integration/ESP-AGENT-HANDOFF.md`](../integration/ESP-AGENT-HANDOFF.md).
 
 Primary current contracts:
-
 1. [`../integration/00-START-HERE.md`](../integration/00-START-HERE.md)
 2. [`../integration/01-MOBILE-BACKEND-API-CONTRACT.md`](../integration/01-MOBILE-BACKEND-API-CONTRACT.md)
 3. [`../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md`](../integration/02-BACKEND-DEVICE-ADDITIVE-CONTRACT.md)
 4. [`../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md`](../integration/03-HARDWARE-IMPLEMENTATION-HANDOFF.md)
 5. [`../integration/05-IMPLEMENTATION-STATUS.md`](../integration/05-IMPLEMENTATION-STATUS.md)
-6. [`../integration/06-DECISION-REGISTER.md`](../integration/06-DECISION-REGISTER.md)
+6. [`06-DECISION-REGISTER.md`](../integration/06-DECISION-REGISTER.md) — Dated decision lineage; not runtime authority.
 7. [`../integration/08-DOCS-MAINTENANCE-PROTOCOL.md`](../integration/08-DOCS-MAINTENANCE-PROTOCOL.md)
 8. [`../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md`](../integration/09-ENDPOINT-EVENT-COVERAGE-MATRIX.md)
+9. [`../integration/11-FULL-ECOSYSTEM-ARCHITECTURE-AND-STATUS.md`](../integration/11-FULL-ECOSYSTEM-ARCHITECTURE-AND-STATUS.md)
 
-Do not read integration `04`, `07`, or `10` as current execution instructions;
-they are completed historical operator records.
+---
 
-## Domain references
-
-- [`04-component-ownership.md`](04-component-ownership.md) and
-  [`05-source-of-truth-matrix.md`](05-source-of-truth-matrix.md) retain useful
-  ownership boundaries.
-- [`08-auth-device-pairing.md`](08-auth-device-pairing.md) describes the
-  current code-only enrollment model.
-- [`14-additive-hardware-events.md`](14-additive-hardware-events.md) records the
-  exact current source event inventory and physical acceptance boundary.
-- Other numbered P9 documents are frozen design/checkpoint records unless their
-  banner explicitly says current. Their candidate ports, old migration counts,
-  old route shapes, `READY_TO_IMPLEMENT` labels, and deployment assertions are
-  historical only.
-
-The existing physical voice authority remains
-[`../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`](../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md).
-
-## Legacy verifier control text
-
-> **HISTORICAL PREDECESSOR — NOT CURRENT STATUS**
-> The following strings are retained only for the legacy P9.1 verifier. They
-> describe the isolated-candidate checkpoint before production promotion.
-
-```text
-no P9.1 candidate is deployed to production
-P9.2–P9.6 remain proposed and not implemented
-```
-
-They are superseded by the production status at the top of this page.
+## Domain Specifications
+- [`06-database-schema-prisma.md`](06-database-schema-prisma.md) — Referensi skema lengkap 43 model database Prisma.
+- [`08-auth-device-pairing.md`](08-auth-device-pairing.md) — Model autentikasi & pairing code-only dengan aturan *One Active Device per User*.
+- [`13-scheduler-proactive-speech.md`](13-scheduler-proactive-speech.md) — Two-tier Schedule NLU & Proactive Delivery pipeline.
+- [`18-action-intent-schema.md`](18-action-intent-schema.md) — Skema semantic action intents (Schedule & Spotify).
+- [`26-push-notifications.md`](26-push-notifications.md) — Mobile Push Notification service & Expo integration.
+- [`27-device-speech-arbiter.md`](27-device-speech-arbiter.md) — Device Speech Arbiter & sinkronisasi audio speaker hardware.

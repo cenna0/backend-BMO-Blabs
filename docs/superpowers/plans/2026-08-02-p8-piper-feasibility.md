@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P8 Piper Prudence Feasibility Implementation Plan
 
@@ -23,7 +23,7 @@ Docker, pytest, JSON/JSON Lines.
 **Files:**
 - Create: `piper-candidate/requirements-runtime.lock`
 - Create: `piper-candidate/requirements-verify.lock`
-- Create: `piper-candidate/bmo_piper/manifest.py`
+- Create: `piper-candidate/joy_piper/manifest.py`
 - Test: `piper-candidate/tests/test_manifest.py`
 
 - [x] Write tests proving exact asset hashes, speaker `prudence: 0`, four speakers,
@@ -36,9 +36,9 @@ Docker, pytest, JSON/JSON Lines.
 ### Task 2: Implement synthesis and audio boundaries
 
 **Files:**
-- Create: `piper-candidate/bmo_piper/engine.py`
-- Create: `piper-candidate/bmo_piper/audio.py`
-- Create: `piper-candidate/bmo_piper/ffmpeg.py`
+- Create: `piper-candidate/joy_piper/engine.py`
+- Create: `piper-candidate/joy_piper/audio.py`
+- Create: `piper-candidate/joy_piper/ffmpeg.py`
 - Test: `piper-candidate/tests/test_engine.py`
 - Test: `piper-candidate/tests/test_audio.py`
 - Test: `piper-candidate/tests/test_ffmpeg.py`
@@ -53,9 +53,9 @@ Docker, pytest, JSON/JSON Lines.
 ### Task 3: Implement the persistent worker and benchmark
 
 **Files:**
-- Create: `piper-candidate/bmo_piper/worker.py`
-- Create: `piper-candidate/bmo_piper/process.py`
-- Create: `piper-candidate/bmo_piper/benchmark.py`
+- Create: `piper-candidate/joy_piper/worker.py`
+- Create: `piper-candidate/joy_piper/process.py`
+- Create: `piper-candidate/joy_piper/benchmark.py`
 - Create: `piper-candidate/comparison-text.json`
 - Test: `piper-candidate/tests/test_process.py`
 - Test: `piper-candidate/tests/test_benchmark.py`
@@ -72,7 +72,7 @@ Docker, pytest, JSON/JSON Lines.
 **Files:**
 - Create: `piper-candidate/Dockerfile`
 - Create: `piper-candidate/Dockerfile.dockerignore`
-- Create: `piper-candidate/bmo_piper/host_monitor.py`
+- Create: `piper-candidate/joy_piper/host_monitor.py`
 - Test: `piper-candidate/tests/test_packaging.py`
 - Test: `piper-candidate/tests/test_host_monitor.py`
 
@@ -85,9 +85,9 @@ Docker, pytest, JSON/JSON Lines.
 ### Task 5: Provision, benchmark, compare, and bundle
 
 **Files:**
-- Create outside Git: `/opt/bmo/temp/p8-piper-feasibility/assets/PIPER_ASSET_MANIFEST.json`
-- Create outside Git: `/opt/bmo/temp/p8-piper-feasibility/evidence/benchmark-results.json`
-- Create outside Git: `/opt/bmo/temp/p8-piper-feasibility/listening/`
+- Create outside Git: `/opt/joy/temp/p8-piper-feasibility/assets/PIPER_ASSET_MANIFEST.json`
+- Create outside Git: `/opt/joy/temp/p8-piper-feasibility/evidence/benchmark-results.json`
+- Create outside Git: `/opt/joy/temp/p8-piper-feasibility/listening/`
 
 - [x] Verify/download each pinned asset once, write exact hashes/sizes/licenses, and
   prove subsequent inference works with `--network none`.

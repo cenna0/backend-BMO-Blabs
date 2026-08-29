@@ -9,7 +9,7 @@
 Use this prompt only after the Phase 1 docs commit is present and implementation is explicitly authorized.
 
 ```text
-Implement BMO Phase 2 from the frozen integration contract.
+Implement Joy Phase 2 from the frozen integration contract.
 
 Read docs/integration/00-START-HERE.md through 10-OPERATOR-PROMPT-RUNBOOK.md, the current PRD, and the linked P9 source-of-truth documents. Verify current Git/runtime drift before modifying code.
 

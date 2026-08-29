@@ -1,4 +1,4 @@
-# BMO Docs Re-Verification — 2026-07-26
+# Joy Docs Re-Verification — 2026-07-26
 
 **Result:** PASS for documentation/handoff consistency  
 **Source-code re-audit:** PENDING — backend source was not included in the uploaded ZIP
@@ -100,7 +100,7 @@ The active entrypoint/reference docs no longer claim:
 Active implementation phase: P5
 P1 status: READY, NOT AUTHORIZED
 WHISPER_MODEL=small
-TEMP_AUDIO_DIR=/opt/bmo-mvp/temp-audio
+TEMP_AUDIO_DIR=/opt/joy-mvp/temp-audio
 ```
 
 Historical evidence/PRD/archive may still contain old values in their original context and are explicitly labeled/lower authority.
@@ -126,7 +126,7 @@ Re-review confirmed:
 The documentation package itself is ready. These are intentionally still pending implementation evidence:
 
 1. P6 VPS foundation.
-2. P7 public `api.personalbmo.web.id` deployment and external fake ESP32 E2E.
+2. P7 public `api.personaljoy.web.id` deployment and external fake ESP32 E2E.
 3. P8 real RVC inference + resource benchmark.
 4. P9 PostgreSQL/Prisma readiness + restore test.
 5. P10 physical ESP32 acceptance.

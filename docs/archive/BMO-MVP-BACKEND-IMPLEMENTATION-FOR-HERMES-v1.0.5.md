@@ -1,11 +1,11 @@
-# BMO MVP — Instruksi Implementasi Full Backend untuk Hermes
+# Joy MVP — Instruksi Implementasi Full Backend untuk Hermes
 
 **Versi:** 1.0.5
 **Tanggal:** 2026-07-18
-**Eksekutor:** Hermes Agent pada VPS BMO
-**Tujuan:** Membangun, men-deploy, menguji, dan mendokumentasikan full backend voice MVP BMO.
+**Eksekutor:** Hermes Agent pada VPS Joy
+**Tujuan:** Membangun, men-deploy, menguji, dan mendokumentasikan full backend voice MVP Joy.
 
-> Seluruh instruksi operasional di dokumen ini menggunakan Bahasa Indonesia. Nama kode, endpoint, field JSON, command, dan environment variable tetap English. Respons suara BMO pada runtime harus selalu menggunakan English.
+> Seluruh instruksi operasional di dokumen ini menggunakan Bahasa Indonesia. Nama kode, endpoint, field JSON, command, dan environment variable tetap English. Respons suara Joy pada runtime harus selalu menggunakan English.
 
 ---
 
@@ -36,7 +36,7 @@ ESP32 upload satu WAV utuh
 → faster-whisper STT
 → Hermes menghasilkan jawaban teks English
 → Kokoro TTS
-→ RVC voice conversion BMO bila tersedia
+→ RVC voice conversion Joy bila tersedia
 → FFmpeg menghasilkan MP3
 → backend membuat URL audio sementara
 → backend memberi tahu ESP32 melalui WebSocket
@@ -68,8 +68,8 @@ State request pipeline suara MVP disimpan in-memory. Hilangnya request aktif saa
 - UUID v4 dari ESP32 sebagai request ID dan idempotency key;
 - state request in-memory, tanpa PostgreSQL untuk voice MVP;
 - faster-whisper multilingual dengan auto-detect Indonesia/English/mixed;
-- BMO selalu menjawab dalam English;
-- Kokoro + RVC BMO dengan fallback Kokoro-only;
+- Joy selalu menjawab dalam English;
+- Kokoro + RVC Joy dengan fallback Kokoro-only;
 - MP3 dikirim sebagai URL dan diambil melalui HTTP;
 - mode display MVP hanya `idle`, `thinking`, `speaking`, dan `error`; backend hanya mengirim `thinking`;
 - retry download MP3 satu kali dari awal;
@@ -112,7 +112,7 @@ Aturan wajib:
 - Jangan expose port `8642` ke internet.
 - Jangan mencetak API key aktif ke log atau laporan.
 - Jangan mengubah global `SOUL.md` tanpa persetujuan user.
-- Backend wajib mengirim personality/instructions BMO pada setiap request.
+- Backend wajib mengirim personality/instructions Joy pada setiap request.
 
 Audit Hermes yang diberikan user sudah memverifikasi `/v1/responses`, `/v1/chat/completions`, dan `/v1/models`. Namun model pada body saat ini hanya label/cosmetic; model LLM aktual tetap ditentukan konfigurasi Hermes. Karena itu `/v1/models` boleh dipakai untuk diagnosis, tetapi jangan dijadikan dependency runtime backend.
 
@@ -130,10 +130,10 @@ VPS host
 │   └── 127.0.0.1:8642
 │
 └── Docker Compose
-    ├── bmo-backend
+    ├── joy-backend
     │   ├── network_mode: host
     │   └── 0.0.0.0:3000
-    └── bmo-audio-service
+    └── joy-audio-service
         ├── bridge network biasa
         └── publish 127.0.0.1:8001 → container:8001
 ```
@@ -141,11 +141,11 @@ VPS host
 Gunakan `network_mode: host` **hanya untuk backend**, karena backend harus mengakses Hermes pada `127.0.0.1:8642` milik host. Audio service tidak membutuhkan host networking dan harus diisolasi pada bridge network dengan port yang hanya dipublish ke loopback host.
 
 ```yaml
-bmo-backend:
+joy-backend:
   network_mode: host
   restart: unless-stopped
 
-bmo-audio-service:
+joy-audio-service:
   ports:
     - "127.0.0.1:8001:8001"
   restart: unless-stopped
@@ -163,7 +163,7 @@ bmo-audio-service:
 Gunakan:
 
 ```text
-/opt/bmo-mvp/
+/opt/joy-mvp/
 ├── backend/
 ├── audio-service/
 ├── tests/
@@ -355,8 +355,8 @@ https://github.com/hexgrad/kokoro
 RVC:
 https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI
 
-Community BMO RVC model:
-https://huggingface.co/Freaky98/CGO-adventure-time-BMO-rvc-v2-420e
+Community Joy RVC model:
+https://huggingface.co/Freaky98/CGO-adventure-time-Joy-rvc-v2-420e
 ```
 
 Jangan memakai floating dependency tanpa mencatat versi final yang benar-benar lolos test.
@@ -367,18 +367,18 @@ faster-whisper dan Kokoro dapat mengunduh model/voice saat pertama kali dipakai.
 
 Gunakan prosedur berikut:
 
-1. Buat script/container bootstrap satu kali yang memiliki akses tulis ke `/opt/bmo-mvp/models`.
-2. Download model Whisper `small`, weight/voice Kokoro, dependency RVC, dan model BMO ke cache persisten.
+1. Buat script/container bootstrap satu kali yang memiliki akses tulis ke `/opt/joy-mvp/models`.
+2. Download model Whisper `small`, weight/voice Kokoro, dependency RVC, dan model Joy ke cache persisten.
 3. Catat source, revision, ukuran, dan SHA256 di `MODEL_MANIFEST.md`.
 4. Jalankan smoke inference saat cache masih writable.
-5. Setelah lengkap, runtime `bmo-audio-service` mount directory model sebagai read-only.
+5. Setelah lengkap, runtime `joy-audio-service` mount directory model sebagai read-only.
 6. Runtime production harus gagal dengan pesan jelas jika model wajib hilang; jangan diam-diam mengunduh model baru.
 
 Gunakan cache persisten:
 
 ```text
-HF_HOME=/opt/bmo-mvp/models/hf-cache
-TORCH_HOME=/opt/bmo-mvp/models/torch-cache
+HF_HOME=/opt/joy-mvp/models/hf-cache
+TORCH_HOME=/opt/joy-mvp/models/torch-cache
 ```
 
 Cache sementara library lain dapat diarahkan ke `/tmp/cache`.
@@ -463,7 +463,7 @@ Respons valid:
 
 ```json
 {
-  "text": "BMO, tolong remind aku about the meeting tomorrow.",
+  "text": "Joy, tolong remind aku about the meeting tomorrow.",
   "speech_detected": true,
   "language": "id",
   "language_probability": 0.82
@@ -476,7 +476,7 @@ Jangan menolak mixed language hanya karena bahasa dominannya Indonesia atau Engl
 
 ## 11. Konfigurasi Kokoro
 
-**BMO selalu menjawab dalam English.** Input user boleh Indonesia, English, atau campuran, tetapi Hermes wajib menghasilkan jawaban English sebelum TTS.
+**Joy selalu menjawab dalam English.** Input user boleh Indonesia, English, atau campuran, tetapi Hermes wajib menghasilkan jawaban English sebelum TTS.
 
 Konfigurasi awal:
 
@@ -505,16 +505,16 @@ Aturan:
 
 ---
 
-## 12. RVC Voice BMO
+## 12. RVC Voice Joy
 
 Gunakan community model sebagai aset eksperimental MVP, bukan model resmi yang dijamin kualitasnya.
 
 Repository model:
 
 ```text
-Repo      : Freaky98/CGO-adventure-time-BMO-rvc-v2-420e
+Repo      : Freaky98/CGO-adventure-time-Joy-rvc-v2-420e
 Revision  : 82a8bc529bd41b930589188ead30f073d4f99fc0
-File      : CGO-adventure-time-BMO-rvc-v2-420e.zip
+File      : CGO-adventure-time-Joy-rvc-v2-420e.zip
 Size      : 63,780,149 bytes
 SHA256    : dadb3507d3f836836b16c5605ace8d383e57eddcc92dc2a5fc4406e1c49d27f0
 License   : openrail (model card sangat minim; perlakukan sebagai aset eksperimen)
@@ -522,7 +522,7 @@ License   : openrail (model card sangat minim; perlakukan sebagai aset eksperime
 
 Prosedur:
 
-1. Download revision exact ke `/opt/bmo-mvp/models/rvc-bmo/`.
+1. Download revision exact ke `/opt/joy-mvp/models/rvc-bmo/`.
 2. Verifikasi byte size dan SHA256 sebelum extract.
 3. Inspeksi isi archive sebelum extract.
 4. Jangan menjalankan script dari archive model.
@@ -539,7 +539,7 @@ Prosedur:
 
 ```text
 Normal:
-Kokoro WAV → RVC BMO → FFmpeg → MP3
+Kokoro WAV → RVC Joy → FFmpeg → MP3
 
 Fallback:
 Kokoro WAV → FFmpeg → MP3
@@ -559,9 +559,9 @@ Jika Kokoro juga gagal, return `TTS_FAILED`.
 Generate:
 
 ```text
-“Hi! BMO is ready to help.”
-“Do not worry. BMO is right here with you.”
-“Yay! BMO found the answer.”
+“Hi! Joy is ready to help.”
+“Do not worry. Joy is right here with you.”
+“Yay! Joy found the answer.”
 ```
 
 Untuk setiap kalimat buat:
@@ -635,7 +635,7 @@ Sukses:
 
 ```json
 {
-  "text": "Hello BMO, how are you?",
+  "text": "Hello Joy, how are you?",
   "speech_detected": true,
   "language": "en",
   "language_probability": 0.97,
@@ -669,7 +669,7 @@ Body:
 ```json
 {
   "request_id": "<uuid>",
-  "text": "Hi! BMO is ready to help.",
+  "text": "Hi! Joy is ready to help.",
   "use_rvc": true
 }
 ```
@@ -695,7 +695,7 @@ X-TTS-Engine: kokoro
 
 ## 15. Public Backend API
 
-Implementasikan kontrak dari `BMO-MVP-HW-INTERFACE-CONTRACT.md`.
+Implementasikan kontrak dari `Joy-MVP-HW-INTERFACE-CONTRACT.md`.
 
 Route wajib:
 
@@ -781,7 +781,7 @@ ESP32 → Backend, autentikasi:
 ```json
 {
   "event": "authenticate",
-  "device_id": "bmo-001",
+  "device_id": "joy-001",
   "device_token": "<device-secret>"
 }
 ```
@@ -792,7 +792,7 @@ Backend → ESP32, autentikasi sukses:
 {
   "event": "authenticated",
   "status": "ok",
-  "device_id": "bmo-001",
+  "device_id": "joy-001",
   "backend_state": "idle | thinking | audio_ready",
   "active_request_id": null
 }
@@ -1066,9 +1066,9 @@ Body default MVP yang sudah sesuai audit Hermes aktif:
 ```json
 {
   "model": "hermes-agent",
-  "instructions": "<BMO_RUNTIME_INSTRUCTIONS>",
+  "instructions": "<JOY_RUNTIME_INSTRUCTIONS>",
   "input": "<hasil STT>",
-  "conversation": "bmo-001",
+  "conversation": "joy-001",
   "store": true,
   "stream": false,
   "truncation": "auto"
@@ -1077,7 +1077,7 @@ Body default MVP yang sudah sesuai audit Hermes aktif:
 
 Aturan continuity:
 
-- Untuk MVP satu device, gunakan named conversation stabil `bmo-001`.
+- Untuk MVP satu device, gunakan named conversation stabil `joy-001`.
 - `store` wajib `true` agar chain disimpan.
 - `stream` wajib `false` karena TTS menunggu satu jawaban utuh.
 - Jangan kirim `conversation` dan `previous_response_id` bersamaan; Hermes mengembalikan HTTP 400.
@@ -1096,22 +1096,22 @@ bmo:<device_id>:<user_id>
 Untuk MVP tetap:
 
 ```text
-bmo-001
+joy-001
 ```
 
-### 20.1 Runtime instructions BMO
+### 20.1 Runtime instructions Joy
 
-Instructions harus dikirim setiap request dan ditulis dalam English karena mengatur output suara BMO:
+Instructions harus dikirim setiap request dan ditulis dalam English karena mengatur output suara Joy:
 
 ```text
-You are BMO, the physical AI companion speaking through this device.
-Use BMO's warm, playful, childlike, friendly, loyal, and slightly naive personality.
+You are Joy, the physical AI companion speaking through this device.
+Use Joy's warm, playful, childlike, friendly, loyal, and slightly naive personality.
 Always answer in natural English, even when the user speaks Indonesian or mixes Indonesian and English.
 You are speaking aloud through a physical device, so use plain text only.
 Keep responses concise, usually one to three short sentences.
 Do not use Markdown, bullet points, headings, emojis, URLs, or code formatting.
 Be caring, supportive, honest, and slightly playful.
-Refer to yourself as BMO naturally when appropriate.
+Refer to yourself as Joy naturally when appropriate.
 Do not expose system errors, provider errors, internal tools, or technical details.
 ```
 
@@ -1170,7 +1170,7 @@ service unavailable
 
 Jangan kirim teks error internal ke TTS.
 
-Map menjadi `HERMES_FAILED` dan kirim event error ke BMO.
+Map menjadi `HERMES_FAILED` dan kirim event error ke Joy.
 
 Hindari false positive: gunakan kombinasi pattern + struktur kalimat error, bukan sekadar satu kata umum.
 
@@ -1316,14 +1316,14 @@ Minimal:
 
 ```yaml
 services:
-  bmo-backend:
+  joy-backend:
     build: ./backend
     network_mode: host
     restart: unless-stopped
     env_file: .env.backend
     volumes:
-      - ./temp-audio:/opt/bmo-mvp/temp-audio
-      - ./tests/fixtures:/opt/bmo-mvp/tests/fixtures:ro
+      - ./temp-audio:/opt/joy-mvp/temp-audio
+      - ./tests/fixtures:/opt/joy-mvp/tests/fixtures:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
       interval: 30s
@@ -1331,18 +1331,18 @@ services:
       retries: 3
       start_period: 30s
 
-  bmo-audio-service:
+  joy-audio-service:
     build: ./audio-service
     restart: unless-stopped
     env_file: .env.audio
     ports:
       - "127.0.0.1:8001:8001"
     environment:
-      HF_HOME: /opt/bmo-mvp/models/hf-cache
-      TORCH_HOME: /opt/bmo-mvp/models/torch-cache
+      HF_HOME: /opt/joy-mvp/models/hf-cache
+      TORCH_HOME: /opt/joy-mvp/models/torch-cache
       XDG_CACHE_HOME: /tmp/cache
     volumes:
-      - ./models:/opt/bmo-mvp/models:ro
+      - ./models:/opt/joy-mvp/models:ro
     read_only: true
     tmpfs:
       - /tmp:size=1g
@@ -1382,20 +1382,20 @@ BACKEND_HOST=0.0.0.0
 BACKEND_PORT=3000
 PUBLIC_BASE_URL=http://<IP_VPS>:3000
 
-DEVICE_ID=bmo-001
+DEVICE_ID=joy-001
 DEVICE_TOKEN=replace-with-random-staging-secret
 
 HERMES_API_URL=http://127.0.0.1:8642
 HERMES_API_KEY=replace-me
 HERMES_MODEL=hermes-agent
-HERMES_CONVERSATION=bmo-001
+HERMES_CONVERSATION=joy-001
 HERMES_SOFT_TIMEOUT_MS=30000
 HERMES_HARD_TIMEOUT_MS=180000
 
 AUDIO_SERVICE_URL=http://127.0.0.1:8001
 INTERNAL_SERVICE_TOKEN=replace-with-random-secret
 
-TEMP_AUDIO_DIR=/opt/bmo-mvp/temp-audio
+TEMP_AUDIO_DIR=/opt/joy-mvp/temp-audio
 TEMP_AUDIO_TTL_SECONDS=300
 TEMP_AUDIO_CLEANUP_INTERVAL_SECONDS=30
 REQUEST_TOMBSTONE_TTL_SECONDS=600
@@ -1405,7 +1405,7 @@ MAX_AUDIO_DURATION_SECONDS=60
 TOTAL_PIPELINE_TIMEOUT_MS=300000
 
 HARDWARE_TEST_MODE=false
-HARDWARE_TEST_MP3_PATH=/opt/bmo-mvp/tests/fixtures/test-response.mp3
+HARDWARE_TEST_MP3_PATH=/opt/joy-mvp/tests/fixtures/test-response.mp3
 ```
 
 `.env.audio.example`:
@@ -1417,8 +1417,8 @@ AUDIO_SERVICE_HOST=0.0.0.0
 AUDIO_SERVICE_PORT=8001
 INTERNAL_SERVICE_TOKEN=replace-with-random-secret
 
-HF_HOME=/opt/bmo-mvp/models/hf-cache
-TORCH_HOME=/opt/bmo-mvp/models/torch-cache
+HF_HOME=/opt/joy-mvp/models/hf-cache
+TORCH_HOME=/opt/joy-mvp/models/torch-cache
 XDG_CACHE_HOME=/tmp/cache
 MODEL_DOWNLOAD_ALLOWED=false
 
@@ -1434,7 +1434,7 @@ KOKORO_LANG_CODE=a
 KOKORO_VOICE=af_heart
 
 RVC_ENABLED=true
-RVC_MODEL_PATH=/opt/bmo-mvp/models/rvc-bmo/model.pth
+RVC_MODEL_PATH=/opt/joy-mvp/models/rvc-bmo/model.pth
 RVC_INDEX_PATH=
 RVC_F0_UP_KEY=0
 RVC_F0_METHOD=rmvpe
@@ -1536,7 +1536,7 @@ Sediakan test mode yang dapat diaktifkan melalui env:
 
 ```env
 HARDWARE_TEST_MODE=true
-HARDWARE_TEST_MP3_PATH=/opt/bmo-mvp/tests/fixtures/test-response.mp3
+HARDWARE_TEST_MP3_PATH=/opt/joy-mvp/tests/fixtures/test-response.mp3
 ```
 
 Saat aktif:
@@ -1630,7 +1630,7 @@ Implementasi dianggap selesai jika:
 - [ ] Display hanya memakai `idle`, `thinking`, `speaking`, dan `error`; tidak ada mode `listening`.
 - [ ] STT memahami English, Indonesian, dan mixed input.
 - [ ] No-speech tidak dikirim ke Hermes.
-- [ ] Hermes memakai `conversation:bmo-001`, `store:true`, `stream:false`, dan `truncation:auto`; continuity named conversation terbukti.
+- [ ] Hermes memakai `conversation:joy-001`, `store:true`, `stream:false`, dan `truncation:auto`; continuity named conversation terbukti.
 - [ ] Hermes menjawab selalu dalam English.
 - [ ] Output Hermes plain text tanpa Markdown.
 - [ ] Provider error tidak diteruskan ke TTS.
@@ -1724,7 +1724,7 @@ Minta approval user sebelum:
 - men-deploy domain/TLS;
 - merotasi secret production.
 
-Untuk tindakan aman di dalam `/opt/bmo-mvp/`, lanjutkan tanpa menunggu approval tambahan selama tidak merusak service existing.
+Untuk tindakan aman di dalam `/opt/joy-mvp/`, lanjutkan tanpa menunggu approval tambahan selama tidak merusak service existing.
 
 ---
 
@@ -1733,7 +1733,7 @@ Untuk tindakan aman di dalam `/opt/bmo-mvp/`, lanjutkan tanpa menunggu approval 
 | Versi | Perubahan |
 |---|---|
 | 1.0.0 | Instruksi implementasi awal |
-| 1.0.1 | Seluruh instruksi diubah ke Bahasa Indonesia; runtime personality dan jawaban suara BMO tetap English |
+| 1.0.1 | Seluruh instruksi diubah ke Bahasa Indonesia; runtime personality dan jawaban suara Joy tetap English |
 | 1.0.2 | Memperketat isolasi Docker/secret, pin aset RVC, kompatibilitas Python, tombstone idempotency, race HTTP/WS, kontrak MP3, dan cleanup state |
 | 1.0.3 | Menambah model cache persisten, idempotensi playback, deduplikasi `audio_ready`, `AUDIO_EXPIRED`, status duplicate upload yang exact, reconnect playback tests, sanitizer TTS, dan startup health grace period |
 | 1.0.4 | Memisahkan keputusan locked dari baseline, mengunci empat mode display tanpa `listening`, menghapus asumsi `/v1/models`, menambah capability test/adapter Hermes, schema event/HTTP canonical agar dokumen self-contained, canonical `WEBSOCKET_NOT_CONNECTED`, state sync setelah backend restart, hash WAV untuk idempotency, public status mapping, HTTP 410 audio expired, privacy log, dan validasi sample rate RVC |

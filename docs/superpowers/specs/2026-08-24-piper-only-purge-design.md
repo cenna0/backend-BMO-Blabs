@@ -1,4 +1,4 @@
-# BMO Piper-Only Audio Cleanup and Kokoro/RVC Purge Design
+# Joy Piper-Only Audio Cleanup and Kokoro/RVC Purge Design
 
 Date: 2026-08-24
 Status: IMPLEMENTED AND PRODUCTION-VERIFIED; final evidence: `docs/operations/2026-08-24-piper-only-purge-evidence.md`
@@ -6,7 +6,7 @@ Supersedes the runtime scope of `2026-08-24-remove-rvc-design.md`.
 
 ## Goal
 
-Move production BMO to one verified audio path:
+Move production Joy to one verified audio path:
 
 ```text
 ESP / voice input
@@ -27,7 +27,7 @@ preserved.
 
 ## Current context and constraints
 
-- Production audio is `bmo-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34`.
+- Production audio is `joy-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34`.
 - The production image is built from `audio-service/Dockerfile` and the
   current service runs Piper-only; the former Kokoro fallback is historical.
 - The observed production audio RSS is approximately 2.217 GiB.
@@ -81,7 +81,7 @@ free -b
 docker stats --no-stream
 ```
 
-Protected workloads include `bmo-production-*`, production PostgreSQL,
+Protected workloads include `joy-production-*`, production PostgreSQL,
 Hermes, and required operational services. Only a non-production workload
 proved unused by read-only inspection may be stopped; no unrelated volumes,
 images, or data are deleted.

@@ -1,16 +1,13 @@
-# BMO Hardware / ESP32 Implementation Handoff
+# Joy Hardware / ESP32 Implementation Handoff
 
 > **CURRENT / CANONICAL**
 > Backend code-only pairing is production-deployed. This document describes
 > firmware and real-device work, whose status remains
 > `PENDING_PHYSICAL_ESP`.
 
-**Audited:** 2026-08-20
-**Production image:** `bmo-p9.1:pairing-code-only-d1473d0`
-**Deployed-image source revision:**
-`d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable provenance, not current
-Git HEAD)
-**Production migrations:** `7 completed, 0 unfinished, 0 rolled_back`
+**Audited:** 2026-08-29
+**Production image:** `joy-p9.1:production`
+**Production migrations:** 10 completed, 0 unfinished, 0 rolled_back
 **Hardware WSS:** `wss://api.personalbmo.web.id/ws`
 
 Start at [`ESP-AGENT-HANDOFF.md`](ESP-AGENT-HANDOFF.md). The existing physical
@@ -50,6 +47,11 @@ device_log
 device_telemetry
 device_settings_applied
 pairing_mode_request
+voice_reserve
+voice_cancel
+proactive_offer_accepted
+proactive_done
+proactive_failed
 ```
 
 Backend → ESP:
@@ -65,17 +67,24 @@ wifi_configuration
 device_settings
 pairing_code
 pairing_completed
+voice_reserve_accepted
+voice_reserve_rejected
+voice_reserve_expired
+proactive_offer
+proactive_audio_ready
+proactive_cancel
+display_qr
+clear_qr
 ```
 
 `backend/src/websocket/events.ts` wins if prose drifts. Source-defined
-Wi-Fi/log/telemetry/settings support is not physical acceptance. No proactive
-hardware event family is defined in the current source schema.
+Wi-Fi/log/telemetry/settings support is not physical acceptance. The current source schema defines the proactive hardware event family; physical implementation and acceptance remain `PENDING_PHYSICAL_ESP`.
 
 ## Milestone 2 — physical code-only pairing
 
 After stable connection/auth/voice continuity:
 
-1. An authenticated unbound BMO receives `pairing_code` automatically.
+1. An authenticated unbound Joy receives `pairing_code` automatically.
 2. Display the six digits and clear them at `expires_at`.
 3. Use a debounced `pairing_mode_request` only when replacement is actually
    needed; Backend enforces a five-second cooldown and six per 15 minutes.

@@ -1,7 +1,7 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO by BLABS — Integration PRD v1.4.0
+# Joy by BLABS — Integration PRD v1.4.0
 
 > **HISTORICAL PRODUCT SNAPSHOT — NOT RUNTIME AUTHORITY**
 > This version is frozen at its 2026-08-11 product checkpoint. Freeze-time
@@ -16,11 +16,11 @@
 
 ## Product objective
 
-BMO combines an existing physical voice device with a mobile account, durable personal data, device management, chat/memory/schedules, and controlled WhatsApp/Spotify capabilities. The VPS platform is the Backend: Caddy, Backend API service, PostgreSQL, Hermes, Audio Service, deployment/networking, secrets, and observability.
+Joy combines an existing physical voice device with a mobile account, durable personal data, device management, chat/memory/schedules, and controlled WhatsApp/Spotify capabilities. The VPS platform is the Backend: Caddy, Backend API service, PostgreSQL, Hermes, Audio Service, deployment/networking, secrets, and observability.
 
 ## Existing user value to preserve
 
-- Physical BMO authenticates over WSS `/ws`.
+- Physical Joy authenticates over WSS `/ws`.
 - It uploads a complete raw WAV by HTTP and downloads generated MP3 by HTTP.
 - The Backend uses Hermes for reasoning and Audio Service for STT/TTS.
 - Six-digit pairing semantics remain the ownership bootstrap.
@@ -42,7 +42,7 @@ BMO combines an existing physical voice device with a mobile account, durable pe
 
 - Mobile calls only the Backend API.
 - Backend owns auth, policy, durable workflows, provider actions, delivery, and audit.
-- PostgreSQL is BMO durable truth; Hermes is reasoning plus the WhatsApp session boundary; Audio Service is transient media processing; ESP owns local application/playback.
+- PostgreSQL is Joy durable truth; Hermes is reasoning plus the WhatsApp session boundary; Audio Service is transient media processing; ESP owns local application/playback.
 - Chat history is not automatic memory. Schedules are not memory. Ordinary WhatsApp content is not automatically copied into either.
 - Provider secrets, Wi-Fi passwords, DOB, recovery tokens, and raw session bytes never appear in safe user payloads, logs, chat, memory, or Git.
 

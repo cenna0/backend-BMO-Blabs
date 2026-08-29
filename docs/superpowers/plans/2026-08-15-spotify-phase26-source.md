@@ -136,7 +136,7 @@
 
 - [ ] **Step 4: Implement six-month authorization lifecycle.**
 
-  Treat `authorizedAt + six calendar months` as the refresh-token deadline. Before refresh, if the deadline has passed, delete the SpotifyCredential and set the connection to `RECONNECT_REQUIRED`. On provider `INVALID_GRANT`, delete credential state, clear provider metadata, set `RECONNECT_REQUIRED`, and return only the stable BMO-safe error. Never retry a failed refresh indefinitely.
+  Treat `authorizedAt + six calendar months` as the refresh-token deadline. Before refresh, if the deadline has passed, delete the SpotifyCredential and set the connection to `RECONNECT_REQUIRED`. On provider `INVALID_GRANT`, delete credential state, clear provider metadata, set `RECONNECT_REQUIRED`, and return only the stable Joy-safe error. Never retry a failed refresh indefinitely.
 
 - [ ] **Step 5: Run the service and crypto tests through the red/green cycle.**
 
@@ -157,7 +157,7 @@
 - Modify: `backend/tests/p9/integrations.http.test.ts`
 - Modify: `backend/tests/p9/mobile-events.unit.test.ts`
 
-- [ ] **Step 1: Add explicit stable BMO error codes.**
+- [ ] **Step 1: Add explicit stable Joy error codes.**
 
   Add `RECONNECT_REQUIRED`, `NO_ACTIVE_DEVICE`, `PREMIUM_REQUIRED`, and a Spotify provider-rate-limit code where needed. Map 401/invalid-grant, 403, 429, 5xx/timeouts, and no-device outcomes without returning raw provider text.
 
@@ -244,7 +244,7 @@
 
   ```bash
   git rev-parse HEAD
-  docker build --file backend/Dockerfile.p9.1 --build-arg VCS_REF="$(git rev-parse HEAD)" --tag "bmo-p9.1-candidate:spotify-phase26-$(git rev-parse --short HEAD)" backend
+  docker build --file backend/Dockerfile.p9.1 --build-arg VCS_REF="$(git rev-parse HEAD)" --tag "joy-p9.1-candidate:spotify-phase26-$(git rev-parse --short HEAD)" backend
   ```
 
   Do not start/recreate containers, run migrations against production, invoke OAuth, expose ports, modify Caddy, restart Hermes/WhatsApp services, or use real Spotify credentials.

@@ -8,7 +8,7 @@
 
 | Decision | State |
 |---|---|
-| PostgreSQL/Prisma is durable BMO application storage | Frozen; existing P9.1 candidate |
+| PostgreSQL/Prisma is durable Joy application storage | Frozen; existing P9.1 candidate |
 | One Backend API service owns mobile/device application APIs | Frozen target |
 | v1.0.5 device voice remains immutable | Frozen existing |
 | Mobile `/api/v1/ws` is separate from device `/ws` | Frozen target |
@@ -19,7 +19,7 @@
 | Scheduler is structured data; proactive delivery is generic | Frozen target |
 | Wi-Fi desired state is encrypted in DB; ESP applies it | Frozen target / physical pending |
 | Spotify uses server-side Authorization Code and Backend-owned tokens/actions | Frozen target / live blocked |
-| Hermes owns WhatsApp session; Backend owns BMO policy/audit | Frozen target / bridge contract source-verified, live session blocked |
+| Hermes owns WhatsApp session; Backend owns Joy policy/audit | Frozen target / bridge contract source-verified, live session blocked |
 | Additive migrations; no Phase 1 production migration | Frozen |
 | Provider/physical capability is not acceptance evidence | Frozen |
 

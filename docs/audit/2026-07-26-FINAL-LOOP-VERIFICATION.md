@@ -1,7 +1,7 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO Docs — Final Loop Verification
+# Joy Docs — Final Loop Verification
 
 **Date:** 2026-07-26  
 **Result:** `PASS — no significant documentation inconsistency found after final loop`  
@@ -73,7 +73,7 @@ Verified current runtime targets consistently across active authority documents:
 
 ```text
 WHISPER_MODEL=medium
-WHISPER_HOTWORDS=BMO
+WHISPER_HOTWORDS=Joy
 WHISPER_DEVICE=cpu
 WHISPER_COMPUTE_TYPE=int8
 WHISPER_CPU_THREADS=4
@@ -93,13 +93,13 @@ Historical `small`/Kokoro-speed evidence remains available only as historical ev
 Verified the current target includes:
 
 - `main` as production Git source;
-- `/opt/bmo/app` as clean production checkout;
+- `/opt/joy/app` as clean production checkout;
 - separate config/models/data/temp/backups/deploy paths;
 - real secrets outside Git;
 - immutable commit-SHA-related Docker application images;
 - no production live-source bind mount;
 - Caddy as host system service;
-- `api.personalbmo.web.id` and `monitor.personalbmo.web.id`;
+- `api.personaljoy.web.id` and `monitor.personaljoy.web.id`;
 - Tailscale admin path before public SSH restriction;
 - Beszel Hub + local Agent, private origin, public authenticated HTTPS UI;
 - fresh Telegram credential supplied out-of-band;
@@ -195,7 +195,7 @@ The secret scan includes detection for the previously exposed/revoked Telegram c
 The following must **not** be guessed in documentation and are intentionally left for their owning execution phase:
 
 - actual current VPS user/service/firewall/package state — P6 preflight;
-- approved Git remote and working deploy credential for `bmo-admin` — P6;
+- approved Git remote and working deploy credential for `joy-admin` — P6;
 - real DNS/TLS reachability — P6/P7 evidence;
 - fresh Telegram bot credential and target chat ID — P6, out-of-band;
 - exact RVC `.pth` / `.index` filenames and compatible inference runtime — P8;

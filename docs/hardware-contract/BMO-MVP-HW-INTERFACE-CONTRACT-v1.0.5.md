@@ -1,14 +1,14 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO MVP — Kontrak Antarmuka Hardware ↔ Backend
+# Joy MVP — Kontrak Antarmuka Hardware ↔ Backend
 
 **Versi:** 1.0.5
 **Tanggal:** 2026-07-18
 **Cakupan:** Pipeline suara MVP
-**Ditujukan untuk:** Tim hardware/firmware ESP32-S3 dan tim backend BMO
+**Ditujukan untuk:** Tim hardware/firmware ESP32-S3 dan tim backend Joy
 
-> Bahasa dokumen ini adalah Bahasa Indonesia. Nama event, header HTTP, field JSON, dan kode error tetap menggunakan English agar konsisten di implementasi. BMO sendiri akan berbicara dalam English.
+> Bahasa dokumen ini adalah Bahasa Indonesia. Nama event, header HTTP, field JSON, dan kode error tetap menggunakan English agar konsisten di implementasi. Joy sendiri akan berbicara dalam English.
 
 ## 0. Status Keputusan Dokumen
 
@@ -26,7 +26,7 @@ Dokumen ini membedakan dua jenis keputusan:
 - Mode display MVP hanya `idle`, `thinking`, `speaking`, dan `error`; tidak ada mode `listening` terpisah.
 - Mode `speaking` dimulai oleh firmware ketika playback benar-benar mulai.
 - Download MP3 diulang satu kali dari awal jika gagal; HTTP Range/resume belum dipakai.
-- BMO selalu berbicara dalam English.
+- Joy selalu berbicara dalam English.
 - Error ditampilkan melalui ekspresi hardware dan audio error lokal.
 
 **Baseline teknis yang masih boleh disesuaikan setelah benchmark:**
@@ -49,7 +49,7 @@ Detail seperti `backend_state`, SHA-256 body, tombstone request, dan HTTP `410 A
 
 ## 1. Tujuan MVP
 
-BMO harus mampu:
+Joy harus mampu:
 
 1. Mendeteksi wake word secara lokal di ESP32-S3.
 2. Merekam suara user secara utuh.
@@ -66,7 +66,7 @@ Pada MVP ini **tidak ada audio chunk melalui WebSocket**. Audio input dikirim se
 ## 2. Gambaran Komunikasi
 
 ```text
-ESP32-S3 BMO                         Backend VPS
+ESP32-S3 Joy                         Backend VPS
      │                                    │
      │── buka WebSocket ─────────────────►│
      │── authenticate ───────────────────►│
@@ -106,7 +106,7 @@ Backend **tidak membuka koneksi baru ke IP lokal ESP32**. ESP32 yang membuka dan
 Kredensial awal MVP:
 
 ```text
-device_id: bmo-001
+device_id: joy-001
 device_token: secret acak unik
 ```
 
@@ -136,7 +136,7 @@ ws://<IP_VPS>:3000/ws
 Setelah domain dan TLS tersedia:
 
 ```text
-wss://<DOMAIN_API_BMO>/ws
+wss://<DOMAIN_API_Joy>/ws
 ```
 
 ESP32 adalah **WebSocket client**. Backend adalah **WebSocket server**.
@@ -150,7 +150,7 @@ ESP32 → Backend:
 ```json
 {
   "event": "authenticate",
-  "device_id": "bmo-001",
+  "device_id": "joy-001",
   "device_token": "<device-secret>"
 }
 ```
@@ -161,7 +161,7 @@ Backend → ESP32 jika berhasil:
 {
   "event": "authenticated",
   "status": "ok",
-  "device_id": "bmo-001",
+  "device_id": "joy-001",
   "backend_state": "idle",
   "active_request_id": null
 }
@@ -196,7 +196,7 @@ Firmware tetap wajib membaca event JSON bila sempat diterima, lalu memakai close
 
 ### 4.3 Koneksi ganda
 
-Jika `bmo-001` membuka koneksi baru sementara koneksi lama masih aktif:
+Jika `joy-001` membuka koneksi baru sementara koneksi lama masih aktif:
 
 1. Koneksi terbaru yang sudah terautentikasi menjadi koneksi aktif.
 2. Backend mencoba mengirim event berikut ke koneksi lama:
@@ -304,7 +304,7 @@ POST http://<IP_VPS>:3000/api/v1/voice
 Setelah domain:
 
 ```text
-POST https://<DOMAIN_API_BMO>/api/v1/voice
+POST https://<DOMAIN_API_Joy>/api/v1/voice
 ```
 
 ### 6.3 Header request
@@ -312,7 +312,7 @@ POST https://<DOMAIN_API_BMO>/api/v1/voice
 ```http
 POST /api/v1/voice HTTP/1.1
 Host: <backend-host>
-X-Device-Id: bmo-001
+X-Device-Id: joy-001
 X-Device-Token: <device-secret>
 X-Request-Id: <uuid-v4>
 Content-Type: audio/wav
@@ -573,7 +573,7 @@ Jika event `audio_ready` untuk request ID yang sama diterima ulang akibat reconn
 - saat `failed_pending_send`: kirim ulang `audio_playback_failed`;
 - saat belum pernah mulai download: gunakan URL terbaru selama belum expired.
 
-Ini mencegah satu jawaban BMO diputar dua kali ketika hanya koneksi WebSocket yang sempat putus.
+Ini mencegah satu jawaban Joy diputar dua kali ketika hanya koneksi WebSocket yang sempat putus.
 
 MVP tidak memakai event acknowledgment terpisah seperti `audio_ready_received`. Keandalan `audio_ready` ditangani melalui sinkronisasi state saat reconnect, pengiriman ulang event bila file masih valid, dan deduplikasi berdasarkan `request_id` di firmware.
 
@@ -715,10 +715,10 @@ Perilaku firmware:
 
 | Kode | Tampilan | Audio lokal |
 |---|---|---|
-| `NO_SPEECH` | Ekspresi error | “Sorry, it is too noisy. BMO cannot hear you.” |
-| Error lain yang recoverable | Ekspresi error | “Oh no. BMO could not answer. Please try again.” |
+| `NO_SPEECH` | Ekspresi error | “Sorry, it is too noisy. Joy cannot hear you.” |
+| Error lain yang recoverable | Ekspresi error | “Oh no. Joy could not answer. Please try again.” |
 
-Audio error disimpan lokal di BMO agar tetap dapat dimainkan walaupun backend/TTS gagal.
+Audio error disimpan lokal di Joy agar tetap dapat dimainkan walaupun backend/TTS gagal.
 
 Setelah audio error selesai, firmware kembali ke `idle`.
 
@@ -730,7 +730,7 @@ Jika WebSocket putus ketika backend masih memproses request:
 
 1. ESP32 melakukan reconnect.
 2. ESP32 autentikasi ulang.
-3. Backend mengecek pending request untuk `bmo-001`.
+3. Backend mengecek pending request untuk `joy-001`.
 4. Jika request masih diproses, backend mengirim ulang `display_status: thinking`.
 5. Jika MP3 sudah tersedia dan belum expired, backend mengirim ulang `audio_ready`.
 6. ESP32 mengambil dan memutar audio seperti biasa.
@@ -745,7 +745,7 @@ MP3 memiliki TTL **5 menit**. Jika sudah expired, backend mengirim `request_fail
 
 ## 10. Satu Request Aktif per Device
 
-Pada MVP, BMO hanya boleh memiliki satu request aktif:
+Pada MVP, Joy hanya boleh memiliki satu request aktif:
 
 ```text
 idle (termasuk rekaman lokal) → thinking → speaking → idle

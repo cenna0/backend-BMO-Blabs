@@ -1,13 +1,13 @@
-# BMO Backend — Remove Login Rate Limit Only
+# Joy Backend — Remove Login Rate Limit Only
 
 **Date:** 2026-08-23  
 **Task type:** Backend production change  
 **Scope:** Extremely narrow — remove rate limiting from `POST /api/v1/auth/login` only  
-**Recommended VPS path:** `/opt/bmo/app/docs/operations/2026-08-23-REMOVE-LOGIN-RATE-LIMIT.md`
+**Recommended VPS path:** `/opt/joy/app/docs/operations/2026-08-23-REMOVE-LOGIN-RATE-LIMIT.md`
 
 ## 1. Objective
 
-Change the BMO Backend so repeated login attempts are **not blocked by the Backend login rate limiter**.
+Change the Joy Backend so repeated login attempts are **not blocked by the Backend login rate limiter**.
 
 Current user-visible behavior:
 
@@ -223,13 +223,13 @@ Do not rewrite frozen/historical P9.1 foundation evidence merely to erase the pr
 Work from the canonical VPS repository, expected at:
 
 ```text
-/opt/bmo/app
+/opt/joy/app
 ```
 
 Before mutation, capture and report without exposing secrets:
 
 ```bash
-cd /opt/bmo/app
+cd /opt/joy/app
 git status --short
 git branch --show-current
 git rev-parse HEAD
@@ -282,7 +282,7 @@ No Prisma migration is expected or authorized for this task.
 
 ## 8. Required Commands / Verification
 
-From `/opt/bmo/app/backend`, the repository currently exposes these relevant scripts:
+From `/opt/joy/app/backend`, the repository currently exposes these relevant scripts:
 
 ```bash
 npm run typecheck
@@ -344,7 +344,7 @@ Do not deploy by editing files inside a running container.
 
 Build a new immutable Backend image from the tested commit and use the repository's current Backend-only cutover mechanism. Preserve the previous production image as rollback.
 
-If the current production Compose is `/opt/bmo/app/ops/deploy/p9.1-production-compose.yml`, update only the production Backend image reference through the existing production env/config mechanism and recreate only the Backend service. Verify the actual live workflow first; do not treat historical runbook commands as automatically current.
+If the current production Compose is `/opt/joy/app/ops/deploy/p9.1-production-compose.yml`, update only the production Backend image reference through the existing production env/config mechanism and recreate only the Backend service. Verify the actual live workflow first; do not treat historical runbook commands as automatically current.
 
 ---
 
@@ -505,4 +505,4 @@ Never include passwords, tokens, JWTs, API keys, database URLs, or secret-file c
 
 **The user requested exactly one behavioral change:** remove the Backend rate limit on login.
 
-Do not turn this task into a broader authentication redesign or a removal of rate limiting across BMO.
+Do not turn this task into a broader authentication redesign or a removal of rate limiting across Joy.

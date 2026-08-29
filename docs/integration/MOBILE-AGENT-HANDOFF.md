@@ -1,4 +1,4 @@
-# BMO Mobile Agent Handoff
+# Joy Mobile Agent Handoff
 
 > **CURRENT / CANONICAL**
 > Backend/VPS code-only pairing is deployed and production-verified. If source
@@ -8,8 +8,8 @@
 
 - API base: `https://api.personalbmo.web.id`
 - Mobile WSS: `wss://api.personalbmo.web.id/api/v1/ws`
-- current Mobile REST routes: `79`
-- current Mobile WebSocket event names: `12`
+- current P9 router registrations: `93` (the coverage matrix lists all current HTTP routes)
+- Mobile WS: initial `authenticate`, `authenticated` acknowledgement, and 11 schema-defined outbound application events
 
 Read in this order:
 

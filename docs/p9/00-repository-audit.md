@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P9 Repository Audit
 
@@ -24,10 +24,10 @@
 
 | Area | Documents |
 |---|---|
-| Product/roadmap | `docs/product/BMO-BY-BLABS-PRD-v1.2.4.md`, `docs/roadmap/P6-P10-ROADMAP.md`, `docs/roadmap/P8-EXECUTION-SPEC.md`, `docs/NEXT-ACTION.md` |
+| Product/roadmap | `docs/product/Joy-BY-BLABS-PRD-v1.2.4.md`, `docs/roadmap/P6-P10-ROADMAP.md`, `docs/roadmap/P8-EXECUTION-SPEC.md`, `docs/NEXT-ACTION.md` |
 | Current status/evidence | `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, `IMPLEMENTATION-STATUS.md`, `P8-PRODUCTION-ROLLOUT-EVIDENCE.md`, `POST-P8-STORAGE-CLEANUP-EVIDENCE.md`, `P7-TEST-EVIDENCE.md` |
 | Backend/Hermes | `01-SCOPE-AND-DECISIONS.md`, `02-API-AND-WEBSOCKET-CONTRACT.md`, `03-BACKEND-ARCHITECTURE.md`, `04-AUDIO-SERVICE.md`, `06-DEPLOYMENT-AND-OPERATIONS.md`, `backend/src/services/hermes.client.ts`, `request-store.ts`, `websocket/events.ts`, `config/env.ts` |
-| Hardware | `docs/hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`, `docs/hardware-handoff/README.md`, `AGENT-CONTEXT.md`, `CURRENT-STATUS.md`, `DEPLOYMENT-CONFIG.md`, `ACCEPTANCE-TESTS.md` |
+| Hardware | `docs/hardware-contract/Joy-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`, `docs/hardware-handoff/README.md`, `AGENT-CONTEXT.md`, `CURRENT-STATUS.md`, `DEPLOYMENT-CONFIG.md`, `ACCEPTANCE-TESTS.md` |
 | Runtime/tests | `docker-compose.yml`, `.env.*.example`, `backend/package.json`, backend Hermes/request/WebSocket/voice tests, `scripts/verify-backend-mvp-docs.py` |
 
 ## Outdated or incomplete statements found

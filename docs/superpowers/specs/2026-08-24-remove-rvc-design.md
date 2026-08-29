@@ -8,7 +8,7 @@ Date: 2026-08-24
 ## Goal
 
 Remove the local RVC implementation, artifacts, documentation, and Git refs
-from the BMO workspace while preserving the Piper-only audio path (STT, Piper, and FFmpeg).
+from the Joy workspace while preserving the Piper-only audio path (STT, Piper, and FFmpeg).
 
 ## Scope
 

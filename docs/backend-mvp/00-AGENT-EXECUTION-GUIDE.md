@@ -1,7 +1,7 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO Backend MVP — Agent Execution Guide
+# Joy Backend MVP — Agent Execution Guide
 
 > **SUPERSEDED ONBOARDING — DO NOT USE FOR CURRENT MOBILE/ESP WORK**
 > This guide preserves the legacy voice/P1–P8 execution model. Start current
@@ -56,11 +56,11 @@ Agent wajib membaca dalam urutan berikut:
 2. `IMPLEMENTATION-STATUS.md`.
 3. `01-SCOPE-AND-DECISIONS.md`.
 4. `../operations/MAINTENANCE-AND-RECOVERY.md` untuk phase P6+ yang menyentuh VPS/operations.
-5. `../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` hanya untuk kewajiban public interface backend.
+5. `../hardware-contract/Joy-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` hanya untuk kewajiban public interface backend.
 6. Dokumen implementation package yang diwajibkan oleh phase aktif.
 7. `05-TESTING-AND-ACCEPTANCE.md` untuk test dan definition of done phase aktif.
 8. `REQUIREMENT-TRACEABILITY.md` saat verifikasi akhir.
-9. Bagian PRD relevan di `../product/BMO-BY-BLABS-PRD-v1.2.4.md` hanya untuk consistency check; PRD bukan instruksi untuk mengimplementasikan fitur phase lain.
+9. Bagian PRD relevan di `../product/Joy-BY-BLABS-PRD-v1.2.4.md` hanya untuk consistency check; PRD bukan instruksi untuk mengimplementasikan fitur phase lain.
 
 Agent boleh membaca dokumen lain untuk memahami dependency dan interface, tetapi **tidak boleh mengimplementasikan scope dokumen lain** kecuali status phase-nya `AUTHORIZED` atau `IN_PROGRESS`.
 
@@ -68,7 +68,7 @@ Agent boleh membaca dokumen lain untuk memahami dependency dan interface, tetapi
 
 Jika ditemukan perbedaan, gunakan urutan authority berikut:
 
-1. **Public firmware ↔ backend interface:** `../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`.
+1. **Public firmware ↔ backend interface:** `../hardware-contract/Joy-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`.
 2. **Current STT/TTS runtime values:** `CURRENT-RUNTIME-CONFIG.md`.
 3. **Actual implementation status/evidence:** `IMPLEMENTATION-STATUS.md` + latest phase/manual evidence.
 4. **Detail implementasi backend/audio service:** active canonical references di folder `backend-mvp/` ini.
@@ -189,7 +189,7 @@ implementasi lokal
 → redeploy
 ```
 
-Git `main` is the production source of truth. `/opt/bmo/app` is a clean production/deployment checkout, not a scratch development directory. If Codex must change application code, use a normal Git branch/worktree or separate development checkout, run the required tests, merge/land the approved change into `main`, then update `/opt/bmo/app` to the selected commit and rebuild immutable images. An emergency host edit is not a valid production release until it is captured in Git and redeployed, otherwise drift exists.
+Git `main` is the production source of truth. `/opt/joy/app` is a clean production/deployment checkout, not a scratch development directory. If Codex must change application code, use a normal Git branch/worktree or separate development checkout, run the required tests, merge/land the approved change into `main`, then update `/opt/joy/app` to the selected commit and rebuild immutable images. An emergency host edit is not a valid production release until it is captured in Git and redeployed, otherwise drift exists.
 
 Secret asli, model weights, cache model, dan generated audio tidak boleh disimpan di Git.
 

@@ -5,7 +5,7 @@
 ## Perubahan utama
 
 1. Current STT runtime diubah dari baseline lama `small` menjadi `medium` multilingual CPU INT8.
-2. Hotword `BMO` ditambahkan sebagai current runtime decoding context.
+2. Hotword `Joy` ditambahkan sebagai current runtime decoding context.
 3. Kokoro tetap memakai `af_heart` dan speed `0.80` menjadi current deployment target.
 4. PRD dinaikkan dari v1.2.0 ke v1.2.1.
 5. Consolidated Backend Implementation dinaikkan dari v1.0.5 ke v1.0.6.
@@ -20,7 +20,7 @@
 | Current decision | Evidence |
 |---|---|
 | `WHISPER_MODEL=medium` | `backend-mvp/P5-STT-ACCURACY-INVESTIGATION.md` |
-| `WHISPER_HOTWORDS=BMO` | `backend-mvp/P5-STT-ACCURACY-INVESTIGATION.md` |
+| `WHISPER_HOTWORDS=Joy` | `backend-mvp/P5-STT-ACCURACY-INVESTIGATION.md` |
 | English/ID/mixed/silence/noise regression remains valid | same |
 | `KOKORO_VOICE=af_heart` | P3/P5 evidence |
 | `KOKORO_SPEED=0.80` | `backend-mvp/P5-MANUAL-TEST-EVIDENCE.md` + later project decision |

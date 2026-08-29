@@ -1,13 +1,13 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO Backend MVP — Verification Report (Historical Package Baseline)
+# Joy Backend MVP — Verification Report (Historical Package Baseline)
 
 **Tanggal verifikasi:** 2026-07-18  
 **Package version:** 1.0.1  
 **Result:** PASS for the 2026-07-18 documentation package baseline
 
-> **2026-07-26 audit note:** this report proves the original documentation migration/package, not current implementation status. Since this report was written, P1–P5 implementation evidence was added, STT tuning selected `medium` + `BMO` hotword, and future deployment scope was split into P6–P10. Use `IMPLEMENTATION-STATUS.md`, `P5-*` evidence, `../hardware-handoff/`, and `../roadmap/P6-P10-ROADMAP.md` for current status.
+> **2026-07-26 audit note:** this report proves the original documentation migration/package, not current implementation status. Since this report was written, P1–P5 implementation evidence was added, STT tuning selected `medium` + `Joy` hotword, and future deployment scope was split into P6–P10. Use `IMPLEMENTATION-STATUS.md`, `P5-*` evidence, `../hardware-handoff/`, and `../roadmap/P6-P10-ROADMAP.md` for current status.
 
 ## 1. Source documents
 

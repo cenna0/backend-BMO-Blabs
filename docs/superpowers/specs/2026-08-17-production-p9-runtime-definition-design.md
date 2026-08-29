@@ -5,7 +5,7 @@
 **Frozen application artifact:**
 
 - Commit: `9819ef7c05bd9c71ea153feffc41ca8f96695287`
-- Image: `bmo-p9.1-candidate:spotify-phase26-9819ef7`
+- Image: `joy-p9.1-candidate:spotify-phase26-9819ef7`
 - Image ID/digest: `sha256:047301dd3ff0f16812d163455fd4f2fe6f12238435651e4f286cf305cc919241`
 
 ## Goal
@@ -22,14 +22,14 @@ The production definition is a separate Compose file containing only
 `127.0.0.1:3000`, so it retains the existing Caddy origin and can reach the
 existing loopback dependencies. PostgreSQL uses PostgreSQL 16.14 at the
 verified digest, an internal Compose network, a shared Unix-socket volume, and
-the production bind path `/opt/bmo/data/postgres`; it has no published host
+the production bind path `/opt/joy/data/postgres`; it has no published host
 port.
 
 The existing `docker-compose.yml` remains the voice runtime definition. Its
-stale `/opt/bmo/data/avatars` bind is removed because the current voice-only
+stale `/opt/joy/data/avatars` bind is removed because the current voice-only
 Backend does not mount or use it and the host path does not exist. The P9
-Compose definition separately declares `/opt/bmo/data/avatars` and
-`/opt/bmo/data/bug-reports` as required future writable production paths with
+Compose definition separately declares `/opt/joy/data/avatars` and
+`/opt/joy/data/bug-reports` as required future writable production paths with
 `create_host_path: false`. This makes the path required for P9 without
 creating it during preparation.
 
@@ -57,13 +57,13 @@ The production Compose file accepts only an explicit production image
 reference and contains no build section. The current local candidate image is
 tagged under a candidate repository name, so preparation does not retag it.
 Future provisioning may perform a metadata-only local retag to
-`bmo-p9.1:spotify-phase26-9819ef7`, then must compare the production tag's
+`joy-p9.1:spotify-phase26-9819ef7`, then must compare the production tag's
 image ID to the frozen digest before any deployment. The production Compose
 never refers to the candidate project or candidate validation paths.
 
 ## Backup and restore
 
-The production backup directory is `/opt/bmo/backups/database`, separate from
+The production backup directory is `/opt/joy/backups/database`, separate from
 candidate backup directories. Existing `p9:backup` writes AES-256 encrypted
 custom-format dumps and `.sha256` sidecars with seven daily/four weekly
 retention. Existing `p9:restore` is used against a fresh isolated Compose
@@ -83,7 +83,7 @@ migration is defined.
 ## Caddy and external dependencies
 
 `NO_CADDY_CHANGE_REQUIRED`. The existing route remains
-`https://api.personalbmo.web.id` to `127.0.0.1:3000`. The candidate `:3010`
+`https://api.personaljoy.web.id` to `127.0.0.1:3000`. The candidate `:3010`
 callback patch is not used. Audio `:8001`, Hermes `:8642`, WhatsApp bridge
 `:3001`, and WhatsApp resolver `:3002` remain external existing runtime
 dependencies and are absent from the production P9 Compose service list.

@@ -1,4 +1,4 @@
-# BMO Docs Audit — 2026-07-26
+# Joy Docs Audit — 2026-07-26
 
 **Scope:** full uploaded `docs/` archive  
 **Primary objective:** make the documentation usable as a hardware ↔ backend handoff without requiring backend source reading.
@@ -20,9 +20,9 @@ The following canonical source snapshots were intentionally left byte-for-byte u
 
 | File | SHA-256 |
 |---|---|
-| `hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` | `633e398a7fa39a3ebc469af7f9ca46fd04890339bb132ec7de2c2286207c6a44` |
-| `product/BMO-BY-BLABS-PRD-v1.2.0.md` | `77b4bba8333aa277201976b024466d85c10257b13a63d5f5824b6c94555b70b8` |
-| `archive/BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md` | `d1554d8d2cdbd6e32cf7acca75ce17031adcc47463b8577f64cdc288fa076853` |
+| `hardware-contract/Joy-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md` | `633e398a7fa39a3ebc469af7f9ca46fd04890339bb132ec7de2c2286207c6a44` |
+| `product/Joy-BY-BLABS-PRD-v1.2.0.md` | `77b4bba8333aa277201976b024466d85c10257b13a63d5f5824b6c94555b70b8` |
+| `archive/Joy-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md` | `d1554d8d2cdbd6e32cf7acca75ce17031adcc47463b8577f64cdc288fa076853` |
 
 The PRD remains product context. Current implementation/deployment overrides are documented in active backend/handoff files rather than rewriting the historical PRD snapshot.
 
@@ -61,11 +61,11 @@ Resolution:
 The old P6 meant roughly “VPS integration/benchmark/staging/final report”. Subsequent project decisions added:
 
 - Linux user/permission model;
-- `/opt/bmo` persistent layout;
+- `/opt/joy` persistent layout;
 - Git `main` as production source;
 - immutable Docker image runtime;
 - Caddy;
-- `api.personalbmo.web.id` and `monitor.personalbmo.web.id`;
+- `api.personaljoy.web.id` and `monitor.personaljoy.web.id`;
 - HTTPS/WSS;
 - Tailscale admin path / SSH migration;
 - firewall/public-port policy;
@@ -85,7 +85,7 @@ Active references still presented faster-whisper `small` as the implementation c
 
 ```text
 WHISPER_MODEL=medium
-WHISPER_HOTWORDS=BMO
+WHISPER_HOTWORDS=Joy
 ```
 
 while keeping CPU INT8, 4 threads, 1 worker, beam 5, VAD, and language auto-detect.
@@ -94,15 +94,15 @@ Impact: deployment could load the wrong model and reproduce the known poor trans
 
 Resolution:
 
-- updated active Audio Service reference to `medium` + `BMO` hotword;
+- updated active Audio Service reference to `medium` + `Joy` hotword;
 - kept P2 `small` references as historical evidence of what P2 originally verified;
 - explicitly require VPS resource/latency benchmark before deployment verification.
 
 ### F. Deployment layout was obsolete for the current plan
 
-Old deployment documentation used `/opt/bmo-mvp`, direct staging IP/port flows, and did not include the newly agreed persistent/source split, Caddy/Beszel/Tailscale/DB/backup plan.
+Old deployment documentation used `/opt/joy-mvp`, direct staging IP/port flows, and did not include the newly agreed persistent/source split, Caddy/Beszel/Tailscale/DB/backup plan.
 
-Resolution: rewrote the active deployment/operations reference around `/opt/bmo`, Git/image separation, external config/secrets, production domain, monitoring, backup, rollback, and hardware handoff gate.
+Resolution: rewrote the active deployment/operations reference around `/opt/joy`, Git/image separation, external config/secrets, production domain, monitoring, backup, rollback, and hardware handoff gate.
 
 ### G. RVC status could be misunderstood
 
@@ -121,11 +121,11 @@ firmware protocol impact: none; output remains MP3 through audio_ready
 The agreed target is:
 
 ```text
-https://api.personalbmo.web.id
-wss://api.personalbmo.web.id/ws
+https://api.personaljoy.web.id
+wss://api.personaljoy.web.id/ws
 ```
 
-but BMO backend public deployment had not been verified in the evidence archive.
+but Joy backend public deployment had not been verified in the evidence archive.
 
 Resolution: `hardware-handoff/DEPLOYMENT-CONFIG.md` starts with `DEPLOYMENT_STATUS: NOT_VERIFIED`. Hardware is told not to treat the endpoint as live until P7 updates it with evidence.
 

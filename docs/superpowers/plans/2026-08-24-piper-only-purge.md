@@ -1,11 +1,11 @@
-# BMO Piper-Only Audio Cleanup Implementation Plan
+# Joy Piper-Only Audio Cleanup Implementation Plan
 
 > **HISTORICAL ONLY — COMPLETED 2025-08-25**
 > This plan has been executed with production evidence in `docs/operations/2026-08-24-piper-only-purge-evidence.md`. Unchecked boxes below describe the original task checklist; do not treat them as pending production work.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`-`) syntax for tracking.
 
-**Goal:** Remove active Kokoro/RVC runtime semantics and migrate BMO production to a verified faster-whisper → Hermes → Piper → FFmpeg → MP3 pipeline with memory-gated candidate promotion.
+**Goal:** Remove active Kokoro/RVC runtime semantics and migrate Joy production to a verified faster-whisper → Hermes → Piper → FFmpeg → MP3 pipeline with memory-gated candidate promotion.
 
 **Architecture:** Modify the existing `audio-service` implementation in place so its TTS orchestrator has only Piper and FFmpeg. Build an immutable candidate image, run it on port 8002 with read-only Whisper/Piper mounts, route a candidate backend and fake ESP to that port, then promote the candidate digest while retaining the old production image for deterministic rollback. Purge model/cache/archive artifacts only after post-promotion verification.
 
@@ -16,12 +16,12 @@
 ## Task 1: Protect the dirty workspace and capture migration evidence
 
 **Files:**
-- Read only: repository Git state, Docker runtime, `/opt/bmo/models`, `/opt/bmo/cache/audio`, `/opt/bmo/temp`
+- Read only: repository Git state, Docker runtime, `/opt/joy/models`, `/opt/joy/cache/audio`, `/opt/joy/temp`
 - Create later: `docs/operations/2026-08-24-piper-only-purge-evidence.md`
 
 - [ ] **Step 1: Confirm the approved source and dirty-file boundary**
 
-Run from `/opt/bmo/app`:
+Run from `/opt/joy/app`:
 
 ```bash
 git branch --show-current
@@ -39,15 +39,15 @@ Expected: branch `main`, starting SHA `06652ea...`, and only the already observe
 Run without printing secrets:
 
 ```bash
-docker inspect bmo-production-audio-1 --format 'container_image_id={{.Image}} repo_image={{.Config.Image}} compose_project={{index .Config.Labels "com.docker.compose.project"}} compose_file={{index .Config.Labels "com.docker.compose.project.config_files"}}'
-docker image inspect bmo-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34 --format 'id={{.Id}} size={{.Size}} repo_digests={{json .RepoDigests}}'
+docker inspect joy-production-audio-1 --format 'container_image_id={{.Image}} repo_image={{.Config.Image}} compose_project={{index .Config.Labels "com.docker.compose.project"}} compose_file={{index .Config.Labels "com.docker.compose.project.config_files"}}'
+docker image inspect joy-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34 --format 'id={{.Id}} size={{.Size}} repo_digests={{json .RepoDigests}}'
 free -h
 free -b
 docker ps
 docker stats --no-stream
 ps -eo pid,user,comm,%cpu,%mem,rss,vsz --sort=-rss | head -25
-df -h /opt/bmo/app
-du -sb /opt/bmo/models /opt/bmo/cache/audio /opt/bmo/temp 2>/dev/null
+df -h /opt/joy/app
+du -sb /opt/joy/models /opt/joy/cache/audio /opt/joy/temp 2>/dev/null
 ```
 
 Expected: production container identity is recorded, host and audio baselines are available, and no production service is stopped.
@@ -57,12 +57,12 @@ Expected: production container identity is recorded, host and audio baselines ar
 Inspect only non-production state:
 
 ```bash
-docker inspect bmo-p9-1-backend-1 bmo-p9-1-postgres-1 --format '{{.Name}} project={{index .Config.Labels "com.docker.compose.project"}} status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'
-docker ps --filter 'name=bmo-production' --format '{{.Names}}'
-docker ps --filter 'name=bmo-p9-1' --format '{{.Names}}'
+docker inspect joy-p9-1-backend-1 joy-p9-1-postgres-1 --format '{{.Name}} project={{index .Config.Labels "com.docker.compose.project"}} status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'
+docker ps --filter 'name=joy-production' --format '{{.Names}}'
+docker ps --filter 'name=joy-p9-1' --format '{{.Names}}'
 ```
 
-The only permitted stop candidate is an unused non-production `bmo-p9-1` workload confirmed not to be serving an active acceptance session. Do not use `docker compose down --volumes`, delete any volume, or stop `bmo-production-*`, Hermes, or PostgreSQL production.
+The only permitted stop candidate is an unused non-production `joy-p9-1` workload confirmed not to be serving an active acceptance session. Do not use `docker compose down --volumes`, delete any volume, or stop `joy-production-*`, Hermes, or PostgreSQL production.
 
 - [ ] **Step 4: Verify staging remains task-scoped**
 
@@ -99,9 +99,9 @@ def test_piper_failure_returns_tts_failed_without_fallback_or_ffmpeg(tmp_path):
     orchestrator = TtsOrchestrator(settings=settings(tmp_path), piper=piper, ffmpeg=ffmpeg)
 
     with pytest.raises(TtsSynthesisError, match="TTS_FAILED"):
-        orchestrator.synthesize("BMO is ready")
+        orchestrator.synthesize("Joy is ready")
 
-    assert piper.calls == ["BMO is ready"]
+    assert piper.calls == ["Joy is ready"]
     assert ffmpeg.calls == []
 ```
 
@@ -125,7 +125,7 @@ Update `test_tts_api.py` and `test_health_and_auth.py` to assert:
 ```python
 response = client.post(
     "/tts/synthesize",
-    json={"request_id": str(uuid4()), "text": "BMO is ready"},
+    json={"request_id": str(uuid4()), "text": "Joy is ready"},
     headers=auth,
 )
 assert response.headers["x-tts-engine"] == "piper"
@@ -254,8 +254,8 @@ Run:
 
 ```bash
 rg -n -i 'kokoro|misaki|spacy|torch|torchaudio|phonemizer|espeak|transformers|soundfile|subprocess|Popen|run\\(' audio-service Dockerfile* audio-service/Dockerfile audio-service/app audio-service/scripts audio-service/tests requirements* .env* docker-compose.yml
-docker run --rm bmo-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34 python -m pip freeze
-docker run --rm bmo-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34 sh -lc 'command -v ffmpeg; command -v ffprobe; command -v espeak-ng || true; python - <<"PY"
+docker run --rm joy-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34 python -m pip freeze
+docker run --rm joy-audio@sha256:62ad9adead83d863ab2bf28a2ac75e5a116dc68bab8ff06eec81b7a0407ddb34 sh -lc 'command -v ffmpeg; command -v ffprobe; command -v espeak-ng || true; python - <<"PY"
 import importlib.util
 for name in ("faster_whisper", "piper", "onnxruntime", "torch", "kokoro", "spacy", "transformers"):
     print(name, bool(importlib.util.find_spec(name)))
@@ -378,13 +378,13 @@ Expected: zero test failures, zero TypeScript errors, and a successful build. Fi
 
 **Files:**
 - Modify: `audio-service/scripts/verify_voice_pipeline.py`
-- Modify: `piper-candidate/bmo_piper/shutdown_suite.py`
-- Modify: `piper-candidate/bmo_piper/host_snapshot.py`
+- Modify: `piper-candidate/joy_piper/shutdown_suite.py`
+- Modify: `piper-candidate/joy_piper/host_snapshot.py`
 - Modify: `piper-candidate/tests/test_packaging.py`
 - Modify: `piper-candidate/tests/test_host_snapshot.py`
-- Delete: `piper-candidate/bmo_piper/kokoro_reference.py`
+- Delete: `piper-candidate/joy_piper/kokoro_reference.py`
 - Delete: `piper-candidate/tests/test_kokoro_reference.py`
-- Delete: `piper-candidate/bmo_piper/bundle.py` if its only consumers are Kokoro/RVC comparison tooling
+- Delete: `piper-candidate/joy_piper/bundle.py` if its only consumers are Kokoro/RVC comparison tooling
 - Delete: `piper-candidate/comparison-text.json` if it is used only by the deleted comparison bundle
 - Create: `ops/deploy/piper-only-candidate-compose.yml`
 - Modify: `p9.1-compose.yml` only to allow candidate backend audio URL override
@@ -416,7 +416,7 @@ Create `ops/deploy/piper-only-candidate-compose.yml` with an `audio` service tha
 - uses `${AUDIO_CANDIDATE_IMAGE}`;
 - binds `127.0.0.1:8002:8002`;
 - overrides Uvicorn to port 8002;
-- mounts `/opt/bmo/models/runtime` and `/opt/bmo/models/piper` read-only;
+- mounts `/opt/joy/models/runtime` and `/opt/joy/models/piper` read-only;
 - mounts a candidate TTS temp directory separately from production;
 - mounts any cache read-only and sets offline/download-disabled values;
 - contains no Kokoro/RVC environment key or model path.
@@ -468,7 +468,7 @@ Use the committed task source rather than dirty P9/Spotify/WhatsApp files for th
 Build the audio candidate with no cache:
 
 ```bash
-docker build --no-cache --build-arg VCS_REF="$(git rev-parse HEAD)" -t bmo-audio:piper-only-candidate-$(git rev-parse --short HEAD) audio-service
+docker build --no-cache --build-arg VCS_REF="$(git rev-parse HEAD)" -t joy-audio:piper-only-candidate-$(git rev-parse --short HEAD) audio-service
 ```
 
 Expected: exit 0 and no model download step. Record tag, image ID, repo digest if available, and image size.
@@ -478,14 +478,14 @@ Expected: exit 0 and no model download step. Record tag, image ID, repo digest i
 Run against the candidate image without host model mounts:
 
 ```bash
-docker run --rm --network none bmo-audio:piper-only-candidate-$(git rev-parse --short HEAD) python - <<'PY'
+docker run --rm --network none joy-audio:piper-only-candidate-$(git rev-parse --short HEAD) python - <<'PY'
 import importlib.util
 for name in ("faster_whisper", "piper", "onnxruntime"):
     assert importlib.util.find_spec(name), name
 for name in ("kokoro", "spacy", "torch", "transformers"):
     assert importlib.util.find_spec(name) is None, name
 PY
-docker run --rm --network none bmo-audio:piper-only-candidate-$(git rev-parse --short HEAD) sh -lc 'command -v ffmpeg && command -v ffprobe && ! command -v rvc'
+docker run --rm --network none joy-audio:piper-only-candidate-$(git rev-parse --short HEAD) sh -lc 'command -v ffmpeg && command -v ffprobe && ! command -v rvc'
 ```
 
 Expected: required STT/Piper/FFmpeg tools exist, obsolete packages/tools are absent, and the process has no network path.
@@ -529,7 +529,7 @@ curl --fail --silent --show-error http://127.0.0.1:8002/readyz
 free -h
 free -b
 docker stats --no-stream
-candidate_audio_container="$(docker ps --filter 'label=com.docker.compose.service=audio' --filter 'label=com.docker.compose.project=bmo-p9-1' --format '{{.Names}}' | head -1)"
+candidate_audio_container="$(docker ps --filter 'label=com.docker.compose.service=audio' --filter 'label=com.docker.compose.project=joy-p9-1' --format '{{.Names}}' | head -1)"
 test -n "${candidate_audio_container}"
 docker inspect "${candidate_audio_container}" --format 'oom_killed={{.State.OOMKilled}} restarts={{.RestartCount}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'
 ```
@@ -543,9 +543,9 @@ Use the real WAV fixture and protected internal service token without printing i
 ```bash
 python3 audio-service/scripts/verify_voice_pipeline.py \
   --base-url http://127.0.0.1:8002 \
-  --token-file /opt/bmo/config/audio-service.token \
+  --token-file /opt/joy/config/audio-service.token \
   --wav audio-service/temp/real-inference-fixtures/english.wav \
-  --output /tmp/bmo-piper-candidate-result.json
+  --output /tmp/joy-piper-candidate-result.json
 ```
 
 Expected: candidate STT returns speech, candidate TTS returns `X-TTS-Engine: piper`, FFmpeg reports valid mono 24 kHz MP3 at the configured bitrate, and the result identifies port 8002. If the protected token file has a different known path, use that path without printing its contents.
@@ -556,11 +556,11 @@ Use candidate backend `http://127.0.0.1:3010` and candidate-only device credenti
 
 ```bash
 cd backend
-BMO_BASE_URL=http://127.0.0.1:3010 \
-DEVICE_ID=bmo-001 \
-DEVICE_TOKEN="$(docker inspect bmo-p9-1-backend-1 --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^DEVICE_TOKEN=//p')" \
+Joy_BASE_URL=http://127.0.0.1:3010 \
+DEVICE_ID=joy-001 \
+DEVICE_TOKEN="$(docker inspect joy-p9-1-backend-1 --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^DEVICE_TOKEN=//p')" \
 FAKE_ESP32_WAV_PATH=../audio-service/temp/real-inference-fixtures/english.wav \
-FAKE_ESP32_OUTPUT_MP3_PATH=/tmp/bmo-piper-candidate-fake-esp.mp3 \
+FAKE_ESP32_OUTPUT_MP3_PATH=/tmp/joy-piper-candidate-fake-esp.mp3 \
 npm run fake-esp32
 ```
 
@@ -582,8 +582,8 @@ If all candidate checks pass, stop only candidate services before promotion unle
 Run:
 
 ```bash
-old_audio_digest="$(docker inspect bmo-production-audio-1 --format '{{.Image}}')"
-candidate_audio_digest="$(docker image inspect bmo-audio:piper-only-candidate-$(git rev-parse --short HEAD) --format '{{.Id}}')"
+old_audio_digest="$(docker inspect joy-production-audio-1 --format '{{.Image}}')"
+candidate_audio_digest="$(docker image inspect joy-audio:piper-only-candidate-$(git rev-parse --short HEAD) --format '{{.Id}}')"
 test -n "${old_audio_digest}"
 test -n "${candidate_audio_digest}"
 printf '%s\n' "old_audio_digest=${old_audio_digest}" "candidate_audio_digest=${candidate_audio_digest}"
@@ -634,17 +634,17 @@ Capture audio RSS, host `MemAvailable`, image sizes, and disk usage using Task 1
 Run read-only inventory:
 
 ```bash
-find /opt/bmo/models /opt/bmo/cache/audio /opt/bmo/temp -xdev \( -iname '*kokoro*' -o -iname '*rvc*' -o -iname '*rmvpe*' -o -iname '*hubert*' \) -print
-du -sb /opt/bmo/models/runtime/kokoro-82m-af-heart /opt/bmo/models/kokoro 2>/dev/null || true
-find /opt/bmo/cache/audio -xdev -type d -iname '*kokoro*' -print
-find /opt/bmo -xdev -type f \( -iname '*rvc*' -o -iname '*kokoro*' \) -print
+find /opt/joy/models /opt/joy/cache/audio /opt/joy/temp -xdev \( -iname '*kokoro*' -o -iname '*rvc*' -o -iname '*rmvpe*' -o -iname '*hubert*' \) -print
+du -sb /opt/joy/models/runtime/kokoro-82m-af-heart /opt/joy/models/kokoro 2>/dev/null || true
+find /opt/joy/cache/audio -xdev -type d -iname '*kokoro*' -print
+find /opt/joy -xdev -type f \( -iname '*rvc*' -o -iname '*kokoro*' \) -print
 ```
 
 Require every deletion target to be Kokoro/RVC-only. Do not delete Whisper, Piper, or shared cache roots.
 
 - [ ] **Step 2: Delete only verified obsolete model/cache/archive artifacts**
 
-After Task 8 production readiness, delete only reviewed Kokoro/RVC directories/files using explicit paths and a recoverable operator procedure. Do not use broad `rm -rf /opt/bmo/models`, `rm -rf /opt/bmo/cache/audio`, or Docker volume/image prune. Keep the old production image until rollback-retention is verified.
+After Task 8 production readiness, delete only reviewed Kokoro/RVC directories/files using explicit paths and a recoverable operator procedure. Do not use broad `rm -rf /opt/joy/models`, `rm -rf /opt/joy/cache/audio`, or Docker volume/image prune. Keep the old production image until rollback-retention is verified.
 
 - [ ] **Step 3: Rewrite active documentation and mark historical evidence**
 
@@ -705,4 +705,4 @@ Expected: all relevant tests pass; final status contains only unrelated pre-exis
 
 - [ ] **Step 4: Produce the required final report**
 
-Use the exact `BMO_PIPER_ONLY_PURGE_RESULT` format from the user request. Return `PASS` only if candidate and post-promotion end-to-end verification passed with numeric resource before/after evidence. Return `BLOCKED` for any resource gate, candidate, promotion, or verification failure, naming the first failed gate and confirming production/image/model safety state.
+Use the exact `Joy_PIPER_ONLY_PURGE_RESULT` format from the user request. Return `PASS` only if candidate and post-promotion end-to-end verification passed with numeric resource before/after evidence. Return `BLOCKED` for any resource gate, candidate, promotion, or verification failure, naming the first failed gate and confirming production/image/model safety state.

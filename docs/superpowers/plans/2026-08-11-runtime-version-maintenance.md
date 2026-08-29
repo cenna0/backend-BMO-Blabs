@@ -1,12 +1,12 @@
-# BMO Runtime Version Maintenance Implementation Plan
+# Joy Runtime Version Maintenance Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task with verification checkpoints.
 
-**Goal:** Audit and safely update only the live VPS runtime components whose stable versions are newer, preserving healthy BMO production and recording evidence for every component.
+**Goal:** Audit and safely update only the live VPS runtime components whose stable versions are newer, preserving healthy Joy production and recording evidence for every component.
 
 **Architecture:** Work in the requested order: Codex CLI, Hermes Agent, Docker Engine, then the private PostgreSQL 16 candidate. Each component gets an official-source check, compatibility decision, one bounded update, immediate version/health/regression verification, and documentation synchronization before the next component. Historical evidence remains unchanged.
 
-**Tech Stack:** Ubuntu 24.04, systemd, Docker Engine/Compose, Hermes systemd service, PostgreSQL 16 Alpine container, BMO Backend/Audio containers, Caddy, Beszel, Codex CLI, Git.
+**Tech Stack:** Ubuntu 24.04, systemd, Docker Engine/Compose, Hermes systemd service, PostgreSQL 16 Alpine container, Joy Backend/Audio containers, Caddy, Beszel, Codex CLI, Git.
 
 ---
 
@@ -29,7 +29,7 @@
 
 - [ ] Identify the installed binary and its official update mechanism.
 - [ ] Update only when the official stable target is newer and the mechanism is non-destructive.
-- [ ] Run `codex --version` and record the result; do not restart BMO services.
+- [ ] Run `codex --version` and record the result; do not restart Joy services.
 
 ### Task 3: Hermes Agent
 
@@ -77,7 +77,7 @@
 - Modify: `docs/NEXT-ACTION.md` for current runtime claims if needed
 - Modify: `docs/operations/MAINTENANCE-AND-RECOVERY.md` with observed/verified timestamps
 
-- [ ] Run the complete BMO health and fake-device regression: health, WSS/auth, pairing path, voice STT, Hermes, Piper, `audio_ready`, MP3 serving, Backend, Audio, Caddy, and Beszel.
+- [ ] Run the complete Joy health and fake-device regression: health, WSS/auth, pairing path, voice STT, Hermes, Piper, `audio_ready`, MP3 serving, Backend, Audio, Caddy, and Beszel.
 - [ ] Scan tracked files for stale current-version claims while preserving historical evidence.
 - [ ] Review `git diff` and ensure only runtime maintenance documentation/config changes are present.
 - [ ] Commit and push only after fresh verification; report exact before/after versions, skipped/blocked components, tests, changed files, branch, commit SHA, status, and next action.

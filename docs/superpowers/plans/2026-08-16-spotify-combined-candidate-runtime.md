@@ -17,7 +17,7 @@
 
 - [ ] **Step 1: Assert the canonical env seed contract**
 
-  Require `/opt/bmo/config/p9.1/compose.env`, the exact source `/tmp/bmo-p9-1-validation-20260804/compose.env`, `install -m 0600`, and no content-printing command.
+  Require `/opt/joy/config/p9.1/compose.env`, the exact source `/tmp/joy-p9-1-validation-20260804/compose.env`, `install -m 0600`, and no content-printing command.
 
 - [ ] **Step 2: Assert the Compose command matrix**
 
@@ -38,7 +38,7 @@
 
 - [ ] **Step 1: Implement read-only path/mode checks**
 
-  Require `P9_COMPOSE_ENV_FILE` to equal `/opt/bmo/config/p9.1/compose.env`, require a non-empty regular non-symlink file, reject permissions broader than `0600`, and print only sanitized status.
+  Require `P9_COMPOSE_ENV_FILE` to equal `/opt/joy/config/p9.1/compose.env`, require a non-empty regular non-symlink file, reject permissions broader than `0600`, and print only sanitized status.
 
 ### Task 3: Correct the operator runbook
 
@@ -47,7 +47,7 @@
 
 - [ ] **Step 1: Document the non-executed env seed**
 
-  Use `install` from the existing temporary source, preserve `bmo-admin:bmo-admin` ownership and `0700`/`0600` modes, and explicitly state the command is not executed by this task.
+  Use `install` from the existing temporary source, preserve `joy-admin:joy-admin` ownership and `0700`/`0600` modes, and explicitly state the command is not executed by this task.
 
 - [ ] **Step 2: Document the exact file matrix**
 

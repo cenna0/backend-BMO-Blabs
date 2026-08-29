@@ -1,7 +1,7 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO Backend MVP — Testing, Acceptance, and Evidence
+# Joy Backend MVP — Testing, Acceptance, and Evidence
 
 **Versi:** 1.0.1  
 **Status:** CANONICAL VERIFICATION REFERENCE
@@ -46,7 +46,7 @@ Physical ESP32 test dan progressive hardware playback tetap requirement final da
 | P3 | Kokoro, waveform merge, FFmpeg, RVC + fallback, audio metadata | Hermes/full orchestration |
 | P4 | Hermes adapter, output parsing/filtering, full STT→Hermes→TTS orchestration | Deployment publik dan final benchmark |
 | P5 | Reconnect, duplicate/idempotency, lifecycle, TTL, cleanup, security, failure matrix, full regression | Domain/TLS tanpa approval |
-| P6 | VPS foundation, secure operations, monitoring/alerts, backup baseline | Public BMO API claim before foundation verification |
+| P6 | VPS foundation, secure operations, monitoring/alerts, backup baseline | Public Joy API claim before foundation verification |
 | P7 | VPS backend/audio deployment, Hermes integration, public HTTPS/WSS fake-device E2E | Physical ESP32 sign-off |
 | P8 | Real RVC inference, fallback regression, CPU/RAM/latency benchmark | Hardware protocol change |
 | P9 | PostgreSQL/Prisma readiness, migration, backup/restore | Moving voice request state into DB |
@@ -159,7 +159,7 @@ Implementasi dianggap selesai jika:
 - [ ] Display hanya memakai `idle`, `thinking`, `speaking`, dan `error`; tidak ada mode `listening`.
 - [ ] STT memahami English, Indonesian, dan mixed input.
 - [ ] No-speech tidak dikirim ke Hermes.
-- [ ] Hermes memakai `conversation:bmo-001`, `store:true`, `stream:false`, dan `truncation:auto`; continuity named conversation terbukti.
+- [ ] Hermes memakai `conversation:joy-001`, `store:true`, `stream:false`, dan `truncation:auto`; continuity named conversation terbukti.
 - [ ] Hermes menjawab selalu dalam English.
 - [ ] Output Hermes plain text tanpa Markdown.
 - [ ] Provider error tidak diteruskan ke TTS.

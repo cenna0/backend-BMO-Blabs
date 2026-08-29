@@ -22,7 +22,7 @@ The strict ordinary Mobile claim contains only the six-digit `code`. It does
 not accept `pairingId`, `hardwareId`, `deviceName`, `deviceCredential`,
 `DEVICE_TOKEN`, or `tokenHash`. A non-secret `hardwareId` may appear later in a
 normal `SafeDevice` response, but it is never a Mobile pairing input. Device
-name defaults to `BMO`; friendly rename happens through existing settings APIs.
+name defaults to `Joy`; friendly rename happens through existing settings APIs.
 
 ## Trusted hardware enrollment
 

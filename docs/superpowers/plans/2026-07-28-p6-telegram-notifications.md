@@ -12,13 +12,13 @@
 
 ## File structure
 
-- `ops/telegram/bmo_telegram_notify.py`: strict Telegram client, Hermes health validation, persistent three-failure/recovery state machine, and fixed labeled direct-path test.
+- `ops/telegram/joy_telegram_notify.py`: strict Telegram client, Hermes health validation, persistent three-failure/recovery state machine, and fixed labeled direct-path test.
 - `ops/telegram/beszel_telegram_relay.py`: private HTTP relay that maps strict Telegram delivery to fixed HTTP success/failure for Beszel.
 - `ops/telegram/configure_beszel_telegram.py`: short-lived local PocketBase auth token, settings-preserving Beszel webhook configuration, and sanitized Beszel test invocation.
-- `ops/telegram/systemd/bmo-hermes-health-notify.service`: sandboxed one-shot health check with systemd credentials and persistent state directory.
-- `ops/telegram/systemd/bmo-hermes-health-notify.timer`: one-minute scheduler.
-- `ops/telegram/systemd/bmo-telegram-test.service`: static sandboxed direct-path receipt test.
-- `tests/operations/test_bmo_telegram_notify.py`: strict HTTP/API validation and health state-machine tests.
+- `ops/telegram/systemd/joy-hermes-health-notify.service`: sandboxed one-shot health check with systemd credentials and persistent state directory.
+- `ops/telegram/systemd/joy-hermes-health-notify.timer`: one-minute scheduler.
+- `ops/telegram/systemd/joy-telegram-test.service`: static sandboxed direct-path receipt test.
+- `tests/operations/test_joy_telegram_notify.py`: strict HTTP/API validation and health state-machine tests.
 - `tests/operations/test_beszel_telegram_relay.py`: relay success/failure and log-sanitization tests.
 - `tests/operations/test_configure_beszel_telegram.py`: JWT construction, settings merge, and sanitized API failure tests.
 - `docs/backend-mvp/P6-TEST-EVIDENCE.md`: sanitized final P6 evidence.
@@ -28,8 +28,8 @@
 ### Task 1: Strict Telegram client and Hermes state machine
 
 **Files:**
-- Create: `tests/operations/test_bmo_telegram_notify.py`
-- Create: `ops/telegram/bmo_telegram_notify.py`
+- Create: `tests/operations/test_joy_telegram_notify.py`
+- Create: `ops/telegram/joy_telegram_notify.py`
 
 - [ ] **Step 1: Write failing strict-delivery tests**
 
@@ -64,10 +64,10 @@ class TelegramDeliveryTests(unittest.TestCase):
 Run:
 
 ```bash
-python3 -m unittest -v tests.operations.test_bmo_telegram_notify
+python3 -m unittest -v tests.operations.test_joy_telegram_notify
 ```
 
-Expected: import failure because `ops.telegram.bmo_telegram_notify` does not exist.
+Expected: import failure because `ops.telegram.joy_telegram_notify` does not exist.
 
 - [ ] **Step 3: Implement strict in-process Telegram delivery**
 
@@ -160,8 +160,8 @@ Use fixed messages labeled `[P6 HERMES HEALTH] DOWN`,
 Run:
 
 ```bash
-python3 -m unittest -v tests.operations.test_bmo_telegram_notify
-python3 -m py_compile ops/telegram/bmo_telegram_notify.py
+python3 -m unittest -v tests.operations.test_joy_telegram_notify
+python3 -m py_compile ops/telegram/joy_telegram_notify.py
 ```
 
 Expected: all tests pass and compilation exits zero.
@@ -283,7 +283,7 @@ Expected: all tests pass and compilation exits zero.
 **Files:**
 - Create: `tests/operations/test_beszel_telegram_relay.py`
 - Create: `ops/telegram/beszel_telegram_relay.py`
-- Modify: `/opt/bmo/deploy/infra-compose.yml`
+- Modify: `/opt/joy/deploy/infra-compose.yml`
 
 - [ ] **Step 1: Test relay success and sanitized failure**
 
@@ -296,7 +296,7 @@ logged.
 - [ ] **Step 2: Implement the relay**
 
 Accept only `POST /notify` and `GET /health`, bound to the container network.
-Read a bounded UTF-8 message, prefix it with `[BMO BESZEL]`, and call the strict
+Read a bounded UTF-8 message, prefix it with `[JOY BESZEL]`, and call the strict
 Telegram client in-process. Never log the message, request path, token, chat
 identifier, exception message, or Telegram response body.
 
@@ -311,9 +311,9 @@ but do not start the relay before the token file exists.
 ### Task 3: Hardened systemd units
 
 **Files:**
-- Create: `ops/telegram/systemd/bmo-hermes-health-notify.service`
-- Create: `ops/telegram/systemd/bmo-hermes-health-notify.timer`
-- Create: `ops/telegram/systemd/bmo-telegram-test.service`
+- Create: `ops/telegram/systemd/joy-hermes-health-notify.service`
+- Create: `ops/telegram/systemd/joy-hermes-health-notify.timer`
+- Create: `ops/telegram/systemd/joy-telegram-test.service`
 
 - [ ] **Step 1: Create the health service**
 
@@ -321,17 +321,17 @@ Required unit properties:
 
 ```ini
 [Unit]
-Description=BMO Hermes health notification check
+Description=Joy Hermes health notification check
 After=network-online.target hermes-gateway.service
 Wants=network-online.target
 
 [Service]
 Type=oneshot
 DynamicUser=yes
-ExecStart=/usr/local/libexec/bmo-hermes-health-notify check
-LoadCredential=telegram-bot-token:/opt/bmo/config/telegram/bot-token
-LoadCredential=telegram-chat-id:/opt/bmo/config/telegram/chat-id
-StateDirectory=bmo-hermes-health-notify
+ExecStart=/usr/local/libexec/joy-hermes-health-notify check
+LoadCredential=telegram-bot-token:/opt/joy/config/telegram/bot-token
+LoadCredential=telegram-chat-id:/opt/joy/config/telegram/chat-id
+StateDirectory=joy-hermes-health-notify
 StateDirectoryMode=0700
 UMask=0077
 NoNewPrivileges=yes
@@ -357,7 +357,7 @@ OnBootSec=2min
 OnUnitActiveSec=60s
 AccuracySec=5s
 RandomizedDelaySec=5s
-Unit=bmo-hermes-health-notify.service
+Unit=joy-hermes-health-notify.service
 
 [Install]
 WantedBy=timers.target
@@ -368,7 +368,7 @@ WantedBy=timers.target
 Use the same credentials and sandboxing, omit `StateDirectory`, and set:
 
 ```ini
-ExecStart=/usr/local/libexec/bmo-hermes-health-notify test
+ExecStart=/usr/local/libexec/joy-hermes-health-notify test
 ```
 
 No `[Install]` section is allowed, preventing recurring enablement.
@@ -379,9 +379,9 @@ Run:
 
 ```bash
 systemd-analyze verify \
-  ops/telegram/systemd/bmo-hermes-health-notify.service \
-  ops/telegram/systemd/bmo-hermes-health-notify.timer \
-  ops/telegram/systemd/bmo-telegram-test.service
+  ops/telegram/systemd/joy-hermes-health-notify.service \
+  ops/telegram/systemd/joy-hermes-health-notify.timer \
+  ops/telegram/systemd/joy-telegram-test.service
 ```
 
 Expected: no syntax or dependency errors.
@@ -389,12 +389,12 @@ Expected: no syntax or dependency errors.
 ### Task 4: Install host components and collect the token securely
 
 **Files:**
-- Install: `/usr/local/libexec/bmo-hermes-health-notify` (`root:root`, `0755`)
+- Install: `/usr/local/libexec/joy-hermes-health-notify` (`root:root`, `0755`)
 - Install: `/usr/local/libexec/bmo-configure-beszel-telegram` (`root:root`, `0750`)
-- Install: `/usr/local/libexec/bmo-beszel-telegram-relay` (`root:root`, `0755`)
+- Install: `/usr/local/libexec/joy-beszel-telegram-relay` (`root:root`, `0755`)
 - Install: the three source units under `/etc/systemd/system/` (`root:root`, `0644`)
-- Create: `/opt/bmo/config/telegram/chat-id` (`root:root`, `0600`)
-- User creates: `/opt/bmo/config/telegram/bot-token` (`root:root`, `0600`)
+- Create: `/opt/joy/config/telegram/chat-id` (`root:root`, `0600`)
+- User creates: `/opt/joy/config/telegram/bot-token` (`root:root`, `0600`)
 
 - [ ] **Step 1: Install scripts, units, directory, and chat file**
 
@@ -407,7 +407,7 @@ enable the timer until the live direct-path test succeeds.
 The operator runs this in their own Tailscale SSH terminal:
 
 ```bash
-sudo install -d -o root -g root -m 0700 /opt/bmo/config/telegram
+sudo install -d -o root -g root -m 0700 /opt/joy/config/telegram
 sudo bash -c '
 set -eu
 umask 077
@@ -419,25 +419,25 @@ if ! [[ "$token" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]]; then
   unset token
   exit 1
 fi
-tmp="$(mktemp /opt/bmo/config/telegram/.bot-token.XXXXXX)"
+tmp="$(mktemp /opt/joy/config/telegram/.bot-token.XXXXXX)"
 trap '\''rm -f -- "$tmp"; unset token'\'' EXIT
 printf "%s\n" "$token" >"$tmp"
 chown root:root "$tmp"
 chmod 0600 "$tmp"
-mv -f -- "$tmp" /opt/bmo/config/telegram/bot-token
+mv -f -- "$tmp" /opt/joy/config/telegram/bot-token
 trap - EXIT
 unset token
 '
 sudo stat -c '%A %U:%G %n' \
-  /opt/bmo/config/telegram \
-  /opt/bmo/config/telegram/bot-token
+  /opt/joy/config/telegram \
+  /opt/joy/config/telegram/bot-token
 ```
 
 Expected metadata:
 
 ```text
-drwx------ root:root /opt/bmo/config/telegram
--rw------- root:root /opt/bmo/config/telegram/bot-token
+drwx------ root:root /opt/joy/config/telegram
+-rw------- root:root /opt/joy/config/telegram/bot-token
 ```
 
 - [ ] **Step 3: Verify metadata without reading contents**
@@ -450,7 +450,7 @@ metadata and boolean validation results.
 
 - [ ] **Step 1: Run the direct strict test**
 
-Start `bmo-telegram-test.service`. Success requires:
+Start `joy-telegram-test.service`. Success requires:
 
 ```text
 systemd service Result=success
@@ -479,7 +479,7 @@ value.
 Require confirmation of:
 
 1. `[P6 HERMES PATH TEST]` from the strict host notifier;
-2. `[BMO BESZEL]` plus Beszel's built-in `Test Alert` / “notification from
+2. `[JOY BESZEL]` plus Beszel's built-in `Test Alert` / “notification from
    Beszel” message.
 
 Do not mark either delivered or P6 verified before the operator confirms both.
@@ -489,8 +489,8 @@ Do not mark either delivered or P6 verified before the operator confirms both.
 After confirmation:
 
 ```bash
-systemctl enable --now bmo-hermes-health-notify.timer
-systemctl start bmo-hermes-health-notify.service
+systemctl enable --now joy-hermes-health-notify.timer
+systemctl start joy-hermes-health-notify.service
 ```
 
 Verify the timer is enabled/active, the manual healthy run succeeds, state is
@@ -541,11 +541,11 @@ Run:
 ```bash
 python3 -m unittest -v \
   tests.operations.test_beszel_telegram_relay \
-  tests.operations.test_bmo_telegram_notify \
+  tests.operations.test_joy_telegram_notify \
   tests.operations.test_configure_beszel_telegram
 python3 -m py_compile \
   ops/telegram/beszel_telegram_relay.py \
-  ops/telegram/bmo_telegram_notify.py \
+  ops/telegram/joy_telegram_notify.py \
   ops/telegram/configure_beszel_telegram.py \
   scripts/verify-backend-mvp-docs.py
 python3 scripts/verify-backend-mvp-docs.py

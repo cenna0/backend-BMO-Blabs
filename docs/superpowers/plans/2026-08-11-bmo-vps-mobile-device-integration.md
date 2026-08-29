@@ -1,8 +1,8 @@
-# BMO VPS Mobile and Device Integration Implementation Plan
+# Joy VPS Mobile and Device Integration Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Integrate the frozen mobile/device application contract into the single production-shaped BMO Backend API candidate while preserving the public physical voice path and keeping production rollout gated.
+**Goal:** Integrate the frozen mobile/device application contract into the single production-shaped Joy Backend API candidate while preserving the public physical voice path and keeping production rollout gated.
 
 **Architecture:** Extend the existing `createBackendRuntime` and P9.1 Prisma runtime; do not create a second business API. PostgreSQL remains durable truth, `/api/v1/ws` is a separate authenticated mobile event transport, `/ws` remains the device voice socket with an additive owner-binding bridge, and Hermes/Audio/provider calls stay behind Backend services.
 

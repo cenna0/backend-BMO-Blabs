@@ -30,10 +30,10 @@ transfer, pause/resume/skip, seek, volume, shuffle, and repeat.
 The WhatsApp implementation uses the installed Hermes 0.20.0 Baileys bridge
 unchanged as a transport-only process for the user's personal WhatsApp
 account. `hermes-gateway.service` keeps `WHATSAPP_ENABLED=false`; a separate
-`bmo-whatsapp-bridge.service` binds the official bridge to loopback
+`joy-whatsapp-bridge.service` binds the official bridge to loopback
 `127.0.0.1:3001` with the paired session at
 `/home/hermes/.hermes/whatsapp/session` and `--mode bot`. `bot` is transport
-semantics, not a second-number product identity. BMO Backend is the sole
+semantics, not a second-number product identity. Joy Backend is the sole
 `GET /messages` consumer and the launcher uses official
 `WHATSAPP_DM_POLICY=pairing` only to admit events to the private queue. An
 optional protected non-wildcard `WHATSAPP_ALLOWED_USERS` value is used only by

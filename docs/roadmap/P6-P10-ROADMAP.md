@@ -1,7 +1,7 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO — P6–P10 Infrastructure and Hardware Readiness Roadmap
+# Joy — P6–P10 Infrastructure and Hardware Readiness Roadmap
 
 > **HISTORICAL ROADMAP — NOT CURRENT EXECUTION INSTRUCTIONS**
 > P9 Backend rollout and seven migrations are complete. Current Mobile/ESP work
@@ -25,7 +25,7 @@ record.
 [`../backend-mvp/P6-TEST-EVIDENCE.md`](../backend-mvp/P6-TEST-EVIDENCE.md).
 
 ### Goal
-Prepare a safe, repeatable VPS foundation without yet claiming the BMO voice stack is publicly ready.
+Prepare a safe, repeatable VPS foundation without yet claiming the Joy voice stack is publicly ready.
 
 ### Inputs
 - existing VPS;
@@ -38,15 +38,15 @@ Prepare a safe, repeatable VPS foundation without yet claiming the BMO voice sta
 - preflight audit;
 - classify Hermes from recorded evidence; preserve it when present; bootstrap it when absent;
 - keep Hermes as a host runtime, bind only to `127.0.0.1:8642`, and record actual user/paths/startup/recovery evidence;
-- create/confirm `bmo-admin` operating model and Codex access from that account;
+- create/confirm `joy-admin` operating model and Codex access from that account;
 - install/configure Docker Engine + Compose if absent;
-- create `/opt/bmo` layout/ownership including persistent `MODEL_MANIFEST.md`;
+- create `/opt/joy` layout/ownership including persistent `MODEL_MANIFEST.md`;
 - config/secret separation;
 - Caddy baseline;
 - DNS/TLS preparation;
 - Tailscale admin access setup and SSH migration verification;
 - firewall baseline;
-- Beszel + public authenticated `monitor.personalbmo.web.id`;
+- Beszel + public authenticated `monitor.personaljoy.web.id`;
 - Telegram alert integration using VPS-held secret;
 - Docker log rotation/resource observability;
 - backup directories/schedules and restore procedure draft;
@@ -65,13 +65,13 @@ Prepare a safe, repeatable VPS foundation without yet claiming the BMO voice sta
 - Hermes health passes, listener is only `127.0.0.1:8642`, and no public `:8642` exposure exists;
 - Hermes restart behavior is verified and reboot/autostart behavior is checked where safely possible;
 - Docker/Compose works;
-- `/opt/bmo` ownership/permissions verified;
+- `/opt/joy` ownership/permissions verified;
 - secrets are outside Git and mode-restricted;
 - public exposure is limited to approved reverse-proxy ports;
 - Tailscale SSH path is tested before public SSH is restricted;
 - Beszel is reachable through HTTPS/login and can alert Telegram;
 - backup mechanism can create a test artifact;
-- no BMO API availability claim yet unless P7 also passes.
+- no Joy API availability claim yet unless P7 also passes.
 
 ### Dependency
 None beyond safe access to the existing VPS and explicit authorization for risky network changes.
@@ -88,7 +88,7 @@ None beyond safe access to the existing VPS and explicit authorization for risky
 - deployment source:
   `4d7b472adc4c2243d8f7364032a491ad70efb6d3`;
 - immutable backend/audio image digests are recorded in the P7 evidence;
-- public HTTPS/WSS endpoint `api.personalbmo.web.id` is live and verified;
+- public HTTPS/WSS endpoint `api.personaljoy.web.id` is live and verified;
 - public fake-ESP32 acceptance passed `23/23`;
 - production/resource soak passed and P7 closure is complete;
 - `hardware-handoff/DEPLOYMENT-CONFIG.md` is verified, unlocking the live
@@ -106,7 +106,7 @@ Run the existing backend/audio implementation on the real VPS and expose it safe
 - P6-verified Hermes host API healthy on `127.0.0.1:8642`.
 
 ### Scope
-- verify/fetch the P6-established `/opt/bmo/app` Git checkout and select the exact `main` commit to deploy;
+- verify/fetch the P6-established `/opt/joy/app` Git checkout and select the exact `main` commit to deploy;
 - fresh source-vs-doc contract audit before deployment: routes/events/env behavior must match the canonical HW contract and current runtime docs; block/document any conflict before changing public behavior;
 - build immutable backend/audio images with restart/health readiness policy;
 - preserve/test the target topology: backend host networking + loopback `:3000`, Audio Service loopback publish `:8001`, Hermes host loopback `:8642`;
@@ -115,7 +115,7 @@ Run the existing backend/audio implementation on the real VPS and expose it safe
 - run backend/audio containers as non-root where possible;
 - connect backend → Hermes host service;
 - P7 integrates backend/audio with Hermes; it does not perform initial Hermes installation.
-- Caddy route `api.personalbmo.web.id`;
+- Caddy route `api.personaljoy.web.id`;
 - HTTPS/WSS public smoke tests;
 - fake ESP32 E2E over public domain;
 - measure baseline CPU/RAM/disk/latency;
@@ -130,7 +130,7 @@ Run the existing backend/audio implementation on the real VPS and expose it safe
 - `hardware-handoff/DEPLOYMENT-CONFIG.md` updated to `VERIFIED` only if the public fake-ESP32 gate passes, which allows the HW team to begin live endpoint integration before final P10 physical acceptance.
 
 ### Acceptance criteria
-- `https://api.personalbmo.web.id/health` works through Caddy;
+- `https://api.personaljoy.web.id/health` works through Caddy;
 - WSS auth works through public hostname;
 - valid WAV upload returns canonical response;
 - `thinking` and `audio_ready` work through WSS;
@@ -161,7 +161,7 @@ the archived experimental branch remains host-capacity blocked.
 ### Inputs
 - P7 deployed Audio Service;
 - verified RVC asset revision/hash;
-- candidate future layout `/opt/bmo/models/rvc/bmo/`, subject to P8 audit; this
+- candidate future layout `/opt/joy/models/rvc/bmo/`, subject to P8 audit; this
   path was not provisioned or resolved by P7.
 
 ### Scope

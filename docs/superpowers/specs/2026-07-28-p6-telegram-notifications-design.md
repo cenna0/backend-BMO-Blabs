@@ -18,9 +18,9 @@ This work does not deploy or modify P7 application services.
 Runtime credentials live outside Git:
 
 ```text
-/opt/bmo/config/telegram/             root:root 0700
-/opt/bmo/config/telegram/bot-token    root:root 0600
-/opt/bmo/config/telegram/chat-id      root:root 0600
+/opt/joy/config/telegram/             root:root 0700
+/opt/joy/config/telegram/bot-token    root:root 0600
+/opt/joy/config/telegram/chat-id      root:root 0600
 ```
 
 The operator enters the token from `/dev/tty` with terminal echo disabled. The
@@ -75,11 +75,11 @@ the request body, stored URL, response body, or authorization material.
 Install a small host notifier, a timer/service pair, and a static test service:
 
 ```text
-/usr/local/libexec/bmo-hermes-health-notify
-/usr/local/libexec/bmo-beszel-telegram-relay
-/etc/systemd/system/bmo-hermes-health-notify.service
-/etc/systemd/system/bmo-hermes-health-notify.timer
-/etc/systemd/system/bmo-telegram-test.service
+/usr/local/libexec/joy-hermes-health-notify
+/usr/local/libexec/joy-beszel-telegram-relay
+/etc/systemd/system/joy-hermes-health-notify.service
+/etc/systemd/system/joy-hermes-health-notify.timer
+/etc/systemd/system/joy-telegram-test.service
 ```
 
 The timer runs once per minute. The notifier requests

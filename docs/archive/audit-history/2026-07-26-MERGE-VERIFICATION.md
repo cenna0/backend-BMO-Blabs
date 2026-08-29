@@ -1,4 +1,4 @@
-# BMO Docs Merge Verification — 2026-07-26
+# Joy Docs Merge Verification — 2026-07-26
 
 **Result:** PASS
 
@@ -8,7 +8,7 @@ This package uses the previous hardware-handoff package as its base and applies 
 
 ```env
 WHISPER_MODEL=medium
-WHISPER_HOTWORDS=BMO
+WHISPER_HOTWORDS=Joy
 WHISPER_DEVICE=cpu
 WHISPER_COMPUTE_TYPE=int8
 WHISPER_CPU_THREADS=4
@@ -27,7 +27,7 @@ Historical P2 evidence may still mention `small`; historical P5 UAT evidence may
 
 - `hardware-handoff/` retained.
 - `roadmap/P6-P10-ROADMAP.md` retained.
-- `/opt/bmo` production layout retained.
+- `/opt/joy` production layout retained.
 - Caddy/domain/Tailscale/Beszel/Telegram/backup/deployment decisions retained.
 - Real RVC remains unverified and is still a P8 gate; Kokoro fallback remains valid.
 

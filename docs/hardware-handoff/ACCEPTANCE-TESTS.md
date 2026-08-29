@@ -1,7 +1,7 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO MVP — Physical ESP32 Acceptance Tests
+# Joy MVP — Physical ESP32 Acceptance Tests
 
 > **VOICE-SPECIFIC PHYSICAL MATRIX**
 > Start at
@@ -47,7 +47,7 @@ Notes:
 
 ### HW-AT-001 — Production TLS/time prerequisite
 
-**Action:** Boot on normal network, synchronize device time, connect to the verified `wss://api.personalbmo.web.id/ws` hostname with certificate validation enabled.
+**Action:** Boot on normal network, synchronize device time, connect to the verified `wss://api.personaljoy.web.id/ws` hostname with certificate validation enabled.
 **Pass:** device clock is trustworthy enough for certificate validity, WSS handshake succeeds without insecure/skip-verify mode, and firmware connects by hostname rather than hardcoding the VPS IP.
 
 ### HW-AT-002 — Local recording stop rules
@@ -58,7 +58,7 @@ Notes:
 ### HW-AT-003 — WSS connect + authenticate
 
 **Action:** Boot device, connect Wi-Fi and WSS, send valid `authenticate`.  
-**Pass:** `authenticated` received for `bmo-001`; socket remains open.
+**Pass:** `authenticated` received for `joy-001`; socket remains open.
 
 ### HW-AT-004 — Invalid WebSocket credentials
 

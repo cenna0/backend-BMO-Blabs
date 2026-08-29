@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P3 — Kokoro + FFmpeg + RVC fallback Implementation Plan
 
@@ -7,7 +7,7 @@
 
 > **For agentic workers:** Execute inline in this session. No subagent delegation unless the user explicitly asks for it.
 
-**Goal:** Implement only P3 Audio Service voice synthesis: Kokoro English TTS, optional RVC BMO conversion, FFmpeg MP3 output, authenticated internal `/tts/synthesize`, model/cache safety, cleanup, tests, and local evidence.
+**Goal:** Implement only P3 Audio Service voice synthesis: Kokoro English TTS, optional RVC Joy conversion, FFmpeg MP3 output, authenticated internal `/tts/synthesize`, model/cache safety, cleanup, tests, and local evidence.
 
 **Architecture:** Keep P3 inside `audio-service/`. FastAPI remains the HTTP/auth boundary; `tts.py` owns text validation and synthesis orchestration; `kokoro_tts.py`, `ffmpeg.py`, and `rvc.py` isolate external runtimes behind injectable adapters; scripts handle safe model bootstrap and real local verification. Express backend, Hermes, public WebSocket/API, firmware, deployment, and P4–P6 remain untouched.
 

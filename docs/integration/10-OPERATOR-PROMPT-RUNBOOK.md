@@ -3,7 +3,7 @@
 > **COMPLETED / HISTORICAL — DO NOT EXECUTE AS A CURRENT PRODUCTION RUNBOOK.**
 > The candidate Spotify/WhatsApp workflow, production provisioning, six
 > migrations, backup checkpoints, Backend cutover, and source closure are
-> complete. Its `3010` port, loopback callback, `/tmp/bmo-p9-1-validation-*`
+> complete. Its `3010` port, loopback callback, `/tmp/joy-p9-1-validation-*`
 > paths, candidate overrides, and promotion commands are historical only.
 > Current Mobile engineers must start at `00-START-HERE.md`.
 
@@ -39,17 +39,17 @@ may be applied only to the isolated candidate project. Live OAuth is blocked
 until the operator completes these steps one at a time. No command in this
 section was executed by the source-wiring task.
 
-1. The current candidate uses `/tmp/bmo-p9-1-validation-20260804/compose.env`.
+1. The current candidate uses `/tmp/joy-p9-1-validation-20260804/compose.env`.
    Persist it later, only after separate operator authorization, at the one
-   canonical path `/opt/bmo/config/p9.1/compose.env` without printing contents:
+   canonical path `/opt/joy/config/p9.1/compose.env` without printing contents:
 
    ```bash
    umask 077
-   install -d -o bmo-admin -g bmo-admin -m 0700 /opt/bmo/config/p9.1
-   install -o bmo-admin -g bmo-admin -m 0600 \
-     /tmp/bmo-p9-1-validation-20260804/compose.env \
-     /opt/bmo/config/p9.1/compose.env
-   stat -c 'owner=%U:%G mode=%a path=%n' /opt/bmo/config/p9.1/compose.env
+   install -d -o joy-admin -g joy-admin -m 0700 /opt/joy/config/p9.1
+   install -o joy-admin -g joy-admin -m 0600 \
+     /tmp/joy-p9-1-validation-20260804/compose.env \
+     /opt/joy/config/p9.1/compose.env
+   stat -c 'owner=%U:%G mode=%a path=%n' /opt/joy/config/p9.1/compose.env
    ```
 
    The repository does not contain either env file. Do not use `cat`,
@@ -64,9 +64,9 @@ section was executed by the source-wiring task.
 5. Use these protected host paths outside Git:
 
    ```text
-   /opt/bmo/config/p9.1/spotify-client-id
-   /opt/bmo/config/p9.1/spotify-client-secret
-   /opt/bmo/config/p9.1/spotify-token-encryption-key
+   /opt/joy/config/p9.1/spotify-client-id
+   /opt/joy/config/p9.1/spotify-client-secret
+   /opt/joy/config/p9.1/spotify-token-encryption-key
    ```
 
    After separate authorization to provision secrets, create mode-0600 files
@@ -76,25 +76,25 @@ section was executed by the source-wiring task.
 6. Export paths, not secret values, and verify the exact env/secret contracts:
 
    ```bash
-   export P9_COMPOSE_ENV_FILE=/opt/bmo/config/p9.1/compose.env
-   export SPOTIFY_CLIENT_ID_FILE=/opt/bmo/config/p9.1/spotify-client-id
-   export SPOTIFY_CLIENT_SECRET_FILE=/opt/bmo/config/p9.1/spotify-client-secret
-   export SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE=/opt/bmo/config/p9.1/spotify-token-encryption-key
+   export P9_COMPOSE_ENV_FILE=/opt/joy/config/p9.1/compose.env
+   export SPOTIFY_CLIENT_ID_FILE=/opt/joy/config/p9.1/spotify-client-id
+   export SPOTIFY_CLIENT_SECRET_FILE=/opt/joy/config/p9.1/spotify-client-secret
+   export SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE=/opt/joy/config/p9.1/spotify-token-encryption-key
    export SPOTIFY_CALLBACK_URL=http://127.0.0.1:4310/api/v1/integrations/spotify/callback
-   /opt/bmo/app/ops/spotify/verify-candidate-env.sh
-   /opt/bmo/app/ops/spotify/verify-secret-files.sh
+   /opt/joy/app/ops/spotify/verify-candidate-env.sh
+   /opt/joy/app/ops/spotify/verify-secret-files.sh
    ```
 
 7. Set the immutable candidate image reference and render the complete
    combined Backend composition. Both provider overrides are required here:
 
    ```bash
-   export P9_CANDIDATE_IMAGE=bmo-p9.1-candidate:spotify-phase26-<final-sha>
-   docker compose --project-name bmo-p9-1 \
+   export P9_CANDIDATE_IMAGE=joy-p9.1-candidate:spotify-phase26-<final-sha>
+   docker compose --project-name joy-p9-1 \
      --env-file "$P9_COMPOSE_ENV_FILE" \
-     -f /opt/bmo/app/p9.1-compose.yml \
-     -f /opt/bmo/app/ops/whatsapp/p9.1-identity-resolver.override.yml \
-     -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
+     -f /opt/joy/app/p9.1-compose.yml \
+     -f /opt/joy/app/ops/whatsapp/p9.1-identity-resolver.override.yml \
+     -f /opt/joy/app/ops/spotify/p9.1-secrets.override.yml \
      config
    ```
 
@@ -102,9 +102,9 @@ section was executed by the source-wiring task.
    using the base file. The provider overrides are unnecessary for PostgreSQL:
 
    ```bash
-   docker compose --project-name bmo-p9-1 \
+   docker compose --project-name joy-p9-1 \
      --env-file "$P9_COMPOSE_ENV_FILE" \
-     -f /opt/bmo/app/p9.1-compose.yml \
+     -f /opt/joy/app/p9.1-compose.yml \
      up -d postgres
    ```
 
@@ -113,9 +113,9 @@ section was executed by the source-wiring task.
    provider runtime behavior:
 
    ```bash
-   docker compose --project-name bmo-p9-1 \
+   docker compose --project-name joy-p9-1 \
      --env-file "$P9_COMPOSE_ENV_FILE" \
-     -f /opt/bmo/app/p9.1-compose.yml \
+     -f /opt/joy/app/p9.1-compose.yml \
      run --rm --no-deps backend npm run prisma:migrate:deploy
    ```
 
@@ -123,11 +123,11 @@ section was executed by the source-wiring task.
     WhatsApp resolver and Spotify secrets remain present:
 
    ```bash
-   docker compose --project-name bmo-p9-1 \
+   docker compose --project-name joy-p9-1 \
      --env-file "$P9_COMPOSE_ENV_FILE" \
-     -f /opt/bmo/app/p9.1-compose.yml \
-     -f /opt/bmo/app/ops/whatsapp/p9.1-identity-resolver.override.yml \
-     -f /opt/bmo/app/ops/spotify/p9.1-secrets.override.yml \
+     -f /opt/joy/app/p9.1-compose.yml \
+     -f /opt/joy/app/ops/whatsapp/p9.1-identity-resolver.override.yml \
+     -f /opt/joy/app/ops/spotify/p9.1-secrets.override.yml \
      up -d --no-build --force-recreate backend
    ```
 

@@ -19,7 +19,7 @@ ESP32 --WSS /ws + HTTP raw WAV/MP3--> Caddy --> Backend API service
 ## Boundary rules
 
 - Caddy owns TLS/routing only. Backend owns authentication, authorization, APIs, application state, orchestration, and audit.
-- PostgreSQL owns durable BMO data. Hermes owns reasoning/personality and its WhatsApp session, not BMO application records.
+- PostgreSQL owns durable Joy data. Hermes owns reasoning/personality and its WhatsApp session, not Joy application records.
 - Audio Service owns bounded STT/TTS/FFmpeg processing, not identity or durable media.
 - Mobile never calls PostgreSQL, Hermes, Audio Service, ESP, or provider APIs directly.
 - ESP owns local Wi-Fi application, recording, playback, display, and firmware behavior. The VPS owns desired state and delivery records.

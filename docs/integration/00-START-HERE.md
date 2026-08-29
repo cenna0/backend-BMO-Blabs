@@ -1,19 +1,15 @@
-# BMO Mobile Integration — Current Production Entry Point
+# Joy Mobile Integration — Current Production Entry Point
 
 > **CURRENT / CANONICAL**
 > Use this page for current Mobile onboarding; dated plans/evidence do not
 > override current source.
 
-**Audited:** 2026-08-20
-**Deployed-image source revision:**
-`d1473d04f4b76ccb52cc8eeaff52a268504310f0` (immutable provenance, not current
-Git HEAD).
+**Audited:** 2026-08-29
 **Production state:** P9 Backend and PostgreSQL are live and healthy.
-**Production image:** `bmo-p9.1:pairing-code-only-d1473d0`.
-**Migration #7:** `20260818110000_pairing_code_only_enrollment` is applied;
-production migration state is `7 completed, 0 unfinished, 0 rolled_back`.
+**Production image:** `joy-p9.1:production`.
+**Production migrations:** 10 completed migrations are applied; the latest is `20260827120000_mobile_push_tokens`.
 **Production verification:** Health and six-sample soak passed; Mobile REST is
-79 routes and Mobile WS is 12 events.
+93 `/api/v1` registrations and Mobile WS uses an `authenticate` handshake, an `authenticated` acknowledgement, and 11 schema-defined application events.
 **Physical status:** `PENDING_PHYSICAL_ESP`.
 
 This is the current onboarding page for the Mobile team. Do not use old
@@ -49,7 +45,7 @@ Mobile uses only `/api/v1/ws`; the ESP32 uses only `/ws`.
 The physical Mobile app must not use VPS localhost addresses. Port `3010` is a
 historical private candidate port and is not the production Mobile API.
 
-Mobile communicates only with the BMO Backend. It must not connect directly to
+Mobile communicates only with the Joy Backend. It must not connect directly to
 Hermes, PostgreSQL, Audio Service, the WhatsApp bridge, the WhatsApp identity
 resolver, Spotify Web API, or the ESP32.
 
@@ -72,7 +68,7 @@ definition, those sources win. The current status vocabulary is:
 React Native Mobile
         │ HTTPS / WSS
         ▼
-BMO Backend :3000
+Joy Backend :3000
    ├── PostgreSQL :private
    ├── Hermes :8642
    ├── Audio Service :8001
@@ -83,7 +79,7 @@ BMO Backend :3000
 
 Only the Backend is a Mobile integration boundary. Spotify/provider access and
 refresh tokens, OAuth state, resolver/provider/session internals, and internal
-service keys remain server-side. The Mobile app necessarily holds the BMO
+service keys remain server-side. The Mobile app necessarily holds the Joy
 application access and refresh tokens, submits the Wi-Fi password to the
 Backend, and submits only the six-digit pairing code. Wi-Fi passwords are
 never returned in Backend responses, and the physical `DEVICE_TOKEN` remains
@@ -113,7 +109,7 @@ state:
 ## Production safety boundaries
 
 - Do not repeat production promotion, migrations, or candidate acceptance as part of Mobile integration.
-- Do not use candidate Compose, candidate secrets, candidate callback URLs, or `/tmp/bmo-p9-1-validation-*` paths.
+- Do not use candidate Compose, candidate secrets, candidate callback URLs, or `/tmp/joy-p9-1-validation-*` paths.
 - Do not apply the candidate Caddy patch or use port `3010`.
 - Do not call `/messages`, `/send`, Hermes, Spotify, PostgreSQL, or the resolver directly.
 - Do not treat source/test implementation as proof of physical ESP behavior.

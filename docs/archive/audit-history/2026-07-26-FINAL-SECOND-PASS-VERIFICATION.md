@@ -1,4 +1,4 @@
-# BMO Docs — Final Second-Pass Verification
+# Joy Docs — Final Second-Pass Verification
 
 **Date:** 2026-07-26  
 **Result:** PASS
@@ -10,10 +10,10 @@ Fresh second-pass review focused on replacing the project `docs/` folder and mak
 ## Additional issues found and fixed in this pass
 
 1. Reconciled P6 authorization semantics: explicit `execute P6` / `continue next phase` authorizes planned non-destructive P6 installs/configuration, while destructive/unexpected actions still require separate approval.
-2. Removed secret-file permission ambiguity: baseline `bmo-admin:bmo-admin`, mode `600`; stricter root ownership is allowed only with a proven sudo deploy path.
+2. Removed secret-file permission ambiguity: baseline `joy-admin:joy-admin`, mode `600`; stricter root ownership is allowed only with a proven sudo deploy path.
 3. Clarified PostgreSQL, real `postgres.env`, and `DATABASE_URL` activate in P9; P7 voice deployment must not depend on DB.
 4. Locked Caddy as a host system service for deterministic access to loopback-only origins.
-5. Added `/opt/bmo/deploy/infra-compose.yml` as P6 Compose source for Beszel/infra-only containers.
+5. Added `/opt/joy/deploy/infra-compose.yml` as P6 Compose source for Beszel/infra-only containers.
 6. Required Git-commit-SHA image identity for deterministic P7 rollback.
 7. Added production ESP32 TLS prerequisite: trustworthy time (NTP/SNTP) + certificate-chain validation; never disable TLS verification.
 8. Promoted active PRD to v1.2.3 and archived v1.2.2 so filename/version stay truthful.
@@ -22,7 +22,7 @@ Fresh second-pass review focused on replacing the project `docs/` folder and mak
 
 - Required docs present: PASS
 - Markdown local links: PASS (0 broken)
-- Runtime (`medium`, hotword `BMO`, CPU INT8/4 threads/1 worker/beam 5/VAD, Kokoro `af_heart` speed `0.80`): PASS
+- Runtime (`medium`, hotword `Joy`, CPU INT8/4 threads/1 worker/beam 5/VAD, Kokoro `af_heart` speed `0.80`): PASS
 - Handoff endpoint set present: PASS
 - Handoff event set present: PASS
 - Firmware TLS prerequisite present: PASS
@@ -40,11 +40,11 @@ Fresh second-pass review focused on replacing the project `docs/` folder and mak
 These must be discovered/supplied during execution, not invented in docs:
 
 - actual VPS users/services/listeners/firewall state;
-- current Git remote and working auth/deploy key for `bmo-admin`;
+- current Git remote and working auth/deploy key for `joy-admin`;
 - replacement Telegram bot token and numeric group chat ID, supplied out-of-band;
 - real DNS/TLS reachability evidence;
 - actual RVC extracted `.pth` / `.index` filenames and real inference result;
-- public `api.personalbmo.web.id` E2E evidence;
+- public `api.personaljoy.web.id` E2E evidence;
 - physical ESP32 acceptance evidence.
 
 ## Final conclusion

@@ -1,321 +1,204 @@
-> **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+# Joy Backend — Public API and WebSocket Contract
 
-# BMO Backend MVP — Public API and WebSocket Contract
+**Version:** 3.2.0  
+**Status:** CANONICAL PRODUCTION INTERFACE  
+**Authority:** Hardware Contract v1.0.5 & P9.1 Production Platform
 
-**Versi:** 1.0.1  
-**Status:** CANONICAL BACKEND INTERFACE  
-**Authority eksternal:** Hardware Contract v1.0.5
-
-> **Status:** Canonical backend MVP documentation package  
-> **Derived from:** Backend Implementation v1.0.5, Hardware Contract v1.0.5, PRD v1.2.4  
-> **Scope:** Backend voice MVP only. Firmware, mobile app, Spotify, WhatsApp, PostgreSQL, dan Prisma tidak diimplementasikan dalam package ini.
-
-
-## Cara menggunakan file ini
-
-File ini berisi kewajiban backend pada public REST API, WebSocket, upload WAV, idempotency, public state, dan error mapping. Jika detail public interface berbeda dari file ini, hardware contract versi terbaru menang dan mismatch harus dilaporkan sebelum coding dilanjutkan.
-
-Agent tidak boleh menambahkan event, alias error, endpoint, acknowledgment, audio WebSocket, atau field wajib baru tanpa approval user.
-
-## 15. Public Backend API
-
-Implementasikan kontrak dari `../hardware-contract/BMO-MVP-HW-INTERFACE-CONTRACT-v1.0.5.md`.
-
-Route wajib:
-
-```text
-GET  /health
-WS   /ws
-POST /api/v1/voice
-GET  /audio/:audioId.mp3
-```
-
-Untuk route audio, kirim minimal:
-
-```http
-Content-Type: audio/mpeg
-Content-Length: <bytes>
-Cache-Control: no-store, private, max-age=0
-```
-
-Jangan aktifkan directory listing. Hanya UUID audio valid yang boleh diakses.
-
-### 15.1 `GET /health`
-
-Jangan bocorkan secret:
-
-```json
-{
-  "status": "ok",
-  "backend": "ok",
-  "hermes": "ok",
-  "audio_service": "ok",
-  "rvc": "available"
-}
-```
-
-Gunakan `degraded` jika RVC unavailable tetapi Kokoro fallback bekerja.
+Dokumen ini mendefinisikan seluruh kontrak antarmuka publik dan internal antara Joy Backend dengan Perangkat Hardware (ESP32-S3), Aplikasi Joy Mobile (iOS/Android), serta health check load balancer/Caddy.
 
 ---
 
-## 16. Persyaratan WebSocket
-
-Implementasikan:
-
-- autentikasi message maksimal 5 detik setelah connect;
-- close code canonical: `4001` auth required, `4003` invalid credentials, `4008` auth timeout;
-- koneksi terautentikasi terbaru menang;
-- device registry in-memory;
-- native ping setiap 60 detik;
-- tutup koneksi setelah 2 missed pong;
-- tidak menerapkan idle timeout satu jam selama ping/pong sehat;
-- respons `authenticated` menyertakan `backend_state` dan `active_request_id` untuk sinkronisasi setelah reconnect/restart;
-- backend hanya mengirim mode display `thinking`; `idle`, `speaking`, dan `error` dikendalikan firmware;
-- tidak membuat atau mengirim mode display `listening`;
-- kirim ulang pending `audio_ready` setelah reconnect jika MP3 masih valid;
-- jangan membuat event `audio_ready_received`; reliability memakai reconnect state sync + deduplikasi `request_id`;
-- validasi schema JSON;
-- batas ukuran message kecil karena audio tidak dikirim melalui WebSocket.
-
-ESP32 → Backend:
+## 1. Ringkasan Endpoint & Protokol
 
 ```text
-authenticate
-audio_playback_done
-audio_playback_failed
+Hardware WebSocket:  wss://api.personalbmo.web.id/ws
+Hardware Voice In:   POST https://api.personalbmo.web.id/api/v1/voice
+Hardware Audio Out:  GET https://api.personalbmo.web.id/audio/:audioId.mp3
+Mobile WebSocket:    wss://api.personalbmo.web.id/api/v1/ws
+Mobile REST API:     https://api.personalbmo.web.id/api/v1/*
+TTS Synthesis:       POST https://api.personalbmo.web.id/api/v1/tts/synthesize
+Push Notification:   POST|DELETE|GET https://api.personalbmo.web.id/api/v1/settings/push-tokens
+Health Checks:       GET https://api.personalbmo.web.id/readyz, /livez, /health
 ```
 
-Backend → ESP32:
+---
 
-```text
-authenticated
-authentication_failed
-connection_replaced
-display_status
-audio_ready
-request_failed
-```
+## 2. Kontrak Perangkat Keras ESP32 (Hardware Voice Interface)
 
-Jangan mengirim WAV atau MP3 melalui WebSocket.
+### 2.1 Upload Audio Suara (`POST /api/v1/voice`)
+ESP32 mengunggah rekaman suara pengguna ke backend melalui HTTP POST.
 
-### 16.1 Schema event canonical
+- **Header Wajib**:
+  ```http
+  X-Device-Id: joy-001
+  X-Device-Token: <secret-device-token>
+  X-Request-Id: <uuid-v4>
+  Content-Type: audio/wav
+  Content-Length: <bytes>
+  ```
+- **Header Opsional (Voice Reservation Protocol)**:
+  ```http
+  X-Voice-Lease-Id: <uuid-v4>
+  X-Voice-Reserve-Receipt: <string>
+  ```
+- **Spesifikasi WAV PCM**:
+  - Format: RIFF WAV PCM signed 16-bit little-endian
+  - Sample Rate: 16.000 Hz (16 kHz)
+  - Channels: 1 (Mono)
+  - Maksimal Ukuran: 3.145.728 bytes (3 MB)
+  - Maksimal Durasi: 60 detik
+- **Prasyarat**: Koneksi WebSocket `/ws` harus dalam status aktif dan terautentikasi.
+- **Respons HTTP**:
+  - `202 Accepted`: Upload valid diterima, proses pipeline dimulai asynchronous:
+    ```json
+    {
+      "request_id": "1340f6a2-5438-48f0-922e-d4b78483c804",
+      "status": "processing"
+    }
+    ```
+  - `200 OK`: Duplicate request ID yang valid (`{"request_id":"...","status":"processing|audio_ready|completed","duplicate":true}`).
+  - `401 Unauthorized`: Device credential salah (`INVALID_DEVICE_CREDENTIALS`).
+  - `409 Conflict`: WebSocket belum terhubung (`WEBSOCKET_NOT_CONNECTED`) atau device sedang memproses request lain (`DEVICE_BUSY`).
+  - `413 Payload Too Large`: Ukuran WAV melebihi 3 MB (`AUDIO_TOO_LARGE`).
+  - `415 Unsupported Media Type`: Header bukan `audio/wav` (`UNSUPPORTED_AUDIO_TYPE`).
+  - `422 Unprocessable Entity`: Struktur RIFF WAV PCM tidak valid (`INVALID_AUDIO_FORMAT`).
 
-ESP32 → Backend, autentikasi:
+### 2.2 Pengambilan Audio Output (`GET /audio/:audioId.mp3`)
+ESP32 mengunduh file audio respons Joy yang telah disintesis:
+- **Format Respons**: Audio MPEG Layer 3 (MP3), 24 kHz Mono, 96 kbps.
+- **Header Respons**:
+  ```http
+  Content-Type: audio/mpeg
+  Transfer-Encoding: chunked
+  Cache-Control: public, max-age=300
+  ```
+- **Durasi Kedaluwarsa (TTL)**: 300 detik (5 menit) sejak audio selesai dibuat.
 
-```json
-{
-  "event": "authenticate",
-  "device_id": "bmo-001",
-  "device_token": "<device-secret>"
-}
-```
+---
 
-Backend → ESP32, autentikasi sukses:
+## 3. Protokol Hardware WebSocket (`wss://api.personalbmo.web.id/ws`)
 
-```json
-{
-  "event": "authenticated",
-  "status": "ok",
-  "device_id": "bmo-001",
-  "backend_state": "idle | thinking | audio_ready",
-  "active_request_id": null
-}
-```
+### 3.1 Handshake & Autentikasi
+1. ESP32 membuka koneksi TCP WSS ke `/ws`.
+2. ESP32 **wajib** mengirim event `authenticate` dalam waktu 5 detik:
+   ```json
+   {
+     "event": "authenticate",
+     "device_id": "joy-001",
+     "device_token": "secret-device-token"
+   }
+   ```
+3. Backend membalas:
+   ```json
+   { "event": "authenticated", "status": "ok", "device_id": "joy-001", "backend_state": "idle", "active_request_id": null }
+   ```
+   Atau jika gagal:
+   ```json
+   { "event": "authentication_failed", "error": "INVALID_DEVICE_CREDENTIALS" }
+   ```
 
-Jika `backend_state` bukan `idle`, `active_request_id` wajib berisi UUID request aktif. Setelah respons auth, kirim ulang event state yang relevan.
+### 3.2 Alur Percakapan Normal
+1. ESP32 merekam audio, memulai upload `POST /api/v1/voice`.
+2. Backend mengirim status indikator layar ke ESP32:
+   ```json
+   { "event": "display_status", "request_id": "uuid", "status": "thinking" }
+   ```
+3. Pipeline AI memproses Groq Whisper STT (dengan local faster-whisper fallback) -> Hermes Core production provider -> Edge-TTS (dengan Piper fallback) -> FFmpeg.
+4. Backend mengirim event `audio_ready` berisi URL MP3 dan transkrip teks:
+   ```json
+   {
+     "event": "audio_ready",
+     "request_id": "1340f6a2-5438-48f0-922e-d4b78483c804",
+     "audio_url": "https://api.personalbmo.web.id/audio/a1b2c3d4.mp3",
+     "format": "mp3",
+     "expires_in_seconds": 300,
+     "transcript": "Halo Joy, apa kabar?",
+     "response_text": "Aku baik banget! Kamu gimana?",
+     "text": "Aku baik banget! Kamu gimana?"
+   }
+   ```
+5. ESP32 mengunduh MP3, memutar via I2S DAC, lalu mengirim konfirmasi selesai:
+   ```json
+   {
+     "event": "audio_playback_done",
+     "request_id": "1340f6a2-5438-48f0-922e-d4b78483c804"
+   }
+   ```
+6. Firmware returns to IDLE after playback; the source hardware schema only defines display_status with status thinking.
 
-Backend → ESP32, autentikasi gagal:
-
-```json
-{
-  "event": "authentication_failed",
-  "error": "INVALID_DEVICE_CREDENTIALS"
-}
-```
-
-Setelah event tersebut, tutup socket dengan `4003`. Jika auth tidak dikirim dalam 5 detik gunakan `4008`; jika client mengirim event lain sebelum auth gunakan `4001`.
-
-Backend → koneksi lama ketika koneksi baru mengambil alih:
-
-```json
-{
-  "event": "connection_replaced",
-  "reason": "NEW_CONNECTION_ESTABLISHED"
-}
-```
-
-Backend → ESP32, mode thinking:
-
-```json
-{
-  "event": "display_status",
-  "request_id": "<uuid-v4>",
-  "status": "thinking"
-}
-```
-
-Backend → ESP32, audio siap:
-
-```json
-{
-  "event": "audio_ready",
-  "request_id": "<uuid-v4>",
-  "audio_url": "https://api.personalbmo.web.id/audio/<audio-uuid>.mp3",
-  "format": "mp3",
-  "expires_in_seconds": 300
-}
-```
-
-Hitung `expires_in_seconds` dari `expires_at - now` setiap kali event dikirim. Pada resend setelah reconnect, jangan mereset TTL menjadi 300 detik.
-
-ESP32 → Backend, playback selesai:
-
-```json
-{
-  "event": "audio_playback_done",
-  "request_id": "<uuid-v4>"
-}
-```
-
-ESP32 → Backend, playback gagal:
-
-```json
-{
-  "event": "audio_playback_failed",
-  "request_id": "<uuid-v4>",
-  "reason": "DOWNLOAD_FAILED | DECODE_FAILED | PLAYBACK_FAILED"
-}
-```
-
-Saat menerima `audio_playback_failed`, backend **tidak** mengirim ulang `audio_ready` dan tidak membuat MP3 baru. ESP32 sudah melakukan satu retry download dari awal sebelum mengirim event tersebut. Backend menghapus MP3, menandai request gagal, melepas busy state, dan menerima duplicate event secara idempotent.
-
-Backend → ESP32, pipeline gagal:
-
+### 3.3 Penanganan Error (`request_failed`)
+Jika terjadi kegagalan pada tahapan pipeline mana pun, backend mengirim:
 ```json
 {
   "event": "request_failed",
-  "request_id": "<uuid-v4>",
-  "code": "NO_SPEECH | INVALID_AUDIO | STT_FAILED | HERMES_FAILED | TTS_FAILED | AUDIO_EXPIRED | PIPELINE_TIMEOUT | INTERNAL_ERROR",
+  "request_id": "1340f6a2-5438-48f0-922e-d4b78483c804",
+  "code": "STT_FAILED",
   "recoverable": true
 }
 ```
-
-Schema `authentication_failed` dan `connection_replaced` harus sama persis dengan HW contract. Tolak event unknown atau schema invalid tanpa menjatuhkan seluruh process backend.
-
----
-
-## 17. Persyaratan Upload Voice
-
-`POST /api/v1/voice` menerima raw WAV bytes.
-
-Header wajib:
-
-```text
-X-Device-Id
-X-Device-Token
-X-Request-Id
-Content-Type: audio/wav
-Content-Length
-```
-
-Validasi:
-
-```text
-WAV RIFF
-PCM signed 16-bit little-endian
-16 kHz
-mono
-maksimal 3 MB
-maksimal 60 detik
-request ID harus UUID v4
-WebSocket harus aktif dan terautentikasi
-satu request aktif per device
-```
-
-Cek WebSocket dua kali: sebelum menerima body besar dan sekali lagi setelah WAV selesai divalidasi tepat sebelum request state dibuat/HTTP `202` dikirim. Jika koneksi hilang di tengah upload, hapus file sementara dan return `409 WEBSOCKET_NOT_CONNECTED`.
-
-Return `202 Accepted` segera setelah upload aman diterima dan request state dibuat. Pipeline dijalankan asynchronous.
-
-Karena HTTP dan WebSocket merupakan koneksi terpisah, firmware dapat menerima `display_status: thinking` sebelum atau sesudah HTTP `202`. Seluruh event wajib memakai `request_id`; backend dan fake ESP32 test harus menguji kedua kemungkinan urutan.
-
-Idempotency:
-
-- request pertama yang valid: `202 Accepted`;
-- duplicate `device_id + request_id` yang valid: `200 OK` dengan `duplicate:true` dan status publik aktual;
-- status internal `accepted`, `transcribing`, `thinking`, dan `generating_voice` dipetakan menjadi status publik `processing`;
-- request ID sama + device sama tidak boleh membuat pipeline baru;
-- backend menghitung SHA-256 body WAV dan menyimpannya sebagai `input_sha256`;
-- request ID sama dengan body hash berbeda: `409 REQUEST_ID_CONFLICT`;
-- jika status `audio_ready` dan file belum expired, kirim ulang `audio_ready`;
-- request ID sama dari device lain: `409 REQUEST_ID_CONFLICT`;
-- tombstone completed/failed/expired dipertahankan baseline minimal 10 menit.
-
-Urutan validasi wajib:
-
-1. validasi credentials dan header dasar;
-2. cek duplicate `device_id + request_id`;
-3. jika duplicate, return status existing tanpa terkena `DEVICE_BUSY`;
-4. jika request ID baru, baru cek satu request aktif per device.
-
-Untuk duplicate request, baca body dengan batas 3 MB dan bandingkan SHA-256 terhadap request awal. `Content-Length` berbeda boleh menjadi early rejection, tetapi hash body adalah pemeriksaan final. Jika berbeda, return `409 REQUEST_ID_CONFLICT` dan jangan memulai pipeline baru.
-
-### 17.1 HTTP response canonical
-
-| Kondisi | HTTP | Error/status |
-|---|---:|---|
-| Request baru valid | `202` | `{"request_id":"<uuid>","status":"processing"}` |
-| Duplicate valid | `200` | `{"request_id":"<uuid>","status":"processing|audio_ready|completed|failed|expired","duplicate":true,"error_code":null}` |
-| WebSocket belum aktif/auth | `409` | `WEBSOCKET_NOT_CONNECTED` |
-| Device masih memproses request lain | `409` | `DEVICE_BUSY` |
-| Device credential salah | `401` | `INVALID_DEVICE_CREDENTIALS` |
-| Header wajib hilang | `400` | `MISSING_REQUIRED_HEADER` |
-| Request ID bukan UUID v4 | `400` | `INVALID_REQUEST_ID` |
-| Request ID sama tetapi device/body berbeda | `409` | `REQUEST_ID_CONFLICT` |
-| Content-Type bukan `audio/wav` | `415` | `UNSUPPORTED_AUDIO_TYPE` |
-| Body lebih dari 3 MB | `413` | `AUDIO_TOO_LARGE` |
-| WAV/PCM metadata tidak valid | `422` | `INVALID_AUDIO_FORMAT` |
-| Error backend tak terduga sebelum accept | `500` | `INTERNAL_ERROR` |
-
-Untuk `WEBSOCKET_NOT_CONNECTED`, gunakan body exact:
-
-```json
-{
-  "error": "WEBSOCKET_NOT_CONNECTED",
-  "message": "Device must reconnect before uploading audio."
-}
-```
-
-Gunakan hanya kode `WEBSOCKET_NOT_CONNECTED`; jangan membuat alias `WEBSOCKET_NOT_READY`.
-
-Jangan return `202` sebelum seluruh raw body diterima, ukuran/hash selesai dihitung, file WAV tersimpan aman, dan request state berhasil dibuat.
+**Daftar Kode Error**:
+- `NO_SPEECH`: Tidak ada suara pengguna yang terdeteksi (audio kosong/hening).
+- `INVALID_AUDIO`: File WAV rusak atau spesifikasi tidak sesuai.
+- `STT_FAILED`: Layanan transkripsi gagal.
+- `HERMES_FAILED`: Layanan LLM gagal merespons.
+- `TTS_FAILED`: Layanan sintesis suara gagal.
+- `AUDIO_EXPIRED`: URL audio diakses setelah melewati batas TTL 300 detik.
+- `PIPELINE_TIMEOUT`: Total waktu pemrosesan melebihi batas waktu (default 300 detik).
+- `INTERNAL_ERROR`: Kesalahan tak terduga pada server backend.
 
 ---
 
-## 22. Mapping Error
 
-| Sumber | Kode ke ESP32 |
-|---|---|
-| WAV rusak atau tidak sesuai | `INVALID_AUDIO` |
-| Tidak ada speech/noise | `NO_SPEECH` |
-| STT crash/timeout | `STT_FAILED` |
-| Hermes network/HTTP/invalid output/provider error | `HERMES_FAILED` |
-| Kokoro dan fallback gagal | `TTS_FAILED` |
-| MP3 expired sebelum playback | `AUDIO_EXPIRED` |
-| Total timeout | `PIPELINE_TIMEOUT` |
-| Error tak terduga | `INTERNAL_ERROR` |
-
-Event:
-
-```json
-{
-  "event": "request_failed",
-  "request_id": "<uuid>",
-  "code": "HERMES_FAILED",
-  "recoverable": true
-}
-```
-
-Firmware yang memainkan voice error lokal dan ekspresi error.
+### 3.4 WhatsApp QR Display Protocol (`display_qr` & `clear_qr`)
+1. Backend / WhatsApp Bridge mengirim event `display_qr` saat sesi pairing WhatsApp dimulai:
+   ```json
+   {
+     "event": "display_qr",
+     "qr": "2@abc...xyz,123...",
+     "expires_at": "2026-08-27T10:10:00.000Z"
+   }
+   ```
+2. ESP32 meng-generate visual QR code secara realtime via library `qrcodegen` dan menampilkannya pada layar TFT LCD ILI9341 320x240.
+3. Saat user selesai scan via WhatsApp Linked Devices atau sesi kedaluwarsa, backend mengirim `clear_qr`:
+   ```json
+   {
+     "event": "clear_qr"
+   }
+   ```
+   ESP32 membersihkan layar dan kembali ke animasi wajah `IDLE`.
 
 ---
+
+## 4. Protokol Proactive Speech & Voice Reservation
+
+### 4.1 Voice Capture Reservation
+Digunakan untuk mengamankan slot audio capture hardware secara terkoordinasi:
+- **Inbound (ESP32 -> Backend)**:
+  - `voice_reserve`: `{"event": "voice_reserve", "request_id": UUID}`
+  - `voice_cancel`: `{"event": "voice_cancel", "request_id": UUID, "lease_id": UUID, "reserve_receipt": string, "reason": "NO_SPEECH"|"LOCAL_ABORT"|"UPLOAD_HANDOFF_FAILED"}`
+- **Outbound (Backend -> ESP32)**:
+  - `voice_reserve_accepted`: `{"event": "voice_reserve_accepted", "request_id": UUID, "lease_id": UUID, "reserve_receipt": string, "capture_lease_duration_seconds": 45, "capture_lease_expires_at": ISO}`
+  - `voice_reserve_rejected`: `{"event": "voice_reserve_rejected", "request_id": UUID, "reason": "UNAUTHENTICATED"|"NOT_IDLE"|"BUSY"|"STALE_REQUEST"}`
+  - `voice_reserve_expired`: `{"event": "voice_reserve_expired", "request_id": UUID, "lease_id": UUID, "reserve_receipt": string}`
+
+### 4.2 Proactive Schedule Delivery
+Digunakan ketika backend memicu jadwal pengingat untuk disuarakan langsung di robot Joy:
+- **Backend -> ESP32**:
+  - `proactive_offer`: `{"event": "proactive_offer", "delivery_id": UUID, "attempt_id": UUID, "offer_receipt": string, "expires_at_ms": number}`
+  - `proactive_audio_ready`: `{"event": "proactive_audio_ready", "source": "SCHEDULE", "delivery_id": UUID, "attempt_id": UUID, "lease_id": UUID, "audio_url": URL, "audio_receipt": string, "expires_at_ms": number}`
+  - `proactive_cancel`: `{"event": "proactive_cancel", "source": "SCHEDULE", "delivery_id": UUID, "attempt_id": UUID, "lease_id": UUID}`
+- **ESP32 -> Backend**:
+  - `proactive_offer_accepted`: `{"event": "proactive_offer_accepted", "delivery_id": UUID, "attempt_id": UUID, "offer_receipt": string}`
+  - `proactive_done`: `{"event": "proactive_done", "source": "SCHEDULE", "delivery_id": UUID, "attempt_id": UUID, "lease_id": UUID, "audio_receipt": string, "reason": "COMPLETED"}`
+  - `proactive_failed`: `{"event": "proactive_failed", "source": "SCHEDULE", "delivery_id": UUID, "attempt_id": UUID, "lease_id": UUID, "audio_receipt": string, "reason": "DOWNLOAD_FAILED"|"DECODE_FAILED"|"PLAYBACK_FAILED"|"CANCELLED"|"LEASE_EXPIRED"|"WATCHDOG_STALLED"}`
+
+---
+
+## 5. Health Checks & Diagnostic Probes
+
+- **Liveness Probe**: `GET /livez` -> `{"status":"ok"}` (HTTP 200)
+- **Readiness Probe**: `GET /readyz` / `GET /health` -> `{"status":"ok", ...}` (HTTP 200 jika DB & Audio Service siap, HTTP 503 jika tidak siap).
+- **Database Ops Probes**:
+  - `GET /api/v1/ops/db/livez` -> DB connection liveness
+  - `GET /api/v1/ops/db/readyz` -> DB connection pool readiness
+  - `GET /api/v1/ops/db/migrations` -> Applied Prisma migrations list

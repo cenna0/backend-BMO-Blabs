@@ -49,8 +49,8 @@ def test_production_secrets_are_read_only_file_mounts(self):
 
 def test_candidate_paths_and_project_names_are_absent(self):
     rendered = json.dumps(self.config)
-    self.assertNotIn("/tmp/bmo-p9-1-validation-20260804", rendered)
-    self.assertNotIn("bmo-p9-1", rendered)
+    self.assertNotIn("/tmp/joy-p9-1-validation-20260804", rendered)
+    self.assertNotIn("joy-p9-1", rendered)
     self.assertNotIn("127.0.0.1:3010", rendered)
 
 def test_rollback_targets_backend_without_dependencies(self):
@@ -82,23 +82,23 @@ exist.
 - [ ] **Step 1: Remove only the stale voice-runtime avatar bind**
 
 Delete the current voice `backend` environment line
-`AVATAR_STORAGE_DIR: /opt/bmo/data/avatars` and its corresponding bind mount.
-Keep `/opt/bmo/temp/audio`, the existing Backend host networking, port 3000,
+`AVATAR_STORAGE_DIR: /opt/joy/data/avatars` and its corresponding bind mount.
+Keep `/opt/joy/temp/audio`, the existing Backend host networking, port 3000,
 and the Audio service unchanged.
 
 - [ ] **Step 2: Add the production P9 Compose file**
 
-Define Compose project `bmo-production-p9` with exactly these services:
+Define Compose project `joy-production-p9` with exactly these services:
 
 ```yaml
-name: bmo-production-p9
+name: joy-production-p9
 
 services:
   postgres:
     image: postgres:16.14-alpine3.22@sha256:786dab398303b8ce7cb76b407bb21ef2e4dfbbbd4c6abcf3d29b3130467ffdbc
     environment:
-      POSTGRES_DB: ${P9_POSTGRES_DB:-bmo}
-      POSTGRES_USER: ${P9_POSTGRES_USER:-bmo}
+      POSTGRES_DB: ${P9_POSTGRES_DB:-joy}
+      POSTGRES_USER: ${P9_POSTGRES_USER:-joy}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     secrets:
       - source: postgres_password
@@ -106,7 +106,7 @@ services:
         mode: 0400
     volumes:
       - type: bind
-        source: ${P9_POSTGRES_DATA_DIR:-/opt/bmo/data/postgres}
+        source: ${P9_POSTGRES_DATA_DIR:-/opt/joy/data/postgres}
         target: /var/lib/postgresql/data
         bind:
           create_host_path: false
@@ -124,32 +124,32 @@ services:
   backend:
     image: ${P9_PRODUCTION_IMAGE:?Set P9_PRODUCTION_IMAGE to the verified production image tag}
     env_file:
-      - path: ${P9_PRODUCTION_BACKEND_ENV_FILE:-/opt/bmo/config/p9.1/backend.env}
+      - path: ${P9_PRODUCTION_BACKEND_ENV_FILE:-/opt/joy/config/p9.1/backend.env}
         required: true
     environment:
       NODE_ENV: production
       BACKEND_HOST: 127.0.0.1
       BACKEND_PORT: "3000"
       TRUST_PROXY_HOPS: "1"
-      PUBLIC_BASE_URL: https://api.personalbmo.web.id
+      PUBLIC_BASE_URL: https://api.personaljoy.web.id
       HERMES_API_URL: http://127.0.0.1:8642
       AUDIO_SERVICE_URL: http://127.0.0.1:8001
       WHATSAPP_BRIDGE_URL: http://127.0.0.1:3001
       WHATSAPP_IDENTITY_RESOLVER_URL: http://127.0.0.1:3002
-      SPOTIFY_CALLBACK_URL: https://api.personalbmo.web.id/api/v1/integrations/spotify/callback
+      SPOTIFY_CALLBACK_URL: https://api.personaljoy.web.id/api/v1/integrations/spotify/callback
       HARDWARE_TEST_MODE: "false"
       P9_ENABLED: "true"
       P9_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
-      P9_POSTGRES_USER: ${P9_POSTGRES_USER:-bmo}
-      P9_POSTGRES_DB: ${P9_POSTGRES_DB:-bmo}
+      P9_POSTGRES_USER: ${P9_POSTGRES_USER:-joy}
+      P9_POSTGRES_DB: ${P9_POSTGRES_DB:-joy}
       P9_POSTGRES_SOCKET_DIR: /var/run/postgresql
       P9_WIFI_ENCRYPTION_KEY_FILE: /run/secrets/wifi_encryption_key
       WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE: /run/secrets/whatsapp_identity_resolver_token
       SPOTIFY_CLIENT_ID_FILE: /run/secrets/spotify_client_id
       SPOTIFY_CLIENT_SECRET_FILE: /run/secrets/spotify_client_secret
       SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE: /run/secrets/spotify_token_encryption_key
-      AVATAR_STORAGE_DIR: /opt/bmo/data/avatars
-      BUG_REPORT_STORAGE_DIR: /opt/bmo/data/bug-reports
+      AVATAR_STORAGE_DIR: /opt/joy/data/avatars
+      BUG_REPORT_STORAGE_DIR: /opt/joy/data/bug-reports
     depends_on:
       postgres:
         condition: service_healthy
@@ -179,18 +179,18 @@ services:
         target: /var/run/postgresql
         read_only: true
       - type: bind
-        source: /opt/bmo/temp/audio
-        target: /opt/bmo/temp/audio
+        source: /opt/joy/temp/audio
+        target: /opt/joy/temp/audio
         bind:
           create_host_path: false
       - type: bind
-        source: ${P9_AVATAR_DATA_DIR:-/opt/bmo/data/avatars}
-        target: /opt/bmo/data/avatars
+        source: ${P9_AVATAR_DATA_DIR:-/opt/joy/data/avatars}
+        target: /opt/joy/data/avatars
         bind:
           create_host_path: false
       - type: bind
-        source: ${P9_BUG_REPORT_DATA_DIR:-/opt/bmo/data/bug-reports}
-        target: /opt/bmo/data/bug-reports
+        source: ${P9_BUG_REPORT_DATA_DIR:-/opt/joy/data/bug-reports}
+        target: /opt/joy/data/bug-reports
         bind:
           create_host_path: false
     restart: unless-stopped
@@ -245,24 +245,24 @@ Expected: PASS.
 Use these non-secret values and host paths:
 
 ```dotenv
-P9_PRODUCTION_IMAGE=bmo-p9.1:spotify-phase26-9819ef7
-P9_PRODUCTION_BACKEND_ENV_FILE=/opt/bmo/config/p9.1/backend.env
-P9_POSTGRES_DB=bmo
-P9_POSTGRES_USER=bmo
-P9_POSTGRES_DATA_DIR=/opt/bmo/data/postgres
-P9_AVATAR_DATA_DIR=/opt/bmo/data/avatars
-P9_BUG_REPORT_DATA_DIR=/opt/bmo/data/bug-reports
-P9_POSTGRES_PASSWORD_FILE=/opt/bmo/config/p9.1/postgres-password
-P9_WIFI_ENCRYPTION_KEY_FILE=/opt/bmo/config/p9.1/wifi-encryption-key
-P9_WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE=/opt/bmo/config/whatsapp/identity-resolver.token
-SPOTIFY_CLIENT_ID_FILE=/opt/bmo/config/p9.1/spotify-client-id
-SPOTIFY_CLIENT_SECRET_FILE=/opt/bmo/config/p9.1/spotify-client-secret
-SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE=/opt/bmo/config/p9.1/spotify-token-encryption-key
-P9_COMPOSE_FILE=/opt/bmo/app/ops/deploy/p9.1-production-compose.yml
-P9_COMPOSE_PROJECT=bmo-production-p9
-P9_COMPOSE_ENV_FILE=/opt/bmo/config/p9.1/production.compose.env
-P9_BACKUP_DIR=/opt/bmo/backups/database
-P9_BACKUP_PASSPHRASE_FILE=/opt/bmo/config/p9.1/backup-passphrase
+P9_PRODUCTION_IMAGE=joy-p9.1:spotify-phase26-9819ef7
+P9_PRODUCTION_BACKEND_ENV_FILE=/opt/joy/config/p9.1/backend.env
+P9_POSTGRES_DB=joy
+P9_POSTGRES_USER=joy
+P9_POSTGRES_DATA_DIR=/opt/joy/data/postgres
+P9_AVATAR_DATA_DIR=/opt/joy/data/avatars
+P9_BUG_REPORT_DATA_DIR=/opt/joy/data/bug-reports
+P9_POSTGRES_PASSWORD_FILE=/opt/joy/config/p9.1/postgres-password
+P9_WIFI_ENCRYPTION_KEY_FILE=/opt/joy/config/p9.1/wifi-encryption-key
+P9_WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE=/opt/joy/config/whatsapp/identity-resolver.token
+SPOTIFY_CLIENT_ID_FILE=/opt/joy/config/p9.1/spotify-client-id
+SPOTIFY_CLIENT_SECRET_FILE=/opt/joy/config/p9.1/spotify-client-secret
+SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE=/opt/joy/config/p9.1/spotify-token-encryption-key
+P9_COMPOSE_FILE=/opt/joy/app/ops/deploy/p9.1-production-compose.yml
+P9_COMPOSE_PROJECT=joy-production-p9
+P9_COMPOSE_ENV_FILE=/opt/joy/config/p9.1/production.compose.env
+P9_BACKUP_DIR=/opt/joy/backups/database
+P9_BACKUP_PASSPHRASE_FILE=/opt/joy/config/p9.1/backup-passphrase
 ```
 
 - [ ] **Step 2: Add the application env template**
@@ -275,7 +275,7 @@ NODE_ENV=production
 BACKEND_HOST=127.0.0.1
 BACKEND_PORT=3000
 TRUST_PROXY_HOPS=1
-PUBLIC_BASE_URL=https://api.personalbmo.web.id
+PUBLIC_BASE_URL=https://api.personaljoy.web.id
 P9_ENABLED=true
 P9_JWT_SECRET=<operator-provisioned-32-byte-or-longer-secret>
 P9_PAIRING_PEPPER=<operator-provisioned-32-byte-or-longer-secret>
@@ -288,9 +288,9 @@ WHATSAPP_IDENTITY_RESOLVER_TOKEN_FILE=/run/secrets/whatsapp_identity_resolver_to
 SPOTIFY_CLIENT_ID_FILE=/run/secrets/spotify_client_id
 SPOTIFY_CLIENT_SECRET_FILE=/run/secrets/spotify_client_secret
 SPOTIFY_TOKEN_ENCRYPTION_KEY_FILE=/run/secrets/spotify_token_encryption_key
-SPOTIFY_CALLBACK_URL=https://api.personalbmo.web.id/api/v1/integrations/spotify/callback
-AVATAR_STORAGE_DIR=/opt/bmo/data/avatars
-BUG_REPORT_STORAGE_DIR=/opt/bmo/data/bug-reports
+SPOTIFY_CALLBACK_URL=https://api.personaljoy.web.id/api/v1/integrations/spotify/callback
+AVATAR_STORAGE_DIR=/opt/joy/data/avatars
+BUG_REPORT_STORAGE_DIR=/opt/joy/data/bug-reports
 ```
 
 Document that the placeholder P9 JWT/pairing values and existing voice
@@ -324,7 +324,7 @@ Run:
 
 ```bash
 find backend/prisma/migrations -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
-docker image inspect bmo-p9.1-candidate:spotify-phase26-9819ef7 --format '{{.Id}} {{json .RepoDigests}} {{json .RepoTags}}'
+docker image inspect joy-p9.1-candidate:spotify-phase26-9819ef7 --format '{{.Id}} {{json .RepoDigests}} {{json .RepoTags}}'
 ```
 
 Expected: exactly six migration directories and the frozen image ID/digest.
@@ -339,7 +339,7 @@ These commands do not rebuild or retag the image.
 - [ ] **Step 1: Render Compose with fixture files**
 
 Run the focused packaging test, which invokes `docker compose config --format
-json` with temporary empty fixture files. Do not point it at `/opt/bmo/config`
+json` with temporary empty fixture files. Do not point it at `/opt/joy/config`
 or any candidate secret path.
 
 - [ ] **Step 2: Validate Compose YAML without starting services**
@@ -347,9 +347,9 @@ or any candidate secret path.
 Run:
 
 ```bash
-docker compose --project-name bmo-production-p9 \
-  --env-file /opt/bmo/app/ops/deploy/p9.1-production.compose.env.example \
-  --file /opt/bmo/app/ops/deploy/p9.1-production-compose.yml config -q
+docker compose --project-name joy-production-p9 \
+  --env-file /opt/joy/app/ops/deploy/p9.1-production.compose.env.example \
+  --file /opt/joy/app/ops/deploy/p9.1-production-compose.yml config -q
 ```
 
 If the example’s placeholder file paths are absent, use the focused test’s

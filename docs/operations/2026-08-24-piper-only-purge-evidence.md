@@ -1,15 +1,18 @@
-# BMO Piper-Only Production Cutover and Kokoro Purge Evidence
+# Joy Piper-Only Production Cutover and Kokoro Purge Evidence
 
-**Result:** `BMO_PIPER_ONLY_PURGE_RESULT=PASS`
+> **HISTORICAL EVIDENCE — SUPERSEDED BY LIVE RUNTIME SNAPSHOT**
+> This report records the 2026-08-25 Piper-only cutover checkpoint. It is not the current production TTS configuration; use `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md` for live values.
+
+**Result:** `Joy_PIPER_ONLY_PURGE_RESULT=PASS`
 **Date:** 2026-08-25
-**Repository:** `/opt/bmo/app`
+**Repository:** `/opt/joy/app`
 **Branch:** `main`
 **Source HEAD at preflight:** `4fcd1cb6a2b9b049e5c335ea5050532dacf63ab1`
-**Evidence directory:** `/opt/bmo/temp/piper-only-cutover-evidence/20260825T095934Z`
+**Evidence directory:** `/opt/joy/temp/piper-only-cutover-evidence/20260825T095934Z`
 
 ## Final production state
 
-- Production Audio image: `bmo-audio@sha256:24e1c4244ea8868f731d819ea75cb57c1e464b6df3bd9679d65fd4711643488c`.
+- Production Audio image: `joy-audio@sha256:24e1c4244ea8868f731d819ea75cb57c1e464b6df3bd9679d65fd4711643488c`.
 - Audio endpoint: `127.0.0.1:8001`, container healthy, restart count `0`, OOM `false` at final check.
 - Final Audio readiness: `{"status":"ok","stt_loaded":true,"piper_loaded":true,"ffmpeg_available":true}`.
 - Final Backend readiness: `backend=ok`, `hermes=ok`, `audio_service=ok`, `database=ok`.
@@ -45,10 +48,10 @@ The pinned candidate Backend image exited before full isolated flow because its 
 Deleted only reviewed Kokoro paths:
 
 ```text
-/opt/bmo/models/runtime/kokoro-82m-af-heart
-/opt/bmo/models/kokoro
-/opt/bmo/models/hf-cache/hub/models--hexgrad--Kokoro-82M
-/opt/bmo/models/hf-cache/hub/.locks/models--hexgrad--Kokoro-82M
+/opt/joy/models/runtime/kokoro-82m-af-heart
+/opt/joy/models/kokoro
+/opt/joy/models/hf-cache/hub/models--hexgrad--Kokoro-82M
+/opt/joy/models/hf-cache/hub/.locks/models--hexgrad--Kokoro-82M
 ```
 
 Recorded pre-purge sizes:
@@ -58,7 +61,7 @@ Kokoro runtime model: 327,738,002 bytes
 Kokoro HuggingFace cache: 327,757,628 bytes
 ```
 
-Post-purge scan found no Kokoro, RMVPE, or Hubert paths under active model/cache/temp roots. Piper assets remain at `/opt/bmo/models/piper`. `/opt/bmo/archive/p8-rvc` was intentionally retained as historical evidence. The old Docker rollback image was not deleted or pruned.
+Post-purge scan found no Kokoro, RMVPE, or Hubert paths under active model/cache/temp roots. Piper assets remain at `/opt/joy/models/piper`. `/opt/joy/archive/p8-rvc` was intentionally retained as historical evidence. The old Docker rollback image was not deleted or pruned.
 
 ## Resource and storage evidence
 

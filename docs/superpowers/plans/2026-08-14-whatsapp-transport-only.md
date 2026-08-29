@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Run the installed Hermes 0.20.0 Baileys bridge as a private, transport-only process while the BMO Backend remains the sole `/messages` consumer and authoritative owner of inbound policy.
+**Goal:** Run the installed Hermes 0.20.0 Baileys bridge as a private, transport-only process while the Joy Backend remains the sole `/messages` consumer and authoritative owner of inbound policy.
 
-**Architecture:** A dedicated `bmo-whatsapp-bridge.service` launches the unchanged official `bridge.js` as `hermes` on loopback `127.0.0.1:3001`, with stdout/stderr discarded because startup output can include provider identities. Its health endpoint and systemd state provide observability; its internal reconnect loop remains authoritative. The paired identity is the user's personal WhatsApp account; official `--mode bot` plus `WHATSAPP_DM_POLICY=pairing` is transport behavior only. BMO reads only `/messages`, owns one-user binding, treats inbound text as untrusted data, classifies groups with default-deny notification rules, and provides generic mobile/proactive delivery without invoking privileged Hermes behavior. The protected Hermes allowlist is optional and only gates official owner-message forwarding; it is not the Backend notification policy.
+**Architecture:** A dedicated `joy-whatsapp-bridge.service` launches the unchanged official `bridge.js` as `hermes` on loopback `127.0.0.1:3001`, with stdout/stderr discarded because startup output can include provider identities. Its health endpoint and systemd state provide observability; its internal reconnect loop remains authoritative. The paired identity is the user's personal WhatsApp account; official `--mode bot` plus `WHATSAPP_DM_POLICY=pairing` is transport behavior only. Joy reads only `/messages`, owns one-user binding, treats inbound text as untrusted data, classifies groups with default-deny notification rules, and provides generic mobile/proactive delivery without invoking privileged Hermes behavior. The protected Hermes allowlist is optional and only gates official owner-message forwarding; it is not the Backend notification policy.
 
 **Tech Stack:** TypeScript, Zod, Vitest, Hermes 0.20.0 Node bridge, systemd unit template, shell launcher, Markdown integration docs.
 
@@ -41,8 +41,8 @@
 ### Task 3: Add the supervised transport-only runtime source
 
 **Files:**
-- Create: `ops/whatsapp/bmo-whatsapp-bridge-launcher`
-- Create: `ops/whatsapp/systemd/bmo-whatsapp-bridge.service`
+- Create: `ops/whatsapp/joy-whatsapp-bridge-launcher`
+- Create: `ops/whatsapp/systemd/joy-whatsapp-bridge.service`
 - Modify: `backend/tests/p9/whatsapp-transport-boundary.unit.test.ts`
 
 - [x] Make the launcher read only the WhatsApp keys it needs from Hermes `.env`, fail closed unless `WHATSAPP_ENABLED=false` and mode is `bot`, then exec the unchanged official Node bridge with `--port 3001 --session /home/hermes/.hermes/whatsapp/session --mode bot`, `WHATSAPP_DM_POLICY=pairing`, and owner-message forwarding enabled.

@@ -1,16 +1,16 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
-# BMO Backend MVP — Requirement Traceability (Historical Migration Baseline)
+# Joy Backend MVP — Requirement Traceability (Historical Migration Baseline)
 
 **Versi:** 1.0.1  
 **Status:** HISTORICAL VERIFIED BASELINE
 
 ## 1. Tujuan
 
-Matrix ini membuktikan bahwa seluruh top-level requirement Backend Implementation v1.0.5 §1–§33 memiliki target primary dalam package baru. Dokumen sumber disimpan sebagai arsip read-only di `../archive/BMO-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md`.
+Matrix ini membuktikan bahwa seluruh top-level requirement Backend Implementation v1.0.5 §1–§33 memiliki target primary dalam package baru. Dokumen sumber disimpan sebagai arsip read-only di `../archive/Joy-MVP-BACKEND-IMPLEMENTATION-FOR-HERMES-v1.0.5.md`.
 
-> **2026-07-26 note:** this matrix proves the original v1.0.5 documentation migration. Active deployment details in `06-DEPLOYMENT-AND-OPERATIONS.md` have since been intentionally updated for the current `/opt/bmo`, Caddy, domain, monitoring, backup, and P6–P10 plan. Public hardware protocol authority remains unchanged.
+> **2026-07-26 note:** this matrix proves the original v1.0.5 documentation migration. Active deployment details in `06-DEPLOYMENT-AND-OPERATIONS.md` have since been intentionally updated for the current `/opt/joy`, Caddy, domain, monitoring, backup, and P6–P10 plan. Public hardware protocol authority remains unchanged.
 
 ## 2. Backend source migration matrix
 
@@ -27,7 +27,7 @@ Matrix ini membuktikan bahwa seluruh top-level requirement Backend Implementatio
 | §9 | Teknologi Audio Service | `04-AUDIO-SERVICE.md` | MIGRATED |
 | §10 | Konfigurasi faster-whisper | `04-AUDIO-SERVICE.md` | MIGRATED |
 | §11 | Konfigurasi Kokoro | `04-AUDIO-SERVICE.md` | MIGRATED |
-| §12 | RVC Voice BMO | `04-AUDIO-SERVICE.md` | MIGRATED |
+| §12 | RVC Voice Joy | `04-AUDIO-SERVICE.md` | MIGRATED |
 | §13 | Output FFmpeg | `04-AUDIO-SERVICE.md` | MIGRATED |
 | §14 | API Internal Audio Service | `04-AUDIO-SERVICE.md` | MIGRATED |
 | §15 | Public Backend API | `02-API-AND-WEBSOCKET-CONTRACT.md` | MIGRATED |
@@ -93,7 +93,7 @@ Matrix ini membuktikan bahwa seluruh top-level requirement Backend Implementatio
 | UUID v4 dari ESP32 sebagai idempotency key | 01, 02 | YES |
 | State voice request in-memory | 01, 03 | YES |
 | STT auto-detect ID/EN/mixed | 01, 04 | YES |
-| BMO output selalu English, plain text, singkat | 01, 03, 04 | YES |
+| Joy output selalu English, plain text, singkat | 01, 03, 04 | YES |
 | Kokoro + RVC dengan fallback Kokoro-only | 01, 04 | YES |
 | MP3 URL via WS, bytes via HTTP GET | 01, 02 | YES |
 | Display modes hanya idle/thinking/speaking/error | 01, 02 | YES |

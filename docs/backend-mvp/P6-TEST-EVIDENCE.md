@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P6 — VPS Foundation and Operations Baseline — Test Evidence
 
@@ -33,8 +33,8 @@ OS                    Ubuntu 24.04.4 LTS
 Kernel                6.8.0-124-generic
 CPU / RAM             4 vCPU / 7.8 GiB
 Root disk             95.82 GiB total / about 88 GiB available
-Operator              bmo-admin (sudo + docker groups)
-Production checkout   /opt/bmo/app
+Operator              joy-admin (sudo + docker groups)
+Production checkout   /opt/joy/app
 Git branch            main
 Initial HEAD/origin    114dbd6fc3fbd23ad01a8d6f2470da5a2bca9f50
 P6 implementation     d3103da (local main; not pushed in this execution)
@@ -93,14 +93,14 @@ as a first recovery action.
 
 ## 4. Operator, filesystem, Git, and secrets
 
-- `bmo-admin` is the active Tailscale SSH operator.
-- Codex works as `bmo-admin` (`codex-cli 0.145.0`).
-- `bmo-admin` belongs to `sudo` and `docker`. Docker-group access is
+- `joy-admin` is the active Tailscale SSH operator.
+- Codex works as `joy-admin` (`codex-cli 0.145.0`).
+- `joy-admin` belongs to `sudo` and `docker`. Docker-group access is
   root-equivalent and was used for the root-level P6 workflow when noninteractive
   `sudo` was unavailable.
-- `/opt/bmo/app` is the approved `main` checkout and fetch access works.
-- `/opt/bmo/deploy/current`, `/opt/bmo/deploy/previous`, and
-  `/opt/bmo/deploy/history` exist.
+- `/opt/joy/app` is the approved `main` checkout and fetch access works.
+- `/opt/joy/deploy/current`, `/opt/joy/deploy/previous`, and
+  `/opt/joy/deploy/history` exist.
 - Persistent data, config, backups, and models are outside the Git checkout.
 - Beszel Agent key/token files are mode `600`.
 - The Git checkout contains only `.env.*.example` templates, not live runtime
@@ -118,7 +118,7 @@ Docker live restore   enabled
 ```
 
 Beszel is pinned by tag and digest in
-`/opt/bmo/deploy/infra-compose.yml`:
+`/opt/joy/deploy/infra-compose.yml`:
 
 ```text
 Hub    henrygd/beszel:0.18.7
@@ -174,7 +174,7 @@ D-Bus ListUnits        PASS
 D-Bus property read    PASS
 systemd records        6
 visible units          bmo-backup.timer
-                       bmo-hermes-health-notify.timer
+                       joy-hermes-health-notify.timer
                        caddy
                        docker
                        hermes-gateway
@@ -186,7 +186,7 @@ visible units          bmo-backup.timer
 ```text
 Caddy                  2.11.4
 Runtime source         /etc/caddy/Caddyfile (root:caddy, mode 640)
-Recoverable source     /opt/bmo/config/caddy/Caddyfile
+Recoverable source     /opt/joy/config/caddy/Caddyfile
 Source checksums       identical
 api HTTP               308 -> HTTPS
 api HTTPS              valid certificate; deliberate P6 503 placeholder
@@ -226,8 +226,8 @@ Internal listener evidence:
 :5432            absent
 ```
 
-This is still P6: `api.personalbmo.web.id` is a placeholder and is not a
-verified BMO API.
+This is still P6: `api.personaljoy.web.id` is a placeholder and is not a
+verified Joy API.
 
 ## 8. Monitoring and alerts
 
@@ -273,7 +273,7 @@ Healthy state                      failures=0, down_alerted=false
 
 The pinned Shoutrrr 0.14.1 Telegram client can falsely report success for a
 failed request, so Beszel stores only a token-free generic webhook to the
-private `bmo-telegram-relay` container. The relay reuses the strict sender and
+private `joy-telegram-relay` container. The relay reuses the strict sender and
 returns success to Beszel only after Telegram returns HTTP 2xx and decoded
 boolean `ok=true`.
 
@@ -351,7 +351,7 @@ PASS operator + Codex
 PASS Git main/fetch/clean before evidence edit
 PASS Hermes health/startup/loopback-only listener
 PASS Docker/Compose/Beszel health
-PASS /opt/bmo layout and secret permissions
+PASS /opt/joy layout and secret permissions
 PASS DNS/Caddy/TLS/routes
 PASS Tailscale SSH
 PASS UFW approved surface; public SSH allow removed
@@ -373,13 +373,13 @@ WARN Beszel 0.18.7 alert-model limitations
 ### 11.1 Telegram group target migration
 
 On 2026-07-29, the operator explicitly authorized moving both P6 Telegram
-notification paths from the prior private chat to the `monitorvpsBMO` group.
+notification paths from the prior private chat to the `monitorvpsJoy` group.
 The numeric chat identifier remains omitted from this sanitized evidence.
 
 ```text
 Telegram getChat HTTP/API validation        PASS
 Telegram chat type                          group
-Telegram chat title                         monitorvpsBMO
+Telegram chat title                         monitorvpsJoy
 Chat-ID replacement                         atomic same-directory rename
 Credential directory metadata               root:root 0700
 Token/chat file metadata                    root:root 0600 regular single-line
@@ -388,7 +388,7 @@ Direct database settings edit               none
 Beszel managed internal relay targets       1
 Relay strict delivery                       HTTP 2xx + Telegram ok=true PASS
 Hermes strict delivery                      HTTP 2xx + Telegram ok=true PASS
-[BMO BESZEL GROUP TEST] receipt              operator confirmed
+[JOY BESZEL GROUP TEST] receipt              operator confirmed
 [P6 HERMES GROUP TEST] receipt               operator confirmed
 Hermes timer/state                          enabled / active; clean
 P7                                          NOT_STARTED
@@ -396,9 +396,9 @@ Git push                                    not performed
 ```
 
 The relay rewrites only the byte-for-byte Beszel 0.18.7 built-in test payload
-to `[BMO BESZEL GROUP TEST]`. Seven near-match and ordinary payload cases prove
+to `[JOY BESZEL GROUP TEST]`. Seven near-match and ordinary payload cases prove
 that whitespace, punctuation, case, prefix, substring, and normal alert
-variations retain the existing `[BMO BESZEL]` label. The current notification
+variations retain the existing `[JOY BESZEL]` label. The current notification
 suite passes 38 tests.
 
 The deployed notifier and relay match the verified repository sources.

@@ -4,7 +4,7 @@
 
 **Current lifecycle note:** Code-only enrollment is deployed from immutable
 image source revision `d1473d04f4b76ccb52cc8eeaff52a268504310f0` as
-`bmo-p9.1:pairing-code-only-d1473d0`. Migration
+`joy-p9.1:pairing-code-only-d1473d0`. Migration
 `20260818110000_pairing_code_only_enrollment` is applied in production; state
 is `7 completed, 0 unfinished, 0 rolled_back`. Health, Mobile REST/WS smoke,
 and the six-sample soak passed. Physical firmware acceptance remains
@@ -75,7 +75,7 @@ Documentation-only corrections must say why observed code/runtime differs. Featu
 - Aliases are not canonical routes unless registered in source.
 - Device and mobile WebSockets have separate tables.
 - Every additive device event stays `PENDING_PHYSICAL_ESP` until firmware code plus physical acceptance exists.
-- Provider capability is not BMO integration evidence; credentials/session/callback and an acceptance result must be named.
+- Provider capability is not Joy integration evidence; credentials/session/callback and an acceptance result must be named.
 
 ## 5. Schema rules
 

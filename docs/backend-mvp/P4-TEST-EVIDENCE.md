@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P4 — Hermes adapter + full voice pipeline orchestration Test Evidence
 
@@ -45,7 +45,7 @@ RVC was requested by backend with `use_rvc=true`; Audio Service correctly used K
 |---|---|
 | Audio Service backend client for `/stt/transcribe` and `/tts/synthesize` | `backend/tests/audio-service-client.test.ts` |
 | Hermes `/v1/responses` default adapter | `backend/tests/hermes-client.test.ts`; real local Hermes full pipeline |
-| Runtime BMO instructions sent every request | unit test payload assertion |
+| Runtime Joy instructions sent every request | unit test payload assertion |
 | Parser does not rely on `output[0]`; ignores tool/function items | unit tests; Hermes fixture includes ignored function item |
 | `/v1/chat/completions` fallback adapter exists but is not runtime default | separate unit test only |
 | Sanitizer removes Markdown/URL/code fences, caps three sentences / 600 chars | unit tests |
@@ -54,7 +54,7 @@ RVC was requested by backend with `use_rvc=true`; Audio Service correctly used K
 | `NO_SPEECH`, `STT_FAILED`, `HERMES_FAILED`, `TTS_FAILED`, `PIPELINE_TIMEOUT`, `INTERNAL_ERROR` mapping | unit/integration tests |
 | Raw WAV → STT → Hermes → TTS → MP3 → `audio_ready` | full local fake-device pipeline |
 | WAV input cleanup | unit/integration tests |
-| Per-conversation serialization | `backend/tests/conversation-queue.test.ts`; pipeline uses `HERMES_CONVERSATION=bmo-001` |
+| Per-conversation serialization | `backend/tests/conversation-queue.test.ts`; pipeline uses `HERMES_CONVERSATION=joy-001` |
 | Public endpoint/WebSocket event/hardware contract unchanged | scope audit and docs verifier |
 
 ## 3. Real local Hermes evidence
@@ -112,7 +112,7 @@ Input fixture:
 | Fixture | `audio-service/temp/real-inference-fixtures/english.wav` |
 | WAV contract | PCM signed 16-bit little-endian, 16 kHz, mono |
 | STT duration | 4.032 s |
-| Transcript | `Hello BMO, please help me remember the meeting tomorrow.` |
+| Transcript | `Hello Joy, please help me remember the meeting tomorrow.` |
 | Detected language | `en` |
 | Language probability | `0.9942911863327026` |
 | Speech detected | `true` |
@@ -123,7 +123,7 @@ Hermes/TTS result:
 |---|---|
 | Hermes mode | `real-local` |
 | Hermes model label | `hermes-agent` |
-| Sanitized English response | `Of course, friend. What time tomorrow should BMO remind you about the meeting?` |
+| Sanitized English response | `Of course, friend. What time tomorrow should Joy remind you about the meeting?` |
 | TTS request `use_rvc` | `true` |
 | TTS engine | `kokoro` |
 | RVC applied | `false` |
@@ -156,7 +156,7 @@ Pipeline timings:
 Final MP3:
 
 ```text
-Path: D:\codex\BMO\audio-service\temp\p4-full-pipeline\pipeline-output.mp3
+Path: D:\codex\Joy\audio-service\temp\p4-full-pipeline\pipeline-output.mp3
 codec: mp3
 sample_rate: 24000
 channels: 1

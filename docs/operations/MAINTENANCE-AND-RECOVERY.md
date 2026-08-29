@@ -1,4 +1,4 @@
-# BMO VPS — Maintenance and Recovery Runbook
+# Joy VPS — Maintenance and Recovery Runbook
 
 > **SUPERSEDED FOR CURRENT P9 OPERATIONS — DO NOT EXECUTE STALE CANDIDATE STEPS**
 > This file contains valuable P6–P8 maintenance history plus candidate-era P9
@@ -7,7 +7,7 @@
 > agents must not use this file as an integration contract.
 
 **Status:** HISTORICAL P6–P8 RUNBOOK WITH SUPERSEDED P9 CANDIDATE SECTIONS
-**Owner:** `bmo-admin` / Codex when explicitly authorized  
+**Owner:** `joy-admin` / Codex when explicitly authorized  
 **Applies from:** P6 foundation onward; service-specific steps activate when the related phase is deployed.
 
 > Purpose: make routine maintenance and recovery deterministic. Do not improvise destructive fixes on the VPS. Record the state before changing it, preserve a proven Hermes installation, bootstrap it only when evidence shows it is absent, and use the latest verified deployment record as the rollback anchor.
@@ -57,7 +57,7 @@ the cadence only with evidence and must not silently remove these controls.
 - After each update: health check, login/access test, monitoring visibility, and rollback availability.
 - Preserve the current and previous known-good application images/releases. Reclaim Docker build cache/old images only after identifying them as unreferenced/disposable; do not use blind mass-prune as routine maintenance.
 
-### BMO application dependencies
+### Joy application dependencies
 
 - Dependency changes happen in Git, pass tests, merge to `main`, then deploy via immutable commit-SHA-tagged images.
 - Do not run ad-hoc `npm update`, `pip install -U`, or equivalent on the production host/container and leave that as untracked state.
@@ -118,7 +118,7 @@ Do not mark recovery complete because processes merely exist; check the service 
 | Caddy down / TLS route broken | inspect Caddy service/config/cert logs | restore last known-good Caddy config; do not expose origin ports as a shortcut |
 | Tailscale unavailable | keep/recover known-good SSH path | never lock out admin; repair Tailscale before tightening SSH again |
 | Docker daemon down | inspect daemon/disk before restart | restart Docker safely; do not delete volumes/images blindly |
-| Beszel Hub/Agent down | use SSH/system tools for diagnosis | restart verified Compose stack; monitoring outage must not affect BMO runtime |
+| Beszel Hub/Agent down | use SSH/system tools for diagnosis | restart verified Compose stack; monitoring outage must not affect Joy runtime |
 | Telegram alert broken | test notification target/credential | monitoring remains usable; replace credential only out-of-band |
 | Disk <20 GB free | stop large model/image downloads and investigate | clean only known disposable cache/log/temp artifacts; never mass-prune blindly |
 | Disk full | stop writes causing damage where safe, identify largest known paths | recover space from documented disposable files/log rotation; verify DB/filesystem before normal operation |
@@ -141,7 +141,7 @@ new VPS
 → secure admin access
 → install/verify base host tooling
 → restore Caddy/Tailscale/Docker foundation
-→ restore /opt/bmo configuration + deployment metadata
+→ restore /opt/joy configuration + deployment metadata
 → restore Beszel configuration/data as needed
 → classify Hermes as PRESENT or ABSENT from evidence
 → PRESENT: recover it through its recorded user/path/startup mechanism without cosmetic migration
@@ -221,13 +221,13 @@ ss -lntp | grep ':8642'
 # Caddy: validate persistent config before restart
 sudo caddy validate --config /etc/caddy/Caddyfile
 sudo systemctl restart caddy
-curl --fail --silent --show-error https://monitor.personalbmo.web.id/api/health
+curl --fail --silent --show-error https://monitor.personaljoy.web.id/api/health
 
 # Docker and Beszel
 sudo systemctl status docker --no-pager
-docker compose -f /opt/bmo/deploy/infra-compose.yml config -q
-docker compose -f /opt/bmo/deploy/infra-compose.yml up -d
-docker compose -f /opt/bmo/deploy/infra-compose.yml ps
+docker compose -f /opt/joy/deploy/infra-compose.yml config -q
+docker compose -f /opt/joy/deploy/infra-compose.yml up -d
+docker compose -f /opt/joy/deploy/infra-compose.yml ps
 
 # Tailscale: do not restart from the only working private SSH session
 tailscale status
@@ -238,9 +238,9 @@ sudo systemctl start bmo-backup.service
 systemctl status bmo-backup.service bmo-backup.timer --no-pager
 
 # Hermes health notifications
-sudo systemctl start bmo-hermes-health-notify.service
-systemctl status bmo-hermes-health-notify.service \
-  bmo-hermes-health-notify.timer --no-pager
+sudo systemctl start joy-hermes-health-notify.service
+systemctl status joy-hermes-health-notify.service \
+  joy-hermes-health-notify.timer --no-pager
 ```
 
 Telegram credential installation/rotation uses hidden input on the operator's
@@ -248,7 +248,7 @@ Tailscale SSH terminal. The command text, process arguments, and environment do
 not contain the token:
 
 ```bash
-sudo install -d -o root -g root -m 0700 /opt/bmo/config/telegram
+sudo install -d -o root -g root -m 0700 /opt/joy/config/telegram
 sudo bash -c '
 set -eu
 umask 077
@@ -261,18 +261,18 @@ if ! [[ "$token" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]]; then
   printf "Invalid Telegram token format\n" >/dev/tty
   exit 1
 fi
-runtime_token_file="$(mktemp /opt/bmo/config/telegram/.bot-token.XXXXXX)"
+runtime_token_file="$(mktemp /opt/joy/config/telegram/.bot-token.XXXXXX)"
 trap '\''rm -f -- "$runtime_token_file"; unset token'\'' EXIT
 printf "%s\n" "$token" >"$runtime_token_file"
 chown root:root "$runtime_token_file"
 chmod 0600 "$runtime_token_file"
-mv -f -- "$runtime_token_file" /opt/bmo/config/telegram/bot-token
+mv -f -- "$runtime_token_file" /opt/joy/config/telegram/bot-token
 trap - EXIT
 unset token
 '
 sudo stat -c '%A %U:%G %n' \
-  /opt/bmo/config/telegram \
-  /opt/bmo/config/telegram/bot-token
+  /opt/joy/config/telegram \
+  /opt/joy/config/telegram/bot-token
 ```
 
 Required metadata is directory `root:root` mode `0700` and bot-token file
@@ -294,18 +294,18 @@ if ! [[ "$chat_id" =~ ^-[0-9]+$ ]]; then
   printf "Invalid Telegram group chat ID format\n" >/dev/tty
   exit 1
 fi
-runtime_chat_file="$(mktemp /opt/bmo/config/telegram/.chat-id.XXXXXX)"
+runtime_chat_file="$(mktemp /opt/joy/config/telegram/.chat-id.XXXXXX)"
 trap '\''rm -f -- "$runtime_chat_file"; unset chat_id'\'' EXIT
 printf "%s\n" "$chat_id" >"$runtime_chat_file"
 chown root:root "$runtime_chat_file"
 chmod 0600 "$runtime_chat_file"
-mv -f -- "$runtime_chat_file" /opt/bmo/config/telegram/chat-id
+mv -f -- "$runtime_chat_file" /opt/joy/config/telegram/chat-id
 trap - EXIT
 unset chat_id
 '
 sudo stat -c '%A %U:%G %n' \
-  /opt/bmo/config/telegram \
-  /opt/bmo/config/telegram/chat-id
+  /opt/joy/config/telegram \
+  /opt/joy/config/telegram/chat-id
 ```
 
 After replacing `chat-id`, force-recreate the relay so its read-only bind mount
@@ -313,7 +313,7 @@ references the new inode. Reapply the managed Beszel target through the
 authenticated configuration helper; never edit Beszel's database directly.
 
 Beszel uses a token-free generic webhook to the private
-`bmo-telegram-relay` container. Do not switch it to the pinned Shoutrrr
+`joy-telegram-relay` container. Do not switch it to the pinned Shoutrrr
 Telegram client: that client can falsely report success for a failed Telegram
 request. The relay has no published host port and accepts delivery only after
 Telegram returns HTTP 2xx and boolean `ok=true`.
@@ -321,22 +321,22 @@ Telegram returns HTTP 2xx and boolean `ok=true`.
 After initial installation or token replacement:
 
 ```bash
-docker compose -f /opt/bmo/deploy/infra-compose.yml \
+docker compose -f /opt/joy/deploy/infra-compose.yml \
   up -d --force-recreate telegram-relay
-docker compose -f /opt/bmo/deploy/infra-compose.yml \
+docker compose -f /opt/joy/deploy/infra-compose.yml \
   ps telegram-relay
-sudo systemctl start bmo-telegram-test.service
+sudo systemctl start joy-telegram-test.service
 sudo /usr/local/libexec/bmo-configure-beszel-telegram
 systemctl status \
-  bmo-hermes-health-notify.timer \
-  bmo-telegram-test.service \
+  joy-hermes-health-notify.timer \
+  joy-telegram-test.service \
   --no-pager
 ```
 
-Confirm both the `[P6 HERMES GROUP TEST]` and `[BMO BESZEL GROUP TEST]`
+Confirm both the `[P6 HERMES GROUP TEST]` and `[JOY BESZEL GROUP TEST]`
 messages before revoking an old token or destination. The relay applies the
 group-test label only to the exact known Beszel built-in test payload; every
-other payload retains the normal `[BMO BESZEL]` label. Runtime logs and
+other payload retains the normal `[JOY BESZEL]` label. Runtime logs and
 evidence may contain only sanitized status categories; never record the token,
 chat identifier, Telegram request URL, PocketBase authorization token,
 request/response bodies, complete Shoutrrr target, or notification message
@@ -362,7 +362,7 @@ Monthly off-server workflow:
 1. Run `bmo-backup.service` and verify the newest
    `manifests/<timestamp>/SHA256SUMS`.
 2. On the VPS, create a single mode-`600` staging archive under
-   `/home/bmo-admin/` containing only the matching protected
+   `/home/joy-admin/` containing only the matching protected
    `config/<timestamp>` and `manifests/<timestamp>` directories.
 3. Copy it from the admin workstation over Tailscale SSH to an encrypted,
    access-controlled off-server destination.
@@ -396,8 +396,8 @@ above remain unchanged and are evidence for their original verification date.
 Observed on VPS : codex-cli 0.147.0 (was 0.145.0)
 Verified at     : 2026-08-11T11:33:10+07:00 Asia/Jakarta
 Upstream check  : 0.147.0 from the official @openai/codex package and Codex CLI documentation
-Update method   : user-local npm prefix /home/bmo-admin/.local
-Impact          : no BMO service restart required; production services were not recreated
+Update method   : user-local npm prefix /home/joy-admin/.local
+Impact          : no Joy service restart required; production services were not recreated
 ```
 
 ### Hermes Agent
@@ -427,7 +427,7 @@ Compatibility   : same major line; current Compose/runtime inventory remained he
 ### PostgreSQL 16 candidate
 
 ```text
-Observed on VPS : 16.14-alpine3.22, private container bmo-p9-1-postgres-1 (healthy); before update 16.10-alpine3.22
+Observed on VPS : 16.14-alpine3.22, private container joy-p9-1-postgres-1 (healthy); before update 16.10-alpine3.22
 Verified at     : 2026-08-11T17:46:38+07:00 Asia/Jakarta
 Upstream check  : PostgreSQL 16.14 official minor release
 Status          : UPDATED — controlled candidate-only recreate completed; production and unrelated databases were not touched

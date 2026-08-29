@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P8 Piper Prudence Feasibility Design
 
@@ -27,19 +27,19 @@ prompt.
 
 ## Components and data flow
 
-- `piper-candidate/bmo_piper/manifest.py` verifies exact filenames, sizes, SHA-256 values,
+- `piper-candidate/joy_piper/manifest.py` verifies exact filenames, sizes, SHA-256 values,
   model/config identity, speaker mapping, sample rate, and license metadata before
   loading the model.
-- `piper-candidate/bmo_piper/engine.py` loads the pinned CPU model and synthesizes only speaker
+- `piper-candidate/joy_piper/engine.py` loads the pinned CPU model and synthesizes only speaker
   ID `0` to a canonical request-local WAV path.
-- `piper-candidate/bmo_piper/process.py` owns the persistent worker process, request
+- `piper-candidate/joy_piper/process.py` owns the persistent worker process, request
   timeouts, bounded JSON protocol, scoped termination, and child reaping.
-- `piper-candidate/bmo_piper/audio.py` validates WAV/MP3 structure and calculates technical
-  metrics. `piper-candidate/bmo_piper/ffmpeg.py` performs the fixed mono/24 kHz/96 kbps
+- `piper-candidate/joy_piper/audio.py` validates WAV/MP3 structure and calculates technical
+  metrics. `piper-candidate/joy_piper/ffmpeg.py` performs the fixed mono/24 kHz/96 kbps
   conversion with timeout and process-tree cleanup.
-- `piper-candidate/bmo_piper/benchmark.py` runs cold processes, one loaded warm process, the
+- `piper-candidate/joy_piper/benchmark.py` runs cold processes, one loaded warm process, the
   canonical phrase matrix, 20-request stability, and machine-readable measurement.
-- `piper-candidate/bmo_piper/host_monitor.py` runs on the host, watches production and safety
+- `piper-candidate/joy_piper/host_monitor.py` runs on the host, watches production and safety
   thresholds, and terminates only the named candidate on a stop condition.
 
 The primary path is:

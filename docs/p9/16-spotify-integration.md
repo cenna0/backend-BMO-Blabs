@@ -13,17 +13,17 @@ candidate image is built
 
 The Backend is the confidential Spotify OAuth client, credential owner,
 refresh authority, provider adapter, and Spotify Connect action executor.
-Mobile calls authenticated BMO routes; Hermes may request only a validated
+Mobile calls authenticated Joy routes; Hermes may request only a validated
 semantic action. Neither component receives a Spotify access token, refresh
 token, client secret, provider URL, endpoint, or raw provider response.
 
 Spotify audio remains on the user's Spotify device. It never routes through the
-BMO speaker, Audio Service, Piper, or the device proactive-audio path.
+Joy speaker, Audio Service, Piper, or the device proactive-audio path.
 
 ## Exact scopes
 
 - `user-read-private`: read the Spotify current-user `account_id` and account
-  market. `account_id` is the canonical BMO↔Spotify link; Spotify `id` is
+  market. `account_id` is the canonical Joy↔Spotify link; Spotify `id` is
   retained only as non-canonical server-side profile metadata.
 - `user-read-playback-state`: list devices and read current playback.
 - `user-modify-playback-state`: play, pause, skip, seek, volume, shuffle,
@@ -44,12 +44,12 @@ file in candidate/runtime configuration.
 The current-user profile's immutable `account_id` is the only durable Spotify
 account-linking identity. The profile `id` may be stored as
 `spotifyProfileId` for provider metadata and diagnostics, but it cannot select
-or authorize a BMO account. Both identity fields remain server-side and are
+or authorize a Joy account. Both identity fields remain server-side and are
 never bearer credentials, Mobile response fields, Hermes inputs, or log data.
 
 The callback rejects a profile that has no `account_id`; it never falls back to
 `id`. A repeated authorization with the same `account_id` updates the existing
-BMO user's credential, while an account already linked to another BMO user is
+Joy user's credential, while an account already linked to another Joy user is
 rejected. Disconnect and reconnect wipe or replace the server-side identity
 metadata together with the credential lifecycle state.
 
@@ -65,7 +65,7 @@ atomically, while an omitted replacement preserves the existing ciphertext.
 `POST /api/v1/integrations/spotify/connect` returns only an authorization URL.
 The state is 32 random bytes represented as a URL-safe hex value; only its
 SHA-256 verifier is persisted in `OAuthState`. It is tied to the authenticated
-BMO user, exact configured redirect URI, ten-minute expiry, and single-use
+Joy user, exact configured redirect URI, ten-minute expiry, and single-use
 claim. The callback does not trust a Mobile bearer token. It derives ownership
 only from validated state and never logs the callback code or provider token
 response.
@@ -94,6 +94,6 @@ not require popularity ranking. Device selection is explicit requested device,
 valid preferred device, active device, then typed `NO_ACTIVE_DEVICE`. A missing
 device never returns a fake success. Playback-control 403 is projected as
 `PREMIUM_REQUIRED`; 401/`invalid_grant`, 429, timeout, and 5xx outcomes are
-projected as stable BMO-safe errors without provider bodies.
+projected as stable Joy-safe errors without provider bodies.
 
 `QUEUE` and arbitrary Spotify proxying are outside Phase 2.6.

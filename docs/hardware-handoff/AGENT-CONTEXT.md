@@ -1,4 +1,4 @@
-# BMO Hardware / ESP Agent Context
+# Joy Hardware / ESP Agent Context
 
 > **CURRENT ENTRYPOINT**
 > Start with
@@ -33,6 +33,11 @@ device_log
 device_telemetry
 device_settings_applied
 pairing_mode_request
+voice_reserve
+voice_cancel
+proactive_offer_accepted
+proactive_done
+proactive_failed
 ```
 
 Backend → ESP:
@@ -48,9 +53,17 @@ wifi_configuration
 device_settings
 pairing_code
 pairing_completed
+voice_reserve_accepted
+voice_reserve_rejected
+voice_reserve_expired
+proactive_offer
+proactive_audio_ready
+proactive_cancel
+display_qr
+clear_qr
 ```
 
-Wi-Fi/log/telemetry/settings schemas exist in Backend source, but physical
+Wi-Fi/log/telemetry/settings and proactive-delivery schemas exist in Backend source, but physical
 support remains `PENDING_PHYSICAL_ESP`. Pairing is Backend-deployed but remains
 `PENDING_PHYSICAL_ESP` for firmware and real-device acceptance.
 

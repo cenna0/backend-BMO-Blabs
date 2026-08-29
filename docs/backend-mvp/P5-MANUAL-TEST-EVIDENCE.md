@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P5 Manual Test Evidence
 
@@ -23,11 +23,11 @@
 Command yang dipakai:
 
 ```powershell
-npm run build                         # D:\codex\BMO\backend
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\BMO\manual-validation\start-backend-real.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\BMO\manual-validation\start-backend-hardware.ps1
+npm run build                         # D:\codex\Joy\backend
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\Joy\manual-validation\start-backend-real.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\Joy\manual-validation\start-backend-hardware.ps1
 .\.venv\Scripts\python.exe -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8001
-npm run hermes-fixture                # D:\codex\BMO\backend
+npm run hermes-fixture                # D:\codex\Joy\backend
 ```
 
 ### Real Audio Service
@@ -78,7 +78,7 @@ Observed sequence:
 6. Download MP3: HTTP `200`, `Content-Type: audio/mpeg`, 62,541 bytes.
 7. Salinan listenable disimpan di:
 
-   `D:\codex\BMO\manual-validation\audio\happy-path-english-real-audio-service.mp3`
+   `D:\codex\Joy\manual-validation\audio\happy-path-english-real-audio-service.mp3`
 
 8. `audio_playback_done` terkirim.
 9. Backend log: `speech_detected:true`, `language:"en"`, `rvc_applied:false`, `tts_engine:"kokoro"`, total `11,130 ms`.
@@ -102,7 +102,7 @@ Follow-up upload `202` setelah cleanup dibuktikan oleh hardware matrix berikutny
 
 Tambahan direct TTS real tersimpan di:
 
-`D:\codex\BMO\manual-validation\audio\audio-service-real-kokoro.mp3`
+`D:\codex\Joy\manual-validation\audio\audio-service-real-kokoro.mp3`
 
 Ukuran 38,061 bytes; ffprobe `mp3`, 24 kHz, mono, 96 kbps, durasi `3.075000` s.
 
@@ -112,9 +112,9 @@ Endpoint: `POST http://127.0.0.1:8001/stt/transcribe`, token internal valid, HTT
 
 | Sample | speech | language | Text/result |
 |---|---:|---|---|
-| English | true | `en` | `Hello BMO, please help me remember the meeting tomorrow.` |
-| Indonesian | true | `id` | `Halo BMO, tolong bantu aku mengingat jadwal hari ini.` |
-| Mixed Indonesian-English | true | `id` | `BMO, tolong remin aku about the meeting tomorrow.` |
+| English | true | `en` | `Hello Joy, please help me remember the meeting tomorrow.` |
+| Indonesian | true | `id` | `Halo Joy, tolong bantu aku mengingat jadwal hari ini.` |
+| Mixed Indonesian-English | true | `id` | `Joy, tolong remin aku about the meeting tomorrow.` |
 | Silence | false | `null` | empty text |
 | Noise | false | `null` | empty text |
 
@@ -125,10 +125,10 @@ Ini bukti STT real saja. Tidak berarti backend pipeline untuk silence/noise akan
 Runner manual:
 
 ```powershell
-node D:\codex\BMO\manual-validation\manual-client.mjs sample-matrix
+node D:\codex\Joy\manual-validation\manual-client.mjs sample-matrix
 ```
 
-Untuk English, Indonesian, mixed, silence, dan noise: upload `202`, `display_status: thinking`, `audio_ready`, download `200 audio/mpeg` 4,077 bytes, lalu setelah `audio_playback_done` GET audio menjadi `404`. Salinan dummy MP3 ada di `D:\codex\BMO\manual-validation\audio\hardware-*-rerun.mp3`.
+Untuk English, Indonesian, mixed, silence, dan noise: upload `202`, `display_status: thinking`, `audio_ready`, download `200 audio/mpeg` 4,077 bytes, lalu setelah `audio_playback_done` GET audio menjadi `404`. Salinan dummy MP3 ada di `D:\codex\Joy\manual-validation\audio\hardware-*-rerun.mp3`.
 
 Interpretasi: validasi HTTP/WSS, state, cleanup, dan no-busy lifecycle. Audio hasil adalah dummy fixture; sample content tidak diproses STT dalam mode ini.
 
@@ -199,7 +199,7 @@ Tanggal: 2026-07-25.
 - Proses Hermes lokal; inferensi model memakai provider OpenAI Codex melalui internet.
 - Direct `/v1/responses`: ID `resp_5fdb141901504081b8705aa812ba`, bukan signature fixture; output `Two plus two is 4!`; durasi 22.843 detik.
 - Full pipeline teknis final request `e70f20c3-48c2-4537-a92f-ddaa9f184c1e`: upload HTTP `202`, `display_status:thinking`, reconnect state `thinking`, lalu `audio_ready`.
-- MP3 Kokoro real: `D:\codex\BMO\manual-validation\audio\reconnect-thinking-english.mp3`.
+- MP3 Kokoro real: `D:\codex\Joy\manual-validation\audio\reconnect-thinking-english.mp3`.
 - ffprobe: codec MP3, 24 kHz, mono, 96 kbps stream, durasi 3.625958 detik.
 - Setelah `audio_playback_done`: URL temporary backend HTTP `404`; WebSocket auth melaporkan `backend_state:"idle"` dan `active_request_id:null`.
 - Audio Service: `stt_loaded:true`, `kokoro_loaded:true`, `rvc_available:false`.

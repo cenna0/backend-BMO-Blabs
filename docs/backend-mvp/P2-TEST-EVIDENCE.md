@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P2 — Audio Service bootstrap + faster-whisper STT Evidence
 
@@ -53,9 +53,9 @@ All fixtures were WAV PCM signed 16-bit little-endian, 16 kHz, mono. Speech fixt
 
 | Fixture | Duration | Transcript | Detected language | Language probability | Speech detected | Inference duration | Peak RSS | Result |
 |---|---:|---|---|---:|---|---:|---:|---|
-| `english.wav` | 4.032s | `Hello BMO, please help me remember the meeting tomorrow.` | `en` | 0.9942911863327026 | true | 6.305s | 608079872 | PASS |
-| `indonesian.wav` | 5.184s | `Halo BMO, tolong bantu aku mengingat jadwal hari ini.` | `id` | 0.8635951280593872 | true | 5.802s | 610783232 | PASS |
-| `mixed.wav` | 4.920s | `BMO, tolong remin aku about the meeting tomorrow.` | `id` | 0.8430900573730469 | true | 5.789s | 611401728 | PASS |
+| `english.wav` | 4.032s | `Hello Joy, please help me remember the meeting tomorrow.` | `en` | 0.9942911863327026 | true | 6.305s | 608079872 | PASS |
+| `indonesian.wav` | 5.184s | `Halo Joy, tolong bantu aku mengingat jadwal hari ini.` | `id` | 0.8635951280593872 | true | 5.802s | 610783232 | PASS |
+| `mixed.wav` | 4.920s | `Joy, tolong remin aku about the meeting tomorrow.` | `id` | 0.8430900573730469 | true | 5.789s | 611401728 | PASS |
 | `silence.wav` | 2.000s | `` | — | 0.0 | false | 2.648s | 608440320 | PASS |
 | `noise.wav` | 2.000s | `` | — | 0.0 | false | 2.643s | 608358400 | PASS |
 

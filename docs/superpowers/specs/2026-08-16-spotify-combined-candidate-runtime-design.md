@@ -12,13 +12,13 @@ WhatsApp identity-resolver composition or changing any runtime state.
 The persistent Compose environment path is:
 
 ```text
-/opt/bmo/config/p9.1/compose.env
+/opt/joy/config/p9.1/compose.env
 ```
 
 It is seeded later, only by an operator-authorized `install` command from the
-existing `/tmp/bmo-p9-1-validation-20260804/compose.env`. The target directory
-is `bmo-admin:bmo-admin` mode `0700`; the file is
-`bmo-admin:bmo-admin` mode `0600`. The repository never stores the file.
+existing `/tmp/joy-p9-1-validation-20260804/compose.env`. The target directory
+is `joy-admin:joy-admin` mode `0700`; the file is
+`joy-admin:joy-admin` mode `0600`. The repository never stores the file.
 
 ## Compose matrix
 

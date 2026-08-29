@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P5-MANUAL-VALIDATION
 
@@ -36,7 +36,7 @@ Prasyarat: Node.js 22, `backend\node_modules`, `audio-service\.venv`, model cach
 Terminal 1:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\BMO\manual-validation\start-audio-real.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\Joy\manual-validation\start-audio-real.ps1
 ```
 
 Startup lokal UAT menetapkan `KOKORO_SPEED=0.80`. Default production tidak diubah.
@@ -46,7 +46,7 @@ Startup lokal UAT menetapkan `KOKORO_SPEED=0.80`. Default production tidak diuba
 Terminal 2:
 
 ```powershell
-cd D:\codex\BMO\backend
+cd D:\codex\Joy\backend
 $env:HERMES_FIXTURE_HOST='127.0.0.1'
 $env:HERMES_FIXTURE_PORT='8642'
 $env:HERMES_FIXTURE_API_KEY='local-hermes-key'
@@ -58,7 +58,7 @@ npm run hermes-fixture
 Terminal 3:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\BMO\manual-validation\start-backend-real.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\Joy\manual-validation\start-backend-real.ps1
 ```
 
 Script tersebut hanya memakai credential test lokal, `HARDWARE_TEST_MODE=false`, dan bind `127.0.0.1`.
@@ -68,7 +68,7 @@ Script tersebut hanya memakai credential test lokal, `HARDWARE_TEST_MODE=false`,
 Stop backend real, lalu jalankan:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\BMO\manual-validation\start-backend-hardware.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:\codex\Joy\manual-validation\start-backend-hardware.ps1
 ```
 
 Endpoint laptop lokal hardware mode:
@@ -102,24 +102,24 @@ Hardware mode memakai `backend\tests\fixtures\test-response.mp3`; STT, Hermes, K
 ## Sample input
 
 ```text
-D:\codex\BMO\audio-service\temp\real-inference-fixtures\english.wav
-D:\codex\BMO\audio-service\temp\real-inference-fixtures\indonesian.wav
-D:\codex\BMO\audio-service\temp\real-inference-fixtures\mixed.wav
-D:\codex\BMO\audio-service\temp\real-inference-fixtures\silence.wav
-D:\codex\BMO\audio-service\temp\real-inference-fixtures\noise.wav
+D:\codex\Joy\audio-service\temp\real-inference-fixtures\english.wav
+D:\codex\Joy\audio-service\temp\real-inference-fixtures\indonesian.wav
+D:\codex\Joy\audio-service\temp\real-inference-fixtures\mixed.wav
+D:\codex\Joy\audio-service\temp\real-inference-fixtures\silence.wav
+D:\codex\Joy\audio-service\temp\real-inference-fixtures\noise.wav
 ```
 
 Runner manual API/WebSocket:
 
 ```powershell
-node D:\codex\BMO\manual-validation\manual-client.mjs negative-only
-node D:\codex\BMO\manual-validation\manual-client.mjs sample-matrix
-node D:\codex\BMO\manual-validation\manual-client.mjs duplicate-only
-node D:\codex\BMO\manual-validation\manual-client.mjs conflict-only
-node D:\codex\BMO\manual-validation\manual-client.mjs reconnect-audio-only
-node D:\codex\BMO\manual-validation\manual-client.mjs playback-failed-only
-node D:\codex\BMO\manual-validation\manual-client.mjs expired-only
-node D:\codex\BMO\manual-validation\manual-client.mjs real-reconnect-thinking
+node D:\codex\Joy\manual-validation\manual-client.mjs negative-only
+node D:\codex\Joy\manual-validation\manual-client.mjs sample-matrix
+node D:\codex\Joy\manual-validation\manual-client.mjs duplicate-only
+node D:\codex\Joy\manual-validation\manual-client.mjs conflict-only
+node D:\codex\Joy\manual-validation\manual-client.mjs reconnect-audio-only
+node D:\codex\Joy\manual-validation\manual-client.mjs playback-failed-only
+node D:\codex\Joy\manual-validation\manual-client.mjs expired-only
+node D:\codex\Joy\manual-validation\manual-client.mjs real-reconnect-thinking
 ```
 
 Runner ini bukan test runner; ia mengirim request nyata ke service yang sedang hidup dan mencetak event/status yang diamati.

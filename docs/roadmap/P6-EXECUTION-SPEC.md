@@ -1,5 +1,5 @@
 > **HISTORICAL ONLY — DO NOT IMPLEMENT**
-> This document records an earlier BMO checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
+> This document records an earlier Joy checkpoint. Current production authority is `docs/README.md`, `docs/NEXT-ACTION.md`, `docs/backend-mvp/CURRENT-RUNTIME-CONFIG.md`, and `docs/operations/2026-08-24-piper-only-purge-evidence.md`.
 
 # P6 — VPS Foundation and Operations Baseline — Execution Spec
 
@@ -11,7 +11,7 @@
 
 ## 1. Goal
 
-Create a safe, maintainable and repeatable VPS foundation for BMO without yet deploying or claiming the public BMO voice API as ready.
+Create a safe, maintainable and repeatable VPS foundation for Joy without yet deploying or claiming the public Joy voice API as ready.
 
 P6 is successful when later phases can deploy application services into a known filesystem/network/security/monitoring/backup baseline without guessing host state. This includes a healthy loopback-only Hermes host API whether preflight found an existing installation or no Hermes installation at all.
 
@@ -21,16 +21,16 @@ Known project decisions:
 
 ```text
 Domain                    : personalbmo.web.id
-API hostname              : api.personalbmo.web.id
-Monitoring hostname       : monitor.personalbmo.web.id
+API hostname              : api.personaljoy.web.id
+Monitoring hostname       : monitor.personaljoy.web.id
 Production Git branch     : main
-Deployment root           : /opt/bmo
+Deployment root           : /opt/joy
 Reverse proxy             : Caddy as host system service
 Monitoring                : Beszel
 Admin private network     : Tailscale
 Alert destination         : Telegram
 Portainer                 : skipped
-Infrastructure Compose    : /opt/bmo/deploy/infra-compose.yml (Beszel Hub + local Agent and later infra-only containers)
+Infrastructure Compose    : /opt/joy/deploy/infra-compose.yml (Beszel Hub + local Agent and later infra-only containers)
 Runtime packaging         : Docker images + Docker Compose
 ```
 
@@ -42,7 +42,7 @@ Do not during P6:
 
 - deploy backend/audio service as a verified production API;
 - modify backend/audio application source code merely to satisfy P6; P7 owns source-vs-doc audit and any application correction needed for deployment;
-- mark `api.personalbmo.web.id` hardware-ready;
+- mark `api.personaljoy.web.id` hardware-ready;
 - implement PostgreSQL/Prisma application data layer;
 - perform real RVC integration;
 - modify firmware or public HW/backend contract;
@@ -80,7 +80,7 @@ Inspect without modifying:
 - existing containers/images/volumes/networks if Docker exists;
 - Caddy/Tailscale/Beszel presence;
 - firewall implementation/rules;
-- DNS resolution for `api.personalbmo.web.id` and `monitor.personalbmo.web.id`;
+- DNS resolution for `api.personaljoy.web.id` and `monitor.personaljoy.web.id`;
 - Git remote/branch/status of the current project checkout if available; determine whether the remote is public/private and whether existing SSH/deploy-key authentication is already usable;
 - disk headroom.
 
@@ -90,7 +90,7 @@ Guardrail:
 free disk < 20 GB → BLOCK large image/model/runtime downloads and report
 ```
 
-Output: sanitized preflight evidence and a conflict list (if any). If the repository is private and no working non-interactive Git credential/deploy key exists for `bmo-admin`, stop and request that credential rather than inventing or embedding a personal token.
+Output: sanitized preflight evidence and a conflict list (if any). If the repository is private and no working non-interactive Git credential/deploy key exists for `joy-admin`, stop and request that credential rather than inventing or embedding a personal token.
 
 Classify Hermes deterministically before any installation:
 
@@ -107,24 +107,24 @@ Target:
 
 ```text
 root      → emergency/system administration
-bmo-admin → daily SSH, Codex, Git/deploy, Docker operations, sudo when needed
+joy-admin → daily SSH, Codex, Git/deploy, Docker operations, sudo when needed
 Hermes    → keep proven ownership when present; select ownership from the actual install/runtime model when absent
 ```
 
 Requirements:
 
-- create `bmo-admin` only if it does not already exist;
+- create `joy-admin` only if it does not already exist;
 - configure SSH key access before depending on the account;
 - least privilege where practical;
-- if `bmo-admin` joins the Docker group, document that Docker-group access is effectively root-equivalent;
+- if `joy-admin` joins the Docker group, document that Docker-group access is effectively root-equivalent;
 - do not delete the existing working admin account during P6;
 - do not migrate a present Hermes user/path for cleanliness;
 - do not invent a dedicated Hermes Linux user when the selected installation/runtime model does not require one.
 
 Acceptance:
 
-- a fresh `bmo-admin` session can log in and perform authorized admin/deploy tasks;
-- Codex is usable from the `bmo-admin` account through a supported authentication/config path; do not copy another user's credentials blindly;
+- a fresh `joy-admin` session can log in and perform authorized admin/deploy tasks;
+- Codex is usable from the `joy-admin` account through a supported authentication/config path; do not copy another user's credentials blindly;
 - root login is not required for normal operation;
 - a present Hermes installation still runs under its preflight-proven ownership;
 - an absent-then-bootstrapped Hermes installation runs under the ownership selected from its actual installation/runtime requirements, with that decision recorded.
@@ -163,12 +163,12 @@ recovery/start procedure is documented
 
 Do not put active Hermes credentials in Git, docs, logs, command transcripts, or evidence. P7 performs backend/audio → Hermes integration; it does not perform initial Hermes installation.
 
-## 6. Task 2 — `/opt/bmo` filesystem and permission baseline
+## 6. Task 2 — `/opt/joy` filesystem and permission baseline
 
 Create/verify:
 
 ```text
-/opt/bmo/
+/opt/joy/
 ├── app/
 ├── config/
 │   └── caddy/
@@ -195,9 +195,9 @@ Create/verify:
 
 Rules:
 
-- `/opt/bmo/app` is Git/deployment source managed by `bmo-admin`;
-- secret env files are outside Git; baseline owner is `bmo-admin:bmo-admin` with mode `600` so the authorized deploy operator can read them without making them group/world-readable. If P6 chooses a stricter root-owned scheme, the exact `sudo` deploy workflow must be proven and documented;
-- Caddy must not depend on reading secret `.env` files. Keep the recoverable Caddy source under `/opt/bmo/config/caddy/`, then deploy the effective runtime file with explicit Caddy-readable ownership/permissions (baseline `/etc/caddy/Caddyfile`, `root:caddy`, mode `640`) or document/prove an equivalent safe layout;
+- `/opt/joy/app` is Git/deployment source managed by `joy-admin`;
+- secret env files are outside Git; baseline owner is `joy-admin:joy-admin` with mode `600` so the authorized deploy operator can read them without making them group/world-readable. If P6 chooses a stricter root-owned scheme, the exact `sudo` deploy workflow must be proven and documented;
+- Caddy must not depend on reading secret `.env` files. Keep the recoverable Caddy source under `/opt/joy/config/caddy/`, then deploy the effective runtime file with explicit Caddy-readable ownership/permissions (baseline `/etc/caddy/Caddyfile`, `root:caddy`, mode `640`) or document/prove an equivalent safe layout;
 - persistent data/models are not placed inside the Git checkout;
 - runtime model mounts are read-only where possible;
 - service-specific writable directories use the UID/GID required by that service;
@@ -205,25 +205,25 @@ Rules:
 
 ## 6.1 Task 2A — Production Git checkout baseline
 
-Establish `/opt/bmo/app` as the production source checkout without deploying the application yet.
+Establish `/opt/joy/app` as the production source checkout without deploying the application yet.
 
 Rules:
 
 - discover and reuse the actual project Git remote from the current repository/workspace when available; do not invent a repository URL;
 - production source of truth is branch `main`;
-- clone/fetch as `bmo-admin` into `/opt/bmo/app`; if the directory is non-empty, inspect it first and never overwrite unknown files;
-- use a working SSH deploy key/account credential appropriate for `bmo-admin`; never place a personal access token in Git remote URLs, docs, shell history, or evidence;
+- clone/fetch as `joy-admin` into `/opt/joy/app`; if the directory is non-empty, inspect it first and never overwrite unknown files;
+- use a working SSH deploy key/account credential appropriate for `joy-admin`; never place a personal access token in Git remote URLs, docs, shell history, or evidence;
 - verify `origin`, `main`, current commit SHA, clean working tree, and ability to `git fetch` without changing production state;
-- P6 does **not** build/start the BMO backend/audio application from this checkout; application images/deployment begin in P7;
+- P6 does **not** build/start the Joy backend/audio application from this checkout; application images/deployment begin in P7;
 - record the remote in sanitized form, branch, and commit SHA in P6 evidence.
 
 Acceptance:
 
 ```text
-/opt/bmo/app is a valid Git checkout
+/opt/joy/app is a valid Git checkout
 origin points to the approved project repository
 main is available and selected as production source
-bmo-admin can fetch safely
+joy-admin can fetch safely
 working tree is clean or any intentional local state is documented/blocking
 no credential is embedded in the remote URL or evidence
 ```
@@ -278,11 +278,11 @@ Validate DNS first.
 Target names:
 
 ```text
-api.personalbmo.web.id
-monitor.personalbmo.web.id
+api.personaljoy.web.id
+monitor.personaljoy.web.id
 ```
 
-Set up Caddy as a **host system service** so it can reach loopback-only origins cleanly and remain separate from the application Compose lifecycle. Keep its effective config recoverable under `/opt/bmo/config/caddy/` (or a documented symlink/source-of-truth arrangement) and record the exact runtime path.
+Set up Caddy as a **host system service** so it can reach loopback-only origins cleanly and remain separate from the application Compose lifecycle. Keep its effective config recoverable under `/opt/joy/config/caddy/` (or a documented symlink/source-of-truth arrangement) and record the exact runtime path.
 
 P6 requirements:
 
@@ -290,7 +290,7 @@ P6 requirements:
 - valid HTTPS/TLS certificate path works for both the monitoring hostname and API hostname; the API hostname may return a deliberate P6 placeholder until P7;
 - HTTP redirects to HTTPS;
 - Caddy config is stored/recoverable and does not contain secrets unnecessarily;
-- API hostname may be reserved/prepared but must not be documented as BMO API `VERIFIED` until P7 E2E passes;
+- API hostname may be reserved/prepared but must not be documented as Joy API `VERIFIED` until P7 E2E passes;
 - do not expose backend/audio/Hermes origin ports publicly.
 
 ## 10. Task 6 — Firewall transition
@@ -324,12 +324,12 @@ Explicitly verify that no public `:8642` exposure exists after the firewall tran
 
 ## 11. Task 7 — Beszel monitoring + Telegram alerting
 
-Deploy/configure Beszel **Hub + local Agent** using the pinned/tested release selected during P6. Keep persistent Hub/Agent data under `/opt/bmo/data/beszel` (or documented subpaths) and use `/opt/bmo/deploy/infra-compose.yml` as the long-term source of truth. Prefer the supported local Unix-socket Hub↔Agent pattern when compatible with the selected release; otherwise use an explicitly private/local Agent listener. The Agent may read `/var/run/docker.sock` read-only for container telemetry. Never expose the Agent listener or Docker socket publicly.
+Deploy/configure Beszel **Hub + local Agent** using the pinned/tested release selected during P6. Keep persistent Hub/Agent data under `/opt/joy/data/beszel` (or documented subpaths) and use `/opt/joy/deploy/infra-compose.yml` as the long-term source of truth. Prefer the supported local Unix-socket Hub↔Agent pattern when compatible with the selected release; otherwise use an explicitly private/local Agent listener. The Agent may read `/var/run/docker.sock` read-only for container telemetry. Never expose the Agent listener or Docker socket publicly.
 
 Target access:
 
 ```text
-https://monitor.personalbmo.web.id
+https://monitor.personaljoy.web.id
 ```
 
 Requirements:
@@ -436,11 +436,11 @@ Hermes listener is 127.0.0.1:8642 only; no public :8642 exposure
 Hermes actual runtime user, install/config/data paths, and startup/service mechanism recorded
 Hermes restart behavior verified; reboot behavior verified where safely possible or the deferral recorded
 Hermes recovery/start procedure documented
-bmo-admin login/admin path works
+joy-admin login/admin path works
 Tailscale admin SSH works
 Docker/Compose works
-/opt/bmo ownership/permissions correct
-/opt/bmo/app is approved `main` checkout; origin/fetch/clean-state verified under bmo-admin
+/opt/joy ownership/permissions correct
+/opt/joy/app is approved `main` checkout; origin/fetch/clean-state verified under joy-admin
 real secret files absent from Git
 Caddy HTTPS works where configured
 firewall public surface matches approved design
@@ -467,7 +467,7 @@ Hermes PRESENT/ABSENT classification + selected branch
 Hermes runtime user, install/config/data paths, startup/service mechanism, listener, health, restart/reboot, and recovery evidence
 filesystem tree + permissions
 installed/verified versions + pinned infra image tags/digests
-Codex-under-bmo-admin verification
+Codex-under-joy-admin verification
 DNS/TLS result
 Tailscale/SSH result
 firewall before/after summary
@@ -497,10 +497,10 @@ P6 is `VERIFIED` only if:
 - [x] firewall/listener evidence proves no public `:8642` exposure;
 - [x] Hermes restart behavior is verified, automatic startup is configured, and safe reboot evidence or an explicit reboot deferral is recorded;
 - [x] the actual Hermes recovery/start procedure is documented;
-- [x] `bmo-admin` is operational and Codex can run there without copying/exposing another account's secret config;
+- [x] `joy-admin` is operational and Codex can run there without copying/exposing another account's secret config;
 - [x] Docker Engine + Compose are healthy;
-- [x] `/opt/bmo` layout and permissions are verified;
-- [x] `/opt/bmo/app` is the approved clean `main` Git checkout, with `origin` and fetch access verified under `bmo-admin` and no credential embedded in the remote/evidence;
+- [x] `/opt/joy` layout and permissions are verified;
+- [x] `/opt/joy/app` is the approved clean `main` Git checkout, with `origin` and fetch access verified under `joy-admin` and no credential embedded in the remote/evidence;
 - [x] runtime secrets are outside Git with restricted permissions;
 - [x] Tailscale admin SSH is proven before any public SSH restriction;
 - [x] Caddy/TLS foundation works;
